@@ -1062,6 +1062,7 @@
               <div class="sh-desc" data-i18n="sh.users_desc">Manage inspector and admin accounts, roles and permissions.</div>
             </div>
             <div class="sh-actions">
+              <button class="btn btn-sm" id="invite-member-btn" data-action="uaOpenInvite">+ Invite member</button>
               <button class="btn btn-primary btn-sm" id="add-user-btn" data-action="uaOpenForm" data-args="null" data-i18n="ua.btn.add">+ Add user</button>
             </div>
           </div>
@@ -1083,6 +1084,38 @@
             <div class="stat-tile amber">
               <div class="stat-label" data-i18n="ua.stat.last_login">Last login</div>
               <div class="stat-val" style="font-size:14px;margin-top:4px" id="ua-stat-last">—</div>
+            </div>
+          </div>
+
+          <!-- Invite member (Supabase pending_invites) -->
+          <div id="ua-invite-wrap" style="display:none">
+            <div class="form-panel">
+              <div class="form-panel-head">
+                <span class="form-panel-title">Invite member</span>
+                <button class="btn btn-sm" data-action="uaCloseInvite">✕ Cancel</button>
+              </div>
+              <div class="form-panel-body">
+                <div class="fld" style="margin-bottom:12px;color:var(--t3);font-size:12px;line-height:1.5">
+                  No email is sent. The invitee signs up at this app's URL with the email below and auto-joins your org with the chosen role.
+                </div>
+                <div class="fg form-row">
+                  <div class="fld"><label>Email *</label><input id="ua-invite-email" type="email" placeholder="colleague@company.com" autocomplete="off"/></div>
+                  <div class="fld">
+                    <label>Role</label>
+                    <select id="ua-invite-role">
+                      <option value="inspector">Inspector</option>
+                      <option value="senior">Senior Inspector</option>
+                      <option value="admin">Admin</option>
+                      <option value="observer">Observer (read-only)</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+                  <button class="btn" data-action="uaCloseInvite">Cancel</button>
+                  <button class="btn btn-primary" id="ua-invite-submit" data-action="uaSubmitInvite">Send invite</button>
+                </div>
+                <div id="ua-invite-pending" style="margin-top:14px"></div>
+              </div>
             </div>
           </div>
 

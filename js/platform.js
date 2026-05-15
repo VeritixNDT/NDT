@@ -1266,16 +1266,16 @@ async function vxDoSignup() {
   // Successful signup — auto-login. Some backends return a token immediately;
   // if not, perform a follow-up login.
   if(r.data?.accessToken) {
+    // role is intentionally NOT set here — _vxApplySupabaseSession (called
+    // inside vxApi.register) already stashed the server-trusted role from
+    // org_members. Stomping it with a hardcoded 'admin' breaks invited
+    // members (who join as inspector/senior/observer via pending_invites).
     vxPlatformSet({
       accessToken: r.data.accessToken,
       refreshToken: r.data.refreshToken || null,
       tokenExpiry:  r.data.expiresAt   || null,
       userId:       r.data.user?.id    || null,
       orgId:        r.data.org?.id     || null,
-      // Creator is always admin per the orgs_add_creator_as_admin trigger
-      // in 0001_init.sql. Stash so vxIsAdmin() resolves before the next
-      // boot refetches membership.
-      role:         'admin',
       // V14: server returns email_verified; default to false on signup so the
       // banner appears until they click the link from the welcome email.
       emailVerified: !!r.data.user?.email_verified,
@@ -2058,24 +2058,40 @@ var vxApi = {
           error: null,
         };
       }
-      // Session live → provision the org now. Trigger orgs_add_creator_as_admin
-      // bootstraps the org_members row in the same transaction.
+      // Session live → resolve org membership. _vxApplySupabaseSession does
+      // both halves: if the user has an existing org_members row (e.g. they
+      // just claimed a pending_invites entry via the auth.users trigger), it
+      // uses that; otherwise it creates a fresh org and the orgs_add_creator_as_admin
+      // trigger inserts the membership. Either way, cfg.orgId + cfg.role are
+      // server-trusted after this awaits.
       await _vxApplySupabaseSession(session);
-      var orgInsert = await sb.from('orgs')
-        .insert({
-          name: payload.company || (payload.name ? (payload.name + "'s team") : 'New team'),
-          created_by: session.user.id,
-          plan_tier: 'trial',
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .select('id, name, plan_tier, trial_ends_at')
-        .single();
+      var cfg = vxPlatformConfig();
       var newOrg = null;
-      if(!orgInsert.error && orgInsert.data){
-        newOrg = orgInsert.data;
-        vxPlatformSet({ orgId: newOrg.id });
+      if(cfg.orgId){
+        var orgFetch = await sb.from('orgs')
+          .select('id, name, plan_tier, trial_ends_at')
+          .eq('id', cfg.orgId)
+          .maybeSingle();
+        if(!orgFetch.error && orgFetch.data) newOrg = orgFetch.data;
       } else {
-        console.warn('vx: org provisioning failed', orgInsert.error);
+        // Fallback: reconciliation failed inside _vxApplySupabaseSession.
+        // Try once more here so the signup doesn't return a half-provisioned
+        // session. Logs the original error for diagnostics.
+        var orgInsert = await sb.from('orgs')
+          .insert({
+            name: payload.company || (payload.name ? (payload.name + "'s team") : 'New team'),
+            created_by: session.user.id,
+            plan_tier: 'trial',
+            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .select('id, name, plan_tier, trial_ends_at')
+          .single();
+        if(!orgInsert.error && orgInsert.data){
+          newOrg = orgInsert.data;
+          vxPlatformSet({ orgId: newOrg.id, role: 'admin' });
+        } else {
+          console.warn('vx: org provisioning fallback failed', orgInsert.error);
+        }
       }
       return {
         ok: true,
@@ -2087,7 +2103,7 @@ var vxApi = {
           user: {
             id:    session.user.id,
             email: session.user.email,
-            role:  'Admin',
+            role:  _vxRoleToDisplay(vxPlatformConfig().role) || 'Inspector',
             email_verified: !!session.user.email_confirmed_at,
             email_verified_at: session.user.email_confirmed_at || null,
           },
@@ -2165,6 +2181,69 @@ var vxApi = {
     if(!cfg.orgId) return { ok: false, error: 'no org' };
     try {
       var r = await sb.from('entities').delete().eq('org_id', cfg.orgId).eq('key', key);
+      if(r.error) return { ok: false, error: r.error.message };
+      return { ok: true };
+    } catch(e){ return { ok: false, error: String(e.message || e) }; }
+  },
+
+  // Record a pending invite. The invitee receives no email — they sign
+  // up at the app's URL with this email and the handle_pending_invites_on_signup
+  // trigger (migration 0002) auto-joins them to the org with this role.
+  async inviteMember(email, role){
+    if(!vxIsAuthenticated()) return { ok: false, error: 'not signed in' };
+    var sb = _vxSupabase();
+    if(!sb) return { ok: false, error: 'Supabase not configured' };
+    var cfg = vxPlatformConfig();
+    if(!cfg.orgId) return { ok: false, error: 'no org' };
+    if(cfg.role !== 'admin') return { ok: false, error: 'admin access required' };
+    var normEmail = String(email || '').trim().toLowerCase();
+    if(!normEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail)) {
+      return { ok: false, error: 'invalid email address' };
+    }
+    var allowed = { admin:1, senior:1, inspector:1, observer:1 };
+    var normRole = allowed[role] ? role : 'inspector';
+    try {
+      var r = await sb.from('pending_invites')
+        .insert({
+          org_id:     cfg.orgId,
+          email:      normEmail,
+          role:       normRole,
+          invited_by: cfg.userId,
+        });
+      if(r.error){
+        if(/duplicate key|unique/i.test(r.error.message || '')){
+          return { ok: false, error: 'already invited' };
+        }
+        return { ok: false, error: r.error.message };
+      }
+      return { ok: true };
+    } catch(e){ return { ok: false, error: String(e.message || e) }; }
+  },
+
+  // List pending invites for the current org (admin-only via RLS).
+  async listPendingInvites(){
+    if(!vxIsAuthenticated()) return { ok: false, error: 'not signed in', data: [] };
+    var sb = _vxSupabase();
+    if(!sb) return { ok: false, error: 'Supabase not configured', data: [] };
+    var cfg = vxPlatformConfig();
+    if(!cfg.orgId) return { ok: false, error: 'no org', data: [] };
+    try {
+      var r = await sb.from('pending_invites')
+        .select('id, email, role, invited_by, created_at')
+        .eq('org_id', cfg.orgId)
+        .order('created_at', { ascending: false });
+      if(r.error) return { ok: false, error: r.error.message, data: [] };
+      return { ok: true, data: r.data || [] };
+    } catch(e){ return { ok: false, error: String(e.message || e), data: [] }; }
+  },
+
+  // Revoke a pending invite by id.
+  async revokeInvite(inviteId){
+    if(!vxIsAuthenticated()) return { ok: false, error: 'not signed in' };
+    var sb = _vxSupabase();
+    if(!sb) return { ok: false, error: 'Supabase not configured' };
+    try {
+      var r = await sb.from('pending_invites').delete().eq('id', inviteId);
       if(r.error) return { ok: false, error: r.error.message };
       return { ok: true };
     } catch(e){ return { ok: false, error: String(e.message || e) }; }

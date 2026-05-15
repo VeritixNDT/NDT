@@ -1687,6 +1687,99 @@ function uaCloseForm() {
   _certPills = []; _editingIdx = null;
 }
 
+// ── Cloud invite (Supabase pending_invites) ──────────────────────────
+// Distinct from the legacy AUTH_USERS "Add user" form: that one creates
+// a local-only record for offline/fallback signin. This one records a
+// real Supabase invite that gets claimed by the handle_pending_invites_on_signup
+// trigger when the invitee signs up.
+
+function uaOpenInvite() {
+  if(typeof vxIsAdmin === 'function' && !vxIsAdmin()){
+    if(typeof toast === 'function') toast(t('toast.admin_required','Admin access required.'),'error');
+    return;
+  }
+  const w = el('ua-invite-wrap'); if(!w) return;
+  if(el('ua-invite-email')) el('ua-invite-email').value = '';
+  if(el('ua-invite-role'))  el('ua-invite-role').value  = 'inspector';
+  w.style.display = 'block';
+  w.scrollIntoView({behavior:'smooth', block:'nearest'});
+  setTimeout(() => { try { el('ua-invite-email')?.focus(); } catch(e){} }, 80);
+  uaRenderPendingInvites();
+}
+
+function uaCloseInvite() {
+  const w = el('ua-invite-wrap'); if(w) w.style.display = 'none';
+}
+
+async function uaSubmitInvite() {
+  const emailRaw = el('ua-invite-email')?.value || '';
+  const role     = el('ua-invite-role')?.value  || 'inspector';
+  const email    = emailRaw.trim().toLowerCase();
+  if(!email) { toast(t('toast.email_required','Email is required.'),'error'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    toast('Enter a valid email address.','error'); return;
+  }
+  if(typeof vxApi === 'undefined' || !vxApi.inviteMember){
+    toast('Cloud invites unavailable — Supabase not configured.','error'); return;
+  }
+  const btn = el('ua-invite-submit'); if(btn) btn.disabled = true;
+  try {
+    const r = await vxApi.inviteMember(email, role);
+    if(r.ok){
+      toast('Invite recorded for ' + email + '. They auto-join as ' + role + ' on signup.','success');
+      if(el('ua-invite-email')) el('ua-invite-email').value = '';
+      uaRenderPendingInvites();
+    } else if(r.error === 'already invited'){
+      toast(email + ' already has a pending invite for this org.','warn');
+    } else {
+      toast('Invite failed: ' + (r.error || 'unknown error'),'error');
+    }
+  } finally {
+    if(btn) btn.disabled = false;
+  }
+}
+
+async function uaRenderPendingInvites() {
+  const host = el('ua-invite-pending'); if(!host) return;
+  if(typeof vxApi === 'undefined' || !vxApi.listPendingInvites){ host.innerHTML = ''; return; }
+  host.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading pending invites…</div>';
+  const r = await vxApi.listPendingInvites();
+  if(!r.ok){ host.innerHTML = ''; return; }
+  const list = r.data || [];
+  if(!list.length){
+    host.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:6px 0">No pending invites.</div>';
+    return;
+  }
+  const _invRoleClass = r => ({admin:'role-admin', senior:'role-senior', inspector:'role-inspector', observer:'role-viewer'}[r] || 'role-viewer');
+  const _invRoleLabel = r => (typeof _vxRoleToDisplay === 'function' ? _vxRoleToDisplay(r) : r);
+  host.innerHTML = '<div style="font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Pending invites</div>'
+    + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+    + '<th scope="col">Email</th><th scope="col">Role</th><th scope="col">Invited</th><th scope="col"></th>'
+    + '</tr></thead><tbody>'
+    + list.map(inv => {
+        const when = inv.created_at ? fmtDate(inv.created_at) : '—';
+        return '<tr>'
+          + '<td class="mono">' + escapeHtml(inv.email) + '</td>'
+          + '<td><span class="role ' + _invRoleClass(inv.role) + '">' + escapeHtml(_invRoleLabel(inv.role)) + '</span></td>'
+          + '<td class="dim">' + when + '</td>'
+          + '<td><button class="btn btn-xs btn-danger" data-action="uaRevokeInvite" data-args="\'' + inv.id + '\'">Revoke</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+async function uaRevokeInvite(inviteId){
+  if(typeof vxApi === 'undefined' || !vxApi.revokeInvite) return;
+  if(!await vxConfirm({ message: 'Revoke this invite?', okLabel: 'Revoke' })) return;
+  const r = await vxApi.revokeInvite(inviteId);
+  if(r.ok){
+    toast('Invite revoked.','success');
+    uaRenderPendingInvites();
+  } else {
+    toast('Could not revoke: ' + (r.error || 'unknown error'),'error');
+  }
+}
+
 async function saveUser() {
   const name  = el('uf-name').value.trim();
   const email = el('uf-email').value.trim().toLowerCase();

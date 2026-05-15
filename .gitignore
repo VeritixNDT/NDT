@@ -1,0 +1,6 @@
+# Claude Code workspace artifacts (worktrees, local settings, transcripts)
+.claude/
+
+# OS / editor
+.DS_Store
+Thumbs.db

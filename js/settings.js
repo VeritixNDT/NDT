@@ -1228,7 +1228,7 @@ var _sigLastY          = 0;
 
 function loadInspectors() { INSPECTORS = ls(INSP_KEY, []); }
 function saveInspectors() { lss(INSP_KEY, INSPECTORS); }
-function inspIsAdmin()    { return CURRENT_USER?.role === 'Admin'; }
+function inspIsAdmin()    { return typeof vxIsAdmin === 'function' ? vxIsAdmin() : CURRENT_USER?.role === 'Admin'; }
 
 function daysUntil(dateStr) {
   if(!dateStr) return null;

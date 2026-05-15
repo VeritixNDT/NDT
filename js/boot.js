@@ -49,8 +49,10 @@ function bootApp() {
     });
   }
   vxMobileWelcome();
-  // Admin-only settings
-  const isAdmin = CURRENT_USER?.role === 'Admin';
+  // Admin-only settings. Use vxIsAdmin() so the Supabase-side
+  // org_members.role fallback applies — CURRENT_USER may be null right
+  // after a cloud signup that hasn't materialised the legacy user yet.
+  const isAdmin = typeof vxIsAdmin === 'function' ? vxIsAdmin() : CURRENT_USER?.role === 'Admin';
   const tnSettings = el('tn-settings');
   if(tnSettings) tnSettings.style.display = isAdmin ? '' : 'none';
   // Everyone starts on overview

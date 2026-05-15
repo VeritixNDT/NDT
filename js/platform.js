@@ -1272,6 +1272,10 @@ async function vxDoSignup() {
       tokenExpiry:  r.data.expiresAt   || null,
       userId:       r.data.user?.id    || null,
       orgId:        r.data.org?.id     || null,
+      // Creator is always admin per the orgs_add_creator_as_admin trigger
+      // in 0001_init.sql. Stash so vxIsAdmin() resolves before the next
+      // boot refetches membership.
+      role:         'admin',
       // V14: server returns email_verified; default to false on signup so the
       // banner appears until they click the link from the welcome email.
       emailVerified: !!r.data.user?.email_verified,

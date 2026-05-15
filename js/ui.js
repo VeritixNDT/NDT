@@ -1491,7 +1491,7 @@ async function savePwdModal() {
 // PAGE NAVIGATION
 // ══════════════════════════════════════════════
 function showPage(id, btn) {
-  if(id === 'settings' && CURRENT_USER?.role !== 'Admin') {
+  if(id === 'settings' && !(typeof vxIsAdmin === 'function' ? vxIsAdmin() : CURRENT_USER?.role === 'Admin')) {
     toast(t('toast.admin_required_settings','Admin access required for Settings.'), 'error');
     return;
   }

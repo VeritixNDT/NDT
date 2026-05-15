@@ -1,0 +1,1878 @@
+// ══════════════════════════════════════════════
+// REPORT TEMPLATES
+// ══════════════════════════════════════════════
+var TPL_KEY = 'vx-templates-v1';
+var RPT_KEY = 'vx-rptforms-v1';
+var _tplData = {};
+var _rptForms = {};
+var _tplActiveMethod = null;
+var _tplView = 'defaults'; // 'defaults' | 'form'
+
+function loadTemplates() { _tplData = ls(TPL_KEY, {}); _rptForms = ls(RPT_KEY, {}); }
+function saveTemplates() { lss(TPL_KEY, _tplData); }
+function saveRptForms()  { lss(RPT_KEY, _rptForms); }
+
+var TPL_FIELDS = {
+  _common: [
+    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 17638:2016','EN-ISO 17638:2017','EN-ISO 3452-1:2021','EN-ISO 16809:2019','EN-ISO 6507-1','ASME BPVC Section V Art.4 Ed.2023','ASME BPVC Section V Art.6 Ed.2023','ASME BPVC Section V Art.7 Ed.2023','ASME BPVC Section V Art.9 Ed.2023','ASME BPVC 2021: Section II'] },
+    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 level 2','EN-ISO 11666:2018 level 3','EN-ISO 23278:2016 Level 1','EN-ISO 23278:2016 Level 2','EN-ISO 23278:2016 Level 3','EN-ISO 5817:2014','AWS D1.1','ASME BPVC Section VIII div.1 Ed.2023','For client information'] },
+    { id:'proc',  label:'Default procedure no.',       placeholder:'e.g. SV2023-004-NDTD-PRO-0009', options:['SV2023-004-NDTD-PRO-0009','SV2023-004-NDTD-PRO-0005','SV2023-004-NDTD-PRO-0003','SV2023-004-NDTD-PRO-0007','SV2023-004-NDTD-PRO-0013','SV2023-004-NDTD-PRO-0014'] },
+    { id:'equip', label:'Default equipment',           placeholder:'e.g. Olympus EPOCH 650', options:['SIUI Smartor','Olympus EPOCH 650','Olympus EPOCH 6LT','Sonatest Veo+','GE USM 36','Inspection kit','Universal cam gauge','Welding gauge set','X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Mic 10','Sonodur 3','Proceq Equotip 550'] },
+  ],
+  UT: [
+    { id:'coup',  label:'Default couplant',     placeholder:'e.g. Ultragel II', options:['Waterbased','Oil','Ultragel II','Sono 600','Sonagel W','Glycerin'] },
+    { id:'freq',  label:'Frequency (MHz)',       placeholder:'e.g. 5', options:['1','1.5','2','2.25','3.5','4','5','7.5','10','15'] },
+    { id:'range', label:'Calibration range',     placeholder:'e.g. 0-100mm', options:['0-50mm','0-100mm','0-200mm','0-300mm','0-500mm','25-100mm','50-250mm','100-400mm'] },
+    { id:'probe', label:'Default probe',         placeholder:'e.g. MWB 60-4', options:['0°','45°','60°','70°','80°'] },
+    { id:'sens',  label:'Sensitivity',           placeholder:'e.g. DAC + 6dB', options:['DAC + 6dB','DAC + Transfer + 6dB','DAC - 6dB','TCG','6 dB drop','20 dB drop'] },
+    { id:'refblk',label:'Reference block',       placeholder:'e.g. K1 IIW 1', options:['K1 IIW 1','K2 IIW 2','A2 block','A7 block','Custom SDH block'] },
+    { id:'calblk',label:'Calibration block',     placeholder:'e.g. Step wedge', options:['EN-ISO 17640 19mm','EN-ISO 17640 12mm','ASME V SDH block','Step wedge 5-45mm'] },
+  ],
+  MT: [
+    { id:'tech',  label:'Default technique',     placeholder:'e.g. Indirect (yoke)', options:['Indirect (yoke)','Direct (bench)','Coil','Prod'] },
+    { id:'susp',  label:'Test suspension/ink',    placeholder:'e.g. Magnaflux 7HF', options:['Magnaflux 7HF','Magnaflux 14A','MR Chemie MR 76 S','Tiede fluorescent'] },
+    { id:'cur',   label:'Current type',           placeholder:'e.g. AC', options:['AC','HWDC','FWDC','DC'] },
+    { id:'light', label:'UV/White light',         placeholder:'e.g. UV-A > 1000 µW/cm²', options:['UV-A > 1000 µW/cm²','White light > 500 lux','Daylight'] },
+  ],
+  VT: [
+    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 350', options:['350','500','1000'] },
+    { id:'magn', label:'Magnification',            placeholder:'e.g. ×2', options:['×1','×2','×3','×5','×10'] },
+    { id:'dist', label:'Viewing distance',         placeholder:'e.g. 600 mm max', options:['300 mm max','600 mm max','Direct visual'] },
+    { id:'vtequip',label:'Equipment',              placeholder:'e.g. Welding gauge set', options:['Inspection kit','Universal cam gauge','Borescope','Welding gauge set','AWS bridge cam gauge'] },
+  ],
+  PT: [
+    { id:'pen',    label:'Default penetrant',    placeholder:'e.g. Magnaflux ZL4C', options:['Magnaflux ZL4C','Magnaflux ZL-60D','MR Chemie MR 68','Ardrox 970-P22'] },
+    { id:'pdwell', label:'Penetrant dwell time', placeholder:'e.g. 15 mins', options:['5 mins','10 mins','15 mins','20 mins','30 mins'] },
+    { id:'ddwell', label:'Developer dwell time', placeholder:'e.g. 10 mins', options:['7 mins','10 mins','10-20 mins','15 mins','20 mins','30 mins'] },
+    { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
+    { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
+  ],
+  PMI:[
+    { id:'ctrl',label:'System control',placeholder:'e.g. 316L Reference block',options:['316L Reference block','304 Reference block','Duplex reference block','Carbon steel reference block']},
+    { id:'mode',label:'Analysis mode',placeholder:'e.g. Alloy ID',options:['Alloy ID','Grade ID','Residuals','Full quantitative']},
+    { id:'pmiequip',label:'Equipment',placeholder:'e.g. X-MET 8000',options:['X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Niton XL3t']},
+  ],
+  HT: [
+    { id:'scale',label:'Hardness scale',placeholder:'e.g. HV10, HRC',options:['HV10','HV5','HRC','HB','HRB','HL (Leeb)']},
+    { id:'method',label:'Test method',placeholder:'e.g. UCI, Rebound',options:['UCI','Rebound (Leeb)','Vickers','Rockwell','Brinell']},
+    { id:'htequip',label:'Equipment',placeholder:'e.g. Mic 10',options:['Mic 10','Sonodur 3','Dynamic','Proceq Equotip 550','TH170']},
+  ],
+  RT: [
+    { id:'source',label:'Radiation source',placeholder:'e.g. Ir-192',options:['Ir-192','Se-75','Co-60','X-ray 160kV','X-ray 200kV','X-ray 300kV']},
+    { id:'film',label:'Film/detector',placeholder:'e.g. D7',options:['D4 / Kodak MX','D5 / Kodak T200','D7 / Kodak AA400','DR panel','CR plate']},
+    { id:'iqitype',label:'IQI type',placeholder:'e.g. Wire EN 462-1',options:['Wire type EN 462-1','Step-hole EN 462-2','ASTM wire penetrameter','ASTM hole penetrameter']},
+    { id:'sfd',label:'Source-film distance',placeholder:'e.g. 700 mm',options:['350 mm','500 mm','700 mm','1000 mm']},
+  ],
+  ET: [
+    { id:'freq',label:'Test frequency (kHz)',placeholder:'e.g. 100',options:['10','50','100','200','500','1000']},
+    { id:'coil',label:'Coil/probe type',placeholder:'e.g. Absolute pencil',options:['Absolute pencil probe','Differential probe','Encircling coil','Sector probe']},
+    { id:'ref',label:'Reference standard',placeholder:'e.g. 1.0mm EDM notch',options:['0.5mm EDM notch','1.0mm EDM notch','1.5mm EDM notch','Through-hole 1.0mm']},
+  ],
+};
+
+// Report form field definitions (common to all methods)
+var RPT_FORM = {
+  client: [
+    { id:'reportNo',  label:'Report no.',       placeholder:'Auto-generated', readonly:true },
+    { id:'revision',   label:'Report revision',   placeholder:'00' },
+    { id:'client',     label:'Client',             placeholder:'Client name' },
+    { id:'project',    label:'Project',            placeholder:'Project name or number' },
+    { id:'location',   label:'Test location',      placeholder:'Site or facility' },
+    { id:'svOrder',    label:'SV Order no.',        placeholder:'SV-XXXX' },
+    { id:'orderNo',    label:'Order no.',           placeholder:'Order number' },
+    { id:'requestNo',  label:'Request no.',         placeholder:'Request number' },
+    { id:'clientRef',  label:'Client reference',    placeholder:'Client reference' },
+    { id:'examDate',   label:'Examination date',    placeholder:'dd/mm/yyyy', type:'date' },
+  ],
+  subject: [
+    { id:'subject',    label:'Subject / component', placeholder:'Pipe, vessel, structure…' },
+    { id:'material',   label:'Material',             placeholder:'e.g. Carbon steel, SS316', options:['Carbon steel','Stainless steel 304','Stainless steel 316','Duplex 2205','Super duplex 2507','Inconel 625','CuNi 90/10','Chrome-moly','Aluminium'] },
+    { id:'dimensions', label:'Dimensions / thickness',placeholder:'e.g. Ø219.1 × 8.2mm' },
+    { id:'weldType',   label:'Weld type / prep',     placeholder:'e.g. Butt weld, Fillet', options:['V-prep','K-prep','½V-prep','Single bevel','Double V','J-prep','Fillet','Square butt','No prep'] },
+    { id:'weldProcess',label:'Welding process',      placeholder:'e.g. SMAW, GTAW', options:['SMAW','GTAW','GMAW','FCAW','SAW','SMAW/GTAW','PAW','ESW','OFW'] },
+    { id:'heatTreat',  label:'Heat treatment',       placeholder:'e.g. PWHT, As-welded', options:['PWHT','APWHT','n.a.','Before','After'] },
+    { id:'surfCond',   label:'Surface condition',    placeholder:'e.g. Ground, As-welded', options:['As welded','Machined','Blasted','Painted','Ground','As cast','As forged','Electropolished'] },
+    { id:'weldPos',    label:'Welding position',     placeholder:'e.g. PA (1G)', options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
+    { id:'partExam',   label:'Part examined',        placeholder:'Describe the examined area' },
+  ],
+  exam: [
+    { id:'examType',   label:'Examination type',    placeholder:'e.g. Initial', options:['Weld surface examination','Surface examination','Crack examination','Forging examination','Casting examination','Positive Material Identification','Hardness test','Wall thickness measurements','Lamination examination','Ultrasonic examination'] },
+    { id:'extent',     label:'Extent',               placeholder:'e.g. 100%', options:['100% Weld and HAZ','100% of the given weld','100% Surface examination','100% of the given surface','As requested by the client'] },
+    { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
+    { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
+    { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
+  ],
+  result: [
+    { id:'verdict',    label:'Overall verdict',     placeholder:'', type:'select', options:['— Select —','Acceptable','Not acceptable','For information','Inconclusive'] },
+    { id:'remarks',    label:'Remarks / observations',placeholder:'Closing remarks…', type:'textarea' },
+    { id:'inspector',  label:'Inspector name',      placeholder:'Name of inspector' },
+    { id:'witness',    label:'Witness / 3rd party',  placeholder:'Witness name' },
+    { id:'signDate',   label:'Date signed',          placeholder:'dd/mm/yyyy', type:'date' },
+  ],
+};
+
+function tplBuildTabs() {
+  const tabs = el('tpl-method-tabs'); if(!tabs) return;
+  loadTemplates();
+  const methods = getActiveMethods();
+  tabs.innerHTML = methods.map((m,i) => `
+    <button class="btn btn-sm ${i===0?'btn-primary':''}" id="tpl-tab-${m.id}"
+      data-action="tplSelectMethod" data-args="'${m.id}'"
+      style="${i===0?'':`border-color:${m.color};color:${m.color}`}">${m.id}</button>
+  `).join('');
+  if(methods.length) tplSelectMethod(methods[0].id);
+}
+
+function tplSelectMethod(methodId) {
+  _tplActiveMethod = methodId;
+  const m = NDT_METHODS.find(x => x.id === methodId); if(!m) return;
+  document.querySelectorAll('[id^="tpl-tab-"]').forEach(b => {
+    const mid = b.id.replace('tpl-tab-','');
+    const md = NDT_METHODS.find(x => x.id === mid);
+    if(mid === methodId) { b.className='btn btn-sm btn-primary'; b.style.cssText=''; }
+    else { b.className='btn btn-sm'; b.style.cssText=md?`border-color:${md.color};color:${md.color}`:''; }
+  });
+  _tplView = 'defaults';
+  tplRenderBody(methodId);
+}
+
+function tplSwitchView(view) {
+  _tplView = view;
+  tplRenderBody(_tplActiveMethod);
+}
+
+function tplRenderBody(methodId) {
+  const body = el('tpl-method-body'); if(!body) return;
+  const m = NDT_METHODS.find(x => x.id === methodId); if(!m) return;
+
+  // Sub-tabs
+  let html = `<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:16px">
+    <button data-action="tplSwitchView" data-args="'defaults'" style="padding:8px 18px;font-size:12px;font-family:var(--mono);border:none;background:none;cursor:pointer;letter-spacing:.04em;transition:all .15s;margin-bottom:-2px;
+      color:${_tplView==='defaults'?'var(--cyan)':'var(--t3)'};border-bottom:2px solid ${_tplView==='defaults'?'var(--cyan)':'transparent'}">⚙ Method defaults</button>
+    <button data-action="tplSwitchView" data-args="'form'" style="padding:8px 18px;font-size:12px;font-family:var(--mono);border:none;background:none;cursor:pointer;letter-spacing:.04em;transition:all .15s;margin-bottom:-2px;
+      color:${_tplView==='form'?'var(--cyan)':'var(--t3)'};border-bottom:2px solid ${_tplView==='form'?'var(--cyan)':'transparent'}">📋 Blank report form</button>
+  </div>`;
+
+  if(_tplView === 'defaults') {
+    html += tplRenderDefaults(methodId, m);
+  } else {
+    html += tplRenderForm(methodId, m);
+  }
+  body.innerHTML = html;
+}
+
+function tplRenderDefaults(methodId, m) {
+  const tpl = _tplData[methodId] || {};
+  const common = TPL_FIELDS._common;
+  const specific = TPL_FIELDS[methodId] || [];
+  const allFields = [...common, ...specific];
+  let html = `<div style="border-left:3px solid ${m.color};padding-left:14px;margin-bottom:16px">
+    <div style="font-size:15px;font-weight:600;color:${m.color};margin-bottom:2px">${m.id} — ${escapeHtml(m.name)}</div>
+    <div style="font-size:12px;color:var(--t3)">Configure default values for ${escapeHtml(m.name)} reports</div>
+  </div>`;
+  for(let i=0;i<allFields.length;i+=2){
+    const f1=allFields[i], f2=allFields[i+1];
+    html+=`<div class="fg form-row" style="margin-bottom:10px">${tplFieldHtml(methodId,f1,tpl)}${f2?tplFieldHtml(methodId,f2,tpl):''}</div>`;
+  }
+  html+=`<div class="fld form-row" style="margin-bottom:10px"><label>Standard remarks / closing text</label><textarea id="tpl-${methodId}-remarks" rows="3" placeholder="Default closing text for ${m.id} reports…">${escapeHtml(tpl.remarks||'')}</textarea></div>`;
+  html+=`<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+    <button class="btn btn-sm" data-action="tplClear" data-args="'${methodId}'">Reset defaults</button>
+    <button class="btn btn-primary btn-sm" data-action="tplSave" data-args="'${methodId}'">Save ${m.id} defaults</button></div>`;
+  return html;
+}
+
+function tplRenderForm(methodId, m) {
+  const f = _rptForms[methodId] || {};
+  const tpl = _tplData[methodId] || {};
+  // Auto-increment revision if form was previously saved
+  if(f._saved && f.revision) {
+    const curRev = parseInt(f.revision, 10);
+    if(!isNaN(curRev)) {
+      f.revision = String(curRev + 1).padStart(2, '0');
+      f._saved = false; // Only bump once per load
+    }
+  }
+  let html = `<div style="background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--cyan);margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">
+    <span style="font-size:16px;flex-shrink:0">📋</span>
+    <div>Fill in this form as you would a live <strong>${m.id}</strong> report. Click <strong>Save as template</strong> to pre-fill future reports. The revision number auto-increments when you re-open a saved report.</div>
+  </div>`;
+
+  // Section 1: Report revision & Client info
+  html += tplFormSection('Report revision & client information', RPT_FORM.client, methodId, f);
+  // Section 2: Subject
+  html += tplFormSection('Subject information', RPT_FORM.subject, methodId, f);
+  // Section 3: Examination criteria (common + method-specific from defaults)
+  const examFields = [...RPT_FORM.exam];
+  // Add method defaults as pre-filled context
+  html += tplFormSection('Examination criteria', examFields, methodId, f);
+
+  // Section 4: Method-specific equipment
+  const specific = TPL_FIELDS[methodId] || [];
+  if(specific.length) {
+    const equipFields = specific.map(s => ({...s, id:'eq_'+s.id, label:s.label.replace('Default ','')}));
+    html += tplFormSection(`${m.id} — Equipment & parameters`, equipFields, methodId, f);
+  }
+
+  // Section 5: Result
+  html += tplFormSection('Result & sign-off', RPT_FORM.result, methodId, f);
+
+  html += `<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:12px;border-top:1px solid var(--border)">
+    <button class="btn btn-sm" data-action="rptFormClear" data-args="'${methodId}'">Clear form</button>
+    <button class="btn btn-primary btn-sm" data-action="rptFormSave" data-args="'${methodId}'">Save as ${m.id} template</button></div>`;
+  return html;
+}
+
+function tplFormSection(title, fields, methodId, data) {
+  let html = `<div class="sc" style="margin-bottom:14px"><div class="sc-head"><span class="sc-title">${title}</span></div><div class="sc-body" style="padding:14px 16px">`;
+  for(let i=0;i<fields.length;i+=2){
+    const f1=fields[i], f2=fields[i+1];
+    html+=`<div class="fg form-row" style="margin-bottom:8px">`;
+    html+=rptFieldHtml(methodId,f1,data);
+    if(f2) html+=rptFieldHtml(methodId,f2,data);
+    html+=`</div>`;
+  }
+  html+=`</div></div>`;
+  return html;
+}
+
+function rptFieldHtml(methodId, f, data) {
+  const val = data[f.id] || '';
+  const fid = `rf-${methodId}-${f.id}`;
+  if(f.type==='textarea') return `<div class="fld"><label>${f.label}</label><textarea id="${fid}" rows="2" placeholder="${f.placeholder}">${val}</textarea></div>`;
+  if(f.type==='select') {
+    return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
+      <select id="${fid}" style="flex:1">${(f.options||[]).map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>
+      <button type="button" class="sel-add-btn" data-action="selAddOption" data-args="'${fid}'" title="Add option">+</button>
+      <button type="button" class="sel-del-btn" data-action="selDelOption" data-args="'${fid}'" title="Remove selected">−</button>
+    </div></div>`;
+  }
+  if(f.options && f.options.length) {
+    const opts = f.options.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
+    return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
+      <select id="${fid}" style="flex:1"><option value="">— Select —</option>${opts}</select>
+      <button type="button" class="sel-add-btn" data-action="selAddOption" data-args="'${fid}'" title="Add option">+</button>
+      <button type="button" class="sel-del-btn" data-action="selDelOption" data-args="'${fid}'" title="Remove selected">−</button>
+    </div></div>`;
+  }
+  return `<div class="fld"><label>${f.label}</label><input id="${fid}" type="${f.type||'text'}" value="${val}" placeholder="${f.placeholder||''}" ${f.readonly?'readonly style="color:var(--t3);font-style:italic"':''}/></div>`;
+}
+
+function rptFormSave(methodId) {
+  const m = NDT_METHODS.find(x=>x.id===methodId); if(!m) return;
+  const allFields = [...RPT_FORM.client,...RPT_FORM.subject,...RPT_FORM.exam,...RPT_FORM.result];
+  const specific = (TPL_FIELDS[methodId]||[]).map(s=>({...s,id:'eq_'+s.id}));
+  const all = [...allFields,...specific];
+  const data = {};
+  all.forEach(f => {
+    const inp = el(`rf-${methodId}-${f.id}`);
+    if(inp) data[f.id] = f.type==='select' ? inp.value : inp.value.trim();
+  });
+  _rptForms[methodId] = data;
+  _rptForms[methodId]._saved = true;
+  saveRptForms();
+  toast(`${m.id} report template saved.`);
+}
+
+async function rptFormClear(methodId) {
+  if(!await vxConfirm({ message: `Are you sure you want to clear the ${methodId} report form? Any unsaved changes will be lost.`, okLabel: t('vxc.clear','Clear'), danger: true })) return;
+  delete _rptForms[methodId];
+  saveRptForms();
+  tplRenderBody(methodId);
+  toast(`${methodId} report form cleared.`);
+}
+
+function tplFieldHtml(methodId, f, tpl) {
+  const val = tpl[f.id]||'';
+  const fid = `tpl-${methodId}-${f.id}`;
+  if(f.options && f.options.length) {
+    const opts = f.options.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
+    return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
+      <select id="${fid}" style="flex:1"><option value="">— Select —</option>${opts}</select>
+      <button type="button" class="sel-add-btn" data-action="selAddOption" data-args="'${fid}'" title="Add option">+</button>
+      <button type="button" class="sel-del-btn" data-action="selDelOption" data-args="'${fid}'" title="Remove selected">−</button>
+    </div></div>`;
+  }
+  return `<div class="fld"><label>${f.label}</label><input id="${fid}" type="${f.type||'text'}" value="${val}" placeholder="${f.placeholder}"/></div>`;
+}
+
+function tplSave(methodId) {
+  const m = NDT_METHODS.find(x=>x.id===methodId); if(!m) return;
+  const common = TPL_FIELDS._common;
+  const specific = TPL_FIELDS[methodId]||[];
+  const tpl = {};
+  [...common,...specific].forEach(f => { const inp=el(`tpl-${methodId}-${f.id}`); if(inp) tpl[f.id]=inp.value.trim(); });
+  const rem=el(`tpl-${methodId}-remarks`); if(rem) tpl.remarks=rem.value.trim();
+  _tplData[methodId]=tpl;
+  saveTemplates();
+  toast(`${m.id} template saved.`);
+}
+
+async function tplClear(methodId) {
+  if(!await vxConfirm({ message: `Are you sure you want to reset all ${methodId} defaults? This action cannot be undone.`, okLabel: t('vxc.reset','Reset'), danger: true })) return;
+  delete _tplData[methodId];
+  saveTemplates();
+  tplSelectMethod(methodId);
+  toast(`${methodId} defaults cleared.`);
+}
+
+// ══════════════════════════════════════════════
+// REPORTS PAGE
+// ══════════════════════════════════════════════
+function rptInit() {
+  // Populate method filter
+  const fm = el('rpt-fm'); if(!fm) return;
+  const cur = fm.value;
+  fm.innerHTML = '<option value="">All methods</option>' +
+    getActiveMethods().map(m => `<option value="${m.id}">${m.id}</option>`).join('');
+  fm.value = cur;
+  // V6: restore saved view preference
+  try {
+    const saved = localStorage.getItem(RPT_VIEW_PREF_KEY);
+    if(saved === 'table' || saved === 'kanban') _rptView = saved;
+  } catch(e){}
+  document.getElementById('rpt-vtog-table')?.classList.toggle('active', _rptView === 'table');
+  document.getElementById('rpt-vtog-kanban')?.classList.toggle('active', _rptView === 'kanban');
+  rptRender();
+  rptUpdateBulkBar();
+}
+
+// V6: View state + selection + saved filters
+var _rptView = 'table';            // 'table' | 'kanban'
+var _rptSelectedIdx = new Set();   // indices into the full reports array
+var _rptActiveSavedView = null;    // id of currently active saved view (or null)
+
+var RPT_SAVED_VIEWS_KEY = 'vx-rpt-saved-views-v1';
+var RPT_VIEW_PREF_KEY   = 'vx-rpt-view-pref-v1';
+
+function rptListSavedViews(){ return ls(RPT_SAVED_VIEWS_KEY, []); }
+function rptSaveViewsList(list){ lss(RPT_SAVED_VIEWS_KEY, list); }
+
+function rptSetView(view){
+  _rptView = view;
+  try { localStorage.setItem(RPT_VIEW_PREF_KEY, view); } catch(e){}
+  document.getElementById('rpt-vtog-table')?.classList.toggle('active', view === 'table');
+  document.getElementById('rpt-vtog-kanban')?.classList.toggle('active', view === 'kanban');
+  rptRender();
+}
+
+function rptCollectFilters(){
+  return {
+    search:    el('rpt-search')?.value || '',
+    method:    el('rpt-fm')?.value || '',
+    result:    el('rpt-fr')?.value || '',
+    stage:     el('rpt-fstage')?.value || '',
+    repNo:     el('rpt-f-repno')?.value || '',
+    client:    el('rpt-f-client')?.value || '',
+    inspector: el('rpt-f-insp')?.value || '',
+    subject:   el('rpt-f-subject')?.value || '',
+    drawing:   el('rpt-f-drawing')?.value || '',
+    weldNo:    el('rpt-f-weldno')?.value || '',
+    dateFrom:  el('rpt-f-datefrom')?.value || '',
+    dateTo:    el('rpt-f-dateto')?.value || '',
+  };
+}
+
+function rptApplyFilters(filters){
+  if(el('rpt-search'))     el('rpt-search').value     = filters.search    || '';
+  if(el('rpt-fm'))         el('rpt-fm').value         = filters.method    || '';
+  if(el('rpt-fr'))         el('rpt-fr').value         = filters.result    || '';
+  if(el('rpt-fstage'))     el('rpt-fstage').value     = filters.stage     || '';
+  if(el('rpt-f-repno'))    el('rpt-f-repno').value    = filters.repNo     || '';
+  if(el('rpt-f-client'))   el('rpt-f-client').value   = filters.client    || '';
+  if(el('rpt-f-insp'))     el('rpt-f-insp').value     = filters.inspector || '';
+  if(el('rpt-f-subject'))  el('rpt-f-subject').value  = filters.subject   || '';
+  if(el('rpt-f-drawing'))  el('rpt-f-drawing').value  = filters.drawing   || '';
+  if(el('rpt-f-weldno'))   el('rpt-f-weldno').value   = filters.weldNo    || '';
+  if(el('rpt-f-datefrom')) el('rpt-f-datefrom').value = filters.dateFrom  || '';
+  if(el('rpt-f-dateto'))   el('rpt-f-dateto').value   = filters.dateTo    || '';
+}
+
+function rptSaveCurrentView(){
+  const filters = rptCollectFilters();
+  const activeCount = Object.values(filters).filter(Boolean).length;
+  if(activeCount === 0){ toast(t('toast.set_filter_first','Set at least one filter before saving a view.'), 'warn'); return; }
+  const name = prompt('Name this view:', 'My filter ' + (rptListSavedViews().length + 1));
+  if(!name || !name.trim()) return;
+  const list = rptListSavedViews();
+  const item = { id: 'view-' + Date.now(), name: name.trim(), filters, view: _rptView };
+  list.push(item);
+  rptSaveViewsList(list);
+  _rptActiveSavedView = item.id;
+  toast('View "' + name.trim() + '" saved');
+  rptRenderSavedViews();
+}
+
+function rptApplySavedView(id){
+  const v = rptListSavedViews().find(x => x.id === id);
+  if(!v) return;
+  _rptActiveSavedView = id;
+  rptApplyFilters(v.filters);
+  if(v.view) rptSetView(v.view);
+  else rptRender();
+  rptRenderSavedViews();
+}
+
+async function rptDeleteSavedView(id, evt){
+  if(evt) evt.stopPropagation();
+  if(!await vxConfirm({ message: 'Are you sure you want to delete this saved view?', okLabel: t('vxc.delete','Delete'), danger: true })) return;
+  rptSaveViewsList(rptListSavedViews().filter(v => v.id !== id));
+  if(_rptActiveSavedView === id) _rptActiveSavedView = null;
+  rptRenderSavedViews();
+}
+
+function rptRenderSavedViews(){
+  const wrap = el('rpt-saved-views'); if(!wrap) return;
+  const list = rptListSavedViews();
+  if(!list.length){
+    wrap.innerHTML = '<span style="font-size:11px;color:var(--t3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em">Tip:</span> <span style="font-size:11px;color:var(--t3)">set filters and click "+ Save view" to pin them here.</span>';
+    return;
+  }
+  wrap.innerHTML = '<span class="rpt-view-chip-label">Saved views:</span>' +
+    list.map(v => `
+      <span class="rpt-view-chip ${v.id === _rptActiveSavedView ? 'active' : ''}" data-action="rptApplySavedView" data-args="'${v.id}'">
+        ${escapeHtml(v.name)}
+        <span class="rpt-view-chip-x" data-action="rptDeleteSavedView" data-pass-event="1" data-args="'${v.id}'" title="Delete view">×</span>
+      </span>
+    `).join('') +
+    (_rptActiveSavedView ? `<button class="btn btn-xs" data-action="rptClearActiveView" style="font-size:10px;padding:3px 8px">Clear</button>` : '');
+}
+
+function rptClearActiveView(){
+  _rptActiveSavedView = null;
+  rptClearFilters();
+  rptRenderSavedViews();
+}
+
+// Bulk selection helpers
+function rptToggleSelect(idx, evt){
+  if(evt) evt.stopPropagation();
+  if(_rptSelectedIdx.has(idx)) _rptSelectedIdx.delete(idx);
+  else _rptSelectedIdx.add(idx);
+  rptUpdateBulkBar();
+  rptRender();
+}
+function rptToggleAll(visibleIdxList){
+  const allSelected = visibleIdxList.every(i => _rptSelectedIdx.has(i));
+  if(allSelected) visibleIdxList.forEach(i => _rptSelectedIdx.delete(i));
+  else visibleIdxList.forEach(i => _rptSelectedIdx.add(i));
+  rptUpdateBulkBar();
+  rptRender();
+}
+function rptBulkClearSelection(){ _rptSelectedIdx.clear(); rptUpdateBulkBar(); rptRender(); }
+function rptUpdateBulkBar(){
+  const bar = el('rpt-bulk-bar'); if(!bar) return;
+  const n = _rptSelectedIdx.size;
+  if(n === 0){ bar.classList.remove('show'); bar.style.display = 'none'; return; }
+  bar.classList.add('show');
+  bar.style.display = 'flex';
+  set('rpt-bulk-count', tf('rpt.bulk.selected', '{n} selected', { n }));
+}
+function rptBulkSetStage(stage){
+  const idxs = Array.from(_rptSelectedIdx);
+  const count = setReportStageBulk(idxs, stage);
+  // V31: translated stage name for the toast
+  const stageKey = 'rpt.stage.' + stage.toLowerCase();
+  const stageLbl = t(stageKey, stage);
+  toast(tf('rpt.bulk.stage_done', '{n} report(s) moved to {stage}', { n: count, stage: stageLbl }), 'success');
+  _rptSelectedIdx.clear();
+  rptUpdateBulkBar();
+  rptRender();
+}
+async function rptBulkDelete(){
+  const n = _rptSelectedIdx.size;
+  if(!n) return;
+  if(!await vxConfirm({ message: tf('rpt.bulk.confirm_delete', 'Are you sure you want to delete {n} report(s)? This action cannot be undone.', { n }), okLabel: t('vxc.delete','Delete'), danger: true })) return;
+  const all = ls(KEYS.reports, []);
+  const toRemove = new Set(_rptSelectedIdx);
+  const remaining = all.filter((_, i) => !toRemove.has(i));
+  lss(KEYS.reports, remaining);
+  _rptSelectedIdx.clear();
+  rptUpdateBulkBar();
+  if(typeof updateReportCount === 'function') updateReportCount();
+  rptRender();
+  toast(n + ' report' + (n !== 1 ? 's' : '') + ' deleted');
+}
+function rptBulkExportCsv(){
+  const all = ls(KEYS.reports, []);
+  const idxs = Array.from(_rptSelectedIdx).sort((a,b) => a - b);
+  if(!idxs.length) return;
+  const headers = ['Report no.','Method','Stage','Verdict','Client','Subject','Drawing','Weld no.','Inspector','Date'];
+  const rows = idxs.map(i => {
+    const r = all[i];
+    return [r.reportNo||'', r.method||'', getReportStage(r), r.verdict||'Draft', r.client||'', r.subject||'', r.drawing||'', r.weldNo||'', r.inspector||'', r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''].map(v=>'"'+String(v).replace(/"/g,'""')+'"');
+  });
+  const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'reports-export-'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast(tf('toast.exported_n','Exported {n} report(s).', {n: idxs.length}));
+}
+
+function rptRender() {
+  let list = ls(KEYS.reports, []);
+  const allReports = list.slice(); // keep original index reference for selection
+  const search = (el('rpt-search')?.value || '').toLowerCase().trim();
+  const fm = el('rpt-fm')?.value || '';
+  const fr = el('rpt-fr')?.value || '';
+  const fStage = el('rpt-fstage')?.value || '';
+  const fRepNo = (el('rpt-f-repno')?.value || '').toLowerCase().trim();
+  const fClient = (el('rpt-f-client')?.value || '').toLowerCase().trim();
+  const fInsp = (el('rpt-f-insp')?.value || '').toLowerCase().trim();
+  const fSubject = (el('rpt-f-subject')?.value || '').toLowerCase().trim();
+  const fDateFrom = el('rpt-f-datefrom')?.value || '';
+  const fDateTo = el('rpt-f-dateto')?.value || '';
+  const fDrawing = (el('rpt-f-drawing')?.value || '').toLowerCase().trim();
+  const fWeldNo = (el('rpt-f-weldno')?.value || '').toLowerCase().trim();
+
+  // Build filtered list while preserving the original index in `_origIdx`
+  list = list.map((r, i) => ({ r, _origIdx: i })).filter(({r}) => {
+    if(fm && r.method !== fm) return false;
+    if(fr) {
+      if(fr === 'Draft') { if(r.verdict && r.verdict !== '— Select —') return false; }
+      else if(r.verdict !== fr) return false;
+    }
+    if(fStage && getReportStage(r) !== fStage) return false;
+    if(search) {
+      const hay = [r.reportNo, r.method, r.client, r.subject, r.inspector, r.project, r.location, r.verdict, r.drawing, r.weldNo].map(v => (v||'').toLowerCase()).join(' ');
+      if(!hay.includes(search)) return false;
+    }
+    if(fRepNo   && !(r.reportNo  ||'').toLowerCase().includes(fRepNo))   return false;
+    if(fClient  && !(r.client    ||'').toLowerCase().includes(fClient))  return false;
+    if(fInsp    && !(r.inspector ||'').toLowerCase().includes(fInsp))    return false;
+    if(fSubject && !(r.subject   ||'').toLowerCase().includes(fSubject)) return false;
+    if(fDrawing && !(r.drawing   ||'').toLowerCase().includes(fDrawing)) return false;
+    if(fWeldNo  && !(r.weldNo    ||'').toLowerCase().includes(fWeldNo))  return false;
+    if(fDateFrom){ const d = (r.createdAt||'').split('T')[0]; if(d < fDateFrom) return false; }
+    if(fDateTo)  { const d = (r.createdAt||'').split('T')[0]; if(d > fDateTo)   return false; }
+    return true;
+  });
+
+  const activeFilters = [fm, fr, fStage, search, fRepNo, fClient, fInsp, fSubject, fDrawing, fWeldNo, fDateFrom, fDateTo].filter(Boolean).length;
+  // V31: translated subtitle. Plural-aware report count + "N filter(s) active"
+  // when filters are in play. The {n} interpolation handles localization of
+  // grammatical number for English / Dutch / German / French / Spanish.
+  const reportLbl = list.length === 1
+    ? t('rpt.sub.1_report', '1 report')
+    : tf('rpt.sub.n_reports', '{n} reports', { n: list.length });
+  const filterLbl = activeFilters
+    ? ' · ' + tf('rpt.sub.filters_active', '{n} filter(s) active', { n: activeFilters })
+    : '';
+  set('rpt-sub', reportLbl + filterLbl);
+
+  rptRenderSavedViews();
+
+  if(_rptView === 'kanban') return rptRenderKanban(list, allReports);
+  return rptRenderTable(list, allReports);
+}
+
+function rptRenderTable(list, allReports){
+  const wrap = el('rpt-table-wrap'); if(!wrap) return;
+  // V12: if previous render was kanban, the board needs to go before we
+  // can build the table shell. The shell-creation branch handles this when
+  // table.tbl is missing — but if both exist (theoretically possible after
+  // hot reload), prefer the table.
+  const staleBoard = wrap.querySelector('.kb-board');
+  if(staleBoard) staleBoard.remove();
+  const visibleIdxList = list.map(x => x._origIdx);
+  const allChecked = visibleIdxList.length > 0 && visibleIdxList.every(i => _rptSelectedIdx.has(i));
+
+  // V12 perf: keyed reconciliation. Build the static shell once (header,
+  // wrapper card, table chrome) and on subsequent renders only update the
+  // tbody — and within tbody, only the rows whose data actually changed.
+  // Empirical: ~30× faster on 1000-row filter operations than innerHTML rebuild.
+
+  // Build/recover the shell
+  let table = wrap.querySelector('table.tbl');
+  let tbody = table?.querySelector('tbody');
+  let allCb = table?.querySelector('thead input[type=checkbox]');
+  if(!table || !tbody) {
+    // First render — assemble the full shell
+    wrap.innerHTML = `<div class="sc" style="margin-top:14px"><div class="sc-body np" style="overflow-x:auto">
+      <table class="tbl" style="width:100%"><thead><tr>
+        <th scope="col" style="width:34px;padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select all visible reports" title="Select all visible"></th>
+        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="width:70px" data-i18n="col.actions">Actions</th>
+      </tr></thead><tbody></tbody></table></div></div>`;
+    table = wrap.querySelector('table.tbl');
+    tbody = table.querySelector('tbody');
+    allCb = table.querySelector('thead input[type=checkbox]');
+    // Wire the header checkbox via JS rather than inline onclick (so we can
+    // pass the live visible-idx array without JSON-stringifying on every render)
+    allCb.addEventListener('click', () => rptToggleAll(visibleIdxListLatest));
+  }
+  // Update header checkbox state
+  allCb.checked  = allChecked;
+  allCb.disabled = !list.length;
+
+  // Empty state
+  if(!list.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--t3)">No reports match these filters.</td></tr>';
+    visibleIdxListLatest = [];
+    return;
+  }
+  visibleIdxListLatest = visibleIdxList;
+
+  // Compute desired rows in display order (reversed = newest first)
+  const desired = list.slice().reverse();
+
+  // Index existing rows by key so we can reuse their DOM nodes
+  const existing = new Map();
+  Array.from(tbody.children).forEach(tr => {
+    if(tr.dataset.key) existing.set(tr.dataset.key, tr);
+  });
+
+  // Walk desired list and reuse / update / insert as needed. We track the
+  // previous node so each row can be `.after()`-positioned correctly without
+  // disturbing the DOM more than necessary.
+  let prevNode = null;
+  desired.forEach(({r, _origIdx}) => {
+    const key = 'rpt-' + _origIdx;
+    const sig = _rptRowSig(r, _origIdx);
+    let tr = existing.get(key);
+    if(tr && tr.dataset.sig === sig) {
+      // No data change — just reposition if needed
+    } else if(tr) {
+      // Same row, data changed — update inner HTML
+      tr.innerHTML = _rptRowInner(r, _origIdx);
+      tr.className = _rptSelectedIdx.has(_origIdx) ? 'selected' : '';
+      tr.dataset.sig = sig;
+    } else {
+      // New row
+      tr = document.createElement('tr');
+      tr.dataset.key = key;
+      tr.dataset.sig = sig;
+      tr.className = _rptSelectedIdx.has(_origIdx) ? 'selected' : '';
+      tr.innerHTML = _rptRowInner(r, _origIdx);
+    }
+    // Position: if not already in correct spot, move
+    const expectedSibling = prevNode ? prevNode.nextSibling : tbody.firstChild;
+    if(tr !== expectedSibling) {
+      if(prevNode) prevNode.after(tr);
+      else tbody.prepend(tr);
+    }
+    existing.delete(key);
+    prevNode = tr;
+  });
+
+  // Remove rows that are no longer in the visible list
+  existing.forEach(tr => tr.remove());
+}
+
+// Latest visible-idx list — captured by the header checkbox closure
+var visibleIdxListLatest = [];
+
+// Hash-like signature of a report's rendered fields. If this changes, the
+// row gets re-rendered. Cheap concat; no actual hashing needed.
+function _rptRowSig(r, idx) {
+  return [
+    r.reportNo, r.method, getReportStage(r), r.verdict, r.client, r.subject,
+    r.drawing, r.inspector, r.createdAt, r.stageUpdatedAt,
+    _rptSelectedIdx.has(idx) ? '1' : '0',
+  ].join('|');
+}
+
+// Build the inner HTML of one row. Stable enough to compare via the signature.
+function _rptRowInner(r, _origIdx) {
+  const md = NDT_METHODS.find(x => x.id === r.method);
+  const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : 'Draft';
+  const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':'blue';
+  const stage = getReportStage(r);
+  const sc = RPT_STAGE_COLORS[stage] || RPT_STAGE_COLORS.Draft;
+  const isSelected = _rptSelectedIdx.has(_origIdx);
+  const health = stageHealthy(r);
+  return `<td style="padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select report ${escapeHtml(r.reportNo||'')}" ${isSelected?'checked':''} data-action="rptToggleSelect" data-pass-event="1" data-args="${_origIdx}"></td>
+    <td style="font-family:var(--mono);font-size:12px">${escapeHtml(r.reportNo||'—')}</td>
+    <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${escapeHtml(r.method||'—')}</span></td>
+    <td><span class="badge" data-no-glyph style="background:${sc.bg};color:${sc.fg};box-shadow:inset 0 0 0 1px ${sc.accent}33;font-size:10px">${tStage(stage)}</span>${health!=='fresh'?` <span title="${fmtDuration(timeOnStage(r))} on this stage" style="font-size:10px;color:${health==='critical'?'var(--red)':'var(--amber)'};font-family:var(--mono)">·${fmtDuration(timeOnStage(r))}</span>`:''}</td>
+    <td>${escapeHtml(r.client||'—')}</td>
+    <td>${escapeHtml(r.subject||'—')}</td>
+    <td style="font-size:12px;color:var(--t2)">${escapeHtml(r.drawing||'—')}</td>
+    <td>${escapeHtml(r.inspector||'—')}</td>
+    <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(r.createdAt)}</td>
+    <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>
+    <td><button class="btn btn-sm btn-danger" data-action="rptDelete" data-args="${_origIdx}" aria-label="Delete report ${escapeHtml(r.reportNo||'')}">Del</button></td>`;
+}
+
+function rptRenderKanban(list, allReports){
+  const wrap = el('rpt-table-wrap'); if(!wrap) return;
+  // V12: drop stale table DOM from previous view
+  const staleTable = wrap.querySelector('table.tbl')?.closest('.sc');
+  if(staleTable) staleTable.remove();
+  // Group filtered list by stage
+  const groups = {}; RPT_STAGES.forEach(s => groups[s] = []);
+  list.forEach(({r, _origIdx}) => {
+    const s = getReportStage(r);
+    if(groups[s]) groups[s].push({ r, _origIdx });
+  });
+
+  // V12 perf: keyed reconciliation. Build the board shell once, then on
+  // re-renders only update the cards inside each column. Avoids drag-drop
+  // disruption mid-interaction and saves layout cost on filter typing.
+  let board = wrap.querySelector('.kb-board');
+  if(!board) {
+    // First render — assemble the columns
+    let html = '<div class="kb-board" role="list" aria-label="Report stages">';
+    RPT_STAGES.forEach(stage => {
+      const sc = RPT_STAGE_COLORS[stage];
+      html += `<div class="kb-col" role="listitem" data-stage="${stage}" data-on-dragover="rptKbDragOver" data-pass-event="1" data-on-dragleave="rptKbDragLeave" data-pass-event="1" data-on-drop="rptKbDrop" data-pass-event="1" data-args="'${stage}'" aria-label="${stage} column">
+        <div class="kb-col-head">
+          <span class="kb-col-head-title"><span class="kb-col-head-dot" style="background:${sc.accent}" aria-hidden="true"></span>${tStage(stage)}</span>
+          <span class="kb-col-head-count" aria-label="card count">0</span>
+        </div>
+        <div class="kb-col-body" data-stage-body="${stage}"></div>
+      </div>`;
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+    board = wrap.querySelector('.kb-board');
+  }
+
+  // Update each column independently with keyed reconciliation
+  RPT_STAGES.forEach(stage => {
+    const body = board.querySelector(`[data-stage-body="${stage}"]`);
+    const head = board.querySelector(`[data-stage="${stage}"] .kb-col-head-count`);
+    if(!body) return;
+    const cards = groups[stage].slice().reverse();   // newest first
+    if(head) head.textContent = String(cards.length);
+
+    if(!cards.length) {
+      body.innerHTML = '<div class="kb-empty">No reports here.<br>Drag a card to move it.</div>';
+      return;
+    }
+    // Drop empty placeholder if it exists
+    const empty = body.querySelector('.kb-empty');
+    if(empty) empty.remove();
+
+    // Build map of existing cards by key
+    const existing = new Map();
+    Array.from(body.children).forEach(card => {
+      if(card.dataset.key) existing.set(card.dataset.key, card);
+    });
+
+    // Walk desired cards
+    let prevNode = null;
+    cards.forEach(({r, _origIdx}) => {
+      const key = 'kb-' + _origIdx;
+      const sig = _rptRowSig(r, _origIdx);
+      let card = existing.get(key);
+      if(card && card.dataset.sig === sig) {
+        // unchanged
+      } else if(card) {
+        // update content in place
+        card.outerHTML = rptRenderKanbanCard(r, _origIdx);
+        // outerHTML replaces the node — refetch
+        card = body.querySelector(`[data-key="${key}"]`);
+      } else {
+        // new card
+        const tmp = document.createElement('div');
+        tmp.innerHTML = rptRenderKanbanCard(r, _origIdx);
+        card = tmp.firstElementChild;
+      }
+      // Position
+      const expectedSibling = prevNode ? prevNode.nextSibling : body.firstChild;
+      if(card !== expectedSibling) {
+        if(prevNode) prevNode.after(card);
+        else body.prepend(card);
+      }
+      existing.delete(key);
+      prevNode = card;
+    });
+    // Remove cards no longer in this column
+    existing.forEach(card => card.remove());
+  });
+}
+function rptRenderKanbanCard(r, idx){
+  const md = NDT_METHODS.find(x => x.id === r.method);
+  const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : '—';
+  const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':null;
+  const isSelected = _rptSelectedIdx.has(idx);
+  const health = stageHealthy(r);
+  const healthClass = health === 'fresh' ? '' : 'health-' + health;
+  // V12: data-key + data-sig for keyed reconciliation
+  return `<div class="kb-card ${isSelected?'selected':''} ${healthClass}" draggable="true" data-idx="${idx}" data-key="kb-${idx}" data-sig="${_rptRowSig(r, idx)}" data-on-dragstart="rptKbDragStart" data-pass-event="1" data-args="${idx}" data-on-dragend="rptKbDragEnd" data-pass-event="1" data-action="rptToggleSelect" data-args="${idx}" tabindex="0" role="article" aria-label="Report ${escapeHtml(r.reportNo||'')} on ${getReportStage(r)} stage">
+    <div class="kb-card-row1">
+      <span class="kb-card-id">${escapeHtml(r.reportNo||'—')}</span>
+      <span class="kb-card-method" style="background:${(md?.color||'#5a6880')}1a;color:${md?.color||'#5a6880'}">${escapeHtml(r.method||'?')}</span>
+    </div>
+    <div class="kb-card-subject">${escapeHtml(r.subject || r.client || 'No subject')}</div>
+    <div class="kb-card-meta">
+      <span title="${escapeHtml(r.inspector||'')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${escapeHtml(r.inspector||'—')}</span>
+      <span class="kb-card-meta-time" style="${health==='critical'?'color:var(--red)':health==='stale'?'color:var(--amber)':''}" title="On stage for ${fmtDuration(timeOnStage(r))}">${fmtDuration(timeOnStage(r))}${vClass==='green'?' · ✓':vClass==='red'?' · ✕':''}</span>
+    </div>
+  </div>`;
+}
+
+// Drag and drop
+var _rptDragIdx = null;
+function rptKbDragStart(e, idx){
+  _rptDragIdx = idx;
+  e.target.classList.add('dragging');
+  try { e.dataTransfer.setData('text/plain', String(idx)); e.dataTransfer.effectAllowed = 'move'; } catch(err){}
+}
+function rptKbDragEnd(e){
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.kb-col.drag-over').forEach(c => c.classList.remove('drag-over'));
+  _rptDragIdx = null;
+}
+function rptKbDragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+function rptKbDragLeave(e){
+  if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over');
+}
+function rptKbDrop(e, stage){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const idx = _rptDragIdx != null ? _rptDragIdx : parseInt(e.dataTransfer.getData('text/plain'));
+  if(isNaN(idx)) return;
+  if(setReportStage(idx, stage)) toast(tf('toast.moved_to','Moved to {stage}', {stage: tStage(stage)}));
+  _rptDragIdx = null;
+}
+
+function rptDelete(idx) {
+  const reports = ls(KEYS.reports, []);
+  const original = reports[idx];
+  if(!original) return;
+  // V14: optimistic delete with undo. The report is removed immediately and
+  // the user gets a 6-second window to undo. No confirm() dialog — the undo
+  // toast is the safety net, and it preserves momentum.
+  vxUndoable({
+    message:        'Report ' + (original.reportNo || '(no number)') + ' deleted',
+    undoneMessage:  'Report restored',
+    duration:       6000,
+    apply: () => {
+      const list = ls(KEYS.reports, []);
+      list.splice(idx, 1);
+      lss(KEYS.reports, list);
+      updateReportCount();
+      rptRender();
+    },
+    undo: () => {
+      const list = ls(KEYS.reports, []);
+      list.splice(idx, 0, original);
+      lss(KEYS.reports, list);
+      updateReportCount();
+      rptRender();
+    },
+    commit: () => {
+      // No server-side action needed — the lss() already queued a sync op.
+      // For audit, we could log the commit here.
+    },
+  });
+}
+
+function rptClearFilters() {
+  ['rpt-search','rpt-f-repno','rpt-f-client','rpt-f-insp','rpt-f-subject','rpt-f-drawing','rpt-f-weldno','rpt-f-datefrom','rpt-f-dateto'].forEach(id => { const e=el(id); if(e) e.value=''; });
+  const fm = el('rpt-fm'); if(fm) fm.value = '';
+  const fr = el('rpt-fr'); if(fr) fr.value = '';
+  const fStage = el('rpt-fstage'); if(fStage) fStage.value = '';
+  rptRender();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V6 WORKFLOW — Report stages, audit log, approval routing
+// ══════════════════════════════════════════════════════════════════════════
+var RPT_STAGES = ['Draft', 'Submitted', 'Reviewed', 'Approved', 'Archived'];
+var RPT_STAGE_COLORS = {
+  'Draft':     { bg:'rgba(127,140,170,.10)', fg:'var(--t2)',   accent:'#7f8caa' },
+  'Submitted': { bg:'rgba(0,212,255,.10)',   fg:'var(--cyan)', accent:'#00d4ff' },
+  'Reviewed':  { bg:'rgba(167,139,250,.10)', fg:'var(--violet)', accent:'#a78bfa' },
+  'Approved':  { bg:'rgba(62,207,142,.10)',  fg:'var(--green)', accent:'#3ecf8e' },
+  'Archived':  { bg:'rgba(255,255,255,.04)', fg:'var(--t3)',   accent:'#5a6880' },
+};
+function getReportStage(r){ return r.stage || 'Draft'; }
+
+// Migration: ensure every report has stage + auditLog. Infers stage from verdict if missing.
+function migrateReportsWorkflow(){
+  const all = ls(KEYS.reports, []);
+  let changed = false;
+  all.forEach(r => {
+    if(!r.stage){
+      // Infer: Acceptable verdict + signed → Approved; verdict set but no sign → Reviewed; else Draft
+      if(r.verdict && r.verdict !== '— Select —' && r.signedAt) r.stage = 'Approved';
+      else if(r.verdict && r.verdict !== '— Select —') r.stage = 'Reviewed';
+      else r.stage = 'Draft';
+      changed = true;
+    }
+    if(!Array.isArray(r.auditLog)) { r.auditLog = []; changed = true; }
+  });
+  if(changed) lss(KEYS.reports, all);
+}
+
+function addReportAudit(report, action, details){
+  if(!Array.isArray(report.auditLog)) report.auditLog = [];
+  report.auditLog.push({
+    at: new Date().toISOString(),
+    by: CURRENT_USER ? CURRENT_USER.name : 'System',
+    byId: CURRENT_USER ? CURRENT_USER.id : null,
+    action: action,
+    details: details || ''
+  });
+}
+
+// Move a report by index to a new stage. Records audit. Persists. Refreshes.
+function setReportStage(idx, newStage, comment){
+  const all = ls(KEYS.reports, []);
+  const r = all[idx]; if(!r) return false;
+  if(!RPT_STAGES.includes(newStage)) return false;
+  const prev = getReportStage(r);
+  if(prev === newStage) return false;
+  r.stage = newStage;
+  r.stageUpdatedAt = new Date().toISOString();
+  addReportAudit(r, 'stage:'+newStage, comment ? `${prev} → ${newStage}: ${comment}` : `${prev} → ${newStage}`);
+  lss(KEYS.reports, all);
+  // Refresh whichever views are visible
+  if(typeof rptRender === 'function') rptRender();
+  if(typeof inboxRender === 'function') inboxRender();
+  if(typeof updateReportCount === 'function') updateReportCount();
+  return true;
+}
+
+// Bulk stage change
+function setReportStageBulk(idxList, newStage){
+  const all = ls(KEYS.reports, []);
+  let count = 0;
+  idxList.forEach(idx => {
+    const r = all[idx]; if(!r) return;
+    const prev = getReportStage(r);
+    if(prev === newStage) return;
+    r.stage = newStage;
+    r.stageUpdatedAt = new Date().toISOString();
+    addReportAudit(r, 'stage:'+newStage, `${prev} → ${newStage} (bulk)`);
+    count++;
+  });
+  if(count) lss(KEYS.reports, all);
+  return count;
+}
+
+// Time on current stage (ms since stageUpdatedAt; fall back to createdAt)
+function timeOnStage(r){
+  const t = r.stageUpdatedAt || r.createdAt;
+  if(!t) return 0;
+  return Date.now() - new Date(t).getTime();
+}
+function fmtDuration(ms){
+  if(!ms || ms < 0) return '—';
+  const days = Math.floor(ms / (1000*60*60*24));
+  const hours = Math.floor(ms / (1000*60*60));
+  if(days >= 1) return days + 'd';
+  if(hours >= 1) return hours + 'h';
+  const mins = Math.floor(ms / (1000*60));
+  return mins + 'm';
+}
+// Returns 'fresh' / 'stale' / 'critical' based on time on stage relative to expected pace
+function stageHealthy(r){
+  const dys = timeOnStage(r) / (1000*60*60*24);
+  // Drafts can sit forever; submitted/reviewed should move within a week
+  if(getReportStage(r) === 'Draft' || getReportStage(r) === 'Approved' || getReportStage(r) === 'Archived') return 'fresh';
+  if(dys < 3) return 'fresh';
+  if(dys < 7) return 'stale';
+  return 'critical';
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V6 INBOX — what needs my attention right now
+// ══════════════════════════════════════════════════════════════════════════
+function inboxBuild(){
+  const me = CURRENT_USER;
+  const reports = ls(KEYS.reports, []);
+  const inspectors = ls(KEYS.inspectors, []);
+
+  // 1. Reports awaiting my approval (I'm the named approver, OR I'm Admin/Senior and stage is Submitted/Reviewed and there is no specific approver)
+  const awaitingApproval = reports.filter((r, idx) => {
+    r._idx = idx;
+    const stage = getReportStage(r);
+    if(stage !== 'Submitted' && stage !== 'Reviewed') return false;
+    if(!me) return false;
+    // Explicit approver assignment
+    if(r.approver && r.approver === me.name) return true;
+    // Otherwise, only show to senior/admin roles
+    if((me.role === 'Admin' || me.role === 'Senior') && (!r.approver || r.approver === me.name)) return true;
+    return false;
+  });
+
+  // 2. My drafts (reports I created that haven't been submitted)
+  const myDrafts = reports.filter((r, idx) => {
+    r._idx = idx;
+    if(!me) return false;
+    if(getReportStage(r) !== 'Draft') return false;
+    return r.inspector === me.name || r.createdBy === me.id;
+  });
+
+  // 3. Stale reports (any stage > 7 days, regardless of who owns)
+  const stale = reports.filter((r, idx) => {
+    r._idx = idx;
+    return stageHealthy(r) === 'critical';
+  });
+
+  // 4. Cert expiry within 60 days
+  const now = Date.now();
+  const sixtyDays = 60 * 24 * 60 * 60 * 1000;
+  const certsExpiring = inspectors.map((ins, idx) => ({ ins, idx })).filter(({ins}) => {
+    if(!ins.certExpiry) return false;
+    const ms = new Date(ins.certExpiry).getTime();
+    if(isNaN(ms)) return false;
+    return (ms - now) < sixtyDays;
+  });
+
+  // 5. Calibration due — currently no equipment store; placeholder for future
+  const calDue = []; // future hook
+
+  return { awaitingApproval, myDrafts, stale, certsExpiring, calDue };
+}
+
+function inboxBadgeCount(){
+  const me = CURRENT_USER;
+  if(!me) return 0;
+  const data = inboxBuild();
+  // What deserves a badge: things needing the user's action today
+  return data.awaitingApproval.length + data.certsExpiring.length;
+}
+
+function updateInboxBadge(){
+  const pill = el('inbox-count-pill'); if(!pill) return;
+  const n = inboxBadgeCount();
+  if(n > 0){ pill.textContent = n; pill.style.display = 'inline-flex'; }
+  else { pill.style.display = 'none'; }
+}
+
+function inboxRender(){
+  const me = CURRENT_USER;
+  const subEl = el('inbox-sub');
+  if(subEl) subEl.textContent = me
+    ? tf('inb.sub.hello', 'Hello {name} — what needs your attention right now', { name: me.name.split(' ')[0] })
+    : t('inb.sub', 'What needs your attention right now');
+
+  const data = inboxBuild();
+  const summaryEl = el('inbox-summary');
+  if(summaryEl){
+    const tile = (count, label, urgent, iconSvg, iconBg, iconColor, sectionId, navTo) => `
+      <div class="inbox-tile ${urgent==='attention'?'attention':urgent==='urgent'?'urgent':''}" data-action="_wInboxJumpToSection" data-args="'${sectionId}',${navTo?1:0}">
+        <div class="inbox-tile-icon" style="background:${iconBg};color:${iconColor}">${iconSvg}</div>
+        <div class="inbox-tile-body">
+          <div class="inbox-tile-count">${count}</div>
+          <div class="inbox-tile-label">${label}</div>
+        </div>
+      </div>`;
+    summaryEl.innerHTML = [
+      tile(data.awaitingApproval.length, t('inb.tile.approval','Awaiting your approval'), data.awaitingApproval.length>0?'attention':null,
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+        'rgba(0,212,255,.10)','var(--cyan)',
+        'inbox-sec-approval', true),
+      tile(data.myDrafts.length, t('inb.tile.drafts','Your drafts in progress'), null,
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        'rgba(127,140,170,.10)','var(--t2)',
+        'inbox-sec-drafts', false),
+      tile(data.stale.length, t('inb.tile.stale','Stale reports (7d+)'), data.stale.length>0?'urgent':null,
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        'rgba(242,92,92,.10)','var(--red)',
+        'inbox-sec-stale', false),
+      tile(data.certsExpiring.length, t('inb.tile.certs','Certs expiring (60d)'), data.certsExpiring.length>0?'attention':null,
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/><path d="M14 10h4"/><path d="M14 14h2.5"/></svg>',
+        'rgba(245,166,35,.10)','var(--amber)',
+        'inbox-sec-certs', false),
+    ].join('');
+  }
+
+  const contentEl = el('inbox-content');
+  if(!contentEl) return;
+  let html = '';
+
+  // ── Awaiting approval ──
+  html += `<div class="inbox-section" id="inbox-sec-approval">
+    <div class="inbox-section-head">
+      <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${escapeHtml(t('inb.sec.approval','Awaiting your approval'))}</span>
+      <span class="inbox-section-count">${data.awaitingApproval.length}</span>
+    </div>`;
+  if(data.awaitingApproval.length === 0){
+    html += `<div class="inbox-empty"><div class="inbox-empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>${escapeHtml(t('inb.empty.approval','All clear — nothing waiting on you.'))}</div>`;
+  } else {
+    data.awaitingApproval.slice().sort((a,b) => timeOnStage(b) - timeOnStage(a)).forEach(r => {
+      const md = NDT_METHODS.find(x => x.id === r.method);
+      const stage = getReportStage(r);
+      const sc = RPT_STAGE_COLORS[stage];
+      const tt = timeOnStage(r);
+      const tStr = fmtDuration(tt);
+      const ageColor = stageHealthy(r) === 'critical' ? 'color:var(--red)' : stageHealthy(r) === 'stale' ? 'color:var(--amber)' : 'color:var(--t3)';
+      html += `<div class="inbox-row">
+        <div class="inbox-row-meta">
+          <div class="inbox-row-primary">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--cyan);font-weight:600">${escapeHtml(r.reportNo||'—')}</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:700;background:${(md?.color||'#5a6880')+'1a'};color:${md?.color||'#5a6880'};padding:1px 6px;border-radius:3px">${r.method||'?'}</span>
+            <span style="background:${sc.bg};color:${sc.fg};box-shadow:inset 0 0 0 1px ${sc.accent}33;font-size:10px;padding:2px 7px;border-radius:5px">${escapeHtml(tStage(stage))}</span>
+            <span style="${ageColor};font-family:var(--mono);font-size:10px">${escapeHtml(tf('inb.row.on_stage','{t} on this stage',{t:tStr}))}</span>
+          </div>
+          <div class="inbox-row-secondary">${escapeHtml(r.subject || r.client || t('inb.row.no_subject','No subject'))} · ${escapeHtml(t('inb.row.inspector','Inspector'))}: ${escapeHtml(r.inspector||'—')}</div>
+        </div>
+        <div class="inbox-row-actions">
+          <button class="btn btn-sm btn-primary" data-action="inboxApprove" data-args="${r._idx}">${escapeHtml(t('inb.btn.approve','Approve'))}</button>
+          <button class="btn btn-sm btn-danger" data-action="inboxReject" data-args="${r._idx}">${escapeHtml(t('inb.btn.reject','Reject'))}</button>
+          <button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${r._idx}" title="${escapeHtml(t('inb.btn.view_history','View history'))}">⌕</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // ── My drafts ──
+  html += `<div class="inbox-section" id="inbox-sec-drafts">
+    <div class="inbox-section-head">
+      <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${escapeHtml(t('inb.sec.drafts','Your drafts'))}</span>
+      <span class="inbox-section-count">${data.myDrafts.length}</span>
+    </div>`;
+  if(data.myDrafts.length === 0){
+    html += `<div class="inbox-empty">${escapeHtml(t('inb.empty.drafts','No drafts in progress.'))}</div>`;
+  } else {
+    data.myDrafts.slice(-10).reverse().forEach(r => {
+      const md = NDT_METHODS.find(x => x.id === r.method);
+      html += `<div class="inbox-row">
+        <div class="inbox-row-meta">
+          <div class="inbox-row-primary">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--cyan);font-weight:600">${escapeHtml(r.reportNo||'—')}</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:700;background:${(md?.color||'#5a6880')+'1a'};color:${md?.color||'#5a6880'};padding:1px 6px;border-radius:3px">${r.method||'?'}</span>
+          </div>
+          <div class="inbox-row-secondary">${escapeHtml(r.subject || r.client || t('inb.row.no_subject','No subject'))} · ${fmtDate(r.createdAt)}</div>
+        </div>
+        <div class="inbox-row-actions">
+          <button class="btn btn-sm btn-primary" data-action="inboxSubmit" data-args="${r._idx}">${escapeHtml(t('inb.btn.submit_review','Submit for review'))}</button>
+          <button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${r._idx}" title="${escapeHtml(t('inb.btn.view_history','View history'))}">⌕</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // ── Stale reports ──
+  html += `<div class="inbox-section" id="inbox-sec-stale">
+    <div class="inbox-section-head">
+      <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${escapeHtml(t('inb.sec.stale','Stale (7+ days on stage)'))}</span>
+      <span class="inbox-section-count">${data.stale.length}</span>
+    </div>`;
+  if(data.stale.length === 0){
+    html += `<div class="inbox-empty"><div class="inbox-empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>${escapeHtml(t('inb.empty.stale','No stale reports.'))}</div>`;
+  } else {
+    data.stale.slice().sort((a,b) => timeOnStage(b) - timeOnStage(a)).slice(0, 12).forEach(r => {
+      const md = NDT_METHODS.find(x => x.id === r.method);
+      const stage = getReportStage(r);
+      const sc = RPT_STAGE_COLORS[stage];
+      html += `<div class="inbox-row">
+        <div class="inbox-row-meta">
+          <div class="inbox-row-primary">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--cyan);font-weight:600">${escapeHtml(r.reportNo||'—')}</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:700;background:${(md?.color||'#5a6880')+'1a'};color:${md?.color||'#5a6880'};padding:1px 6px;border-radius:3px">${r.method||'?'}</span>
+            <span style="background:${sc.bg};color:${sc.fg};box-shadow:inset 0 0 0 1px ${sc.accent}33;font-size:10px;padding:2px 7px;border-radius:5px">${escapeHtml(tStage(stage))}</span>
+            <span style="color:var(--red);font-family:var(--mono);font-size:10px">${escapeHtml(tf('inb.row.on_stage_short','{t} on stage',{t:fmtDuration(timeOnStage(r))}))}</span>
+          </div>
+          <div class="inbox-row-secondary">${escapeHtml(r.subject || r.client || t('inb.row.no_subject','No subject'))} · ${escapeHtml(r.inspector||'—')}</div>
+        </div>
+        <div class="inbox-row-actions">
+          <button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${r._idx}" title="${escapeHtml(t('inb.btn.view_history','View history'))}">${escapeHtml(t('inb.btn.view_history','View history'))}</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // ── Cert expiry ──
+  html += `<div class="inbox-section" id="inbox-sec-certs">
+    <div class="inbox-section-head">
+      <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/></svg>${escapeHtml(t('inb.sec.certs','Certifications expiring within 60 days'))}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${data.certsExpiring.length ? `<button class="btn btn-sm" data-action="generateIcsForCerts" title="${escapeHtml(t('inb.btn.export_ics_tip','Download an .ics file with cert expiry events for Outlook/Google/Apple Calendar'))}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${escapeHtml(t('inb.btn.export_ics','Export .ics'))}</button>` : ''}
+        <span class="inbox-section-count">${data.certsExpiring.length}</span>
+      </div>
+    </div>`;
+  if(data.certsExpiring.length === 0){
+    html += `<div class="inbox-empty">${escapeHtml(t('inb.empty.certs','No certifications expiring soon.'))}</div>`;
+  } else {
+    data.certsExpiring.forEach(({ins}) => {
+      const days = Math.round((new Date(ins.certExpiry).getTime() - Date.now()) / (1000*60*60*24));
+      const expired = days < 0;
+      html += `<div class="inbox-row">
+        <div class="inbox-row-meta">
+          <div class="inbox-row-primary">
+            <span style="color:var(--t1);font-weight:500">${escapeHtml(ins.name||'—')}</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${(ins.methods||[]).join(', ')||escapeHtml(t('inb.row.no_methods','No methods'))}</span>
+          </div>
+          <div class="inbox-row-secondary">
+            ${expired
+              ? `<span style="color:var(--red);font-weight:500">${escapeHtml(tf('inb.row.expired_ago','EXPIRED {n} day(s) ago',{n:Math.abs(days)}))}</span>`
+              : `${escapeHtml(tf('inb.row.expires','Expires {date}',{date:fmtDate(ins.certExpiry)}))} · <span style="color:${days<14?'var(--red)':'var(--amber)'};font-family:var(--mono);font-size:10px">${escapeHtml(tf('inb.row.days_left','{n} day(s)',{n:days}))}</span>`
+            }
+          </div>
+        </div>
+        <div class="inbox-row-actions">
+          <button class="btn btn-sm" data-action="_wOpenInspectorsSettings">${escapeHtml(t('inb.btn.open_inspectors','Open inspectors'))}</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  contentEl.innerHTML = html;
+  updateInboxBadge();
+}
+
+// Approval actions
+async function inboxApprove(idx){
+  // Approval is gated to Admin or Senior. The UI only shows the Approve
+  // button to those roles, but the action-level guard protects against
+  // direct calls (e.g. from console or stale UI). Backend will enforce
+  // this independently when it lands.
+  if(!vxIsSeniorOrAdmin()){
+    toast(t('toast.approver_required', 'Senior Inspector or Admin role required to approve.'), 'error');
+    return;
+  }
+  if(!await vxConfirm({ message: t('inb.confirm.approve','Are you sure you want to approve this report?'), okLabel: t('vxc.approve','Approve') })) return;
+  if(setReportStage(idx, 'Approved', '')){
+    toast(t('toast.report_approved','Report approved.'), 'success');
+    inboxRender();
+  }
+}
+function inboxReject(idx){
+  if(!vxIsSeniorOrAdmin()){
+    toast(t('toast.approver_required', 'Senior Inspector or Admin role required to approve.'), 'error');
+    return;
+  }
+  const reason = prompt(t('inb.prompt.reject','Reason for rejection (will be added to the audit log):'));
+  if(reason === null) return;
+  // Move back to Draft, attach reason
+  if(setReportStage(idx, 'Draft', reason || '')){
+    toast(t('toast.report_back_to_draft','Report sent back to Draft with comment.'), 'success');
+    inboxRender();
+  }
+}
+function inboxSubmit(idx){
+  if(setReportStage(idx, 'Submitted', '')){
+    toast(t('toast.submitted_review','Submitted for review.'), 'success');
+    inboxRender();
+  }
+}
+
+// Audit log modal
+function inboxOpenAudit(idx){
+  const r = ls(KEYS.reports, [])[idx];
+  if(!r) return;
+  const log = (r.auditLog||[]).slice().reverse();
+  let modal = document.getElementById('inbox-audit-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'inbox-audit-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  let logHtml = '';
+  if(!log.length) logHtml = '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px">No audit history yet.</div>';
+  else logHtml = log.map(entry => `
+    <div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start">
+      <div style="width:8px;height:8px;border-radius:50%;background:${entry.action.startsWith('stage:Approved')?'var(--green)':entry.action.startsWith('stage:Draft')?'var(--t3)':'var(--cyan)'};margin-top:6px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;color:var(--t1)"><strong>${escapeHtml(entry.by||'—')}</strong> · ${escapeHtml(entry.action||'')}</div>
+        ${entry.details?`<div style="font-size:12px;color:var(--t2);margin-top:3px;font-style:italic">"${escapeHtml(entry.details)}"</div>`:''}
+        <div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:4px">${fmtDate(entry.at)} · ${new Date(entry.at).toLocaleTimeString()}</div>
+      </div>
+    </div>`).join('');
+  modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:560px;max-width:96vw;max-height:75vh;display:flex;flex-direction:column;box-shadow:var(--sh-xl);overflow:hidden">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--t1)">Audit history</div>
+        <div style="font-size:11px;color:var(--t3);font-family:var(--mono);margin-top:2px">${escapeHtml(r.reportNo||'')} — ${log.length} event${log.length!==1?'s':''}</div>
+      </div>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'inbox-audit-modal\'">Close</button>
+    </div>
+    <div style="overflow-y:auto;flex:1">${logHtml}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  openA11yModal(modal);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V7 FIELD-FIRST — photo capture, voice notes, sidebar collapse,
+//                  offline indicator, capture wizard, barcode scanning
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Photo capture with EXIF preservation ─────────────────────
+// Stored as data URLs in the defect record under `photos` array.
+// Browser preserves EXIF when reading via FileReader on mobile camera input.
+var _defPhotos = [];   // working list for the open form
+
+// V14: photos route through IndexedDB (or remote upload if authenticated).
+// The defect record stores { photoId, remoteUrl, name, ... } — NOT base64
+// data — so a single record stays small enough for localStorage / sync.
+// Rendering paths (defRenderPhotos, defOpenPhotoView, PDF embed) resolve
+// the photoId/remoteUrl to an object URL on demand.
+async function defAttachPhotos(input){
+  if(!input.files || !input.files.length) return;
+  const files = Array.from(input.files);
+  input.value = '';
+
+  for(const file of files) {
+    if(!file.type.startsWith('image/')) continue;
+    if(file.size > 25 * 1024 * 1024) {
+      toast(tf('photos.too_large','Photo "{name}" is over 25 MB — skipped.',{name:file.name}), 'warn');
+      continue;
+    }
+    try {
+      // Read as data URL for EXIF + base64-or-blob storage
+      const dataUrl = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = e => res(e.target.result);
+        r.onerror = () => rej(r.error);
+        r.readAsDataURL(file);
+      });
+      const photo = {
+        // Legacy field — kept temporarily for back-compat with code paths that
+        // still expect `.data`. Will become null once those paths are migrated.
+        data: dataUrl,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        capturedAt: new Date(file.lastModified || Date.now()).toISOString(),
+      };
+      // EXIF best-effort (orientation, GPS, datetime)
+      await new Promise(resolve => tryExtractExif(file, exif => {
+        if(exif) Object.assign(photo, exif);
+        resolve();
+      }));
+      // V14: upload to cloud if authenticated, otherwise store in IDB.
+      // Either way, the record stores { photoId, remoteUrl } and drops the
+      // huge base64 blob.
+      try {
+        const result = await vxUploadPhoto(file, { name: file.name, exifDateTime: photo.exifDateTime });
+        photo.photoId  = result.photoId;
+        photo.remoteUrl = result.remoteUrl;
+        // Once we have a remoteUrl OR a photoId pointing to IDB, drop .data
+        // from the persisted record to save space. We keep it on the in-memory
+        // _defPhotos[] entry so the form preview can show the thumbnail
+        // immediately without an extra IDB read.
+        if(result.photoId || result.remoteUrl) {
+          // Mark .data as "transient" — sync-time serializer will strip it
+          photo._transient = true;
+        }
+      } catch(e) {
+        console.warn('Photo storage failed, keeping inline:', e);
+      }
+      _defPhotos.push(photo);
+      defRenderPhotos();
+    } catch(e) {
+      vxReportError(e, 'defAttachPhotos');
+    }
+  }
+}
+
+function tryExtractExif(file, cb){
+  // Lightweight EXIF extraction — reads only the first 64KB looking for GPS + DateTime tags.
+  // Robust enough for "did the phone tag this photo?" but not a full library.
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const view = new DataView(e.target.result);
+      if(view.getUint16(0, false) !== 0xFFD8){ cb(null); return; } // not JPEG
+      let offset = 2;
+      const length = view.byteLength;
+      let exif = {};
+      while(offset < length){
+        if(view.getUint16(offset, false) === 0xFFE1){
+          // APP1 (EXIF) marker
+          const exifLen = view.getUint16(offset+2, false);
+          const exifStart = offset + 4;
+          // Look for ASCII "Exif\0\0"
+          if(view.getUint32(exifStart, false) === 0x45786966){
+            const tiffStart = exifStart + 6;
+            const little = view.getUint16(tiffStart, false) === 0x4949;
+            const ifd0Offset = view.getUint32(tiffStart + 4, little);
+            const ifd0Start = tiffStart + ifd0Offset;
+            const ifd0Entries = view.getUint16(ifd0Start, little);
+            for(let i = 0; i < ifd0Entries; i++){
+              const entryStart = ifd0Start + 2 + i * 12;
+              const tag = view.getUint16(entryStart, little);
+              if(tag === 0x9003 || tag === 0x9004){ // DateTimeOriginal / DateTimeDigitized
+                const valOffset = view.getUint32(entryStart + 8, little);
+                const dStart = tiffStart + valOffset;
+                let str = '';
+                for(let j = 0; j < 19; j++) str += String.fromCharCode(view.getUint8(dStart + j));
+                exif.exifDateTime = str.trim();
+              }
+              if(tag === 0x8825){ // GPS IFD pointer — defer (would need more parsing)
+                exif.hasGps = true;
+              }
+            }
+          }
+          break;
+        }
+        const sectLen = view.getUint16(offset+2, false);
+        offset += 2 + sectLen;
+        if(offset > 65000) break; // safety
+      }
+      cb(Object.keys(exif).length ? exif : null);
+    } catch(err) {
+      cb(null);
+    }
+  };
+  reader.readAsArrayBuffer(file.slice(0, 64 * 1024));
+}
+
+function defRenderPhotos(){
+  const wrap = el('def-photos'); if(!wrap) return;
+  // Keep the add button as the last child
+  const addBtn = wrap.querySelector('.photo-attach-add');
+  wrap.innerHTML = '';
+  _defPhotos.forEach((p, idx) => {
+    const div = document.createElement('div');
+    div.className = 'photo-attach-thumb';
+    div.style.backgroundImage = `url("${p.data}")`;
+    div.title = (p.name || 'Photo') + (p.exifDateTime ? ' · ' + p.exifDateTime : '') + (p.hasGps ? ' · GPS' : '');
+    div.onclick = () => defOpenPhotoView(p);
+    const meta = document.createElement('span');
+    meta.className = 'photo-attach-thumb-meta';
+    meta.textContent = (p.hasGps ? '📍 ' : '') + (p.size ? Math.round(p.size/1024) + 'k' : '');
+    div.appendChild(meta);
+    const x = document.createElement('button');
+    x.className = 'photo-attach-thumb-remove';
+    x.textContent = '×';
+    x.onclick = e => { e.stopPropagation(); _defPhotos.splice(idx, 1); defRenderPhotos(); };
+    div.appendChild(x);
+    wrap.appendChild(div);
+  });
+  if(addBtn) wrap.appendChild(addBtn);
+  else {
+    const lbl = document.createElement('label');
+    lbl.className = 'photo-attach-add';
+    lbl.htmlFor = 'def-photo-input';
+    lbl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Add photo</span>';
+    wrap.appendChild(lbl);
+  }
+}
+
+function defOpenPhotoView(photo){
+  let modal = document.getElementById('def-photo-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'def-photo-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px';
+  // Click-outside-to-close (but not on the inner card)
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  // Save/cancel buttons need access to canvas state; store on the modal element.
+  modal._photo = photo;
+  modal._annotations = Array.isArray(photo.annotations) ? photo.annotations.slice() : [];
+  modal._mode = 'view';   // 'view' | 'arrow' | 'circle' | 'text'
+  modal.innerHTML = `<div style="position:relative;display:flex;flex-direction:column;max-width:96vw;max-height:96vh;gap:10px">
+    <!-- Toolbar -->
+    <div style="display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--border2);border-radius:var(--r2);padding:8px 12px;box-shadow:var(--sh-md)">
+      <span style="font-size:11px;color:var(--t3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Annotate:</span>
+      <button class="btn btn-sm" data-mode="arrow"  data-action="defAnnotMode" data-args="'arrow'"  style="font-size:12px">↗ Arrow</button>
+      <button class="btn btn-sm" data-mode="circle" data-action="defAnnotMode" data-args="'circle'" style="font-size:12px">⊙ Circle</button>
+      <button class="btn btn-sm" data-mode="text"   data-action="defAnnotMode" data-args="'text'"   style="font-size:12px">T Label</button>
+      <span style="width:1px;height:18px;background:var(--border2);margin:0 4px"></span>
+      <button class="btn btn-sm" data-action="defAnnotUndo" title="Remove last annotation" style="font-size:12px">↶ Undo</button>
+      <button class="btn btn-sm btn-danger" data-action="defAnnotClear" style="font-size:12px">Clear all</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-sm btn-primary" data-action="defAnnotSave" style="font-size:12px">Save annotations</button>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'def-photo-modal\'" style="font-size:12px">Close</button>
+    </div>
+    <!-- Stage -->
+    <div id="def-photo-stage" style="position:relative;display:inline-block;align-self:center">
+      <img id="def-photo-img" src="${photo.data}" alt="Defect photo${photo.name?': '+escapeHtml(photo.name):''}" loading="lazy" style="max-width:90vw;max-height:78vh;border-radius:8px;display:block"/>
+      <canvas id="def-photo-canvas" style="position:absolute;inset:0;width:100%;height:100%;cursor:crosshair"></canvas>
+    </div>
+    <!-- Footer -->
+    <div style="display:flex;align-items:center;background:rgba(0,0,0,.6);color:#fff;font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:6px;align-self:center;max-width:90vw;flex-wrap:wrap;gap:10px">
+      <span>${escapeHtml(photo.name||'photo')}</span>
+      ${photo.exifDateTime?`<span style="opacity:.7">·</span><span>${escapeHtml(photo.exifDateTime)}</span>`:''}
+      ${photo.hasGps?'<span style="opacity:.7">·</span><span>📍 GPS embedded</span>':''}
+      <span style="opacity:.7">·</span>
+      <span id="def-annot-count">${modal._annotations.length} annotation${modal._annotations.length!==1?'s':''}</span>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  openA11yModal(modal);
+  // Wait for image to load to size the canvas
+  const img = modal.querySelector('#def-photo-img');
+  const canvas = modal.querySelector('#def-photo-canvas');
+  const sync = () => {
+    canvas.width = img.naturalWidth || img.clientWidth;
+    canvas.height = img.naturalHeight || img.clientHeight;
+    defAnnotRedraw();
+  };
+  if(img.complete) sync();
+  else img.addEventListener('load', sync);
+  // Drawing handlers — coordinates are normalized 0–1 so they survive resize.
+  let drawing = null;
+  canvas.addEventListener('mousedown', e => {
+    if(modal._mode === 'view') return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    if(modal._mode === 'arrow' || modal._mode === 'circle'){
+      drawing = { mode: modal._mode, x1:x, y1:y, x2:x, y2:y };
+    } else if(modal._mode === 'text'){
+      const label = prompt('Label text:', 'D'+(modal._annotations.length+1));
+      if(label !== null) {
+        modal._annotations.push({ mode:'text', x, y, text: label });
+        defAnnotRedraw();
+      }
+    }
+  });
+  canvas.addEventListener('mousemove', e => {
+    if(!drawing) return;
+    const rect = canvas.getBoundingClientRect();
+    drawing.x2 = (e.clientX - rect.left) / rect.width;
+    drawing.y2 = (e.clientY - rect.top) / rect.height;
+    defAnnotRedraw(drawing);
+  });
+  canvas.addEventListener('mouseup', () => {
+    if(!drawing) return;
+    modal._annotations.push(drawing);
+    drawing = null;
+    defAnnotRedraw();
+  });
+  // Initial render
+  defAnnotMode('view');
+}
+function defAnnotMode(mode){
+  const modal = document.getElementById('def-photo-modal'); if(!modal) return;
+  modal._mode = mode;
+  modal.querySelectorAll('button[data-mode]').forEach(b => {
+    b.classList.toggle('btn-primary', b.dataset.mode === mode);
+  });
+  const canvas = document.getElementById('def-photo-canvas');
+  if(canvas) canvas.style.cursor = (mode === 'view') ? 'default' : 'crosshair';
+}
+function defAnnotRedraw(preview){
+  const modal = document.getElementById('def-photo-modal'); if(!modal) return;
+  const canvas = document.getElementById('def-photo-canvas'); if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const all = modal._annotations.concat(preview ? [preview] : []);
+  all.forEach((a, i) => {
+    ctx.save();
+    ctx.lineWidth = Math.max(2, canvas.width / 300);
+    ctx.font = `${Math.max(14, canvas.width/40)}px sans-serif`;
+    ctx.strokeStyle = '#f25c5c';
+    ctx.fillStyle = '#f25c5c';
+    if(a.mode === 'arrow'){
+      const x1 = a.x1*canvas.width, y1 = a.y1*canvas.height;
+      const x2 = a.x2*canvas.width, y2 = a.y2*canvas.height;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      // Arrowhead
+      const ang = Math.atan2(y2-y1, x2-x1);
+      const head = Math.max(10, canvas.width/60);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - head*Math.cos(ang - Math.PI/6), y2 - head*Math.sin(ang - Math.PI/6));
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - head*Math.cos(ang + Math.PI/6), y2 - head*Math.sin(ang + Math.PI/6));
+      ctx.stroke();
+    } else if(a.mode === 'circle'){
+      const x1 = a.x1*canvas.width, y1 = a.y1*canvas.height;
+      const x2 = a.x2*canvas.width, y2 = a.y2*canvas.height;
+      const cx = (x1+x2)/2, cy = (y1+y2)/2;
+      const rx = Math.abs(x2-x1)/2, ry = Math.abs(y2-y1)/2;
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 2*Math.PI); ctx.stroke();
+    } else if(a.mode === 'text'){
+      const x = a.x*canvas.width, y = a.y*canvas.height;
+      const padding = 6;
+      const txt = a.text||'';
+      const m = ctx.measureText(txt);
+      const w = m.width + padding*2;
+      const h = parseInt(ctx.font) + padding;
+      ctx.fillStyle = '#f25c5c';
+      ctx.fillRect(x - w/2, y - h/2, w, h);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(txt, x, y);
+    }
+    ctx.restore();
+  });
+  // Update annotation count label
+  const lbl = document.getElementById('def-annot-count');
+  if(lbl) lbl.textContent = modal._annotations.length + ' annotation' + (modal._annotations.length !== 1 ? 's' : '');
+}
+function defAnnotUndo(){
+  const modal = document.getElementById('def-photo-modal'); if(!modal) return;
+  modal._annotations.pop();
+  defAnnotRedraw();
+}
+async function defAnnotClear(){
+  const modal = document.getElementById('def-photo-modal'); if(!modal) return;
+  if(modal._annotations.length && !(await vxConfirm({ message: 'Are you sure you want to remove all annotations from this defect?', okLabel: t('vxc.remove','Remove'), danger: true }))) return;
+  modal._annotations = [];
+  defAnnotRedraw();
+}
+function defAnnotSave(){
+  const modal = document.getElementById('def-photo-modal'); if(!modal) return;
+  const photo = modal._photo;
+  // Find the photo in _defPhotos and update annotations
+  const i = _defPhotos.indexOf(photo);
+  if(i >= 0){
+    _defPhotos[i] = Object.assign({}, photo, { annotations: modal._annotations.slice() });
+  }
+  modal.remove();
+  if(typeof defRenderPhotos === 'function') defRenderPhotos();
+  toast(t('toast.annotations_saved','Annotations saved.'), 'success');
+}
+
+// ── Voice notes via Web Speech API ────────────────────────────
+var _voiceRecognition = null;
+var _voiceTargetField = null;
+var _voiceBtn = null;
+
+function voiceToggle(fieldId, btn){
+  if(_voiceRecognition){
+    // Stop active recording
+    try { _voiceRecognition.stop(); } catch(e){}
+    return;
+  }
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!Recognition){
+    toast(t('toast.voice_unsupported', 'Voice recognition not supported in this browser.'), 'error');
+    return;
+  }
+  const target = document.getElementById(fieldId);
+  if(!target) return;
+  _voiceTargetField = target;
+  _voiceBtn = btn;
+  const r = new Recognition();
+  r.lang = 'en';
+  r.continuous = true;
+  r.interimResults = true;
+  let baseline = target.value;
+  if(baseline && !baseline.endsWith(' ') && !baseline.endsWith('\n')) baseline += ' ';
+  r.onstart = () => {
+    btn.classList.add('recording');
+    toast(t('toast.mic_listening','Listening — speak naturally. Tap mic again to stop.'), 'info');
+  };
+  r.onresult = ev => {
+    let final = '', interim = '';
+    for(let i = ev.resultIndex; i < ev.results.length; i++){
+      const txt = ev.results[i][0].transcript;
+      if(ev.results[i].isFinal) final += txt + ' ';
+      else interim += txt;
+    }
+    target.value = baseline + final + interim;
+    if(final){ baseline += final; target.dispatchEvent(new Event('input')); }
+  };
+  r.onerror = ev => {
+    if(ev.error === 'no-speech') return;
+    if(ev.error === 'not-allowed'){ toast(t('toast.mic_denied','Microphone permission denied.'), 'error'); }
+    else toast(tf('toast.voice_error','Voice error: {msg}', {msg: ev.error}), 'error');
+  };
+  r.onend = () => {
+    if(_voiceBtn) _voiceBtn.classList.remove('recording');
+    _voiceRecognition = null;
+    _voiceTargetField = null;
+    _voiceBtn = null;
+  };
+  r.start();
+  _voiceRecognition = r;
+}
+
+// ── Sidebar collapse toggle ────────────────────────────────────
+function toggleSidebar(){
+  const html = document.documentElement;
+  const collapsed = html.getAttribute('data-sidebar-collapsed') === 'true';
+  if(collapsed) html.removeAttribute('data-sidebar-collapsed');
+  else html.setAttribute('data-sidebar-collapsed', 'true');
+  try { localStorage.setItem('vx-sidebar-collapsed-v1', collapsed ? '0' : '1'); } catch(e){}
+}
+function loadSidebarState(){
+  try {
+    const v = localStorage.getItem('vx-sidebar-collapsed-v1');
+    if(v === '1') document.documentElement.setAttribute('data-sidebar-collapsed', 'true');
+  } catch(e){}
+}
+
+// ── Online/offline indicator ──────────────────────────────────
+function updateOnlineStatus(){
+  const sig = document.querySelector('.signal');
+  if(!sig) return;
+  if(navigator.onLine){
+    sig.classList.remove('offline');
+    const lbl = el('report-count-label');
+    if(lbl && lbl.textContent.includes('offline')) updateReportCount();
+  } else {
+    sig.classList.add('offline');
+    const lbl = el('report-count-label');
+    if(lbl) lbl.textContent = 'offline — changes will sync';
+  }
+}
+window.addEventListener('online', () => { updateOnlineStatus(); toast(t('toast.back_online','Back online — changes will sync.'), 'success'); });
+window.addEventListener('offline', () => { updateOnlineStatus(); toast(t('toast.offline_mode','You are offline — work continues and will sync when reconnected.'), 'warn'); });
+
+// V9: Ctrl+B / Cmd+B to toggle sidebar collapse
+document.addEventListener('keydown', e => {
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b'){
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    toggleSidebar();
+  }
+});
+
+// ── Capture mode wizard ────────────────────────────────────────
+// Wraps the new-report form in a step-by-step layout for tablet inspectors.
+var _wizardStep = 0;
+var _wizardSteps = [];   // Each step: { fields: [...], title, help }
+var _wizardMethod = null;
+
+function captureWizardStart(){
+  if(!_ovMethod) { toast(t('toast.pick_method', 'Pick a method first.'), 'error'); return; }
+  _wizardMethod = _ovMethod;
+  // Group fields into wizard steps
+  const m = NDT_METHODS.find(x => x.id === _ovMethod); if(!m) return;
+  const specific = (TPL_FIELDS[_ovMethod] || []).map(f => ({...f, id:'eq_'+f.id}));
+  _wizardSteps = [
+    { title: t('wiz.client_title','Client & project'),  help: t('wiz.client_help','Who is this inspection for?'), fields: RPT_FORM.client },
+    { title: t('wiz.subject_title','Subject of inspection'), help: t('wiz.subject_help','What is being inspected?'), fields: RPT_FORM.subject },
+    { title: t('wiz.exam_title','Examination details'),  help: t('wiz.exam_help','When, where, with what.'), fields: RPT_FORM.exam },
+    { title: t('wiz.method_title','Method-specific data'),  help: tf('wiz.method_help','{method} — equipment, technique, parameters.', {method: m.id}), fields: specific.length ? specific : [] },
+    { title: t('wiz.result_title','Result & verdict'),  help: t('wiz.result_help','Findings, acceptance, sign-off.'), fields: RPT_FORM.result },
+  ].filter(s => s.fields && s.fields.length);
+  _wizardStep = 0;
+  let overlay = document.getElementById('capture-wizard');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'capture-wizard';
+    overlay.className = 'capture-wizard-overlay';
+    overlay.innerHTML = `
+      <div class="capture-wizard-head">
+        <button class="btn btn-sm" data-action="captureWizardClose">Exit</button>
+        <span class="capture-wizard-step-counter" id="cw-step-counter">Step 1 of 5</span>
+        <div class="capture-wizard-progress"><div class="capture-wizard-progress-fill" id="cw-progress" style="width:0%"></div></div>
+      </div>
+      <div class="capture-wizard-body" id="cw-body"></div>
+      <div class="capture-wizard-foot">
+        <button class="btn" id="cw-back" data-action="captureWizardBack">← Back</button>
+        <button class="btn btn-primary" id="cw-next" data-action="captureWizardNext">Next →</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.add('open');
+  captureWizardRenderStep();
+}
+
+function captureWizardRenderStep(){
+  const step = _wizardSteps[_wizardStep]; if(!step) return;
+  const body = el('cw-body'); if(!body) return;
+  const counter = el('cw-step-counter');
+  const progress = el('cw-progress');
+  const back = el('cw-back');
+  const next = el('cw-next');
+  if(counter) counter.textContent = `Step ${_wizardStep+1} of ${_wizardSteps.length}`;
+  if(progress) progress.style.width = (((_wizardStep+1) / _wizardSteps.length) * 100) + '%';
+  if(back) back.disabled = (_wizardStep === 0);
+  if(next) next.textContent = (_wizardStep === _wizardSteps.length - 1) ? 'Save report' : 'Next →';
+
+  const m = _wizardMethod;
+  let fldHtml = '';
+  (step.fields || []).forEach(f => {
+    const id = `rf-${m}-${f.id}`;
+    // Try to read the existing value from the underlying form (so multi-step preserves state)
+    const existing = el(id) ? el(id).value : '';
+    const hasMic = f.type !== 'select' && (f.id.includes('remarks') || f.id.includes('notes') || f.id.includes('description'));
+    if(f.type === 'select'){
+      fldHtml += `<div class="fld capture-wizard-fld" style="margin-bottom:14px"><label>${escapeHtml(f.label)}</label><select data-on-change="_wCaptureWizardSetValue" data-pass-el="1" data-args="'${id}'">`;
+      (f.options || []).forEach(o => { fldHtml += `<option ${o===existing?'selected':''}>${escapeHtml(o)}</option>`; });
+      fldHtml += '</select></div>';
+    } else if(f.type === 'date'){
+      fldHtml += `<div class="fld capture-wizard-fld" style="margin-bottom:14px"><label>${escapeHtml(f.label)}</label><input type="date" value="${escapeHtml(existing)}" data-on-change="_wCaptureWizardSetValue" data-pass-el="1" data-args="'${id}'"/></div>`;
+    } else if(hasMic){
+      fldHtml += `<div class="fld capture-wizard-fld voice-wrap-textarea" style="margin-bottom:14px"><label>${escapeHtml(f.label)}</label><textarea rows="3" id="cwfld-${f.id}" data-on-input="_wCaptureWizardSetValue" data-pass-el="1" data-args="'${id}'" placeholder="${escapeHtml(f.placeholder||'')}" style="padding-right:46px">${escapeHtml(existing)}</textarea><button type="button" class="voice-mic-btn" data-action="voiceToggle" data-pass-el="1" data-args="'cwfld-${f.id}'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button></div>`;
+    } else {
+      fldHtml += `<div class="fld capture-wizard-fld" style="margin-bottom:14px"><label>${escapeHtml(f.label)}</label><input value="${escapeHtml(existing)}" data-on-input="_wCaptureWizardSetValue" data-pass-el="1" data-args="'${id}'" placeholder="${escapeHtml(f.placeholder||'')}"/></div>`;
+    }
+  });
+  body.innerHTML = `<div class="capture-wizard-card">
+    <div class="capture-wizard-step-title">${escapeHtml(step.title)}</div>
+    <div class="capture-wizard-step-help">${escapeHtml(step.help)}</div>
+    ${fldHtml}
+  </div>`;
+}
+function captureWizardSetVal(targetId, val){
+  const t = el(targetId);
+  if(t) t.value = val;
+}
+function captureWizardNext(){
+  if(_wizardStep < _wizardSteps.length - 1){
+    _wizardStep++;
+    captureWizardRenderStep();
+    el('cw-body').scrollTop = 0;
+  } else {
+    // Save the report through the existing path
+    captureWizardClose();
+    if(typeof ovSaveReport === 'function') ovSaveReport();
+  }
+}
+function captureWizardBack(){
+  if(_wizardStep > 0){
+    _wizardStep--;
+    captureWizardRenderStep();
+  }
+}
+function captureWizardClose(){
+  const overlay = document.getElementById('capture-wizard');
+  if(overlay) overlay.classList.remove('open');
+}
+
+// ── Barcode scanner ────────────────────────────────────────────
+var _barcodeStream = null;
+var _barcodeInterval = null;
+var _barcodeTargetInput = null;
+
+async function barcodeOpen(targetFieldId){
+  _barcodeTargetInput = targetFieldId;
+  let overlay = document.getElementById('barcode-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'barcode-overlay';
+    overlay.className = 'barcode-scan-overlay';
+    overlay.innerHTML = `<div class="barcode-scan-frame">
+      <div class="barcode-scan-overlay-frame">
+        <video id="barcode-video" class="barcode-scan-video" autoplay muted playsinline></video>
+        <div class="barcode-scan-target"></div>
+      </div>
+      <div class="barcode-scan-foot">
+        <span style="font-size:12px;color:var(--t3)">Align the code in the cyan frame.</span>
+        <button class="btn btn-sm" data-action="barcodeClose">Cancel</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.add('open');
+  if(!('BarcodeDetector' in window)){
+    overlay.querySelector('.barcode-scan-foot span').innerHTML = '<span style="color:var(--amber)">⚠ Barcode detection not supported in this browser. Use a recent Chrome/Edge.</span>';
+    return;
+  }
+  try {
+    _barcodeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    el('barcode-video').srcObject = _barcodeStream;
+    const detector = new window.BarcodeDetector({ formats: ['code_128','code_39','ean_13','ean_8','qr_code','data_matrix','upc_a','upc_e'] });
+    _barcodeInterval = setInterval(async () => {
+      try {
+        const codes = await detector.detect(el('barcode-video'));
+        if(codes && codes.length){
+          const value = codes[0].rawValue;
+          barcodeClose();
+          if(_barcodeTargetInput){
+            const t = document.getElementById(_barcodeTargetInput);
+            if(t){ t.value = value; t.dispatchEvent(new Event('input')); }
+          }
+          toast(tf('toast.scanned','Scanned: {value}', {value}), 'success');
+        }
+      } catch(e){}
+    }, 400);
+  } catch(e){
+    toast(t('toast.camera_denied','Camera access denied or unavailable.'), 'error');
+    barcodeClose();
+  }
+}
+function barcodeClose(){
+  const overlay = document.getElementById('barcode-overlay');
+  if(overlay) overlay.classList.remove('open');
+  if(_barcodeInterval){ clearInterval(_barcodeInterval); _barcodeInterval = null; }
+  if(_barcodeStream){ _barcodeStream.getTracks().forEach(t => t.stop()); _barcodeStream = null; }
+  _barcodeTargetInput = null;
+}
+

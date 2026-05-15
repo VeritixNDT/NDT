@@ -1,0 +1,1410 @@
+// ══════════════════════════════════════════════
+// OVERVIEW PAGE
+// ══════════════════════════════════════════════
+var _ovMethod = null;
+
+function ovInit() {
+  // Build new report method buttons
+  const wrap = el('ov-new-report-btns'); if(!wrap) return;
+  const methods = getActiveMethods();
+  wrap.innerHTML = methods.map(m => `
+    <button class="snav-item" data-action="ovNewReport" data-pass-el="1" data-args="'${m.id}'" style="gap:9px">
+      <span style="width:8px;height:8px;border-radius:50%;background:${m.color};flex-shrink:0"></span>
+      New ${m.id} report
+    </button>
+  `).join('');
+  ovRefreshDashboard();
+}
+
+function ovShowSection(id, btn) {
+  document.querySelectorAll('#page-overview .ss').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#ov-snav .snav-item').forEach(b => b.classList.remove('active'));
+  const sec = el('ov-' + id); if(sec) sec.classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(id === 'dashboard') ovRefreshDashboard();
+  if(id === 'recent') ovRenderRecentList();
+  if(id === 'procedures') procInitView();
+}
+
+// V8: Date range state for dashboard
+var _ovDateRange = 30; // days, or 'all'
+function ovSetDateRange(range){
+  _ovDateRange = range;
+  document.querySelectorAll('#ov-dr-selector .dr-opt').forEach(b => {
+    b.classList.toggle('active', String(b.dataset.range) === String(range));
+  });
+  ovRefreshDashboard();
+}
+function ovFilterByRange(reports){
+  if(_ovDateRange === 'all') return reports;
+  const days = parseInt(_ovDateRange);
+  if(!days) return reports;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return reports.filter(r => {
+    if(!r.createdAt) return false;
+    const t = new Date(r.createdAt).getTime();
+    return t >= cutoff;
+  });
+}
+
+function ovRefreshDashboard() {
+  const allReports = ls(KEYS.reports, []);
+  const reports = ovFilterByRange(allReports);
+  const methods = getActiveMethods();
+  const total = reports.length;
+  const passed = reports.filter(r => r.verdict === 'Acceptable').length;
+  const passRate = total ? Math.round(passed / total * 100) : 0;
+  const defects = reports.filter(r => r.verdict === 'Not acceptable').length;
+  const activeMethodCount = methods.filter(m => reports.some(r => r.method === m.id)).length;
+  const mC = m => reports.filter(r => r.method === m).length;
+  const mP = m => { const rs = reports.filter(r => r.method === m); return rs.length ? Math.round(rs.filter(r => r.verdict === 'Acceptable').length / rs.length * 100) : 0; };
+
+  // Subtitle — use the user's locale for date formatting and a translated
+  // "X methods" label so the dashboard speaks the user's language.
+  const methodsLabel = methods.length === 1
+    ? t('lbl.method', '1 method')
+    : tf('lbl.x_methods', '{n} methods', { n: methods.length });
+  const loc = (typeof vxLocale === 'function' ? vxLocale() : 'en-GB');
+  const dateLabel = new Date().toLocaleDateString(loc, {month:'long', year:'numeric'});
+  set('ov-dash-sub', `${methodsLabel} · ${dateLabel}`);
+
+  // Sparkline data — last 7 days
+  const totalSpark = generate7DaySparkline(reports, 'createdAt');
+  const failSpark = generate7DaySparkline(reports.filter(r => r.verdict === 'Not acceptable'), 'createdAt');
+  const passSpark = generate7DaySparkline(reports.filter(r => r.verdict === 'Acceptable'), 'createdAt');
+  const methodSpark = methods.map((_, i) => activeMethodCount > i ? Math.max(1, Math.round(activeMethodCount * (0.5 + i * 0.08))) : 0);
+
+  // Trend (last 3 days vs previous 3)
+  const trendOf = arr => {
+    const recent = arr.slice(-3).reduce((a,b) => a+b, 0);
+    const prior  = arr.slice(0, 3).reduce((a,b) => a+b, 0);
+    if(prior === 0 && recent === 0) return { label: '0%', cls: 'flat' };
+    if(prior === 0) return { label: '+new', cls: 'up' };
+    const pct = Math.round(((recent - prior) / Math.max(1, prior)) * 100);
+    if(pct > 0)  return { label: '+' + pct + '%', cls: 'up' };
+    if(pct < 0)  return { label: pct + '%', cls: 'down' };
+    return { label: '0%', cls: 'flat' };
+  };
+  const tTotal  = trendOf(totalSpark);
+  const tFail   = trendOf(failSpark);
+  const tPass   = trendOf(passSpark);
+
+  // Trend arrows
+  const arrowFor = cls => cls === 'up'   ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 14 12 8 18 14"/></svg>'
+                       : cls === 'down' ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 10 12 16 18 10"/></svg>'
+                       :                  '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
+  // Metric tiles — refined with sparklines and trend pills
+  const metricsEl = el('ov-metrics');
+  if(metricsEl) metricsEl.innerHTML = `
+    <div class="dash-met" data-action="ovDrillMetric" data-args="'total'" style="cursor:pointer" title="${t('dash.tip_all','Click to see all reports in this period')}">
+      <div class="dash-met-glow" style="background:var(--cyan)"></div>
+      <div class="dash-met-head">
+        <div class="dash-met-label" data-i18n="dash.total_reports">Total reports</div>
+        <div class="dash-met-icon" style="background:rgba(0,212,255,.10);color:var(--cyan)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+      </div>
+      <div class="dash-met-val">${total}<span class="dash-met-trend ${tTotal.cls}">${arrowFor(tTotal.cls)} ${tTotal.label}</span></div>
+      <div class="dash-met-sub">vs previous 3-day window</div>
+      ${sparklineSVG(totalSpark, '#00d4ff')}
+    </div>
+    <div class="dash-met" data-action="ovDrillMetric" data-args="'fail'" style="cursor:pointer" title="${t('dash.tip_fail','Click to see failed reports')}">
+      <div class="dash-met-glow" style="background:var(--red)"></div>
+      <div class="dash-met-head">
+        <div class="dash-met-label" data-i18n="dash.not_acceptable">Not acceptable</div>
+        <div class="dash-met-icon" style="background:rgba(242,92,92,.10);color:var(--red)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+      </div>
+      <div class="dash-met-val" style="color:var(--red)">${defects}<span class="dash-met-trend ${tFail.cls === 'up' ? 'down' : tFail.cls === 'down' ? 'up' : 'flat'}">${arrowFor(tFail.cls)} ${tFail.label}</span></div>
+      <div class="dash-met-sub">of ${total} reports flagged</div>
+      ${sparklineSVG(failSpark, '#f25c5c')}
+    </div>
+    <div class="dash-met" data-action="ovDrillMetric" data-args="'pass'" style="cursor:pointer" title="${t('dash.tip_pass','Click to see passing reports')}">
+      <div class="dash-met-glow" style="background:var(--green)"></div>
+      <div class="dash-met-head">
+        <div class="dash-met-label" data-i18n="dash.pass_rate">Pass rate</div>
+        <div class="dash-met-icon" style="background:rgba(62,207,142,.10);color:var(--green)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+      <div class="dash-met-val" style="color:var(--green)">${passRate}%<span class="dash-met-trend ${tPass.cls}">${arrowFor(tPass.cls)} ${tPass.label}</span></div>
+      <div class="dash-met-sub">${passed} of ${total} acceptable</div>
+      ${sparklineSVG(passSpark, '#3ecf8e')}
+    </div>
+    <div class="dash-met" data-action="ovDrillMetric" data-args="'drafts'" style="cursor:pointer" title="Click to see drafts in progress">
+      <div class="dash-met-glow" style="background:var(--cyan)"></div>
+      <div class="dash-met-head">
+        <div class="dash-met-label">Methods active</div>
+        <div class="dash-met-icon" style="background:rgba(0,153,204,.10);color:var(--cyan2)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v6.5a2 2 0 0 0 .35 1.13l5.3 7.66a2 2 0 0 1-1.65 3.13H6a2 2 0 0 1-1.65-3.13l5.3-7.66A2 2 0 0 0 10 8.5V2"/><path d="M9 2h6"/></svg>
+        </div>
+      </div>
+      <div class="dash-met-val">${activeMethodCount}<span style="font-size:14px;color:var(--t3);font-weight:500"> / ${methods.length}</span></div>
+      <div class="dash-met-sub">${methods.length - activeMethodCount} methods unused</div>
+      <div class="dash-met-bar"><div class="dash-met-bar-fill" style="width:${methods.length?activeMethodCount*100/methods.length:0}%;background:var(--cyan2)"></div></div>
+    </div>`;
+
+  // Method cards
+  const mcardsEl = el('ov-mcards');
+  if(mcardsEl) mcardsEl.innerHTML = methods.map(m => {
+    const failed = reports.filter(r => r.method === m.id && r.verdict === 'Not acceptable').length;
+    return `
+    <div class="dash-mc" data-action="ovNewReport" data-args="'${m.id}'" style="border-color:${m.color}33">
+      <style>#dmc-${m.id}::before{background:${m.color}!important}</style>
+      <div id="dmc-${m.id}" style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${m.color};opacity:.85"></div>
+      <div class="dash-mc-code" style="color:${m.color}">${m.id}</div>
+      <div class="dash-mc-name">${escapeHtml(m.name)}</div>
+      <div class="dash-mc-stats">
+        <div><div class="dash-mc-sl">Reports</div><div class="dash-mc-sv">${mC(m.id)}</div></div>
+        <div><div class="dash-mc-sl">Pass rate</div><div class="dash-mc-sv" style="color:${mP(m.id)>=90?'var(--green)':mP(m.id)>=70?'var(--amber)':'var(--red)'}">${mP(m.id)}%</div></div>
+        <div><div class="dash-mc-sl">Failed</div><div class="dash-mc-sv" style="color:${failed>0?'var(--red)':'var(--t1)'}">${failed}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Recent reports table
+  const recentEl = el('ov-dash-recent');
+  if(recentEl) {
+    const recent = reports.slice(-5).reverse();
+    recentEl.innerHTML = recent.length ? recent.map(r => {
+      const md = NDT_METHODS.find(x => x.id === r.method);
+      // Status timeline based on verdict
+      const ok = r.verdict === 'Acceptable';
+      const fail = r.verdict === 'Not acceptable';
+      const stepsHtml = `<div class="status-timeline" title="Draft → Submitted → Reviewed → Result">
+        <div class="status-step done"></div>
+        <div class="status-step done"></div>
+        <div class="status-step done"></div>
+        <div class="status-step ${fail ? 'failed' : ok ? 'done' : 'active'}"></div>
+      </div>`;
+      const verdictBadge = `<span class="badge badge-${ok?'green':fail?'red':'blue'}">${r.verdict||'Draft'}</span>`;
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--cyan)">${r.reportNo||'—'}</td>
+        <td><span class="badge mono" style="background:${(md?.color||'#5a6880')+'1a'};color:${md?.color||'#5a6880'};box-shadow:inset 0 0 0 1px ${(md?.color||'#5a6880')+'33'}">${r.method}</span></td>
+        <td>${escapeHtml(r.subject||r.client||'—')}</td>
+        <td>${escapeHtml(r.inspector||'—')}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--t3)">${fmtDate(r.createdAt)}</td>
+        <td style="white-space:nowrap">${verdictBadge}</td>
+        <td>${stepsHtml}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="7" style="padding:0">
+      <div class="empty-state" style="padding:40px 20px">
+        <div class="empty-state-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+        </div>
+        <div class="empty-state-title">${escapeHtml(t('ov.empty.recent_title', 'No reports yet'))}</div>
+        <div class="empty-state-desc">${escapeHtml(t('ov.empty.recent_body', 'Create your first inspection report to start tracking results, defects, and method coverage.'))}</div>
+        <div class="empty-state-actions"><button class="btn btn-primary btn-sm" data-action="_wOvNewReportFromActiveMethod">${escapeHtml(t('ov.empty.recent_cta', '+ New report'))}</button></div>
+      </div>
+    </td></tr>`;
+  }
+
+  // Add the status column header if missing
+  const recentTable = recentEl ? recentEl.closest('table') : null;
+  if(recentTable) {
+    const ths = recentTable.querySelectorAll('thead th');
+    if(ths.length === 6) {
+      const th = document.createElement('th');
+      th.textContent = t('col.status', 'Status');
+      recentTable.querySelector('thead tr').appendChild(th);
+    }
+  }
+
+  // Severity bars
+  const sevEl = el('ov-dash-sevbars');
+  if(sevEl) {
+    const sevs = ['Critical','High','Medium','Low'];
+    const sevColors = {Critical:'var(--sev-critical)',High:'var(--sev-high)',Medium:'var(--sev-medium)',Low:'var(--sev-low)'};
+    const sevCounts = {};
+    sevs.forEach(s => sevCounts[s] = 0);
+    const maxSev = Math.max(1, ...Object.values(sevCounts));
+    sevEl.innerHTML = sevs.map(s => `
+      <div class="sev-row">
+        <div class="sev-label">${s}</div>
+        <div class="sev-track"><div class="sev-fill" style="width:${Math.round(sevCounts[s]/maxSev*100)}%;background:${sevColors[s]}"></div></div>
+        <div class="sev-count">${sevCounts[s]}</div>
+      </div>
+    `).join('');
+  }
+
+  // Activity feed with proper SVG icons
+  const actEl = el('ov-dash-activity');
+  if(actEl) {
+    const recent5 = reports.slice(-6).reverse();
+    if(recent5.length) {
+      actEl.innerHTML = recent5.map(r => {
+        const md = NDT_METHODS.find(x => x.id === r.method);
+        const isOk = r.verdict === 'Acceptable';
+        const isFail = r.verdict === 'Not acceptable';
+        const iconBg = isOk ? 'rgba(62,207,142,.10)' : isFail ? 'rgba(242,92,92,.10)' : (md?.color || '#5a6880') + '20';
+        const iconColor = isOk ? 'var(--green)' : isFail ? 'var(--red)' : md?.color || 'var(--t2)';
+        const iconSvg = isOk
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+          : isFail
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+        const verb = isFail ? 'flagged' : isOk ? 'passed' : 'created';
+        return `<div class="act-item">
+          <div class="act-icon" style="background:${iconBg};color:${iconColor}">${iconSvg}</div>
+          <div style="flex:1;min-width:0">
+            <div class="act-text">${r.method} report <strong>${r.reportNo||''}</strong> ${verb}${r.client?' for '+escapeHtml(r.client):''}</div>
+            <div class="act-time">${fmtDate(r.createdAt)}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      actEl.innerHTML = `<div class="empty-state" style="padding:24px 12px">
+        <div class="empty-state-icon" style="width:44px;height:44px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+        <div style="font-size:13px;color:var(--t3)">No activity yet.</div>
+      </div>`;
+    }
+  }
+
+  // Refresh notification badge
+  if(typeof refreshNotifBadge === 'function') refreshNotifBadge();
+
+  // V8: Render heatmap, top defect types, leaderboard, expiry timeline
+  try { ovRenderHeatmap(allReports); } catch(e){ console.warn('heatmap', e); }
+  try { ovRenderDefectTypes(); } catch(e){ console.warn('defect types', e); }
+  try { ovRenderLeaderboard(reports); } catch(e){ console.warn('leaderboard', e); }
+  try { ovRenderExpiryTimeline(); } catch(e){ console.warn('expiry timeline', e); }
+  try { ovRenderGeoMap(); } catch(e){ console.warn('geo map', e); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V8 ANALYTICS — heatmap, leaderboard, defect types, expiry timeline, drill-down
+// ══════════════════════════════════════════════════════════════════════════
+
+// Calendar heatmap of inspection activity (past 12 months)
+function ovRenderHeatmap(allReports){
+  const wrap = el('ov-heatmap-grid');
+  const wrapper = el('ov-heatmap-wrap');
+  if(!wrap || !wrapper) return;
+  if(!allReports.length){ wrapper.style.display = 'none'; return; }
+  wrapper.style.display = 'block';
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const counts = {};
+  allReports.forEach(r => {
+    if(!r.createdAt) return;
+    const d = new Date(r.createdAt);
+    if(isNaN(d)) return;
+    const key = d.toISOString().split('T')[0];
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const max = Math.max(1, ...Object.values(counts));
+  // V30: use the user's locale for month abbreviations so the heatmap reads
+  // naturally in any language (Jan/Feb in English, Janv/Févr in French, etc.).
+  const loc = (typeof vxLocale === 'function' ? vxLocale() : 'en-GB');
+  const monthFmt = new Intl.DateTimeFormat(loc, { month: 'short' });
+  const dateFmt  = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short', year: 'numeric' });
+
+  let html = '';
+  for(let m = 0; m < 12; m++){
+    const mo = new Date(start.getFullYear(), start.getMonth() + m, 1);
+    const monthName = monthFmt.format(mo);
+    const daysIn = new Date(mo.getFullYear(), mo.getMonth() + 1, 0).getDate();
+    let cells = '';
+    for(let d = 1; d <= daysIn; d++){
+      const dateObj = new Date(mo.getFullYear(), mo.getMonth(), d);
+      const key = dateObj.toISOString().split('T')[0];
+      const c = counts[key] || 0;
+      let lvl = '';
+      if(c > 0){
+        const ratio = c / max;
+        if(ratio > 0.75) lvl = 'l4';
+        else if(ratio > 0.5) lvl = 'l3';
+        else if(ratio > 0.25) lvl = 'l2';
+        else lvl = 'l1';
+      }
+      // V30: tooltip uses the same locale-aware date format.
+      const tip = tf('ov.heat.tooltip', '{n} report(s) on {date}', { n: c, date: dateFmt.format(dateObj) });
+      cells += `<div class="heatmap-cell ${lvl}" title="${escapeHtml(tip)}" data-action="ovDrillDate" data-args="'${key}'"></div>`;
+    }
+    html += `<div class="heatmap-month-col"><div class="heatmap-month-lbl">${escapeHtml(monthName)}</div>${cells}</div>`;
+  }
+  wrap.innerHTML = html;
+}
+
+function ovDrillDate(yyyyMMdd){
+  const all = ls(KEYS.reports, []);
+  const matches = all.filter(r => r.createdAt && r.createdAt.startsWith(yyyyMMdd));
+  ovOpenDrilldown(`Reports on ${yyyyMMdd}`, matches);
+}
+
+// Top defect types as horizontal bar chart
+function ovRenderDefectTypes(){
+  const wrap = el('ov-defect-types'); if(!wrap) return;
+  const all = ls(KEYS.defects, []);
+  const filtered = (_ovDateRange === 'all') ? all : all.filter(d => {
+    if(!d.createdAt) return false;
+    const t = new Date(d.createdAt).getTime();
+    return t >= Date.now() - parseInt(_ovDateRange) * 24 * 60 * 60 * 1000;
+  });
+  if(!filtered.length){
+    wrap.innerHTML = `<div style="font-size:12px;color:var(--t3);text-align:center;padding:20px">${escapeHtml(t('ov.no_data','No data in this period'))}</div>`;
+    return;
+  }
+  const counts = {};
+  filtered.forEach(d => { const t = d.type || 'Unknown'; counts[t] = (counts[t]||0) + 1; });
+  const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+  const max = sorted[0][1];
+  wrap.innerHTML = `<div class="barchart">${sorted.map(([type, c]) => `
+    <div class="barchart-row" data-action="ovDrillDefectType" data-args="${JSON.stringify(type).replace(/"/g,'&quot;')}" style="cursor:pointer">
+      <div class="barchart-label" title="${escapeHtml(type)}">${escapeHtml(type)}</div>
+      <div class="barchart-track"><div class="barchart-fill" style="width:${(c/max*100).toFixed(1)}%"></div></div>
+      <div class="barchart-count">${c}</div>
+    </div>`).join('')}</div>`;
+}
+
+function ovDrillDefectType(type){
+  const all = ls(KEYS.defects, []);
+  const matches = all.filter(d => (d.type||'Unknown') === type);
+  ovOpenDefectDrilldown(`${type} defects (${matches.length})`, matches);
+}
+
+// Inspector leaderboard
+function ovRenderLeaderboard(reports){
+  const wrap = el('ov-leaderboard'); if(!wrap) return;
+  const stats = {};
+  reports.forEach(r => {
+    const name = r.inspector || 'Unknown';
+    if(!stats[name]) stats[name] = { name, total: 0, passed: 0, failed: 0, drafts: 0 };
+    stats[name].total++;
+    if(r.verdict === 'Acceptable') stats[name].passed++;
+    else if(r.verdict === 'Not acceptable') stats[name].failed++;
+    if(getReportStage(r) === 'Draft') stats[name].drafts++;
+  });
+  const sorted = Object.values(stats).sort((a,b) => b.total - a.total).slice(0, 8);
+  if(!sorted.length){
+    wrap.innerHTML = `<div style="font-size:12px;color:var(--t3);text-align:center;padding:20px">${escapeHtml(t('ov.no_data','No data in this period'))}</div>`;
+    return;
+  }
+  // V30: translated column headers
+  const lbCols = {
+    rank:      t('lb.col.rank',      '#'),
+    inspector: t('lb.col.inspector', 'Inspector'),
+    reports:   t('lb.col.reports',   'Reports'),
+    pass_pct:  t('lb.col.pass_pct',  'Pass %'),
+    drafts:    t('lb.col.drafts',    'Drafts'),
+  };
+  let html = `<div class="lb-row" style="border-bottom:1px solid var(--border);background:var(--panel2);font-size:9px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t3);padding-top:8px;padding-bottom:8px">
+    <div style="text-align:center">${escapeHtml(lbCols.rank)}</div><div>${escapeHtml(lbCols.inspector)}</div><div style="text-align:right">${escapeHtml(lbCols.reports)}</div><div style="text-align:right">${escapeHtml(lbCols.pass_pct)}</div><div style="text-align:right">${escapeHtml(lbCols.drafts)}</div>
+  </div>`;
+  sorted.forEach((s, i) => {
+    const passPct = s.total ? Math.round(s.passed / s.total * 100) : 0;
+    const passColor = passPct >= 90 ? 'var(--green)' : passPct >= 70 ? 'var(--amber)' : 'var(--red)';
+    const ini = initials(s.name);
+    html += `<div class="lb-row">
+      <div class="lb-rank ${i<3?'top':''}">${i+1}</div>
+      <div class="lb-name"><div class="lb-avatar" style="background:${uaGrad(s.name)}">${ini}</div>${escapeHtml(s.name)}</div>
+      <div class="lb-num">${s.total}</div>
+      <div class="lb-num" style="color:${passColor}">${s.total ? passPct+'%' : '—'}</div>
+      <div class="lb-num ${s.drafts?'':'dim'}">${s.drafts}</div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+// Cert / calibration expiry timeline (Gantt-style, 6-month horizon)
+function ovRenderExpiryTimeline(){
+  const wrap = el('ov-expiry-timeline'); if(!wrap) return;
+  const inspectors = ls(KEYS.inspectors, []);
+  const now = Date.now();
+  const horizonMs = 180 * 24 * 60 * 60 * 1000;
+  const horizon = now + horizonMs;
+  const items = [];
+  inspectors.forEach(ins => {
+    if(!ins.certExpiry) return;
+    const expMs = new Date(ins.certExpiry).getTime();
+    if(isNaN(expMs)) return;
+    if(expMs < now - 30*24*60*60*1000) return;
+    if(expMs > horizon) return;
+    items.push({ kind: 'cert', name: ins.name, label: 'Cert · ' + ((ins.methods||[]).join(',')||'general'), expMs });
+  });
+  if(!items.length){
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--t3);text-align:center;padding:24px">No certifications expiring in the next 6 months — all clear.</div>';
+    return;
+  }
+  items.sort((a,b) => a.expMs - b.expMs);
+  const startMs = now - 7 * 24 * 60 * 60 * 1000;
+  const rangeMs = horizonMs + 7 * 24 * 60 * 60 * 1000;
+  const todayPct = ((now - startMs) / rangeMs) * 100;
+  let html = '';
+  items.forEach(it => {
+    const days = Math.round((it.expMs - now) / (1000*60*60*24));
+    const expired = days < 0;
+    const urgent = !expired && days < 30;
+    const color = expired ? 'var(--red)' : urgent ? 'var(--amber)' : 'var(--green)';
+    const startPct = Math.max(0, ((now - startMs) / rangeMs) * 100);
+    const endPct = Math.max(startPct + 1, ((it.expMs - startMs) / rangeMs) * 100);
+    const widthPct = endPct - startPct;
+    html += `<div class="timeline-row">
+      <div style="font-size:12px;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(it.name)}">${escapeHtml(it.name)}<div style="font-size:10px;color:var(--t3);margin-top:2px">${escapeHtml(it.label)}</div></div>
+      <div class="timeline-track">
+        <div class="timeline-today" style="left:${todayPct.toFixed(2)}%"></div>
+        <div class="timeline-bar" style="left:${startPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;background:${color}">${expired ? `EXPIRED ${Math.abs(days)}d ago` : `${days}d → ${fmtDate(new Date(it.expMs).toISOString())}`}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:${color};text-align:right">${expired ? '⚠ Expired' : days+' days'}</div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+// V9: Geographic distribution of inspections via Leaflet
+// Strategy: maintain a small inline geocode cache for common refinery / port / industrial-hub cities.
+// If a report's "location" field matches one of those, we plot a marker. Unmatched locations are
+// listed underneath the map with a hint to add lat/lng manually. Locations with explicit numeric
+// coordinates (locationLat / locationLng on the report) are always plotted regardless of name.
+var GEO_CACHE = {
+  // Major industrial / refinery hubs — focused on Europe + N. America since user is in NL
+  'rotterdam':       [51.9244, 4.4777],
+  'amsterdam':       [52.3676, 4.9041],
+  'utrecht':         [52.0907, 5.1214],
+  'eindhoven':       [51.4416, 5.4697],
+  'antwerp':         [51.2194, 4.4025],
+  'antwerpen':       [51.2194, 4.4025],
+  'brussels':        [50.8503, 4.3517],
+  'london':          [51.5074, -0.1278],
+  'felixstowe':      [51.9622, 1.3517],
+  'manchester':      [53.4808, -2.2426],
+  'aberdeen':        [57.1497, -2.0943],
+  'newcastle':       [54.9783, -1.6178],
+  'glasgow':         [55.8642, -4.2518],
+  'edinburgh':       [55.9533, -3.1883],
+  'le havre':        [49.4944, 0.1079],
+  'paris':           [48.8566, 2.3522],
+  'marseille':       [43.2965, 5.3698],
+  'hamburg':         [53.5511, 9.9937],
+  'bremen':          [53.0793, 8.8017],
+  'duisburg':        [51.4344, 6.7623],
+  'frankfurt':       [50.1109, 8.6821],
+  'munich':          [48.1351, 11.5820],
+  'berlin':          [52.5200, 13.4050],
+  'milan':           [45.4642, 9.1900],
+  'genoa':           [44.4056, 8.9463],
+  'naples':          [40.8518, 14.2681],
+  'barcelona':       [41.3851, 2.1734],
+  'madrid':          [40.4168, -3.7038],
+  'valencia':        [39.4699, -0.3763],
+  'bilbao':          [43.2630, -2.9350],
+  'lisbon':          [38.7223, -9.1393],
+  'porto':           [41.1579, -8.6291],
+  'dublin':          [53.3498, -6.2603],
+  'copenhagen':      [55.6761, 12.5683],
+  'oslo':            [59.9139, 10.7522],
+  'stavanger':       [58.9700, 5.7331],
+  'bergen':          [60.3913, 5.3221],
+  'stockholm':       [59.3293, 18.0686],
+  'gothenburg':      [57.7089, 11.9746],
+  'helsinki':        [60.1699, 24.9384],
+  'gdansk':          [54.3520, 18.6466],
+  'warsaw':          [52.2297, 21.0122],
+  'prague':          [50.0755, 14.4378],
+  'vienna':          [48.2082, 16.3738],
+  'zurich':          [47.3769, 8.5417],
+  'geneva':          [46.2044, 6.1432],
+  'houston':         [29.7604, -95.3698],
+  'galveston':       [29.3013, -94.7977],
+  'corpus christi':  [27.8006, -97.3964],
+  'baton rouge':     [30.4515, -91.1871],
+  'new orleans':     [29.9511, -90.0715],
+  'philadelphia':    [39.9526, -75.1652],
+  'newark':          [40.7357, -74.1724],
+  'long beach':      [33.7701, -118.1937],
+  'los angeles':     [34.0522, -118.2437],
+  'oakland':         [37.8044, -122.2712],
+  'seattle':         [47.6062, -122.3321],
+  'vancouver':       [49.2827, -123.1207],
+  'calgary':         [51.0447, -114.0719],
+  'edmonton':        [53.5461, -113.4938],
+  'fort mcmurray':   [56.7264, -111.3803],
+  'singapore':       [1.3521, 103.8198],
+  'jurong':          [1.3329, 103.7436],
+  'shanghai':        [31.2304, 121.4737],
+  'busan':           [35.1796, 129.0756],
+  'ulsan':           [35.5384, 129.3114],
+  'mumbai':          [19.0760, 72.8777],
+  'dubai':           [25.2048, 55.2708],
+  'abu dhabi':       [24.4539, 54.3773],
+  'doha':            [25.2854, 51.5310],
+  'jeddah':          [21.4858, 39.1925],
+  'sydney':          [-33.8688, 151.2093],
+  'perth':           [-31.9523, 115.8613],
+  'melbourne':       [-37.8136, 144.9631],
+  'rio de janeiro':  [-22.9068, -43.1729],
+  'sao paulo':       [-23.5505, -46.6333],
+};
+
+function _geoLookup(loc){
+  if(!loc) return null;
+  const key = String(loc).toLowerCase().trim();
+  if(GEO_CACHE[key]) return GEO_CACHE[key];
+  // Try suffix-strip ("Rotterdam, NL" → "rotterdam")
+  const before = key.split(',')[0].trim();
+  if(GEO_CACHE[before]) return GEO_CACHE[before];
+  // Try first word
+  const first = key.split(/[\s,;\/]+/)[0];
+  if(GEO_CACHE[first]) return GEO_CACHE[first];
+  return null;
+}
+
+var _geoMap = null;        // The Leaflet map instance
+var _geoMarkers = [];      // For cleanup on re-render
+
+function ovRenderGeoMap(){
+  const wrap = el('ov-geomap');
+  const wrapper = el('ov-geomap-wrap');
+  if(!wrap || !wrapper) return;
+
+  // Wait for Leaflet
+  if(!window._leafletReady || typeof L === 'undefined'){
+    wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:12px;font-family:var(--mono)">Loading map…</div>';
+    return;
+  }
+
+  const reports = ls(KEYS.reports, []);
+  if(!reports.length){
+    wrapper.style.display = 'none';
+    return;
+  }
+  wrapper.style.display = 'block';
+
+  // Group reports by lat/lng (or city)
+  const buckets = new Map();
+  const orphans = []; // locations we can't geocode
+  reports.forEach(r => {
+    if(typeof r.locationLat === 'number' && typeof r.locationLng === 'number'){
+      const k = r.locationLat.toFixed(3)+','+r.locationLng.toFixed(3);
+      const e = buckets.get(k) || { lat: r.locationLat, lng: r.locationLng, label: r.location || (r.locationLat+', '+r.locationLng), reports: [] };
+      e.reports.push(r);
+      buckets.set(k, e);
+      return;
+    }
+    const coord = _geoLookup(r.location);
+    if(coord){
+      const k = coord.join(',');
+      const e = buckets.get(k) || { lat: coord[0], lng: coord[1], label: r.location, reports: [] };
+      e.reports.push(r);
+      buckets.set(k, e);
+    } else if(r.location){
+      orphans.push(r);
+    }
+  });
+
+  // Build / reset map
+  if(_geoMap){
+    _geoMarkers.forEach(m => _geoMap.removeLayer(m));
+    _geoMarkers = [];
+  } else {
+    wrap.innerHTML = '';
+    _geoMap = L.map(wrap, { zoomControl: true, attributionControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 18,
+    }).addTo(_geoMap);
+  }
+
+  // Plot markers
+  const bounds = [];
+  buckets.forEach(b => {
+    const reports = b.reports || [];
+    const failCount = reports.filter(r => r.verdict === 'Not acceptable').length;
+    const color = failCount > 0 ? '#f25c5c' : '#3ecf8e';
+    const radius = Math.min(28, 8 + Math.sqrt(reports.length) * 4);
+    const marker = L.circleMarker([b.lat, b.lng], {
+      radius, color, weight: 2, fillColor: color, fillOpacity: .35,
+    }).addTo(_geoMap);
+    const list = b.reports.slice(0, 8).map(r => `
+      <li style="margin:4px 0">
+        <strong style="color:#0a4">${escapeHtml(r.reportNo||'—')}</strong>
+        ${r.method?` · ${r.method}`:''}
+        <span style="color:#666">${escapeHtml(r.subject||r.client||'')}</span>
+      </li>`).join('');
+    marker.bindPopup(`<div style="font-family:system-ui;min-width:200px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:4px">${escapeHtml(b.label||'Location')}</div>
+      <div style="font-size:11px;color:#666;margin-bottom:6px">${b.reports.length} report${b.reports.length!==1?'s':''}${failCount?' · '+failCount+' failed':''}</div>
+      <ul style="padding:0;list-style:none;font-size:12px;margin:0">${list}</ul>
+      ${b.reports.length>8?`<div style="font-size:11px;color:#666;margin-top:6px">+ ${b.reports.length-8} more</div>`:''}
+    </div>`);
+    _geoMarkers.push(marker);
+    bounds.push([b.lat, b.lng]);
+  });
+
+  // Fit bounds (or default to a sensible Europe view)
+  if(bounds.length){
+    if(bounds.length === 1) _geoMap.setView(bounds[0], 8);
+    else _geoMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 9 });
+  } else {
+    _geoMap.setView([52, 5], 4);
+  }
+
+  // Update meta caption
+  const meta = el('ov-geomap-meta');
+  if(meta){
+    const placed = Array.from(buckets.values()).reduce((s,b) => s + b.reports.length, 0);
+    meta.textContent = `${buckets.size} location${buckets.size!==1?'s':''} · ${placed} report${placed!==1?'s':''} mapped${orphans.length?' · '+orphans.length+' unmapped':''}`;
+  }
+
+  // Force a tile repaint after layout (Leaflet needs this when its container was hidden)
+  setTimeout(() => { try { _geoMap.invalidateSize(); } catch(e){} }, 100);
+}
+
+// Drill-down modal for reports
+function ovOpenDrilldown(title, list){
+  let modal = document.getElementById('drilldown-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'drilldown-modal';
+  modal.className = 'drilldown-modal open';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  let body = '';
+  if(!list.length){
+    body = '<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px">No results.</div>';
+  } else {
+    body = `<table class="tbl" style="width:100%"><thead><tr><th scope="col">Report</th><th scope="col">Method</th><th scope="col">Subject</th><th scope="col">Inspector</th><th scope="col">Date</th><th scope="col">Result</th></tr></thead><tbody>` +
+      list.map(r => {
+        const md = NDT_METHODS.find(x => x.id === r.method);
+        const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : 'Draft';
+        const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':'blue';
+        return `<tr>
+          <td style="font-family:var(--mono);font-size:12px;color:var(--cyan)">${escapeHtml(r.reportNo||'—')}</td>
+          <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${r.method||'—'}</span></td>
+          <td>${escapeHtml(r.subject||r.client||'—')}</td>
+          <td>${escapeHtml(r.inspector||'—')}</td>
+          <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
+          <td><span class="badge badge-${vClass}" style="font-size:10px">${verdict}</span></td>
+        </tr>`;
+      }).join('') + '</tbody></table>';
+  }
+  modal.innerHTML = `<div class="drilldown-card">
+    <div class="drilldown-head">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--t1)">${escapeHtml(title)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${list.length} item${list.length!==1?'s':''}</div>
+      </div>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'drilldown-modal\'">Close</button>
+    </div>
+    <div class="drilldown-list">${body}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  openA11yModal(modal);
+}
+
+// Drill-down modal for defects
+function ovOpenDefectDrilldown(title, list){
+  let modal = document.getElementById('drilldown-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'drilldown-modal';
+  modal.className = 'drilldown-modal open';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  let body = '';
+  if(!list.length){ body = '<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px">No results.</div>'; }
+  else {
+    body = `<table class="tbl" style="width:100%"><thead><tr><th scope="col">ID</th><th scope="col">Type</th><th scope="col">Severity</th><th scope="col">Location</th><th scope="col">Method</th><th scope="col">Date</th></tr></thead><tbody>` +
+      list.map(d => `<tr>
+        <td style="font-family:var(--mono);font-size:11px">${escapeHtml(d.defectId||'—')}</td>
+        <td>${escapeHtml(d.type||'—')}</td>
+        <td><span class="badge badge-${d.severity==='Critical'?'red':d.severity==='High'?'amber':'blue'}" style="font-size:10px">${d.severity ? escapeHtml(tSeverity(d.severity)) : '—'}</span></td>
+        <td>${escapeHtml(d.location||'—')}</td>
+        <td>${escapeHtml(d.method||'—')}</td>
+        <td style="font-family:var(--mono);font-size:11px">${fmtDate(d.createdAt)}</td>
+      </tr>`).join('') + '</tbody></table>';
+  }
+  modal.innerHTML = `<div class="drilldown-card">
+    <div class="drilldown-head">
+      <div><div style="font-size:14px;font-weight:600;color:var(--t1)">${escapeHtml(title)}</div></div>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'drilldown-modal\'">Close</button>
+    </div>
+    <div class="drilldown-list">${body}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  openA11yModal(modal);
+}
+
+// Drill-down from clicking a metric tile
+function ovDrillMetric(kind){
+  const all = ls(KEYS.reports, []);
+  const reports = ovFilterByRange(all);
+  let title, list;
+  if(kind === 'total'){ title = `All reports in selected period`; list = reports; }
+  else if(kind === 'fail'){ title = `Reports flagged "Not acceptable"`; list = reports.filter(r => r.verdict === 'Not acceptable'); }
+  else if(kind === 'pass'){ title = `Reports marked "Acceptable"`; list = reports.filter(r => r.verdict === 'Acceptable'); }
+  else if(kind === 'drafts'){ title = `Drafts in progress`; list = reports.filter(r => getReportStage(r) === 'Draft'); }
+  else return;
+  ovOpenDrilldown(title, list);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V9 — auto-fill from history, ICS export, webhook outbox
+// ══════════════════════════════════════════════════════════════════════════
+
+var AUTOFILL_FIELDS = ['client','project','drawing','location','contractor','fabricator','poNumber'];
+var _autofillTimer = null;
+
+function autofillBindClientField(methodId){
+  const fid = `rf-${methodId}-client`;
+  const inp = el(fid); if(!inp) return;
+  if(inp.dataset.autofillBound === '1') return;
+  inp.dataset.autofillBound = '1';
+  inp.addEventListener('input', () => {
+    clearTimeout(_autofillTimer);
+    _autofillTimer = setTimeout(() => autofillCheckClient(methodId, inp.value.trim()), 250);
+  });
+}
+
+function autofillCheckClient(methodId, clientName){
+  const hintId = `rf-${methodId}-autofill-hint`;
+  let hint = el(hintId);
+  if(!clientName || clientName.length < 3){
+    if(hint) hint.remove();
+    return;
+  }
+  const all = ls(KEYS.reports, []);
+  const cn = clientName.toLowerCase();
+  const matches = all.slice().reverse().filter(r => r.client && r.client.toLowerCase().includes(cn));
+  if(!matches.length){ if(hint) hint.remove(); return; }
+  const ref = matches[0];
+  const copyable = AUTOFILL_FIELDS.filter(f => f !== 'client' && ref[f] && !el(`rf-${methodId}-${f}`)?.value);
+  if(!copyable.length){ if(hint) hint.remove(); return; }
+
+  if(!hint){
+    const fld = el(`rf-${methodId}-client`)?.closest('.fld');
+    if(!fld) return;
+    hint = document.createElement('div');
+    hint.id = hintId;
+    hint.className = 'autofill-hint';
+    fld.appendChild(hint);
+  }
+  hint.innerHTML = `
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    <span>Found previous report for <strong>${escapeHtml(ref.client)}</strong> (${escapeHtml(ref.reportNo||'—')}). Copy ${copyable.length} field${copyable.length!==1?'s':''}?</span>
+    <button data-action="autofillApply" data-args="'${methodId}','${(ref.reportNo||'').replace(/'/g, "\\'")}'" data-pass-event="1">Yes, copy</button>
+    <span class="autofill-dismiss" data-action="_wDismissParent" data-pass-el="1" title="Dismiss">×</span>`;
+}
+
+function autofillApply(methodId, refReportNo, evt){
+  if(evt) evt.preventDefault();
+  const all = ls(KEYS.reports, []);
+  const ref = all.slice().reverse().find(r => r.reportNo === refReportNo);
+  if(!ref) return;
+  let copied = 0;
+  AUTOFILL_FIELDS.forEach(f => {
+    const inp = el(`rf-${methodId}-${f}`);
+    if(inp && !inp.value && ref[f]){ inp.value = ref[f]; copied++; }
+  });
+  toast(`Copied ${copied} field${copied!==1?'s':''} from ${refReportNo}`, 'success');
+  const hint = el(`rf-${methodId}-autofill-hint`); if(hint) hint.remove();
+}
+
+// ── ICS calendar export ───────────────────────────────────────────────
+function generateIcsForCerts(){
+  const inspectors = ls(KEYS.inspectors, []);
+  const events = [];
+  inspectors.forEach(ins => {
+    if(!ins.certExpiry) return;
+    const d = new Date(ins.certExpiry);
+    if(isNaN(d)) return;
+    events.push({
+      uid: 'cert-' + (ins.id || ins.name) + '@veritix-ndt',
+      title: `Cert expires — ${escapeHtml(ins.name)}`,
+      desc: `Certification expires for ${escapeHtml(ins.name)}. Methods: ${(ins.methods||[]).join(', ') || 'general'}.`,
+      date: d
+    });
+    const reminder = new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000);
+    events.push({
+      uid: 'cert-warn-' + (ins.id || ins.name) + '@veritix-ndt',
+      title: `30-day cert renewal reminder — ${escapeHtml(ins.name)}`,
+      desc: `Certification renewal due in 30 days for ${escapeHtml(ins.name)}.`,
+      date: reminder
+    });
+  });
+  if(!events.length){ toast(t('toast.no_cert_dates','No certification dates to export.'), 'warn'); return; }
+
+  const fmt = d => {
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth()+1).padStart(2, '0');
+    const da = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}${mo}${da}`;
+  };
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[-:.]/g, '').split('T')[0] + 'T' + now.toISOString().split('T')[1].replace(/[-:.]/g, '').slice(0, 6) + 'Z';
+  const escIcs = s => String(s||'').replace(/\\/g,'\\\\').replace(/[\r\n]+/g,' ').replace(/,/g,'\\,').replace(/;/g,'\\;');
+
+  let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Veritix NDT Inspect//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n';
+  events.forEach(ev => {
+    const end = new Date(ev.date.getTime() + 24*60*60*1000);
+    ics += 'BEGIN:VEVENT\r\n';
+    ics += `UID:${ev.uid}\r\n`;
+    ics += `DTSTAMP:${stamp}\r\n`;
+    ics += `DTSTART;VALUE=DATE:${fmt(ev.date)}\r\n`;
+    ics += `DTEND;VALUE=DATE:${fmt(end)}\r\n`;
+    ics += `SUMMARY:${escIcs(ev.title)}\r\n`;
+    ics += `DESCRIPTION:${escIcs(ev.desc)}\r\n`;
+    ics += 'BEGIN:VALARM\r\nTRIGGER:-P7D\r\nACTION:DISPLAY\r\n';
+    ics += `DESCRIPTION:Reminder: ${escIcs(ev.title)}\r\n`;
+    ics += 'END:VALARM\r\nEND:VEVENT\r\n';
+  });
+  ics += 'END:VCALENDAR\r\n';
+
+  const blob = new Blob([ics], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'veritix-cert-expiry-' + new Date().toISOString().split('T')[0] + '.ics';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Exported ${events.length} calendar event${events.length!==1?'s':''}`, 'success');
+}
+
+// ── Webhook outbox ────────────────────────────────────────────────────
+var WEBHOOK_KEY = 'vx-webhooks-v1';
+
+function webhookLoadConfig(){
+  const s = ls(KEYS.settings, {});
+  return {
+    url: s.webhookUrl || '',
+    headers: s.webhookHeaders || '',
+    enabled: !!s.webhookEnabled,
+    triggers: s.webhookTriggers || ['stage:Approved'],
+  };
+}
+function webhookSaveConfig(cfg){
+  const s = ls(KEYS.settings, {});
+  s.webhookUrl = cfg.url;
+  s.webhookHeaders = cfg.headers;
+  s.webhookEnabled = !!cfg.enabled;
+  s.webhookTriggers = cfg.triggers;
+  lss(KEYS.settings, s);
+}
+function webhookGetLog(){ return ls(WEBHOOK_KEY, []); }
+function webhookAppendLog(entry){
+  const log = webhookGetLog();
+  log.unshift(entry);
+  while(log.length > 50) log.pop();
+  lss(WEBHOOK_KEY, log);
+  webhookRenderLog();
+}
+function webhookSaveFromUi(){
+  const cfg = {
+    url: el('wh-url')?.value.trim() || '',
+    headers: el('wh-headers')?.value.trim() || '',
+    enabled: el('wh-enabled')?.checked || false,
+    triggers: Array.from(document.querySelectorAll('.wh-trigger:checked')).map(c => c.value),
+  };
+  webhookSaveConfig(cfg);
+  toast(t('toast.webhook_saved', 'Webhook settings saved'), 'success');
+}
+function webhookFireTest(){
+  const cfg = webhookLoadConfig();
+  if(!cfg.url){ toast(t('toast.set_webhook_url', 'Set a webhook URL first.'), 'error'); return; }
+  if(!cfg.enabled){ toast(t('toast.webhook_enable_first','Enable webhooks first to send a test.'), 'warn'); return; }
+  webhookFire('test', { hello: 'from veritix-ndt-inspect', at: new Date().toISOString() });
+  toast(t('toast.test_fired', 'Test fired — check delivery log below.'), 'info');
+}
+async function webhookFire(action, payload){
+  const cfg = webhookLoadConfig();
+  if(!cfg.enabled || !cfg.url) return;
+  let headers = { 'Content-Type': 'application/json' };
+  if(cfg.headers){
+    cfg.headers.split('\n').forEach(line => {
+      const m = line.match(/^([^:]+):\s*(.+)$/);
+      if(m) headers[m[1].trim()] = m[2].trim();
+    });
+  }
+  const body = JSON.stringify({ action, at: new Date().toISOString(), source: 'veritix-ndt', payload });
+  const entry = { at: new Date().toISOString(), action, url: cfg.url, status: 'pending' };
+  try {
+    const resp = await fetch(cfg.url, { method: 'POST', headers, body, mode: 'cors' });
+    entry.status = resp.ok ? 'ok' : 'http_' + resp.status;
+    entry.code = resp.status;
+  } catch(e){
+    entry.status = 'failed';
+    entry.error = String(e.message || e);
+  }
+  webhookAppendLog(entry);
+}
+function webhookRenderLog(){
+  const wrap = el('wh-log'); if(!wrap) return;
+  const log = webhookGetLog();
+  if(!log.length){
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:14px;text-align:center;font-style:italic">No deliveries yet. Save settings and trigger a stage change, or click "Send test" above.</div>';
+    return;
+  }
+  wrap.innerHTML = log.map(e => {
+    const ok = e.status === 'ok';
+    const color = ok ? 'var(--green)' : 'var(--red)';
+    const lbl = ok ? '✓ ' + (e.code || 'ok') : '✕ ' + (e.status || 'failed');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="font-family:var(--mono);color:${color};font-size:11px;min-width:60px">${lbl}</span>
+      <span style="color:var(--t1);font-weight:500">${escapeHtml(e.action)}</span>
+      <span style="flex:1;color:var(--t3);font-size:11px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(e.url||'')}</span>
+      <span style="color:var(--t3);font-family:var(--mono);font-size:10px">${fmtDate(e.at)} ${new Date(e.at).toLocaleTimeString()}</span>
+    </div>`;
+  }).join('');
+}
+function webhookLoadIntoUi(){
+  const cfg = webhookLoadConfig();
+  if(el('wh-url')) el('wh-url').value = cfg.url;
+  if(el('wh-headers')) el('wh-headers').value = cfg.headers;
+  if(el('wh-enabled')) el('wh-enabled').checked = cfg.enabled;
+  document.querySelectorAll('.wh-trigger').forEach(c => {
+    c.checked = cfg.triggers.includes(c.value);
+  });
+  webhookRenderLog();
+}
+
+// NOTE: setReportStage is wrapped for webhook delivery further down this file
+// (see "Hook setReportStage so webhooks fire automatically on stage changes"
+// near the audit/export region). The original wrapper that lived here fired
+// the same webhook a second time with a different payload shape, so every
+// stage change delivered two webhooks per subscriber. Removed — single wrap
+// is the source of truth.
+
+function ovNewReport(methodId, btn) {
+  _ovMethod = methodId;
+  const m = NDT_METHODS.find(x => x.id === methodId); if(!m) return;
+
+  // Switch to new report section
+  document.querySelectorAll('#page-overview .ss').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#ov-snav .snav-item').forEach(b => b.classList.remove('active'));
+  el('ov-newreport').classList.add('active');
+  if(btn) btn.classList.add('active');
+
+  el('ov-nr-title').textContent = `New ${m.id} report — ${escapeHtml(m.name)}`;
+  el('ov-nr-desc').textContent = `Fill in the ${escapeHtml(m.name)} report details below. Fields are pre-filled from your saved templates.`;
+
+  // Load template data
+  loadTemplates();
+  const tpl = _tplData[methodId] || {};
+  const rptForm = _rptForms[methodId] || {};
+
+  // Merge: rptForm values override tpl values
+  const merged = { ...rptForm };
+
+  // Generate report number
+  const s = ls(KEYS.settings, {});
+  const prefix = s.numPrefix || 'INS';
+  const sep = s.numSep !== undefined ? s.numSep : '-';
+  const yrDigits = parseInt(s.numYear || '4');
+  const digits = parseInt(s.numDigits || '3');
+  const next = parseInt(s.numNext || '1');
+  const yr = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
+  const seq = String(next).padStart(digits, '0');
+  const reportNo = [prefix, yr, seq].filter(Boolean).join(sep);
+  merged.reportNo = reportNo;
+  if(!merged.revision) merged.revision = '00';
+
+  // Build form
+  const body = el('ov-nr-body'); if(!body) return;
+  let html = '';
+
+  // Section 1: Report revision & Client
+  html += ovFormSection('Report revision & client information', RPT_FORM.client, methodId, merged, m);
+  // Section 2: Subject
+  html += ovFormSection('Subject information', RPT_FORM.subject, methodId, merged, m);
+  // Section 3: Exam criteria
+  html += ovFormSection('Examination criteria', RPT_FORM.exam, methodId, merged, m);
+  // Section 4: Method-specific equipment (from template defaults + method fields)
+  const specific = (TPL_FIELDS[methodId] || []).map(f => {
+    const field = {...f, id:'eq_'+f.id, label:f.label.replace('Default ','')};
+    // Pre-fill from template defaults
+    if(!merged['eq_'+f.id] && tpl[f.id]) merged['eq_'+f.id] = tpl[f.id];
+    return field;
+  });
+  if(specific.length) html += ovFormSection(`${m.id} — Equipment & parameters`, specific, methodId, merged, m);
+  // Section 5: Result
+  html += ovFormSection('Result & sign-off', RPT_FORM.result, methodId, merged, m);
+
+  body.innerHTML = html;
+  // V9: bind auto-fill suggestion to client field
+  if(typeof autofillBindClientField === 'function'){
+    setTimeout(() => autofillBindClientField(methodId), 30);
+  }
+}
+
+function ovFormSection(title, fields, methodId, data, m) {
+  let html = `<div class="sc" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">${title}</span></div><div class="sc-body" style="padding:14px 16px">`;
+  for(let i = 0; i < fields.length; i += 2) {
+    const f1 = fields[i], f2 = fields[i+1];
+    html += `<div class="fg form-row" style="margin-bottom:8px">`;
+    html += rptFieldHtml(methodId, f1, data);
+    if(f2) html += rptFieldHtml(methodId, f2, data);
+    html += `</div>`;
+  }
+  html += `</div></div>`;
+  return html;
+}
+
+function ovSaveReport() {
+  if(!_ovMethod) { toast(t('toast.no_method', 'No method selected.'), 'error'); return; }
+  const m = NDT_METHODS.find(x => x.id === _ovMethod); if(!m) return;
+  const allFields = [...RPT_FORM.client, ...RPT_FORM.subject, ...RPT_FORM.exam, ...RPT_FORM.result];
+  const specific = (TPL_FIELDS[_ovMethod] || []).map(f => ({...f, id:'eq_'+f.id}));
+  const all = [...allFields, ...specific];
+  const report = { method: _ovMethod, createdAt: new Date().toISOString() };
+  all.forEach(f => {
+    const inp = el(`rf-${_ovMethod}-${f.id}`);
+    if(inp) report[f.id] = (f.type === 'select') ? inp.value : inp.value.trim();
+  });
+  // V6: ensure new report has stage + audit log
+  report.stage = 'Draft';
+  report.auditLog = [];
+  if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
+  addReportAudit(report, 'created', 'Report created');
+  // Save
+  const reports = ls(KEYS.reports, []);
+  reports.push(report);
+  lss(KEYS.reports, reports);
+  // Increment numbering
+  const s = ls(KEYS.settings, {});
+  s.numNext = (parseInt(s.numNext || '1')) + 1;
+  lss(KEYS.settings, s);
+  updateReportCount();
+  if(typeof updateInboxBadge === 'function') updateInboxBadge();
+  toast(`${m.id} report saved.`);
+  ovShowSection('dashboard', el('ovi-dashboard'));
+}
+
+async function ovResetReport() {
+  if(!_ovMethod) return;
+  if(!await vxConfirm({ message: 'Are you sure you want to clear the report form? Any unsaved changes will be lost.', okLabel: t('vxc.clear','Clear'), danger: true })) return;
+  ovNewReport(_ovMethod, document.querySelector('#ov-snav .snav-item.active'));
+}
+
+function ovRenderRecentList() {
+  const reports = ls(KEYS.reports, []);
+  const wrap = el('ov-reports-table'); if(!wrap) return;
+  if(!reports.length) {
+    wrap.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:13px;padding:20px">No reports saved yet.</div>';
+    return;
+  }
+  let html = `<table class="tbl" style="width:100%"><thead><tr>
+    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:60px"></th>
+  </tr></thead><tbody>`;
+  reports.slice().reverse().forEach((r, i) => {
+    const md = NDT_METHODS.find(x => x.id === r.method);
+    const idx = reports.length - 1 - i;
+    html += `<tr>
+      <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${r.method||'—'}</span></td>
+      <td style="font-family:var(--mono);font-size:12px">${r.reportNo||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${r.revision||'00'}</td>
+      <td>${escapeHtml(r.client||'—')}</td>
+      <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
+      <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
+      <td><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function ovDeleteReport(idx) {
+  if(!await vxConfirm({ message: 'Are you sure you want to delete this report? This action cannot be undone.', okLabel: t('vxc.delete','Delete'), danger: true })) return;
+  const reports = ls(KEYS.reports, []);
+  reports.splice(idx, 1);
+  lss(KEYS.reports, reports);
+  updateReportCount();
+  ovRenderRecentList();
+  toast(t('toast.report_deleted','Report deleted.'));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V9 INTEGRATIONS — ICS export, webhook outbox, public API, unified audit log
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── ICS calendar export ──────────────────────────────────────────────
+function _icsEscape(s){ return String(s||'').replace(/[\\;,]/g, m => '\\'+m).replace(/\n/g, '\\n'); }
+function _icsDate(d){
+  // Format: YYYYMMDD (date only, all-day event)
+  const dd = (d instanceof Date) ? d : new Date(d);
+  const y = dd.getFullYear();
+  const m = String(dd.getMonth()+1).padStart(2,'0');
+  const da = String(dd.getDate()).padStart(2,'0');
+  return `${y}${m}${da}`;
+}
+function _icsBuild(events){
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Veritix//NDT Inspect//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
+  events.forEach(ev => {
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:'+ev.uid);
+    lines.push('DTSTAMP:'+ _icsDate(new Date()) + 'T000000Z');
+    lines.push('DTSTART;VALUE=DATE:'+_icsDate(ev.start));
+    if(ev.end) lines.push('DTEND;VALUE=DATE:'+_icsDate(ev.end));
+    lines.push('SUMMARY:'+_icsEscape(ev.title));
+    if(ev.description) lines.push('DESCRIPTION:'+_icsEscape(ev.description));
+    if(ev.alarm){
+      lines.push('BEGIN:VALARM');
+      lines.push('ACTION:DISPLAY');
+      lines.push('DESCRIPTION:'+_icsEscape(ev.title));
+      lines.push('TRIGGER:-P'+ev.alarm+'D');
+      lines.push('END:VALARM');
+    }
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+function _downloadIcs(filename, content){
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click(); URL.revokeObjectURL(url);
+}
+function exportCertIcs(){
+  const inspectors = ls(KEYS.inspectors, []);
+  const events = [];
+  inspectors.forEach(ins => {
+    if(!ins.certExpiry) return;
+    const d = new Date(ins.certExpiry);
+    if(isNaN(d)) return;
+    events.push({
+      uid: 'cert-'+(ins.id||ins.name).replace(/[^a-z0-9]/gi,'')+'@veritix',
+      start: d,
+      end: new Date(d.getTime() + 24*60*60*1000),
+      title: 'Cert expiry — ' + (ins.name||'?'),
+      description: 'Methods: ' + ((ins.methods||[]).join(', ') || 'none') + '\\nCert authority: ' + (ins.certAuthority||'—'),
+      alarm: 30,
+    });
+  });
+  if(!events.length){ toast(t('toast.no_certs_to_export','No certifications with expiry dates to export.'), 'warn'); return; }
+  _downloadIcs('veritix-cert-expiries.ics', _icsBuild(events));
+  toast(t('toast.calendar_imported','Calendar file downloaded — import into Outlook, Google, or Apple Calendar.'), 'success');
+}
+function exportReportIcs(){
+  // Report "due dates" = stale-flag thresholds for in-progress stages
+  const reports = ls(KEYS.reports, []);
+  const events = [];
+  reports.forEach(r => {
+    const stage = getReportStage(r);
+    if(stage === 'Approved' || stage === 'Archived') return;
+    const lastChange = new Date(r.stageUpdatedAt || r.createdAt || Date.now());
+    const due = new Date(lastChange.getTime() + 7*24*60*60*1000);
+    events.push({
+      uid: 'rpt-'+(r.reportNo||lastChange.getTime()).toString().replace(/[^a-z0-9]/gi,'')+'@veritix',
+      start: due,
+      end: new Date(due.getTime() + 24*60*60*1000),
+      title: `Review due — ${r.reportNo||'(report)'} (${stage})`,
+      description: `Method: ${r.method||'?'}\\nClient: ${escapeHtml(r.client||'—')}\\nSubject: ${escapeHtml(r.subject||'—')}\\nInspector: ${escapeHtml(r.inspector||'—')}`,
+      alarm: 0,
+    });
+  });
+  if(!events.length){ toast(t('toast.no_in_progress','No in-progress reports with due dates.'), 'warn'); return; }
+  _downloadIcs('veritix-report-due-dates.ics', _icsBuild(events));
+  toast(t('toast.calendar_downloaded', 'Calendar file downloaded.'), 'success');
+}
+
+// Hook setReportStage so webhooks fire automatically on stage changes.
+// Routes through the canonical webhook implementation defined above
+// (webhookLoadConfig / webhookFire) which reads its config from
+// KEYS.settings.webhook* — single source of truth.
+var _origSetReportStage = setReportStage;
+setReportStage = function(idx, newStage, comment){
+  const all = ls(KEYS.reports, []);
+  const r = all[idx];
+  const fromStage = r ? getReportStage(r) : null;
+  const result = _origSetReportStage(idx, newStage, comment);
+  if(result && r){
+    try {
+      const cfg = webhookLoadConfig();
+      const stageTrigger = 'stage:' + newStage;
+      if(cfg.enabled && cfg.url && (cfg.triggers || []).includes(stageTrigger)){
+        webhookFire('report.stage_changed', {
+          sentAt: new Date().toISOString(),
+          fromStage, toStage: newStage,
+          report: {
+            reportNo: r.reportNo, method: r.method, client: r.client,
+            subject: r.subject, inspector: r.inspector, verdict: r.verdict,
+            drawing: r.drawing, weldNo: r.weldNo,
+            stage: newStage, createdAt: r.createdAt,
+          },
+          triggeredBy: CURRENT_USER ? { id: CURRENT_USER.id, name: CURRENT_USER.name } : null,
+        });
+      }
+    } catch(e){ console.warn('webhook fire failed', e); }
+  }
+  return result;
+};
+
+// ── Public API export (snapshots) ──────────────────────────────────
+function _downloadJson(filename, obj){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click(); URL.revokeObjectURL(url);
+}
+function apiExport(kind){
+  const map = { reports: KEYS.reports, defects: KEYS.defects, inspectors: KEYS.inspectors };
+  const k = map[kind]; if(!k){ toast(t('toast.unknown_export', 'Unknown export kind'), 'error'); return; }
+  const data = ls(k, []);
+  _downloadJson(`veritix-${kind}-${new Date().toISOString().split('T')[0]}.json`, {
+    schema: 'veritix-v1',
+    kind,
+    exportedAt: new Date().toISOString(),
+    count: data.length,
+    items: data,
+  });
+  toast(`Exported ${data.length} ${kind}.`, 'success');
+}
+function apiOpenSchema(){
+  let modal = document.getElementById('api-schema-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'api-schema-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:680px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--sh-xl);overflow:hidden">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:14px;font-weight:600;color:var(--t1)">Public data schema (v1)</div>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'api-schema-modal\'">Close</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:16px 20px;font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--t1);white-space:pre-wrap">{
+  "schema": "veritix-v1",
+  "kind": "reports" | "defects" | "inspectors",
+  "exportedAt": ISO 8601 string,
+  "count": number,
+  "items": [
+    Report {
+      reportNo: string,
+      method: "UT" | "MT" | "PT" | "RT" | "VT" | "ET" | ...,
+      stage: "Draft" | "Submitted" | "Reviewed" | "Approved" | "Archived",
+      verdict: "Acceptable" | "Not acceptable" | "For information" | "Inconclusive",
+      client: string, subject: string, drawing: string, weldNo: string,
+      inspector: string, project: string, location: string,
+      createdAt: ISO 8601,
+      stageUpdatedAt: ISO 8601,
+      auditLog: AuditEntry[],
+      ...method-specific fields prefixed with "eq_"
+    }
+
+    Defect {
+      defectId: string,
+      type: string, severity: "Critical"|"High"|"Medium"|"Low",
+      status: string, method: string, location: string,
+      depth: string (mm), length: string (mm), width: string (mm),
+      report: string, component: string, drawing: string,
+      inspector: string, disposition: string, notes: string,
+      photos: Photo[],
+      createdAt: ISO 8601, updatedAt: ISO 8601
+    }
+
+    Inspector {
+      id: string, name: string, email: string,
+      methods: string[], certAuthority: string, certNumber: string,
+      certExpiry: ISO 8601 date, level: string,
+      signature: data URL (PNG)
+    }
+
+    AuditEntry {
+      at: ISO 8601, by: string, byId: string|null,
+      action: string, details: string
+    }
+  ]
+}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  openA11yModal(modal);
+}
+
+// ── Unified audit log ──────────────────────────────────────────────
+function auditLogGather(){
+  const events = [];
+  // Reports
+  const reports = ls(KEYS.reports, []);
+  reports.forEach(r => {
+    (r.auditLog||[]).forEach(e => events.push({
+      at: e.at, by: e.by, byId: e.byId, action: e.action, details: e.details,
+      source: 'report', sourceId: r.reportNo || ''
+    }));
+  });
+  // Defects (if defects.auditLog exists, otherwise infer 'created' from createdAt)
+  const defects = ls(KEYS.defects, []);
+  defects.forEach(d => {
+    if(Array.isArray(d.auditLog)){
+      d.auditLog.forEach(e => events.push({ at: e.at, by: e.by, byId: e.byId, action: e.action, details: e.details, source: 'defect', sourceId: d.defectId || '' }));
+    } else if(d.createdAt){
+      events.push({ at: d.createdAt, by: d.createdBy || '—', action: 'created', details: `${d.type||''} (${d.severity||''})`, source: 'defect', sourceId: d.defectId||'' });
+    }
+  });
+  // Sort newest first
+  events.sort((a, b) => (b.at||'').localeCompare(a.at||''));
+  return events;
+}
+function auditLogRender(){
+  const list = el('audit-log-list'); if(!list) return;
+  const filter = (el('audit-log-filter')?.value||'').toLowerCase().trim();
+  const source = el('audit-log-source')?.value || 'all';
+  let events = auditLogGather();
+  if(source !== 'all') events = events.filter(e => e.source === source);
+  if(filter) events = events.filter(e => [e.by, e.action, e.details, e.sourceId, e.source].map(v => (v||'').toLowerCase()).join(' ').includes(filter));
+  set('audit-log-count', events.length + ' event' + (events.length!==1?'s':'') + (filter || source !== 'all' ? ' (filtered)' : ''));
+  if(!events.length){
+    list.innerHTML = '<div style="padding:36px;text-align:center;color:var(--t3);font-size:13px">No matching events.</div>';
+    return;
+  }
+  const sourceColor = { report:'var(--cyan)', defect:'var(--amber)', settings:'var(--violet)', user:'var(--green)' };
+  list.innerHTML = events.slice(0, 200).map(e => `
+    <div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start">
+      <span style="width:6px;height:6px;border-radius:50%;background:${sourceColor[e.source]||'var(--t3)'};margin-top:7px;flex-shrink:0"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:var(--t1)"><strong>${escapeHtml(e.by||'—')}</strong> · ${escapeHtml(e.action||'')}${e.sourceId?` · <span style="font-family:var(--mono);color:var(--cyan)">${escapeHtml(e.sourceId)}</span>`:''}</div>
+        ${e.details?`<div style="font-size:11px;color:var(--t2);margin-top:2px;font-style:italic">"${escapeHtml(e.details)}"</div>`:''}
+        <div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:3px">${e.at?new Date(e.at).toLocaleString():'—'} · ${e.source}</div>
+      </div>
+    </div>`).join('') + (events.length > 200 ? `<div style="padding:14px;text-align:center;color:var(--t3);font-size:11px">Showing first 200 of ${events.length} events. Use filter to narrow.</div>` : '');
+}
+function auditLogExportCsv(){
+  const events = auditLogGather();
+  if(!events.length){ toast(t('toast.no_audit_events','No audit events to export.'), 'warn'); return; }
+  const headers = ['Timestamp','User','Action','Details','Source','Source ID'];
+  const rows = events.map(e => [e.at||'', e.by||'', e.action||'', e.details||'', e.source||'', e.sourceId||''].map(v => '"'+String(v).replace(/"/g,'""')+'"'));
+  const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'veritix-audit-log-'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast(t('toast.audit_exported','Audit log exported.'), 'success');
+}
+
+// Wrap defect save to add audit entries
+var _origDefSave = (typeof defSave === 'function') ? defSave : null;
+if(_origDefSave){
+  defSave = function(){
+    const editIdx = (typeof _defEditIdx === 'number') ? _defEditIdx : -1;
+    const before = editIdx >= 0 ? (ls(KEYS.defects, [])[editIdx]) : null;
+    const result = _origDefSave.apply(this, arguments);
+    // Find the (possibly new) record and append audit
+    const all = ls(KEYS.defects, []);
+    const target = editIdx >= 0 ? all[editIdx] : all[all.length-1];
+    if(target){
+      if(!Array.isArray(target.auditLog)) target.auditLog = [];
+      target.auditLog.push({
+        at: new Date().toISOString(),
+        by: CURRENT_USER ? CURRENT_USER.name : 'System',
+        byId: CURRENT_USER ? CURRENT_USER.id : null,
+        action: before ? 'updated' : 'created',
+        details: target.type ? `${target.type} (${target.severity||'?'})` : '',
+      });
+      lss(KEYS.defects, all);
+    }
+    return result;
+  };
+}
+
+// Wire dbRefresh to also load webhook config + render audit on database tab open
+var _origDbRefreshCard = (typeof dbRefreshCard === 'function') ? dbRefreshCard : null;
+if(_origDbRefreshCard){
+  dbRefreshCard = function(){
+    const r = _origDbRefreshCard.apply(this, arguments);
+    try { webhookLoadConfig(); auditLogRender(); } catch(e){ console.warn(e); }
+    return r;
+  };
+}
+

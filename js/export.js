@@ -1,0 +1,309 @@
+// ══════════════════════════════════════════════════════════════════════════
+// V22 PRINT / PDF EXPORT
+// ══════════════════════════════════════════════════════════════════════════
+// The browser's print dialog doubles as PDF export ("Save as PDF" / "Print
+// to PDF" in every major browser). We render the canvas into a standalone
+// HTML document inside a hidden iframe, then invoke print on that iframe.
+// This is preferable to client-side PDF synthesis (jsPDF) for two reasons:
+// (1) text in the PDF is selectable and searchable; (2) it works identically
+// across browsers without bundling a library. The trade-off is the user
+// going through a print dialog — accepted for a B2B tool where inspectors
+// print certificates routinely anyway.
+
+/**
+ * Build the standalone print HTML containing all pages.
+ * @param {object} report  Resolved report data (real or sample).
+ * @returns {string} Full HTML document.
+ */
+function cvBuildPrintHTML(report){
+  // AUDIT-FIX #1: shared cross-reference resolution. Defects don't get a
+  // page each — they all render together inside the editor page that hosts
+  // the defect-table or defect-row-loop block. The helper locates that page
+  // and maps every defect index to it, so cross-references print correctly.
+  cvCrossRefMap = _cvBuildCrossRefMap(report);
+
+  // V29 — Collect header/footer blocks across ALL pages. These render on
+  // every page in the printed output, regardless of which editor page they
+  // were placed on. De-duplicate by id in case a header block was copied to
+  // multiple pages by the user.
+  const seen = new Set();
+  const headerBlocks = [];
+  const footerBlocks = [];
+  cvPages.forEach(page => {
+    (page.blocks || []).forEach(b => {
+      if(seen.has(b.id)) return;
+      if(b.zone === 'header'){ headerBlocks.push(b); seen.add(b.id); }
+      else if(b.zone === 'footer'){ footerBlocks.push(b); seen.add(b.id); }
+    });
+  });
+
+  /** Render one block as absolutely-positioned div HTML. Shared helper used
+   *  for both zone blocks and body blocks so they format consistently.
+   *  SECURITY: colour/font-size/align values come from user-editable block
+   *  properties and imported template JSON, then get injected into a style="…"
+   *  HTML attribute (not style.cssText). Without validation a value like
+   *  `red" onmouseover="alert(1)` would break out of the attribute. Whitelist
+   *  each to its valid CSS shape before interpolating. */
+  const _pSafeColor = (v, fb) => (typeof v === 'string' && /^(?:#[0-9a-fA-F]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(?:0|1|0?\.\d+)\s*\)|transparent)$/.test(v.trim())) ? v.trim() : fb;
+  const _pSafeFs    = (v, fb) => (typeof v === 'string' && /^\d+(?:\.\d+)?(?:px|pt|em|rem|%)$/.test(v.trim())) ? v.trim() : fb;
+  const _pSafeAlign = (v) => (v === 'center' || v === 'right' || v === 'left' || v === 'justify') ? v : 'left';
+  const renderBlock = (block) => {
+    if(!cvEvalShowWhen(block, report)) return '';
+    const styles = [
+      `position:absolute`,
+      `left:${+block.x||0}px`, `top:${+block.y||0}px`,
+      `width:${+block.w||0}px`, `height:${+block.h||0}px`,
+      block.bgColor ? `background:${_pSafeColor(block.bgColor,'transparent')}` : '',
+      block.showBorder ? `border:0.5px solid ${_pSafeColor(block.borderColor,'#ccc')}` : '',
+      `font-size:${_pSafeFs(block.fontSize,'8.5px')}`,
+      `font-weight:${block.bold?'bold':'normal'}`,
+      `font-style:${block.italic?'italic':'normal'}`,
+      `color:${_pSafeColor(block.color,'#000')}`,
+      `text-align:${_pSafeAlign(block.align)}`,
+      `box-sizing:border-box`,
+      `overflow:hidden`,
+      `z-index:${Number.isFinite(+block.zIndex) ? +block.zIndex : 1}`,
+    ].filter(Boolean).join(';');
+    try {
+      return `<div style="${styles}">${cvRenderBlockContent(block, report, true)}</div>`;
+    } catch(e) {
+      console.warn('Render error for block', block.id, e);
+      // AUDIT-FIX #11: surface render failures visibly. Previously returned
+      // an empty string, which silently dropped the failed block from the
+      // printed PDF — the inspector would have no idea their template had
+      // a problem. A tiny inline warning preserves the block's geometry
+      // (so the rest of the layout isn't disturbed) and gives the user
+      // enough information to find and fix the underlying issue.
+      const errStyles = styles + ';background:rgba(220,38,38,.08);border:1px dashed rgba(220,38,38,.4);color:#991b1b;font-size:9px;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px';
+      return `<div style="${errStyles}">⚠ Render error<br><span style="font-size:7px;font-family:monospace;opacity:.7">${escapeHtml(block.id || '?')}</span></div>`;
+    }
+  };
+
+  // Pre-render the header/footer fragments once — they're identical on every page.
+  const hdrEnabled = cvTplCfg.header && cvTplCfg.header.enabled;
+  const ftrEnabled = cvTplCfg.footer && cvTplCfg.footer.enabled;
+  const hdrFragment = hdrEnabled ? headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
+  const ftrFragment = ftrEnabled ? footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
+
+  let pagesHtml = '';
+  cvPages.forEach((page, pageIdx) => {
+    // Body blocks only — exclude zone-tagged blocks, those are already in the
+    // header/footer fragments. AUDIT-FIX #10: filter before sort. Previously
+    // we spread-and-sorted the entire blocks array then filtered out zone
+    // blocks during iteration, which sorted blocks that were about to be
+    // discarded. Filtering first creates a smaller array, which sort can
+    // then mutate safely (filter always returns a fresh array, so no spread
+    // needed to avoid mutating page.blocks).
+    let bodyHtml = '';
+    page.blocks
+      .filter(b => b.zone !== 'header' && b.zone !== 'footer')
+      .sort((a,b) => (a.zIndex||0) - (b.zIndex||0))
+      .forEach(block => { bodyHtml += renderBlock(block); });
+    pagesHtml += `<div class="vx-print-page" data-page-num="${pageIdx + 1}">
+      ${hdrFragment}
+      ${bodyHtml}
+      ${ftrFragment}
+    </div>`;
+  });
+
+  const title = escapeHtml((report && (report.reportNo||report.id)) || 'NDT Report');
+  return `<!DOCTYPE html>
+<html lang="${vxLocale().split('-')[0]}">
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin:0; padding:0; background:#fff; }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .vx-print-page {
+    position: relative;
+    width: ${CV_PAGE_WIDTH_PX}px;
+    height: ${CV_PAGE_HEIGHT_PX}px;
+    background: #fff;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+  }
+  .vx-print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  @media print {
+    .vx-print-page { width: 210mm; height: 297mm; }
+  }
+  @media screen {
+    body { background: #444; padding: 20px; }
+    .vx-print-page { box-shadow: 0 4px 20px rgba(0,0,0,.5); margin: 0 auto 20px; }
+  }
+  /* Disable any interactive cursors */
+  div { cursor: default !important; }
+</style>
+</head>
+<body>
+${pagesHtml}
+</body>
+</html>`;
+}
+
+/**
+ * Print the current template using the configured preview source (real
+ * report) or the live sample data if no source selected.
+ * @param {object} [opts]
+ * @param {boolean} [opts.openInTab=false]  If true, open in a new tab
+ *   instead of triggering print. Lets the user inspect, then File→Print
+ *   from the tab if they prefer.
+ */
+function cvPrintOrExport(opts){
+  opts = opts || {};
+  // Pick a report: configured preview source if any, else live sample.
+  let report;
+  try {
+    if(typeof cvBuildReport === 'function'){
+      report = cvBuildReport(cvPpvMethod || 'UT', cvPpvResult || 'Pass', cvPpvShowDefects);
+    }
+  } catch(e){ console.error('cvBuildReport failed', e); report = null; }
+
+  let html;
+  try {
+    html = cvBuildPrintHTML(report);
+  } catch(e){
+    console.error('cvBuildPrintHTML failed', e);
+    toast(t('pe.toast.print_failed','Could not prepare the document for printing.'),'error');
+    return;
+  }
+
+  if(opts.openInTab){
+    // Open as a tab — user can save / inspect / re-print
+    const win = window.open('', '_blank');
+    if(!win){
+      toast(t('toast.popup_blocked', 'Pop-up blocked — allow pop-ups to print the manual.'), 'warn');
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    return;
+  }
+
+  // Hidden iframe → print()
+  let iframe = document.getElementById('vx-print-iframe');
+  if(iframe) iframe.remove();
+  iframe = document.createElement('iframe');
+  iframe.id = 'vx-print-iframe';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:-9999px;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(iframe);
+
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(html);
+  idoc.close();
+
+  toast(t('pe.toast.preparing_pdf','Preparing PDF — print dialog will open shortly.'),'info');
+
+  // Defer print() until layout is settled. Images (inline base64) are
+  // already encoded so no network wait; this is just a microtask hop.
+  const triggerPrint = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch(e){
+      console.error('print() threw', e);
+      toast(t('pe.toast.print_failed','Print failed. Try the browser menu instead.'),'error');
+    }
+    // Give the user time to inspect/cancel/print the dialog. Browsers
+    // block the parent thread while the dialog is up, so this timeout
+    // only fires after dismissal.
+    setTimeout(() => { try { iframe.remove(); } catch(e){} }, 1000);
+  };
+
+  // Wait one frame past document load to ensure CSS @page rules apply
+  if(idoc.readyState === 'complete'){
+    requestAnimationFrame(() => requestAnimationFrame(triggerPrint));
+  } else {
+    iframe.addEventListener('load', () => {
+      requestAnimationFrame(() => requestAnimationFrame(triggerPrint));
+    });
+  }
+}
+
+/** Open the rendered template in a new tab for inspection / manual printing. */
+function cvOpenInTab(){ cvPrintOrExport({ openInTab:true }); }
+
+// ── Default layout ───────────────────────────────────────────────────
+async function cvLoadDefaultLayout(){
+  if(cvBlocks.length && !(await vxConfirm({ message: 'Are you sure you want to replace the current page with the default NDT layout? Any custom blocks on this page will be removed.', okLabel: t('vxc.replace','Replace'), danger: true }))) return;
+  cvAutoSnapshot('Before default layout');
+  cvPushUndo();
+  cvPages[cvCurrentPage].blocks=[]; cvSync(); cvNextId=1; cvSelectedId=null; cvSelectedIds=[];
+  const cc=cvTplCfg.sectionColor||cvGetCompanyColor();
+  const add=(key,isLayout,x,y,w,h,extra={})=>{
+    const def=isLayout?CV_LAYOUT_ITEMS.find(i=>i.key===key):CV_FIELD_DEFS[key];
+    const block={
+      id:_cvBlockId(), key, isLayout,
+      x,y, w:w||(def?.w)||160, h:h||(def?.h)||38,
+      text:extra.text||(isLayout?(def?.label||key):(def?.label||key)),
+      fontSize:extra.fontSize||'8.5px', bold:extra.bold||false, italic:false,
+      color:extra.color||'#000', bgColor:extra.bgColor||'transparent',
+      borderColor:'#cccccc', showBorder:extra.showBorder!==false,
+      align:extra.align||'left', zIndex:cvBlocks.length+1, locked:false,
+    };
+    cvBlocks.push(block);
+  };
+  const M=20, W=754;
+  const col4=Math.floor((W-3)/4), col3=Math.floor((W-2)/3), col2=Math.floor((W-1)/2);
+  let y=M;
+
+  add('accent-bar',true,M,y,W,5,{bgColor:cc,showBorder:false}); y+=5;
+  add('logo-co',true,M,y,130,52,{showBorder:false});
+  add('report-no',false,M+134,y,330,26); add('revision',false,M+468,y,90,26); add('method',false,M+562,y,112,26);
+  y+=28;
+  add('exam-date',false,M+134,y,190,24); add('rep-date',false,M+328,y,190,24);
+  y+=30;
+  add('section-header',true,M,y,W,22,{text:'Client information',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
+  add('client',false,M,y,col4,36); add('project',false,M+col4+1,y,col4,36); add('sv-order',false,M+col4*2+2,y,col4-5,36); add('order-no',false,M+col4*3-1,y,col4+8,36);
+  y+=36;
+  add('location',false,M,y,col4,36); add('req-no',false,M+col4+1,y,col4,36); add('ref-client',false,M+col4*2+2,y,col4-5,36);
+  y+=36;
+  add('section-header',true,M,y,W,22,{text:'Subject information',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
+  add('subject',false,M,y,col3*2-5,36); add('drawing-no',false,M+col3*2-4,y,col3-3,36); add('subject-no',false,M+col3*3-5,y,col3+12,36);
+  y+=36;
+  add('welders',false,M,y,col4,36); add('material',false,M+col4+1,y,col4,36); add('weld-prep',false,M+col4*2+2,y,col4-5,36); add('heat-treat',false,M+col4*3-1,y,col4+8,36);
+  y+=36;
+  add('thickness',false,M,y,col4,36); add('surf-cond',false,M+col4+1,y,col4,36); add('temperature',false,M+col4*2+2,y,col4-5,36); add('weld-pos',false,M+col4*3-1,y,col4+8,36);
+  y+=36;
+  add('part-exam',false,M,y,W,36); y+=36;
+  add('section-header',true,M,y,W,22,{text:'Examination criteria',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
+  add('exam-type',false,M,y,col4+20,36); add('extent',false,M+col4+21,y,col4-10,36); add('spec',false,M+col4*2+12,y,col4+5,36); add('acc-crit',false,M+col4*3+18,y,col4-15,36);
+  y+=36;
+  add('procedure',false,M,y,col2,36); add('proc-rev',false,M+col2+1,y,90,36); add('stage',false,M+col2+95,y,col2-90,36);
+  y+=36;
+  add('section-header',true,M,y,W,22,{text:'Equipment',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
+  add('equipment',false,M,y,col3*2-5,36); add('sv-id',false,M+col3*2-4,y,col3-3,36); add('cal-date',false,M+col3*3-5,y,col3+12,36);
+  y+=36;
+  add('method-block',true,M,y,W,88,{showBorder:false}); y+=88;
+  add('section-header',true,M,y,W,22,{text:'Result / Verdict',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
+  add('remarks',false,M,y,W,56); y+=56;
+  add('result',false,M,y,col2-5,46); add('indications',false,M+col2-4,y,col2+11,46);
+  y+=46;
+  add('sig-block',true,M,y,W,80,{showBorder:false}); y+=80;
+  add('page-footer',true,M,y,W,22,{bgColor:'#f5f5f5',color:'#888',fontSize:'7px',showBorder:false});
+
+  cvSaveLayout(); cvRenderPageTabs(); cvRenderCanvas(); cvFitToView();
+  toast(t('toast.layout_loaded','Default NDT layout loaded — customise freely.'));
+}
+
+// Load tpl config on boot
+cvLoadTplConfig();
+
+// ── Service Worker Registration ──────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(() => {});
+  });
+}
+

@@ -1,0 +1,3774 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// PDF TEMPLATE EDITOR v2 — Professional Canvas Layout Builder
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Field definitions — maps to report data ────────────────────────────
+var CV_FIELD_DEFS = {
+  'report-no':    {label:'Report No.',                    ph:'SV-2023-004-NDTD-REP-023-001', get:r=>r.reportNo||r.id||'—',        w:260,h:38, mapTo:'reportNo'},
+  'revision':     {label:'Revision',                      ph:'01',                            get:r=>r.revision||'—',              w:90, h:38, mapTo:'revision'},
+  'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
+  'rep-date':     {label:'Report date / Sign date',       ph:'2025-03-15',                    get:r=>r.signDate||r.repDate||'—',   w:140,h:38, mapTo:'signDate'},
+  'method':       {label:'NDT Method',                    ph:'UT — Ultrasonic',               get:r=>r.method||'—',                w:120,h:38, mapTo:'method'},
+  'client':       {label:'Client',                        ph:'Offshore Structures BV',        get:r=>r.client||'—',                w:200,h:38, mapTo:'client'},
+  'project':      {label:'Project',                       ph:'Platform Alpha — Leg Inspection',get:r=>r.project||'—',              w:240,h:38, mapTo:'project'},
+  'location':     {label:'Test location',                 ph:'Fabrication yard, Rotterdam',   get:r=>r.location||'—',              w:200,h:38, mapTo:'location'},
+  'sv-order':     {label:'SV Order no.',                  ph:'SV-2023-004',                   get:r=>r.svOrder||'—',               w:120,h:38, mapTo:'svOrder'},
+  'order-no':     {label:'Order no.',                     ph:'PO-98271',                      get:r=>r.orderNo||'—',               w:120,h:38, mapTo:'orderNo'},
+  'req-no':       {label:'Request no.',                   ph:'REQ-2023-045',                  get:r=>r.requestNo||'—',             w:150,h:38, mapTo:'requestNo'},
+  'ref-client':   {label:'Client reference',              ph:'OSB-2023-PR-012',               get:r=>r.clientRef||'—',             w:150,h:38, mapTo:'clientRef'},
+  'subject':      {label:'Subject / component',           ph:'Main leg splice weld — Node L4',get:r=>r.subject||'—',               w:260,h:38, mapTo:'subject'},
+  'drawing-no':   {label:'Drawing no.',                   ph:'OSB-DWG-4420-B',                get:r=>r.drawing||'—',               w:150,h:38, mapTo:'drawing'},
+  'subject-no':   {label:'Subject no.',                   ph:'L4-SP-007',                     get:r=>r.subjectNo||'—',             w:130,h:38, mapTo:'subjectNo'},
+  'welders':      {label:'Welder(s)',                     ph:'J. Bakker, M. de Vries',        get:r=>r.welders||'—',               w:175,h:38, mapTo:'welders'},
+  'weld-process': {label:'Welding process',               ph:'FCAW / SAW',                    get:r=>r.weldProcess||'—',           w:130,h:38, mapTo:'weldProcess'},
+  'material':     {label:'Material',                      ph:'S355J2G3',                      get:r=>r.material||'—',              w:130,h:38, mapTo:'material'},
+  'weld-prep':    {label:'Weld type / prep',              ph:'V-groove',                      get:r=>r.weldType||'—',              w:130,h:38, mapTo:'weldType'},
+  'heat-treat':   {label:'Heat treatment',                ph:'PWHT',                          get:r=>r.heatTreat||'—',             w:120,h:38, mapTo:'heatTreat'},
+  'thickness':    {label:'Dimensions / thickness',        ph:'Ø323.9 × 32mm',                get:r=>r.dimensions||'—',            w:110,h:38, mapTo:'dimensions'},
+  'surf-cond':    {label:'Surface condition',             ph:'As welded',                     get:r=>r.surfCond||'—',              w:150,h:38, mapTo:'surfCond'},
+  'temperature':  {label:'Surface temperature',           ph:'18°C',                          get:r=>r.surfTemp||'—',              w:110,h:38, mapTo:'surfTemp'},
+  'weld-pos':     {label:'Welding position',              ph:'PA',                            get:r=>r.weldPos||'—',               w:100,h:38, mapTo:'weldPos'},
+  'part-exam':    {label:'Part examined',                  ph:'100% of weld seam incl. HAZ',   get:r=>r.partExam||'—',              w:380,h:44, mapTo:'partExam'},
+  'exam-type':    {label:'Examination type',              ph:'Weld surface examination',      get:r=>r.examType||'—',              w:200,h:38, mapTo:'examType'},
+  'extent':       {label:'Extent',                        ph:'100% Weld and HAZ',             get:r=>r.extent||'—',                w:160,h:38, mapTo:'extent'},
+  'spec':         {label:'Specification',                 ph:'EN-ISO 17640:2018',             get:r=>r.eq_spec||r.spec||'—',       w:185,h:38, mapTo:'eq_spec / spec'},
+  'acc-crit':     {label:'Acceptance criteria',           ph:'EN-ISO 11666:2018 level 2',     get:r=>r.eq_acc||r.accCrit||'—',     w:200,h:38, mapTo:'eq_acc / accCrit'},
+  'procedure':    {label:'Procedure no.',                 ph:'SV2023-004-NDTD-PRO-0009',      get:r=>r.eq_proc||r.proc||'—',       w:210,h:38, mapTo:'eq_proc / proc'},
+  'proc-rev':     {label:'Procedure revision',            ph:'01',                            get:r=>r.procRev||'—',               w:90, h:38, mapTo:'procRev'},
+  'equipment':    {label:'Equipment',                     ph:'SIUI Smartor 16',               get:r=>r.eq_equip||r.equip||'—',     w:185,h:38, mapTo:'eq_equip / equip'},
+  'sv-id':        {label:'SV-ID No.',                     ph:'SV-UT-004',                     get:r=>r.eq_svid||r.eqSvId||'—',     w:110,h:38, mapTo:'eq_svid'},
+  'cal-date':     {label:'Calibration date',              ph:'2025-01-10',                    get:r=>r.eq_caldate||r.eqCalDate||'—',w:130,h:38, mapTo:'eq_caldate'},
+  'stage':        {label:'Stage of examination',          ph:'Final',                         get:r=>r.stage||'—',                 w:140,h:38, mapTo:'stage'},
+  'result':       {label:'Result / Verdict',              ph:'ACCEPTABLE',                    get:r=>{const v=r.verdict||r.result||'—'; return v==='Acceptable'||v==='Pass'?'ACCEPTABLE':v==='Not acceptable'||v==='Fail'?'NOT ACCEPTABLE':v==='Monitor'?'MONITOR':v;}, w:240,h:48,result:true, mapTo:'verdict'},
+  'indications':  {label:'Reportable indications',        ph:'No / Nee',                      get:r=>r.indications||((r.verdict==='Not acceptable'||r.result==='Fail')?'Yes':'No'), w:155,h:38, mapTo:'indications'},
+  'remarks':      {label:'Remarks / observations',        ph:'No recordable indications detected.',get:r=>r.remarks||'—',          w:400,h:60,multi:true, mapTo:'remarks'},
+  'inspector':    {label:'Inspector name',                ph:'Carl Cope',                     get:r=>r.inspector||'—',             w:160,h:38, mapTo:'inspector'},
+  'insp-level':   {label:'Level',                         ph:'UT Level II',                   get:r=>r.level||(r.method?r.method+' Level II':'—'), w:110,h:38, mapTo:'level'},
+  'cert-auth':    {label:'Cert. Authority',               ph:'PCN:319222',                    get:r=>r.certAuth||'—',              w:160,h:38, mapTo:'certAuth'},
+  'witness':      {label:'Witness / 3rd party',           ph:'Client representative',         get:r=>r.witness||'—',               w:175,h:38, mapTo:'witness'},
+  'sign-date':    {label:'Date signed',                   ph:'2025-03-15',                    get:r=>r.signDate||'—',              w:130,h:38, mapTo:'signDate'},
+  'insp-sig':     {label:'Inspector signature',           ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
+  'client-sig':   {label:'Client sign-off',               ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
+  'insp-date':    {label:'Inspector date',                ph:'____/____/________',            get:r=>'',                           w:145,h:38},
+  'client-date':  {label:'Client date',                   ph:'____/____/________',            get:r=>'',                           w:145,h:38},
+  'blank-field':     {label:'Blank field (single)',       ph:'Custom value',   get:r=>'',  blank:true,            w:200, h:38},
+  'blank-multiline': {label:'Blank field (multi-line)',   ph:'Custom text…',   get:r=>'',  blank:true, multi:true, w:380, h:64},
+  'blank-row-2':     {label:'Blank row — 2 columns',     ph:'',               get:r=>'',  blankRow:2,             w:400, h:38},
+  'blank-row-3':     {label:'Blank row — 3 columns',     ph:'',               get:r=>'',  blankRow:3,             w:560, h:38},
+  'blank-row-4':     {label:'Blank row — 4 columns',     ph:'',               get:r=>'',  blankRow:4,             w:720, h:38},
+
+  // ── COMPUTED / SMART FIELDS ─────────────────────────────────────
+  'defect-count':    {label:'Defect count',          ph:'3',         get:r=>(r.defects||[]).length, w:100,h:38, computed:true, mapTo:'computed'},
+  'pass-rate':       {label:'Pass rate %',           ph:'92%',       get:r=>{const rs=ls(KEYS.reports,[]);if(!rs.length)return'—';return Math.round(rs.filter(x=>x.verdict==='Acceptable').length/rs.length*100)+'%';}, w:120,h:38, computed:true},
+  'rejected-count':  {label:'Rejected indications', ph:'1',         get:r=>(r.defects||[]).filter(d=>d.severity==='Critical'||d.severity==='High'||d.acceptance==='Reject').length, w:140,h:38, computed:true},
+  'today-date':      {label:'Today (auto)',          ph:'15-Mar-2025', get:r=>{const d=new Date();return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}, w:130,h:38, computed:true},
+  'page-num':        {label:'Page X of Y',           ph:'Page 1 of 3', get:r=>'Page 1 of '+(typeof cvPages!=='undefined'?cvPages.length:1), w:130,h:32, computed:true},
+
+  // ── PROCEDURE / CERT / CALIBRATION STATUS ───────────────────────
+  'procedure-link':  {label:'Procedure (linked)',    ph:'SV-PRO-009 Rev 02',  get:r=>'',w:280,h:46, smartLink:'procedure'},
+  'cert-status':     {label:'Inspector cert status', ph:'Level II UT · valid', get:r=>'',w:240,h:46, smartLink:'cert'},
+  'calib-status':    {label:'Equipment calibration', ph:'Cal valid until Q3 2025', get:r=>'',w:240,h:46, smartLink:'calib'},
+  'accept-eval':     {label:'Acceptance evaluation', ph:'7 mm vs ≤ 8 mm (ISO 11666 L2) — ACCEPTABLE', get:r=>'',w:380,h:46, smartLink:'accept'},
+
+  // ── ADVANCED OUTPUT ─────────────────────────────────────────────
+  'qr-code':         {label:'QR — verify report',    ph:'',           get:r=>'',                          w:90, h:90,  qr:true},
+  'weld-map':        {label:'Weld / defect map',     ph:'',           get:r=>'',                          w:380,h:220, weldMap:true},
+  'scan-image':      {label:'A/B/C-scan image',      ph:'',           get:r=>'',                          w:280,h:200, scanImg:true},
+  'cross-ref':       {label:'Cross-reference',       ph:'See defect 3 on page 4', get:r=>'',              w:200,h:32, xref:true},
+
+  // ── REPEATING SECTIONS ──────────────────────────────────────────
+  'defect-row-loop': {label:'Defect row (auto-repeat)', ph:'Loops once per defect', get:r=>'',           w:754,h:34, repeat:'defects'},
+
+  // ── COMPANY (LIVE) ─────────────────────────────────────────────
+  // V29: smart-link fields that read live from the company profile
+  // (Settings → Company). The get() functions invoke _cvCompany() which
+  // reads vx-company-v1 fresh each render — so changes to the profile
+  // appear in the next preview without any explicit refresh.
+  'co-name-smart':    {label:'Company name (live)',    ph:'Acme Inspection Ltd.',     get:r=>_cvCompany().name||'—',         w:260,h:36, smartLink:'company', companyField:'name'},
+  'co-address-smart': {label:'Company address (live)', ph:'1 NDT Street, Antwerp',    get:r=>_cvFormatCompanyAddress(),       w:280,h:56, smartLink:'company', companyField:'address'},
+  'co-phone-smart':   {label:'Company phone (live)',   ph:'+32 3 123 45 67',          get:r=>_cvCompany().phone||'—',        w:160,h:32, smartLink:'company', companyField:'phone'},
+  'co-email-smart':   {label:'Company email (live)',   ph:'info@company.com',         get:r=>_cvCompany().email||'—',        w:200,h:32, smartLink:'company', companyField:'email'},
+  'co-website-smart': {label:'Company website (live)', ph:'https://company.com',      get:r=>_cvCompany().web||'—',          w:200,h:32, smartLink:'company', companyField:'web'},
+  'co-vat-smart':     {label:'Company VAT/reg (live)', ph:'BE 0123.456.789',          get:r=>_cvCompany().reg||'—',          w:160,h:32, smartLink:'company', companyField:'reg'},
+  'co-logo-smart':    {label:'Company logo (live)',    ph:'',                          get:r=>'',                             w:140,h:56, smartLink:'company', companyField:'logo', isLogo:true},
+  'co-block':         {label:'Company info block',     ph:'Acme Inspection Ltd.\n1 NDT Street\n+32 3 123 45 67', get:r=>'',  w:280,h:90, smartLink:'company', companyField:'block', isCompanyBlock:true},
+};
+
+// V29 — Company profile live-read helpers.
+// _cvCompany()                — read the company profile fresh each call
+// _cvFormatCompanyAddress()   — compose a multi-line postal address
+// _cvHasCompanyData()         — quick "has the user filled anything in" check
+function _cvCompany(){
+  try { return ls(KEYS.company, {}) || {}; }
+  catch(e){ return {}; }
+}
+function _cvFormatCompanyAddress(){
+  const c = _cvCompany();
+  const parts = [
+    c.addr1,
+    c.addr2,
+    [c.post, c.city].filter(Boolean).join(' '),
+    c.country,
+  ].filter(s => s && s.trim());
+  return parts.length ? parts.join('\n') : '—';
+}
+function _cvHasCompanyData(){
+  const c = _cvCompany();
+  return !!(c.name || c.addr1 || c.email || c.phone || c.logo);
+}
+
+// V29 — Zone detection. A block placed within the header band (top
+// cvTplCfg.header.heightPx pixels) gets zone='header'; within the footer band
+// (bottom cvTplCfg.footer.heightPx pixels of the A4 page) gets zone='footer';
+// otherwise no zone (page body). A block straddling a band boundary is
+// assigned to the zone where its midpoint lies — biases toward the band the
+// user most likely intended.
+var CV_PAGE_HEIGHT_PX = 1123;
+// AUDIT-FIX #9: A4 page width in CSS pixels (210mm @ 96dpi). Was a bare
+// literal at four sites (cvFitToView, cvApplyZoom width + zoom, print CSS);
+// now named alongside the existing height constant so the page-size pair
+// has a single source of truth. Changing page size (Letter, Legal, etc.)
+// in the future only requires updating these two constants.
+var CV_PAGE_WIDTH_PX  = 794;
+function _cvDetectZone(y, h){
+  const midY = y + (h || 0) / 2;
+  const hdr  = cvTplCfg.header;
+  const ftr  = cvTplCfg.footer;
+  if(hdr && hdr.enabled && midY < (hdr.heightPx || 100)) return 'header';
+  if(ftr && ftr.enabled && midY > (CV_PAGE_HEIGHT_PX - (ftr.heightPx || 60))) return 'footer';
+  return null;   // null = page body (default)
+}
+
+// AUDIT-FIX #1: Cross-reference page-number resolution.
+// Both cvRenderCanvas and cvBuildPrintHTML need to populate cvCrossRefMap
+// with { 'defect-N': 'page X' } so that cross-reference fields can show
+// "See defect-3 on page 4". Earlier versions of this code had two divergent
+// implementations: the preview hardcoded every entry to 'page 1', and the
+// print pipeline mapped defect-N to page-N — both wrong, because defects
+// don't get their own pages by default. They render inline within whichever
+// editor page contains a defect-table or defect-row-loop block. This helper
+// scans cvPages, finds the first page hosting a defect-rendering block, and
+// maps every defect index to that page. Falls back to page 1 if no defect
+// block is found (the cross-reference still resolves to something readable
+// rather than 'pending').
+function _cvBuildCrossRefMap(report){
+  const map = {};
+  if(!report || !report.defects || !report.defects.length) return map;
+  // Find the editor page that hosts the first defect-rendering block.
+  // Recognised renderers: any block whose field def carries repeat:'defects'
+  // (e.g. 'defect-row-loop') AND the 'defect-table' layout block.
+  let defectPageIdx = -1;
+  for(let p = 0; p < cvPages.length; p++){
+    const blocks = cvPages[p].blocks || [];
+    const hasDefectBlock = blocks.some(b => {
+      if(b.key === 'defect-table') return true;
+      const def = CV_FIELD_DEFS[b.key];
+      return !!(def && def.repeat === 'defects');
+    });
+    if(hasDefectBlock){ defectPageIdx = p; break; }
+  }
+  // If no defect block is anywhere on the template, fall back to page 1 so
+  // the cross-ref still renders readable text instead of leaving "pending"
+  // visible in the printed PDF.
+  const pageLabel = 'page ' + (defectPageIdx >= 0 ? defectPageIdx + 1 : 1);
+  (report.defects || []).forEach((d, i) => { map['defect-' + (i + 1)] = pageLabel; });
+  return map;
+}
+
+var CV_LAYOUT_ITEMS = [
+  {key:'section-header', label:'Section header bar',         w:754,h:24},
+  {key:'text-block',     label:'Free text / note',           w:360,h:48},
+  {key:'h-line',         label:'Horizontal divider',         w:754,h:10},
+  {key:'logo-co',        label:'Company logo',               w:140,h:56},
+  {key:'logo-client',    label:'Client logo',                w:140,h:56},
+  {key:'photo-box',      label:'Photo placeholder',          w:220,h:150},
+  {key:'photo-page',     label:'Photo page (6 slots)',       w:754,h:980},
+  {key:'additional-page',label:'Additional page',            w:754,h:980},
+  {key:'defect-table',   label:'Defect / indication table',  w:754,h:90},
+  {key:'method-block',   label:'Method-specific data block', w:754,h:90},
+  {key:'sig-block',      label:'Signature block (2 col)',    w:754,h:80},
+  {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
+  {key:'page-footer',    label:'Page footer bar',            w:754,h:22},
+];
+
+var CV_PALETTE_GROUPS = [
+  {id:'custom',    label:'✦ Custom / Blank',  fields:['blank-field','blank-multiline','blank-row-2','blank-row-3','blank-row-4']},
+  {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block']},
+  {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','rep-date','method']},
+  {id:'client',    label:'Client info',   fields:['client','project','location','sv-order','order-no','req-no','ref-client']},
+  {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','welders','weld-process','material','weld-prep','heat-treat','thickness','surf-cond','temperature','weld-pos','part-exam']},
+  {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},
+  {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date']},
+  {id:'result',    label:'Result',        fields:['result','indications','remarks']},
+  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','witness','sign-date','insp-sig','client-sig','insp-date','client-date']},
+  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','accept-eval']},
+  {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
+  {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},
+  {id:'components',label:'⬢ My components', isComponents:true},
+  {id:'layout',    label:'Layout elements',isLayout:true},
+];
+
+// ── Canvas state ──────────────────────────────────────────────────────
+var CV_KEY = 'vx-canvas-layout-v1';
+
+// V24: stable, collision-resistant block ID generator. Combines an
+// epoch-seconds base-36 timestamp with 6 chars of cryptographic randomness.
+// Format: 'blk-{ts36}-{rand6}' — e.g. 'blk-l8x2k4-h7q9z2'. About 60 bits of
+// entropy per block; collisions effectively impossible in single-user use,
+// safe for cross-device merge later. Uses crypto.getRandomValues where
+// available, falling back to Math.random for older browsers.
+function _cvBlockId(){
+  const ts36 = Date.now().toString(36);
+  let rand;
+  if(typeof crypto !== 'undefined' && crypto.getRandomValues){
+    const buf = new Uint8Array(4);
+    crypto.getRandomValues(buf);
+    rand = Array.from(buf).map(b => b.toString(36).padStart(2,'0')).join('').slice(0,6);
+  } else {
+    rand = Math.random().toString(36).slice(2,8);
+  }
+  return 'blk-' + ts36 + '-' + rand;
+}
+
+// AUDIT-FIX #3: Block-clone helper. Three places used to inline the same
+// five-line pattern: JSON.parse(JSON.stringify(b)) for a deep copy, fresh
+// _cvBlockId(), x/y offset by 16px (= 2 grid cells, visible but adjacent),
+// and a zIndex that lifts the clone above existing blocks. The callers
+// (cvDuplicateBlock, cvPasteClipboard, the Ctrl+D multi-duplicate handler)
+// all push the result to cvBlocks themselves, so this helper just produces
+// the prepared clone — it doesn't mutate cvBlocks. That keeps batch loops
+// correct: each iteration sees a fresh cvBlocks.length when computing the
+// next zIndex, so duplicates of 5 blocks all stack predictably above the
+// originals. The +16 offset is also reused so multi-iteration callers
+// produce a slight cascade rather than overlapping the originals at the
+// exact same coordinates.
+function _cvCloneBlock(b){
+  const nb = JSON.parse(JSON.stringify(b));
+  nb.id = _cvBlockId();
+  nb.x = cvSnap(b.x + 16);
+  nb.y = cvSnap(b.y + 16);
+  nb.zIndex = cvBlocks.length + 1;
+  return nb;
+}
+var CV_TPL_KEY = 'vx-tpl-config-v1';
+var CV_METHOD_TPL_PREFIX = 'vx-method-tpl-';
+
+var cvPages = [{label:'Page 1', blocks:[]}];
+var cvCurrentPage = 0;
+var cvBlocks = cvPages[0].blocks;
+var cvSelectedId = null;
+var cvSelectedIds = [];  // multi-select
+
+// AUDIT-FIX #2: Named helpers for the two "sync cvSelectedId from cvSelectedIds"
+// patterns used across the editor. Earlier code inlined the choice at five
+// different callsites, which made the underlying convention invisible. The
+// convention is:
+//
+//   _cvPrimaryToLast()  — for shift-toggle operations (shift-click on canvas
+//                         or in the layers panel). The block the user most
+//                         recently interacted with becomes the primary
+//                         selection. Matches mainstream editors (Figma,
+//                         Sketch, Illustrator).
+//
+//   _cvPrimaryToFirst() — for batch operations that replace the selection
+//                         wholesale (Ctrl+A select-all, Ctrl+D duplicate-all).
+//                         The first block in document order becomes primary,
+//                         giving a stable, predictable result regardless of
+//                         which order the user clicked things previously.
+//
+// Both helpers gracefully handle the empty-selection case by clearing
+// cvSelectedId to null. Callers don't need to write the `|| null` fallback.
+function _cvPrimaryToLast(){
+  cvSelectedId = cvSelectedIds[cvSelectedIds.length - 1] || null;
+}
+function _cvPrimaryToFirst(){
+  cvSelectedId = cvSelectedIds[0] || null;
+}
+
+// AUDIT-FIX #7 (scoped): the paired-write pattern for selecting exactly one
+// block (or none). Original audit framed this as "cvSelectedId is fully
+// derivable from cvSelectedIds", but after fix #2 made the two-pattern
+// convention explicit (toggle uses last, batch uses first), cvSelectedId
+// genuinely preserves which convention applied at the last selection event.
+// What IS still redundant is the paired-write pattern for the "select
+// exactly one block" case — five sites used to write both fields in two
+// lines. This helper centralizes that.
+//
+// Passing a falsy id (null/undefined) clears the selection — same semantics
+// as cvSelectBlock(null) but without the UI side effects (re-render etc.),
+// so it can be used inside larger operations that batch their re-render.
+function _cvSelectSingle(id){
+  cvSelectedId = id || null;
+  cvSelectedIds = id ? [id] : [];
+}
+var cvDragging = null;
+var cvResizing = null;
+var cvZoom = 1.0;
+var cvPreview = false;
+var cvNextId = 1;
+var cvPaletteDrag = null;
+var cvPaletteCollapsed = {};
+var cvPpvMethod = 'UT';
+var cvPpvResult = 'Pass';
+var cvPpvShowDefects = false;
+var cvUndoStack = [];
+var cvRedoStack = [];
+var cvClipboard = null;  // copy/paste
+var cvDragUndoPushed = false;  // prevent undo spam during drag
+var CV_GRID = 8;
+var CV_SNAP_THRESHOLD = 6;  // pixels for snap-to-edge
+function cvSnap(v){ return Math.round(v/CV_GRID)*CV_GRID; }
+function cvSync(){ cvBlocks = cvPages[cvCurrentPage].blocks; }
+
+function cvGetCompanyColor(){
+  try { const c = ls(KEYS.company, {}); return c.color || '#185FA5'; } catch(e){ return '#185FA5'; }
+}
+
+var cvTplCfg = {
+  sectionColor:'#404040', margin:'8px', baseSize:'8.5px',
+  showLogo:true, showFooter:true,
+  tplLogo:null, logoPos:'left', logoSize:'md',
+  tplLogo2:null, logo2Pos:'right', logo2Size:'md',
+  content:{},
+  // V29 — header/footer zones repeat on every page in print/export.
+  // `enabled` toggles the zone on/off (no-cost when off).
+  // `heightPx` defines the band height in design pixels (1px ≈ 1 web px at zoom 1).
+  // Blocks placed inside the band are tagged with zone='header'|'footer' in the
+  // block JSON; at print time the pipeline injects them at the band position
+  // on every page. In design mode, the band is rendered with a tinted
+  // background and dashed boundary so the user can see the boundary.
+  header:{ enabled:false, heightPx:100, bgColor:'transparent' },
+  footer:{ enabled:false, heightPx:60,  bgColor:'transparent' },
+};
+
+// ── Sample data ──────────────────────────────────────────────────────
+var CV_SAMPLE = {
+  base: {
+    reportNo:'SV-2023-004-NDTD-REP-023-001', revision:'01',
+    client:'Offshore Structures BV', project:'Platform Alpha — Leg Inspection',
+    location:'Fabrication yard — Rotterdam', svOrder:'SV-2023-004',
+    orderNo:'PO-98271', requestNo:'REQ-2023-045', clientRef:'OSB-2023-PR-012',
+    examDate:'2025-03-15',
+    subject:'Main leg splice weld — Node L4', drawing:'OSB-DWG-4420-B',
+    subjectNo:'L4-SP-007', weldProcess:'FCAW / SAW',
+    welders:'J. Bakker, M. de Vries', material:'S355J2G3',
+    weldType:'V-groove', heatTreat:'PWHT',
+    dimensions:'Ø323.9 × 32mm', surfCond:'Blasted',
+    surfTemp:'18°C', weldPos:'PA',
+    partExam:'100% of weld seam incl. HAZ — 1200mm total length',
+    examType:'Weld surface examination', extent:'100% Weld and HAZ',
+    spec:'EN-ISO 17640:2018', accCrit:'EN-ISO 11666:2018 level 2',
+    proc:'SV2023-004-NDTD-PRO-0009', procRev:'01', stage:'Final',
+    equip:'SIUI Smartor 16', eqSvId:'SV-UT-004', eqCalDate:'2025-01-10',
+    inspector:'Carl Cope', level:'UT Level II',
+    certAuth:'PCN:319222', indications:'No / Nee', witness:'Client representative',
+    repDate:'2025-03-15', signDate:'2025-03-15',
+    remarks:'Examination performed in accordance with the approved procedure. No recordable indications were detected. The weld is accepted.',
+  },
+  methodData: {
+    UT:  {coup:'Waterbased', freq:'5 MHz', range:'0-100mm', probe:'Single crystal angle beam 70°', sens:'DAC + Transfer + 6dB', refblk:'K1 IIW 1', calblk:'EN-ISO 17640 32mm'},
+    MT:  {tech:'Indirect (yoke)', susp:'Magnaflux 7HF', cur:'AC', light:'UV-A > 1000 µW/cm²'},
+    VT:  {lux:'500', magn:'×2', dist:'600 mm max', vtequip:'Welding gauge set'},
+    PT:  {pen:'Magnaflux ZL4C', pdwell:'15 mins', ddwell:'10-20 mins', clean:'Magnaflux SKC-S', dev:'Magnaflux SKD-S2'},
+    PMI: {ctrl:'316L Reference block', mode:'Alloy ID', pmiequip:'X-MET 8000 Expert'},
+    HT:  {scale:'HV10', method:'UCI', htequip:'Mic 10'},
+    RT:  {source:'Ir-192', film:'D7 / Kodak AA400', iqitype:'Wire type EN 462-1', sfd:'700 mm'},
+    ET:  {freq:'100 kHz', coil:'Absolute pencil probe', ref:'1.0mm EDM notch'},
+  },
+  defects: [
+    { type:'Linear indication', sev:'High', loc:'250mm from datum', depth:'3.2', len:'12', disp:'Repair required' },
+    { type:'Surface porosity', sev:'Low',  loc:'680mm from datum', depth:'—', len:'4', disp:'Accept as-is' },
+  ]
+};
+
+function cvBuildReport(method, result, showDefects){
+  // V3: If a real report ID is selected, use that report's actual data
+  if(cvPpvReportId){
+    const reports = ls(KEYS.reports, []);
+    const real = reports.find(r => (r.reportNo === cvPpvReportId || r.id === cvPpvReportId));
+    if(real){
+      const b = Object.assign({}, CV_SAMPLE.base, real);
+      // Ensure verdict mirrors result + flags
+      b.method = real.method || method;
+      b.result = real.verdict === 'Acceptable' ? 'Pass' : real.verdict === 'Not acceptable' ? 'Fail' : (real.verdict || result);
+      b.verdict = real.verdict || (result==='Pass'?'Acceptable':result==='Fail'?'Not acceptable':result);
+      b.id = b.reportNo || real.reportNo;
+      // Defects from store, filtered to this report
+      const allDef = ls(KEYS.defects, []);
+      b.defects = allDef.filter(d => d.reportNo === b.reportNo || d.reportId === real.id) || [];
+      if(!b.defects.length && showDefects) b.defects = CV_SAMPLE.defects.slice(0, 1); // give designer at least one row
+      // Method-specific
+      b.methodData = CV_SAMPLE.methodData[b.method] || {};
+      // Maintain alias compatibility
+      b.eq_spec = b.eq_spec||b.spec; b.eq_acc = b.eq_acc||b.accCrit; b.eq_proc = b.eq_proc||b.proc;
+      b.eq_equip = b.eq_equip||b.equip; b.eq_svid = b.eq_svid||b.eqSvId; b.eq_caldate = b.eq_caldate||b.eqCalDate;
+      b.signDate = b.signDate||b.repDate||b.examDate;
+      b.level = b.level || (b.method+' Level II');
+      return b;
+    }
+  }
+  // Fallback: synthetic sample data
+  const b = Object.assign({}, CV_SAMPLE.base);
+  b.method = method; b.result = result;
+  b.id = b.reportNo;
+  b.verdict = result==='Pass'?'Acceptable':result==='Fail'?'Not acceptable':result;
+  b.defects = showDefects ? CV_SAMPLE.defects : [];
+  b.level = method + ' Level II';
+  b.signDate = b.repDate || b.examDate;
+  if(result !== 'Pass') b.indications = 'Yes / Ja';
+  b.eq_spec = b.spec; b.eq_acc = b.accCrit; b.eq_proc = b.proc;
+  b.eq_equip = b.equip; b.eq_svid = b.eqSvId; b.eq_caldate = b.eqCalDate;
+  b.methodData = CV_SAMPLE.methodData[method] || {};
+  return b;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// V3 ENGINE: Conditional visibility, format, computed, components, i18n
+// ════════════════════════════════════════════════════════════════════
+
+var cvPpvReportId = null;       // null = sample data, else report.reportNo
+var cvPpvLanguage = 'en';        // en, nl, de, fr
+var cvComponents = [];           // user-saved components: [{id, name, blocks:[...]}]
+var cvCrossRefMap = {};          // populated during render: { 'defect-3': 'page 4' }
+
+var CV_LANG_LABELS = {
+  en: { method:'NDT Method', client:'Client', project:'Project', subject:'Subject', inspector:'Inspector', report_no:'Report No.', revision:'Revision', exam_date:'Examination date', sign_date:'Date signed', spec:'Specification', acc_crit:'Acceptance criteria', procedure:'Procedure no.', equipment:'Equipment', material:'Material', remarks:'Remarks', result:'Result', acceptable:'ACCEPTABLE', not_acceptable:'NOT ACCEPTABLE', monitor:'MONITOR', defects:'Defects', page:'Page', of:'of' },
+  nl: { method:'NDO-methode', client:'Opdrachtgever', project:'Project', subject:'Onderwerp', inspector:'Inspecteur', report_no:'Rapportnr.', revision:'Revisie', exam_date:'Onderzoeksdatum', sign_date:'Datum ondertekend', spec:'Specificatie', acc_crit:'Acceptatiecriterium', procedure:'Procedurenr.', equipment:'Apparatuur', material:'Materiaal', remarks:'Opmerkingen', result:'Resultaat', acceptable:'AANVAARDBAAR', not_acceptable:'NIET AANVAARDBAAR', monitor:'BEWAKEN', defects:'Indicaties', page:'Pagina', of:'van' },
+  de: { method:'ZfP-Verfahren', client:'Auftraggeber', project:'Projekt', subject:'Gegenstand', inspector:'Prüfer', report_no:'Berichtsnr.', revision:'Revision', exam_date:'Prüfdatum', sign_date:'Unterschriftsdatum', spec:'Spezifikation', acc_crit:'Abnahmekriterium', procedure:'Verfahrensnr.', equipment:'Prüfgerät', material:'Werkstoff', remarks:'Bemerkungen', result:'Ergebnis', acceptable:'ANNEHMBAR', not_acceptable:'NICHT ANNEHMBAR', monitor:'ÜBERWACHEN', defects:'Anzeigen', page:'Seite', of:'von' },
+  fr: { method:'Méthode CND', client:'Client', project:'Projet', subject:'Objet', inspector:'Inspecteur', report_no:'N° de rapport', revision:'Révision', exam_date:'Date d\'examen', sign_date:'Date de signature', spec:'Spécification', acc_crit:'Critère d\'acceptation', procedure:'N° de procédure', equipment:'Équipement', material:'Matériau', remarks:'Remarques', result:'Résultat', acceptable:'ACCEPTABLE', not_acceptable:'NON ACCEPTABLE', monitor:'À SURVEILLER', defects:'Indications', page:'Page', of:'sur' },
+};
+
+// Format a value with a format string; { date | DD-MMM-YYYY }, { num | 0.00 }, { upper }
+function cvFormatValue(value, format){
+  if(value == null || value === '') return '';
+  if(!format) return value;
+  // Date formats
+  const dateMatch = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(dateMatch && /[YMD]/.test(format)){
+    const d = new Date(value);
+    if(isNaN(d)) return value;
+    const pad=n=>String(n).padStart(2,'0');
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthsFull=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return format
+      .replace(/YYYY/g, d.getFullYear())
+      .replace(/YY/g, String(d.getFullYear()).slice(-2))
+      .replace(/MMMM/g, monthsFull[d.getMonth()])
+      .replace(/MMM/g, months[d.getMonth()])
+      .replace(/MM/g, pad(d.getMonth()+1))
+      .replace(/DD/g, pad(d.getDate()));
+  }
+  // Number formats
+  if(!isNaN(parseFloat(value)) && /[#0]/.test(format)){
+    const n = parseFloat(value);
+    const decimals = (format.split('.')[1] || '').length;
+    return n.toFixed(decimals);
+  }
+  // Case formats
+  if(format === 'upper') return String(value).toUpperCase();
+  if(format === 'lower') return String(value).toLowerCase();
+  if(format === 'title') return String(value).replace(/\w\S*/g, w => w.charAt(0).toUpperCase()+w.substr(1).toLowerCase());
+  return value;
+}
+
+// Evaluate conditional show-when rule against report data
+function cvEvalShowWhen(block, report){
+  if(!block.showWhen || !block.showWhen.field) return true;  // no rule = always show
+  if(!report) return true;
+  const { field, op, value } = block.showWhen;
+  let actual;
+  if(field === 'defectCount') actual = (report.defects||[]).length;
+  else if(field === 'verdict') actual = report.verdict;
+  else if(field === 'method') actual = report.method;
+  else actual = report[field];
+  const a = String(actual ?? '').toLowerCase();
+  const v = String(value ?? '').toLowerCase();
+  switch(op){
+    case '=':       return a === v;
+    case '!=':      return a !== v;
+    case 'contains':return a.includes(v);
+    case '>':       return parseFloat(actual) > parseFloat(value);
+    case '<':       return parseFloat(actual) < parseFloat(value);
+    case '>=':      return parseFloat(actual) >= parseFloat(value);
+    case '<=':      return parseFloat(actual) <= parseFloat(value);
+    case 'empty':   return !actual || actual === '' || actual === '—';
+    case 'notEmpty':return !!actual && actual !== '' && actual !== '—';
+    default:        return true;
+  }
+}
+
+// Resolve smart-link content for procedure/cert/calib/accept-eval
+function cvResolveSmartLink(block, report){
+  if(!block || !block.key) return '';
+  const k = block.key;
+  if(k === 'procedure-link'){
+    const procNo = report?.eq_proc || report?.proc || report?.procedure || '—';
+    const rev = report?.procRev || '';
+    const procs = (typeof ls === 'function') ? ls(KEYS.procedures, []) : [];
+    const match = procs.find(p => p.procNo === procNo || p.procedureNo === procNo || p.no === procNo);
+    if(match){
+      return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+        <span style="background:rgba(62,207,142,.15);color:#16a34a;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">✓ LINKED</span>
+        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(procNo)}${rev?' Rev '+escapeHtml(rev):''}</div><div style="font-size:8px;color:#666">${escapeHtml(match.title || match.specification || 'Procedure on file')}</div></div>
+      </div>`;
+    }
+    return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+      <span style="background:rgba(245,166,35,.18);color:#92400e;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">⚠ MISSING</span>
+      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(procNo)}</div><div style="font-size:8px;color:#666">No procedure on file matching this number</div></div>
+    </div>`;
+  }
+  if(k === 'cert-status'){
+    const insp = report?.inspector || '—';
+    const list = (typeof INSPECTORS !== 'undefined') ? INSPECTORS : (typeof ls==='function' ? ls('vx-inspectors-v1',[]) : []);
+    const match = list.find(i => i.name === insp);
+    const examDate = report?.examDate ? new Date(report.examDate) : new Date();
+    if(match){
+      const expiry = match.certExpiry ? new Date(match.certExpiry) : null;
+      const expired = expiry && examDate > expiry;
+      const lvl = match.level || (report?.method+' Level II');
+      const cert = match.certNo || match.certAuthority || '—';
+      const cls = expired
+        ? 'background:rgba(242,92,92,.15);color:#991b1b'
+        : 'background:rgba(62,207,142,.15);color:#16a34a';
+      const lbl = expired ? '⚠ EXPIRED' : '✓ VALID';
+      return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+        <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
+        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(insp)} · ${escapeHtml(lvl)}</div><div style="font-size:8px;color:#666">${escapeHtml(cert)}${expiry?' · expires '+expiry.toLocaleDateString('en-GB'):''}</div></div>
+      </div>`;
+    }
+    return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+      <span style="background:rgba(160,160,160,.18);color:#666;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">— UNKNOWN</span>
+      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(insp)}</div><div style="font-size:8px;color:#666">Inspector not found in directory</div></div>
+    </div>`;
+  }
+  if(k === 'calib-status'){
+    const equip = report?.eq_equip || report?.equip || '—';
+    const calDate = report?.eq_caldate || report?.eqCalDate;
+    const examDate = report?.examDate ? new Date(report.examDate) : new Date();
+    let cls='background:rgba(160,160,160,.18);color:#666', lbl='— NO DATE';
+    let detail = `${escapeHtml(equip)}`;
+    if(calDate){
+      const cd = new Date(calDate);
+      if(!isNaN(cd)){
+        // Assume cal valid 1 year
+        const expiry = new Date(cd); expiry.setFullYear(expiry.getFullYear()+1);
+        if(examDate > expiry){ cls='background:rgba(242,92,92,.15);color:#991b1b'; lbl='⚠ EXPIRED'; }
+        else { cls='background:rgba(62,207,142,.15);color:#16a34a'; lbl='✓ VALID'; }
+        detail += ` · cal ${cd.toLocaleDateString('en-GB')} · expires ${expiry.toLocaleDateString('en-GB')}`;
+      }
+    }
+    return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+      <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
+      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(equip)}</div><div style="font-size:8px;color:#666">${detail.replace(escapeHtml(equip),'').trim().replace(/^·\s*/,'')||'Calibration record on file'}</div></div>
+    </div>`;
+  }
+  if(k === 'accept-eval'){
+    // If block has measurement+criterion props, evaluate
+    const meas = parseFloat(block.measurement);
+    const crit = parseFloat(block.criterion);
+    const unit = block.unit || 'mm';
+    const std  = block.standard || (report?.eq_acc || report?.accCrit || 'acceptance criterion');
+    if(!isNaN(meas) && !isNaN(crit)){
+      const op = block.evalOp || '<=';
+      let pass;
+      if(op === '<=') pass = meas <= crit;
+      else if(op === '<') pass = meas < crit;
+      else if(op === '>=') pass = meas >= crit;
+      else if(op === '>') pass = meas > crit;
+      else pass = meas <= crit;
+      const cls = pass ? 'background:rgba(62,207,142,.15);color:#16a34a' : 'background:rgba(242,92,92,.15);color:#991b1b';
+      const lbl = pass ? '✓ ACCEPTABLE' : '✕ EXCEEDS LIMIT';
+      return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+        <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
+        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${meas} ${escapeHtml(unit)} ${op} ${crit} ${escapeHtml(unit)}</div><div style="font-size:8px;color:#666">${escapeHtml(std)}</div></div>
+      </div>`;
+    }
+    return `<div style="display:flex;align-items:center;gap:6px;height:100%;color:#999;font-size:9px;font-style:italic">Set measurement & criterion in block properties</div>`;
+  }
+  return '';
+}
+
+// Real QR via qrcode-generator library (cdnjs); falls back to deterministic pattern
+function cvRenderQR(payload, size){
+  size = size || 90;
+  payload = String(payload || 'verify');
+
+  // Use real QR library if loaded
+  if(typeof window.qrcode === 'function'){
+    try {
+      // Pick smallest type that fits the payload, error correction M
+      const qr = window.qrcode(0, 'M');
+      qr.addData(payload);
+      qr.make();
+      const moduleCount = qr.getModuleCount();
+      const margin = 4;
+      const cellSize = (size - margin*2) / moduleCount;
+      let cells = '';
+      for(let r=0; r<moduleCount; r++){
+        for(let c=0; c<moduleCount; c++){
+          if(qr.isDark(r, c)){
+            const x = (margin + c*cellSize).toFixed(2);
+            const y = (margin + r*cellSize).toFixed(2);
+            cells += `<rect x="${x}" y="${y}" width="${cellSize.toFixed(2)}" height="${cellSize.toFixed(2)}" fill="#000"/>`;
+          }
+        }
+      }
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block;background:#fff" data-qr-payload="${escapeHtml(payload).slice(0,80)}">
+        <rect width="${size}" height="${size}" fill="#fff"/>
+        ${cells}
+      </svg>`;
+    } catch(e) {
+      console.warn('QR encoding failed, using fallback', e);
+    }
+  }
+
+  // Fallback: deterministic pattern (visually QR-like, not scannable)
+  const hash = (str) => { let h=0; for(let i=0;i<str.length;i++) h = ((h<<5)-h+str.charCodeAt(i))|0; return Math.abs(h); };
+  const seed = hash(payload);
+  const grid = 21;
+  const cellSize = (size - 8) / grid;
+  let cells = '';
+  const drawMarker = (cx, cy) => {
+    cells += `<rect x="${4 + cx*cellSize}" y="${4 + cy*cellSize}" width="${7*cellSize}" height="${7*cellSize}" fill="#000"/>`;
+    cells += `<rect x="${4 + (cx+1)*cellSize}" y="${4 + (cy+1)*cellSize}" width="${5*cellSize}" height="${5*cellSize}" fill="#fff"/>`;
+    cells += `<rect x="${4 + (cx+2)*cellSize}" y="${4 + (cy+2)*cellSize}" width="${3*cellSize}" height="${3*cellSize}" fill="#000"/>`;
+  };
+  drawMarker(0,0); drawMarker(grid-7,0); drawMarker(0,grid-7);
+  for(let y=0; y<grid; y++){
+    for(let x=0; x<grid; x++){
+      if((x<8&&y<8)||(x>grid-9&&y<8)||(x<8&&y>grid-9)) continue;
+      const v = ((seed>>((x*y)%30))^(x*7+y*13)) & 0x3;
+      if(v === 1 || v === 2) cells += `<rect x="${4+x*cellSize}" y="${4+y*cellSize}" width="${cellSize}" height="${cellSize}" fill="#000"/>`;
+    }
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block;background:#fff">
+    <rect width="${size}" height="${size}" fill="#fff"/>
+    ${cells}
+    <text x="${size/2}" y="${size-2}" text-anchor="middle" fill="#999" font-size="6" font-family="Arial">preview</text>
+  </svg>`;
+}
+
+// Build small static weld-map SVG with editable markers in edit mode
+function cvRenderWeldMap(block, report){
+  const w = block.w, h = block.h;
+  const defects = (report?.defects)||[];
+  // Use stored markers if present, else infer from defects
+  const markers = block.weldMarkers && block.weldMarkers.length
+    ? block.weldMarkers
+    : defects.map((d,i) => ({x: 0.15+i*0.18, y:0.5, label:'D'+(i+1), defectIdx:i})).slice(0, 6);
+  const editMode = !cvPreview;
+  let markerHtml = '';
+  markers.forEach((m, i) => {
+    const px = (m.x||0.5) * w;
+    const py = (m.y||0.5) * h;
+    const cls = editMode ? 'cv-weldmark' : '';
+    const cursor = editMode ? 'cursor:move;' : '';
+    markerHtml += `<g class="${cls}" data-marker-idx="${i}" style="${cursor}">
+      <circle cx="${px}" cy="${py}" r="9" fill="#f25c5c" stroke="#fff" stroke-width="2"/>
+      <text x="${px}" y="${py+3}" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold" font-family="Arial" style="user-select:none;pointer-events:none">${escapeHtml(m.label||'D'+(i+1))}</text>
+    </g>`;
+  });
+  const editHint = editMode
+    ? `<text x="${w/2}" y="${h-4}" text-anchor="middle" fill="#888" font-size="7" font-family="Arial">Click to add · Drag to move · Right-click to remove</text>`
+    : `<text x="${w-4}" y="${h-6}" text-anchor="end" fill="#aaa" font-size="7" font-family="Arial">${markers.length} indication${markers.length!==1?'s':''}</text>`;
+  return `<svg class="cv-weldmap-svg" data-block-id="${block.id}" width="100%" height="100%" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="background:#f8f8f8;display:block">
+    <rect x="2" y="2" width="${w-4}" height="${h-4}" fill="#fff" stroke="#ccc" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="${w/2}" y="14" text-anchor="middle" fill="#888" font-size="8" font-family="Arial">WELD / DEFECT MAP</text>
+    <line x1="20" y1="${h/2}" x2="${w-20}" y2="${h/2}" stroke="#888" stroke-width="2" stroke-dasharray="3,2"/>
+    <line x1="20" y1="${h/2-15}" x2="${w-20}" y2="${h/2-15}" stroke="#aaa" stroke-width="0.5"/>
+    <line x1="20" y1="${h/2+15}" x2="${w-20}" y2="${h/2+15}" stroke="#aaa" stroke-width="0.5"/>
+    ${markerHtml}
+    ${editHint}
+  </svg>`;
+}
+
+// Weld map marker editing: handle click on map (place new marker)
+function cvWeldMapClick(blockId, evt){
+  const block = cvBlocks.find(b => b.id === blockId);
+  if(!block || cvPreview) return;
+  // Resolve click coords to relative 0–1
+  const svg = evt.target.closest('svg.cv-weldmap-svg');
+  if(!svg) return;
+  const rect = svg.getBoundingClientRect();
+  const relX = Math.max(0, Math.min(1, (evt.clientX - rect.left) / rect.width));
+  const relY = Math.max(0, Math.min(1, (evt.clientY - rect.top)  / rect.height));
+  // Don't add when clicking an existing marker (handled separately)
+  if(evt.target.closest('.cv-weldmark')) return;
+  if(!block.weldMarkers) block.weldMarkers = [];
+  const label = prompt('Marker label:', 'D'+(block.weldMarkers.length+1));
+  if(label === null) return;
+  cvPushUndo();
+  block.weldMarkers.push({ x: relX, y: relY, label: label.trim() || 'D'+(block.weldMarkers.length+1) });
+  cvSaveLayout();
+  cvRenderCanvas();
+  cvRenderProps(blockId);
+}
+
+// Right-click to remove a marker
+function cvWeldMapMarkerRemove(blockId, idx){
+  const block = cvBlocks.find(b => b.id === blockId);
+  if(!block || !block.weldMarkers) return;
+  cvPushUndo();
+  block.weldMarkers.splice(idx, 1);
+  cvSaveLayout();
+  cvRenderCanvas();
+  cvRenderProps(blockId);
+}
+
+// Drag a marker to a new position
+var _cvWeldDrag = null;
+function cvWeldMapMarkerDragStart(blockId, idx, evt){
+  if(cvPreview) return;
+  evt.stopPropagation();
+  evt.preventDefault();
+  const svg = evt.target.closest('svg.cv-weldmap-svg');
+  _cvWeldDrag = { blockId, idx, svg };
+  document.addEventListener('mousemove', _cvWeldDragMove);
+  document.addEventListener('mouseup', _cvWeldDragEnd, { once: true });
+}
+function _cvWeldDragMove(evt){
+  if(!_cvWeldDrag) return;
+  const { blockId, idx, svg } = _cvWeldDrag;
+  const block = cvBlocks.find(b => b.id === blockId);
+  if(!block || !block.weldMarkers || !block.weldMarkers[idx]) return;
+  const rect = svg.getBoundingClientRect();
+  block.weldMarkers[idx].x = Math.max(0.02, Math.min(0.98, (evt.clientX - rect.left) / rect.width));
+  block.weldMarkers[idx].y = Math.max(0.05, Math.min(0.95, (evt.clientY - rect.top)  / rect.height));
+  cvRenderCanvas();
+}
+function _cvWeldDragEnd(){
+  document.removeEventListener('mousemove', _cvWeldDragMove);
+  if(_cvWeldDrag){
+    cvSaveLayout();
+    cvRenderProps(_cvWeldDrag.blockId);
+  }
+  _cvWeldDrag = null;
+}
+
+// Render the repeating defect rows
+function cvRenderDefectLoop(block, report){
+  const defs = (report?.defects) || [];
+  if(!defs.length){
+    return `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;font-style:italic;border:1px dashed #ddd">↻ No defects to repeat (template row preview)</div>`;
+  }
+  const rowHeight = 28;
+  let html = `<div style="height:100%;overflow:visible">
+    <div style="display:grid;grid-template-columns:30px 1fr 80px 60px 90px 90px;gap:0;background:#374151;color:#fff;font-size:8.5px;font-weight:600;padding:5px 6px">
+      <div>#</div><div>Description</div><div>Type</div><div>Sev.</div><div>Location</div><div>Acceptance</div>
+    </div>`;
+  defs.forEach((d,i)=>{
+    const accCls = d.acceptance==='Accept'?'#16a34a':d.acceptance==='Reject'?'#991b1b':'#666';
+    html += `<div style="display:grid;grid-template-columns:30px 1fr 80px 60px 90px 90px;gap:0;border-bottom:1px solid #eee;padding:3px 6px;font-size:8.5px;background:${i%2?'#f9fafb':'#fff'};min-height:${rowHeight}px;align-items:center">
+      <div style="font-family:monospace;font-weight:600">D${i+1}</div>
+      <div>${escapeHtml(d.description||d.desc||'—')}</div>
+      <div>${escapeHtml(d.type||'—')}</div>
+      <div style="color:${d.severity==='Critical'?'#991b1b':d.severity==='High'?'#c2410c':d.severity==='Medium'?'#92400e':'#16a34a'}">${escapeHtml(d.severity||'—')}</div>
+      <div style="font-family:monospace;font-size:8px">${escapeHtml(d.location||'—')}</div>
+      <div style="color:${accCls};font-weight:600">${escapeHtml(d.acceptance||'—')}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+// ── COMPONENTS LIBRARY ────────────────────────────────────────────
+var CV_COMP_KEY = 'vx-canvas-components-v1';
+function cvLoadComponents(){ cvComponents = ls(CV_COMP_KEY, []); }
+function cvSaveComponents(){ lss(CV_COMP_KEY, cvComponents); }
+function cvSaveAsComponent(){
+  if(!cvSelectedIds.length){ toast(t('toast.select_blocks_first','Select one or more blocks first.'), 'warn'); return; }
+  const name = prompt('Component name:', 'My component '+(cvComponents.length+1));
+  if(!name || !name.trim()) return;
+  // Find bounding origin
+  const blocks = cvSelectedIds.map(id => cvBlocks.find(b=>b.id===id)).filter(Boolean);
+  if(!blocks.length) return;
+  const minX = Math.min(...blocks.map(b=>b.x));
+  const minY = Math.min(...blocks.map(b=>b.y));
+  const comp = {
+    id: 'comp-' + Date.now(),
+    name: name.trim(),
+    blocks: blocks.map(b => {
+      const c = JSON.parse(JSON.stringify(b));
+      c.x -= minX; c.y -= minY;  // normalize to origin
+      delete c.id;  // will be regenerated on insert
+      return c;
+    })
+  };
+  cvComponents.push(comp);
+  cvSaveComponents();
+  cvRenderPalette('');
+  toast(`Component "${name}" saved`, 'success');
+}
+function cvInsertComponent(compId, x, y){
+  const comp = cvComponents.find(c => c.id === compId);
+  if(!comp) return;
+  cvPushUndo();
+  x = x ?? 20;
+  y = y ?? cvBlocks.reduce((m,b)=>Math.max(m,b.y+b.h+4), 20);
+  const newIds = [];
+  (comp.blocks || []).forEach(srcBlock => {
+    const nb = JSON.parse(JSON.stringify(srcBlock));
+    nb.id = _cvBlockId();
+    nb.x += x; nb.y += y;
+    nb.zIndex = cvBlocks.length+1;
+    cvBlocks.push(nb);
+    newIds.push(nb.id);
+  });
+  cvSelectedIds = newIds;
+  cvSelectedId = newIds[0] || null;
+  cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout();
+  toast(`"${escapeHtml(comp.name)}" inserted`, 'success');
+}
+async function cvDeleteComponent(compId){
+  if(!await vxConfirm({ message: 'Are you sure you want to delete this component? Existing instances on the canvas will not be affected.', okLabel: t('vxc.delete','Delete'), danger: true })) return;
+  cvComponents = cvComponents.filter(c => c.id !== compId);
+  cvSaveComponents();
+  cvRenderPalette('');
+}
+
+// ── COMMENTS ──────────────────────────────────────────────────────
+function cvAddCommentToBlock(blockId){
+  const block = cvBlocks.find(b => b.id === blockId);
+  if(!block) return;
+  const text = prompt('Comment:');
+  if(!text || !text.trim()) return;
+  if(!block.comments) block.comments = [];
+  const author = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.name : 'Anonymous';
+  block.comments.push({ author, text: text.trim(), timestamp: Date.now(), resolved: false });
+  cvSaveLayout();
+  cvRenderCanvas();
+  cvRenderProps(blockId);
+  toast(t('toast.comment_added', 'Comment added'), 'success');
+}
+function cvResolveComment(blockId, idx){
+  const block = cvBlocks.find(b => b.id === blockId);
+  if(!block || !block.comments) return;
+  block.comments[idx].resolved = !block.comments[idx].resolved;
+  cvSaveLayout();
+  cvRenderCanvas();
+  cvRenderProps(blockId);
+}
+function cvDeleteComment(blockId, idx){
+  const block = cvBlocks.find(b => b.id === blockId);
+  if(!block || !block.comments) return;
+  block.comments.splice(idx, 1);
+  cvSaveLayout();
+  cvRenderCanvas();
+  cvRenderProps(blockId);
+}
+function cvAllComments(){
+  const out = [];
+  cvPages.forEach((page, pidx) => {
+    (page.blocks || []).forEach(b => {
+      (b.comments||[]).forEach((c, ci) => {
+        out.push({ ...c, blockId: b.id, blockText: b.text || b.key, pageIdx: pidx, commentIdx: ci });
+      });
+    });
+  });
+  return out;
+}
+
+// ── FIND & REPLACE ────────────────────────────────────────────────
+function cvFindReplace(findStr, replaceStr, replaceAll){
+  if(!findStr) return 0;
+  let count = 0;
+  const fields = ['text', 'customValue', 'c1l','c1v','c2l','c2v','c3l','c3v','c4l','c4v'];
+  cvPages.forEach(page => {
+    page.blocks.forEach(b => {
+      fields.forEach(f => {
+        if(b[f] && typeof b[f] === 'string' && b[f].includes(findStr)){
+          const newVal = replaceAll
+            ? b[f].split(findStr).join(replaceStr)
+            : b[f].replace(findStr, replaceStr);
+          if(newVal !== b[f]){ b[f] = newVal; count++; }
+        }
+      });
+    });
+  });
+  if(count){ cvSaveLayout(); cvRenderCanvas(); }
+  return count;
+}
+
+// ── VERSION HISTORY ───────────────────────────────────────────────
+var CV_HISTORY_KEY = 'vx-canvas-history-v1';
+var CV_HISTORY_MAX = 20;
+function cvSaveSnapshot(label){
+  const list = ls(CV_HISTORY_KEY, []);
+  list.push({
+    timestamp: Date.now(),
+    label: label || ('Snapshot ' + new Date().toLocaleString()),
+    pages: JSON.parse(JSON.stringify(cvPages)),
+    user: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.name : 'Anonymous',
+  });
+  while(list.length > CV_HISTORY_MAX) list.shift();
+  lss(CV_HISTORY_KEY, list);
+}
+async function cvLoadSnapshot(timestamp){
+  const list = ls(CV_HISTORY_KEY, []);
+  const snap = list.find(s => s.timestamp === timestamp);
+  if(!snap) return;
+  if(!await vxConfirm({ message: 'Are you sure you want to revert to this version? Any unsaved changes you have made will be lost.', okLabel: t('vxc.revert','Revert'), danger: true })) return;
+  cvPushUndo();
+  cvPages = JSON.parse(JSON.stringify(snap.pages));
+  cvCurrentPage = 0; cvSync();
+  cvSelectedId=null; cvSelectedIds=[];
+  cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+  toast(tf('toast.reverted_to','Reverted to {label}', {label: snap.label}), 'success');
+}
+
+// Auto-snapshot — throttled so we don't spam history
+var _cvLastAutoSnap = 0;
+var CV_AUTOSNAP_MIN_INTERVAL = 5 * 60 * 1000;  // 5 minutes
+function cvAutoSnapshot(label){
+  const now = Date.now();
+  if(now - _cvLastAutoSnap < CV_AUTOSNAP_MIN_INTERVAL && !label) return;
+  _cvLastAutoSnap = now;
+  cvSaveSnapshot(label || 'Auto-snapshot');
+}
+
+// ── Page management ──────────────────────────────────────────────────
+function cvAddPage(){
+  const label = 'Page '+(cvPages.length+1);
+  cvPages.push({label, blocks:[]});
+  cvCurrentPage = cvPages.length-1;
+  cvSync(); cvSelectedId=null; cvSelectedIds=[];
+  cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+  toast(tf('toast.added_label','Added {label}', {label}));
+}
+function cvSwitchPage(idx){
+  if(idx<0||idx>=cvPages.length) return;
+  cvCurrentPage=idx; cvSync(); cvSelectedId=null; cvSelectedIds=[];
+  cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null);
+}
+async function cvDeletePage(idx){
+  if(cvPages.length<=1){ toast(t('toast.cant_delete_only_page', 'Cannot delete the only page')); return; }
+  if(!await vxConfirm({ message: `Are you sure you want to delete "${cvPages[idx].label}"?`, okLabel: t('vxc.delete','Delete'), danger: true })) return;
+  cvPushUndo();
+  cvPages.splice(idx,1);
+  if(cvCurrentPage>=cvPages.length) cvCurrentPage=cvPages.length-1;
+  cvSync(); cvSelectedId=null; cvSelectedIds=[];
+  cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+}
+function cvRenamePage(idx){
+  const name=prompt('Page name:',cvPages[idx].label);
+  if(name&&name.trim()){ cvPages[idx].label=name.trim(); cvRenderPageTabs(); cvSaveLayout(); }
+}
+function cvRenderPageTabs(){
+  const bar=document.getElementById('cv-page-tabs');
+  if(!bar) return;
+  bar.innerHTML = cvPages.map((p,i)=>{
+    const active=i===cvCurrentPage?'active':'';
+    const close=cvPages.length>1?`<span class="pg-close" data-action="cvDeletePage" data-args="${i}" data-stop-prop="1" title="Delete page">✕</span>`:'';
+    return `<button class="canvas-page-tab ${active}" data-action="cvSwitchPage" data-args="${i}" data-on-dblclick="_wCvRenamePageStopProp" data-pass-event="1" data-args="${i}" title="Double-click to rename">${p.label}${close}</button>`;
+  }).join('') + `<button class="canvas-page-add" data-action="cvAddPage" title="Add page">+</button>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+function cvInitCanvas(){
+  cvLoadLayout();
+  cvLoadComponents();   // V3: load saved components
+  cvSync();
+  cvRenderPageTabs();
+  cvRenderPalette('');
+  cvRenderCanvas();
+  cvFitToView();
+  cvRenderMethodBtns();
+  cvUpdateStatusBar();
+  setTimeout(() => cvRefreshPreviewSource(), 50);   // V3: populate report dropdown
+  // V25: reflect saved alignment-guides toggle state on the button
+  const alignBtn = document.getElementById('cv-align-toggle');
+  if(alignBtn){
+    alignBtn.classList.toggle('active', _cvAlignGuidesOn);
+    if(_cvAlignGuidesOn){
+      alignBtn.style.background = 'rgba(79,142,247,.15)';
+      alignBtn.style.color      = 'var(--blue)';
+    }
+  }
+  // V25: prime autosave indicator
+  if(_cvLastSaveTime === 0) _cvLastSaveTime = Date.now();  // treat load as initial save baseline
+  _cvRefreshSaveIndicator();
+  // V29: sync the header/footer Design ribbon checkboxes + height inputs
+  // to persisted cvTplCfg state. Without this, a user who enabled the
+  // header in a previous session would see un-checked checkboxes on next
+  // open even though the header is actually enabled.
+  _cvSyncHeaderFooterUI();
+}
+
+// ── Palette ──────────────────────────────────────────────────────────
+function cvGetLayoutIcon(k){
+  return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼','logo-client':'🖼',
+    'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','method-block':'⚙','sig-block':'✍',
+    'accent-bar':'█','page-footer':'▭'}[k]||'□';
+}
+
+// V24: helper resolves a translated label for palette items.
+// Convention: layout item with key 'section-header' → t('pe.lay.section-header', it.label)
+//             field def with key 'report-no'         → t('cv.fld.report-no', def.label)
+//             palette group id 'identity'            → t('pe.group.identity', grp.label)
+//             group 'advanced' maps to 'advanced_out' key (name collision with ribbon group)
+var _CV_GROUP_KEY_MAP = { 'advanced': 'pe.group.advanced_out' };
+function _cvLayoutLabel(it){ return t('pe.lay.' + it.key, it.label); }
+function _cvFieldLabel(fk, def){ return t('cv.fld.' + fk, def.label); }
+function _cvGroupLabel(grp){ return t(_CV_GROUP_KEY_MAP[grp.id] || ('pe.group.' + grp.id), grp.label); }
+
+// AUDIT-FIX #4: Map a field definition to its palette badge + colour. The
+// classification rule used to be inlined identically at two callsites in
+// cvRenderPalette (the search-results renderer and the grouped-palette
+// renderer). Categories are mutually exclusive and checked in priority
+// order — a field that is both `smartLink` and `computed` (which shouldn't
+// happen but the data is user-extensible) shows as smart-link. Returns an
+// object so callers can spread it into a template literal cleanly.
+//
+//   ⚡ smart link  — purple, live-bound to a settings value
+//   ∑ computed    — teal,   derived/calculated at render time
+//   ★ advanced    — amber,  QR, weld map, scan image, defect-repeat, xref
+//   ✦ blank       — green,  user-fillable placeholder (no data binding)
+//   f field       — blue,   default — pulls from the report record
+function _cvFieldBadge(def){
+  if(def.smartLink)  return { badge:'⚡', badgeStyle:'background:rgba(167,139,250,.15);color:#a78bfa' };
+  if(def.computed)   return { badge:'∑', badgeStyle:'background:rgba(20,184,166,.15);color:#14b8a6' };
+  if(def.qr || def.weldMap || def.scanImg || def.repeat || def.xref)
+                     return { badge:'★', badgeStyle:'background:rgba(245,166,35,.15);color:var(--amber)' };
+  if(def.blank || def.blankRow)
+                     return { badge:'✦', badgeStyle:'background:rgba(62,207,142,.15);color:var(--green)' };
+  return                    { badge:'f', badgeStyle:'background:rgba(79,142,247,.15);color:var(--blue)' };
+}
+
+function cvRenderPalette(filter){
+  const body = document.getElementById('cv-palette-body');
+  if(!body) return;
+  const q = filter.toLowerCase().trim();
+  let html = '';
+
+  // V23: Recently-used group at top (only when not filtering, and only if
+  // there are entries). Single row per entry, same UX as other fields.
+  if(!q){
+    const recents = _cvLoadRecent();
+    if(recents.length){
+      const collapsed = cvPaletteCollapsed['recent'];
+      const recentLabel = t('pe.palette.recently_used', '⏱ Recently used');
+      html += `<div>
+        <div data-action="_wCvTogglePaletteGroup" data-args="'recent'" style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px 4px;cursor:pointer;user-select:none;background:var(--bg2);border-bottom:1px solid var(--border);border-top:1px solid var(--border);position:sticky;top:0;z-index:5">
+          <span style="font-size:9px;font-family:var(--mono);color:var(--cyan);text-transform:uppercase;letter-spacing:.08em">${escapeHtml(recentLabel)} (${recents.length})</span>
+          <svg style="width:9px;height:9px;opacity:.5;transition:transform .15s;${collapsed?'transform:rotate(-90deg)':''}" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div style="${collapsed?'display:none':''}">`;
+      recents.forEach(r => {
+        if(r.isLayout){
+          const it = CV_LAYOUT_ITEMS.find(x => x.key === r.key);
+          if(!it) return;
+          const lbl = _cvLayoutLabel(it);
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+            <span style="font-size:13px;width:16px;text-align:center;flex-shrink:0;opacity:.65">${cvGetLayoutIcon(it.key)}</span><span>${escapeHtml(lbl)}</span>
+          </div>`;
+        } else {
+          const def = CV_FIELD_DEFS[r.key]; if(!def) return;
+          const lbl = _cvFieldLabel(r.key, def);
+          const short = lbl.split(' / ')[0].split(' ').slice(0,4).join(' ');
+          const { badge, badgeStyle } = _cvFieldBadge(def);
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${r.key}',false" data-action="cvAddBlockDefault" data-args="'${r.key}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+            <span style="font-size:8.5px;font-family:var(--mono);${badgeStyle};padding:1px 4px;border-radius:3px;flex-shrink:0">${badge}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(short)}</span>
+          </div>`;
+        }
+      });
+      html += `</div></div>`;
+    }
+  }
+
+  CV_PALETTE_GROUPS.forEach(grp => {
+    let items;
+    if(grp.isLayout){
+      items = CV_LAYOUT_ITEMS.filter(it => !q || _cvLayoutLabel(it).toLowerCase().includes(q) || it.key.includes(q));
+    } else if(grp.isComponents){
+      items = (cvComponents || []).filter(c => !q || c.name.toLowerCase().includes(q));
+    } else {
+      items = (grp.fields || []).filter(fk => {
+        const d = CV_FIELD_DEFS[fk];
+        return !q || fk.includes(q) || (d && _cvFieldLabel(fk, d).toLowerCase().includes(q));
+      });
+    }
+    if(!items.length && !grp.isComponents) return;
+    const collapsed = cvPaletteCollapsed[grp.id];
+    const grpLabel = _cvGroupLabel(grp);
+    html += `<div>
+      <div data-action="_wCvTogglePaletteGroup" data-args="'${grp.id}'" style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px 4px;cursor:pointer;user-select:none;background:var(--bg2);border-bottom:1px solid var(--border);border-top:1px solid var(--border);position:sticky;top:0;z-index:5">
+        <span style="font-size:9px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.08em">${escapeHtml(grpLabel)}${grp.isComponents?' ('+items.length+')':''}</span>
+        <svg style="width:9px;height:9px;opacity:.5;transition:transform .15s;${collapsed?'transform:rotate(-90deg)':''}" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="${collapsed?'display:none':''}">`;
+    if(grp.isComponents){
+      // Add "Save selection as component" CTA
+      html += `<div data-action="cvSaveAsComponent" style="padding:6px 10px;font-size:10px;color:var(--cyan);cursor:pointer;border-bottom:1px solid var(--border);background:rgba(0,212,255,.04);display:flex;align-items:center;gap:6px">
+        <span style="background:rgba(0,212,255,.18);color:var(--cyan);width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold">+</span>
+        <span>${escapeHtml(t('pe.palette.save_as_comp','Save selection as component'))}</span>
+      </div>`;
+      if(!items.length){
+        html += `<div style="padding:14px 10px;font-size:10px;color:var(--t3);text-align:center;font-style:italic;line-height:1.5">${escapeHtml(t('pe.palette.no_components','No components yet.\nSelect 1+ blocks and click\n"Save as component"')).replace(/\n/g,'<br>')}</div>`;
+      } else {
+        items.forEach(comp => {
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'comp:${comp.id}',false" data-action="cvInsertComponent" data-args="'${comp.id}'" title="Drag or click to insert: ${escapeHtml(comp.name)} (${comp.blocks.length} blocks)" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+            <span style="font-size:8.5px;font-family:var(--mono);background:rgba(0,212,255,.15);color:var(--cyan);padding:1px 4px;border-radius:3px;flex-shrink:0">⬢</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(comp.name)}</span>
+            <span style="color:var(--t3);font-size:9px">${comp.blocks.length}</span>
+            <button data-action="cvDeleteComponent" data-args="'${comp.id}'" data-stop-prop="1" title="Delete component" style="background:none;border:none;color:var(--red);font-size:10px;cursor:pointer;padding:1px 4px;opacity:.7">✕</button>
+          </div>`;
+        });
+      }
+    } else if(grp.isLayout){
+      items.forEach(it => {
+        const lbl = _cvLayoutLabel(it);
+        html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+          <span style="font-size:13px;width:16px;text-align:center;flex-shrink:0;opacity:.65">${cvGetLayoutIcon(it.key)}</span><span>${escapeHtml(lbl)}</span>
+        </div>`;
+      });
+    } else {
+      items.forEach(fk => {
+        const def = CV_FIELD_DEFS[fk]; if(!def) return;
+        const lbl = _cvFieldLabel(fk, def);
+        const short = lbl.split(' / ')[0].split(' ').slice(0,4).join(' ');
+        const { badge, badgeStyle } = _cvFieldBadge(def);
+        html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${fk}',false" data-action="cvAddBlockDefault" data-args="'${fk}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+          <span style="font-size:8.5px;font-family:var(--mono);${badgeStyle};padding:1px 4px;border-radius:3px;flex-shrink:0">${badge}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(short)}</span>
+        </div>`;
+      });
+    }
+    html += `</div></div>`;
+  });
+  body.innerHTML = html || `<div style="padding:16px;font-size:12px;color:var(--t3);text-align:center">${escapeHtml(t('pe.palette.no_match','No fields match'))}</div>`;
+}
+
+function cvFilterPalette(q){ cvRenderPalette(q); }
+
+// ── Drag from palette ────────────────────────────────────────────────
+// Argument order matches the dispatcher convention: data-args first, then
+// the event (because the markup uses `data-pass-event="1"` and the
+// dispatcher appends event LAST). Earlier code expected (e, key, isLayout)
+// which silently failed — `e.dataTransfer` was `'fld:reportNo'.dataTransfer`,
+// a TypeError that the dispatcher catches and logs without recovering, so
+// dragging from the palette did nothing.
+function cvPaletteDragStart(key, isLayout, e){
+  cvPaletteDrag = {key, isLayout};
+  if(e && e.dataTransfer){
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', key);
+  }
+}
+function cvDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='copy'; }
+function cvDrop(e){
+  e.preventDefault();
+  if(!cvPaletteDrag) return;
+  const canvas = document.getElementById('cv-canvas');
+  if(!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  // FIX: account for zoom correctly using getBoundingClientRect (already scaled)
+  const x = cvSnap(Math.max(0,(e.clientX - rect.left) / cvZoom));
+  const y = cvSnap(Math.max(0,(e.clientY - rect.top)  / cvZoom));
+  // V3: handle component drops
+  if(cvPaletteDrag.key && cvPaletteDrag.key.startsWith('comp:')){
+    cvInsertComponent(cvPaletteDrag.key.slice(5), x, y);
+  } else {
+    cvAddBlock(cvPaletteDrag.key, cvPaletteDrag.isLayout, x, y);
+  }
+  cvPaletteDrag = null;
+}
+function cvAddBlockDefault(key, isLayout){
+  const lastY = cvBlocks.reduce((m,b)=>Math.max(m,b.y+b.h+4), 20);
+  cvAddBlock(key, isLayout, 20, Math.min(lastY, 1060));
+}
+
+// ── Block creation ───────────────────────────────────────────────────
+function cvAddBlock(key, isLayout, x, y){
+  cvPushUndo();
+  const def = isLayout ? CV_LAYOUT_ITEMS.find(it=>it.key===key) : CV_FIELD_DEFS[key];
+  const id  = _cvBlockId();
+  let bgColor='transparent', color='#000', bold=false, showBorder=true, fontSize='8.5px';
+  if(isLayout){
+    if(key==='section-header'){ bgColor=cvTplCfg.sectionColor||'#404040'; color='#ffffff'; bold=true; showBorder=false; }
+    else if(key==='accent-bar'){ bgColor=cvGetCompanyColor(); showBorder=false; }
+    else if(key==='h-line'){ showBorder=false; }
+    else if(key==='page-footer'){ bgColor='#f5f5f5'; color='#888888'; fontSize='7px'; showBorder=false; }
+    else { showBorder=false; }
+  }
+  const block = {
+    id, key, isLayout,
+    x: Math.max(0,x), y: Math.max(0,y),
+    w: def?.w||160, h: def?.h||38,
+    text: isLayout ? (def?.label||key) : (def?.label||key),
+    fontSize, bold, italic:false,
+    color, bgColor, borderColor:'#cccccc', showBorder,
+    align:'left', zIndex: cvBlocks.length+1,
+    locked: false,
+  };
+  // V29 — assign zone based on drop position. Blocks within the header band
+  // get zone='header' and repeat on every page at print. Footer same. Blocks
+  // outside both bands get no zone (default = page body, single-page only).
+  block.zone = _cvDetectZone(block.y, block.h);
+  cvBlocks.push(block);
+  _cvSelectSingle(id);
+  cvRenderCanvas();
+  cvRenderProps(id);
+  cvSaveLayout();
+  cvUpdateStatusBar();
+  // V23: track this field in the recently-used palette group
+  _cvTrackRecent(key, isLayout);
+  // V26: on narrow screens, auto-close the palette drawer once a field has
+  // been placed. The drawer's job is done; staying open would obscure the
+  // canvas where the user wants to position the new block.
+  const palette = document.getElementById('cv-field-palette');
+  if(palette && palette.classList.contains('cv-drawer-open')){
+    palette.classList.remove('cv-drawer-open');
+    _cvUpdateBackdrop();
+  }
+}
+
+// V23: Recently-used field tracking. Persisted in localStorage so the
+// list survives reloads. Bounded at CV_RECENT_MAX entries. When the user
+// adds the same field again, it bumps to the top.
+var CV_RECENT_KEY = 'vx-canvas-recent-v1';
+var CV_RECENT_MAX = 8;
+
+/** Append (key, isLayout) to recents, dedup, persist. Skips component inserts. */
+function _cvTrackRecent(key, isLayout){
+  if(!key || key.startsWith('comp:')) return;  // components have their own group
+  try {
+    const raw = localStorage.getItem(CV_RECENT_KEY);
+    let list = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(list)) list = [];
+    // Remove existing entry (we'll re-add at top)
+    list = list.filter(r => !(r.key === key && !!r.isLayout === !!isLayout));
+    list.unshift({ key, isLayout: !!isLayout, ts: Date.now() });
+    if(list.length > CV_RECENT_MAX) list = list.slice(0, CV_RECENT_MAX);
+    try {
+    localStorage.setItem(CV_RECENT_KEY, JSON.stringify(list));
+    } catch(e){ console.warn("ls setItem failed", e); }
+    // Re-render palette so the Recently-used group reflects the change.
+    // Use existing search filter if any.
+    const searchEl = document.getElementById('cv-palette-search');
+    if(searchEl) cvRenderPalette(searchEl.value || '');
+  } catch(e){ console.warn('_cvTrackRecent failed', e); }
+}
+
+/** Returns the recents list (most-recent-first). */
+function _cvLoadRecent(){
+  try {
+    const raw = localStorage.getItem(CV_RECENT_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch(e){ return []; }
+}
+
+// ── Smart snap alignment ─────────────────────────────────────────────
+function cvCalcSnapLines(dragId, newX, newY, newW, newH){
+  const lines = [];
+  const edges = { l:newX, r:newX+newW, cx:newX+newW/2, t:newY, b:newY+newH, cy:newY+newH/2 };
+  cvBlocks.forEach(b => {
+    if(b.id === dragId) return;
+    const be = { l:b.x, r:b.x+b.w, cx:b.x+b.w/2, t:b.y, b:b.y+b.h, cy:b.y+b.h/2 };
+    // Vertical snap lines (x-axis alignment)
+    [['l','l'],['r','r'],['l','r'],['r','l'],['cx','cx']].forEach(([a,c])=>{
+      if(Math.abs(edges[a]-be[c]) < CV_SNAP_THRESHOLD) lines.push({axis:'v', pos:be[c], from:Math.min(edges.t,be.t), to:Math.max(edges.b,be.b), delta:be[c]-edges[a], edge:a});
+    });
+    // Horizontal snap lines (y-axis alignment)
+    [['t','t'],['b','b'],['t','b'],['b','t'],['cy','cy']].forEach(([a,c])=>{
+      if(Math.abs(edges[a]-be[c]) < CV_SNAP_THRESHOLD) lines.push({axis:'h', pos:be[c], from:Math.min(edges.l,be.l), to:Math.max(edges.r,be.r), delta:be[c]-edges[a], edge:a});
+    });
+  });
+  return lines;
+}
+
+function cvDrawSnapLines(lines){
+  // Remove old
+  document.querySelectorAll('.cv-snap-line').forEach(e=>e.remove());
+  const canvas = document.getElementById('cv-canvas');
+  if(!canvas) return;
+  lines.forEach(ln => {
+    const el = document.createElement('div');
+    el.className = 'cv-snap-line';
+    if(ln.axis==='v'){
+      el.style.cssText = `position:absolute;left:${ln.pos}px;top:${ln.from}px;width:1px;height:${ln.to-ln.from}px;background:rgba(79,142,247,0.6);z-index:9999;pointer-events:none`;
+    } else {
+      el.style.cssText = `position:absolute;left:${ln.from}px;top:${ln.pos}px;width:${ln.to-ln.from}px;height:1px;background:rgba(79,142,247,0.6);z-index:9999;pointer-events:none`;
+    }
+    canvas.appendChild(el);
+  });
+}
+
+// V25: persistent alignment guides — shows light dashed lines extending from
+// the selected block's edges to any other block whose edge aligns within the
+// snap threshold. Unlike cvDrawSnapLines (drag-only, blue solid), these are
+// drawn whenever a single block is selected AND the toggle is on. Subtle
+// styling (dashed, low opacity) so they don't compete visually with the
+// solid snap lines that appear during drag.
+var _cvAlignGuidesOn = false;  // persisted in localStorage on toggle
+
+function _cvLoadAlignGuidesPref(){
+  try { _cvAlignGuidesOn = localStorage.getItem('vx-cv-align-guides') === '1'; }
+  catch(e){}
+}
+function _cvSaveAlignGuidesPref(){
+  try { localStorage.setItem('vx-cv-align-guides', _cvAlignGuidesOn ? '1' : '0'); }
+  catch(e){}
+}
+
+/** Toggle the persistent alignment guide feature. */
+function cvToggleAlignGuides(){
+  _cvAlignGuidesOn = !_cvAlignGuidesOn;
+  _cvSaveAlignGuidesPref();
+  // Update the toolbar button visual
+  const btn = document.getElementById('cv-align-toggle');
+  if(btn){
+    btn.classList.toggle('active', _cvAlignGuidesOn);
+    btn.style.background = _cvAlignGuidesOn ? 'rgba(79,142,247,.15)' : '';
+    btn.style.color      = _cvAlignGuidesOn ? 'var(--blue)' : '';
+  }
+  _cvRefreshAlignGuides();
+}
+
+/** Compute and draw the persistent guides for the currently-selected single block. */
+function _cvRefreshAlignGuides(){
+  document.querySelectorAll('.cv-align-guide').forEach(e => e.remove());
+  if(!_cvAlignGuidesOn) return;
+  if(cvPreview) return;
+  if(!cvSelectedId || cvSelectedIds.length !== 1) return;
+  const b = cvBlocks.find(bb => bb.id === cvSelectedId);
+  if(!b) return;
+  const canvas = document.getElementById('cv-canvas');
+  if(!canvas) return;
+
+  // Re-use the same edge-comparison logic but accept perfect alignments only
+  // (delta === 0, not the snap-threshold tolerance — we're showing what IS
+  // aligned, not what's close).
+  const edges = { l:b.x, r:b.x+b.w, cx:b.x+b.w/2, t:b.y, b:b.y+b.h, cy:b.y+b.h/2 };
+  const guides = [];
+  cvBlocks.forEach(other => {
+    if(other.id === b.id) return;
+    const oe = { l:other.x, r:other.x+other.w, cx:other.x+other.w/2, t:other.y, b:other.y+other.h, cy:other.y+other.h/2 };
+    [['l','l'],['r','r'],['l','r'],['r','l'],['cx','cx']].forEach(([a,c])=>{
+      if(edges[a] === oe[c]){
+        guides.push({ axis:'v', pos: oe[c],
+          from: Math.min(edges.t, oe.t),
+          to:   Math.max(edges.b, oe.b) });
+      }
+    });
+    [['t','t'],['b','b'],['t','b'],['b','t'],['cy','cy']].forEach(([a,c])=>{
+      if(edges[a] === oe[c]){
+        guides.push({ axis:'h', pos: oe[c],
+          from: Math.min(edges.l, oe.l),
+          to:   Math.max(edges.r, oe.r) });
+      }
+    });
+  });
+
+  // Also show alignment to page edges + page centre (very useful for centring)
+  const pageW = CV_PAGE_WIDTH_PX, pageH = CV_PAGE_HEIGHT_PX;
+  [edges.l, edges.r, edges.cx].forEach(x => {
+    if(x === 0 || x === pageW || x === pageW/2){
+      guides.push({ axis:'v', pos:x, from:0, to:pageH });
+    }
+  });
+  [edges.t, edges.b, edges.cy].forEach(y => {
+    if(y === 0 || y === pageH || y === pageH/2){
+      guides.push({ axis:'h', pos:y, from:0, to:pageW });
+    }
+  });
+
+  guides.forEach(g => {
+    const el = document.createElement('div');
+    el.className = 'cv-align-guide';
+    if(g.axis === 'v'){
+      el.style.cssText = `position:absolute;left:${g.pos}px;top:${g.from}px;width:0;height:${g.to-g.from}px;border-left:1px dashed rgba(20,184,166,.5);z-index:9998;pointer-events:none`;
+    } else {
+      el.style.cssText = `position:absolute;left:${g.from}px;top:${g.pos}px;width:${g.to-g.from}px;height:0;border-top:1px dashed rgba(20,184,166,.5);z-index:9998;pointer-events:none`;
+    }
+    canvas.appendChild(el);
+  });
+}
+
+// Load preference at startup
+_cvLoadAlignGuidesPref();
+
+// ── Render canvas ────────────────────────────────────────────────────
+// V25 — Per-block element cache for keyed reconciliation.
+// Each entry: { el: HTMLElement, sig: string }. Signature captures every
+// property that affects the rendered output so we can skip rebuilds when
+// nothing has changed. Trades a small JSON.stringify cost per block for
+// avoiding 130+ lines of DOM construction work per block per render.
+//
+// Hit rate on a typical session: when the user edits one block's property,
+// 49 of 50 blocks short-circuit on signature match, only the edited one
+// rebuilds. Equivalent perf to selecting (V23's cvUpdateSelectionUI) but
+// extended to the property-edit path.
+var _cvBlockElCache = new Map();
+
+// AUDIT-FIX #5: Upsert (create-or-update) the header or footer visualization
+// band inside the canvas in design mode. Was two near-identical 12-line
+// branches in cvRenderCanvas that differed only by ID, anchor edge, colour,
+// translation key, and default height. Consolidating them removes risk that
+// a future visual tweak only gets applied to one band.
+//
+//   zone   — 'header' | 'footer'
+//   canvas — the cv-canvas element (passed in to avoid a re-lookup)
+//
+// When the zone is enabled in cvTplCfg, the band is created if missing and
+// its height refreshed from config. When the zone is disabled, the band is
+// removed if present. In preview mode the band is always removed because
+// printed pages render the header/footer blocks themselves, not the visual
+// boundary indicator.
+function _cvUpsertZoneBand(zone, canvas){
+  const cfg = cvTplCfg[zone];
+  const id = 'cv-' + zone + '-band';
+  // Per-zone visual config bundled into one object so the branches don't
+  // have to fight over which colour goes where.
+  const opts = zone === 'header'
+    ? { side:'top:0',    borderEdge:'border-bottom', rgb:'79,142,247',  labelAlpha:.8,  bgAlpha:.12, i18nKey:'pe.header.label', fallback:'HEADER — repeats on every page', defaultHeight:100 }
+    : { side:'bottom:0', borderEdge:'border-top',    rgb:'245,166,35', labelAlpha:.95, bgAlpha:.15, i18nKey:'pe.footer.label', fallback:'FOOTER — repeats on every page', defaultHeight:60  };
+  let band = document.getElementById(id);
+  if(!cvPreview && cfg && cfg.enabled){
+    if(!band){
+      band = document.createElement('div');
+      band.id = id;
+      band.style.cssText = `position:absolute;left:0;right:0;${opts.side};background:rgba(${opts.rgb},.05);${opts.borderEdge}:1px dashed rgba(${opts.rgb},.4);pointer-events:none;z-index:1;display:flex;align-items:flex-start;justify-content:flex-end;padding:3px 6px`;
+      const lbl = document.createElement('div');
+      lbl.style.cssText = `font-size:8px;font-family:var(--mono);color:rgba(${opts.rgb},${opts.labelAlpha});background:rgba(${opts.rgb},${opts.bgAlpha});padding:1px 5px;border-radius:2px;letter-spacing:.05em`;
+      lbl.textContent = t(opts.i18nKey, opts.fallback);
+      band.appendChild(lbl);
+      canvas.insertBefore(band, canvas.firstChild?.nextSibling || null);
+    }
+    band.style.height = (cfg.heightPx || opts.defaultHeight) + 'px';
+  } else if(band){
+    band.remove();
+  }
+}
+
+function cvRenderCanvas(){
+  const canvas = document.getElementById('cv-canvas');
+  if(!canvas) return;
+
+  // ── Grid overlay management (preserve across renders) ──
+  let grid = document.getElementById('cv-grid-overlay');
+  if(!cvPreview){
+    if(!grid){
+      grid = document.createElement('div');
+      grid.id = 'cv-grid-overlay';
+      grid.style.cssText='position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(100,100,200,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(100,100,200,.06) 1px,transparent 1px);background-size:8px 8px;z-index:0';
+      canvas.insertBefore(grid, canvas.firstChild);
+    }
+  } else if(grid){
+    grid.remove();
+  }
+
+  // V29 — Header/footer band visualization in design mode.
+  // Two semi-transparent bands above the grid: top = header, bottom = footer.
+  // Each band shows a small "HEADER / FOOTER" label so the user knows the
+  // boundary. In preview/print they disappear (the blocks inside render
+  // normally per-page in the print pipeline).
+  // AUDIT-FIX #5: previously two near-identical 12-line branches inlined
+  // here; now delegated to _cvUpsertZoneBand so the two zones can't drift.
+  _cvUpsertZoneBand('header', canvas);
+  _cvUpsertZoneBand('footer', canvas);
+
+  // ── Build report data once for this render pass ──
+  const report = cvPreview ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects) : null;
+  // AUDIT-FIX #1: use shared helper so editor preview shows the same page
+  // labels the printed PDF will show. The old code hardcoded 'page 1' for
+  // every defect, which lied to the user.
+  cvCrossRefMap = _cvBuildCrossRefMap(report);
+
+  // ── Orphan removal: any cblk-* in DOM not in current cvBlocks ──
+  // Handles three cases: blocks deleted, page switched, layout loaded mid-session.
+  // Also acts as duplicate cleanup — if a previous render left a stale element
+  // with the same id (see cvMouseUp drag handling), the second occurrence is
+  // removed here on the next render pass.
+  const currentIds = new Set(cvBlocks.map(b => b.id));
+  const seenIds = new Set();
+  canvas.querySelectorAll('[id^="cblk-"]').forEach(el => {
+    const bid = el.id.slice(5);
+    if(!currentIds.has(bid)){
+      el.remove();
+      _cvBlockElCache.delete(bid);
+    } else if(seenIds.has(bid)){
+      // Duplicate of an element we've already seen. Removing the element is
+      // necessary but NOT sufficient — the cache may point to either copy.
+      // If it points to the one we just removed, the block render loop below
+      // will call `cached.el.replaceWith(newEl)` on a detached element, which
+      // silently does nothing. The block then keeps its stale visual state
+      // (e.g. unchecking "Show border" appears not to work). Invalidate the
+      // cache so the render loop falls through to the stale-querySelector
+      // path and replaces the remaining (kept) element correctly.
+      el.remove();
+      _cvBlockElCache.delete(bid);
+    } else {
+      seenIds.add(bid);
+    }
+  });
+
+  // ── Render each block, skipping unchanged ones ──
+  const sortedBlocks = [...cvBlocks].sort((a,b)=>(a.zIndex||0)-(b.zIndex||0));
+  // Suffix encodes external dependencies of cvRenderBlockContent — in preview
+  // mode the rendered content depends on which report we're showing.
+  const previewSuffix = cvPreview ? `|p:${cvPpvMethod}|r:${cvPpvResult}|d:${cvPpvShowDefects}` : '|design';
+
+  sortedBlocks.forEach(block => {
+    const passesShowWhen = cvEvalShowWhen(block, report);
+    if(cvPreview && !passesShowWhen){
+      const cached = _cvBlockElCache.get(block.id);
+      if(cached){ cached.el.remove(); _cvBlockElCache.delete(block.id); }
+      return;
+    }
+    const isSel = !cvPreview && (cvSelectedId === block.id || cvSelectedIds.includes(block.id));
+    // Signature: anything that changes what _cvBuildBlockElement produces.
+    const sig = JSON.stringify(block) + '|s:' + isSel + '|h:' + (!passesShowWhen) + previewSuffix;
+
+    const cached = _cvBlockElCache.get(block.id);
+    if(cached && cached.sig === sig){
+      return;   // unchanged
+    }
+
+    const newEl = _cvBuildBlockElement(block, report, isSel, passesShowWhen);
+    if(cached && cached.el.isConnected){
+      // Cached element is still in the DOM — safe to replace in place.
+      cached.el.replaceWith(newEl);
+    } else {
+      // Cache miss OR cached element was detached (e.g. by the duplicate
+      // cleanup above, or by external code). Either way, look for a stale
+      // element in the DOM with this block's id and replace it; otherwise
+      // it's a genuinely new block and we append. Without the isConnected
+      // check, a stale-detached cached.el would silently fail replaceWith
+      // (no-op on detached node) and the block would never render — so
+      // e.g. unchecking "Show border" would appear not to work.
+      const stale = canvas.querySelector('#cblk-' + block.id);
+      if(stale) stale.replaceWith(newEl);
+      else      canvas.appendChild(newEl);
+    }
+    _cvBlockElCache.set(block.id, { el: newEl, sig });
+  });
+
+  // ── Empty state hint (idempotent) ──
+  let emptyHint = canvas.querySelector('#cv-empty-hint');
+  if(!cvBlocks.length && !cvPreview){
+    if(!emptyHint){
+      emptyHint = document.createElement('div');
+      emptyHint.id = 'cv-empty-hint';
+      emptyHint.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none;color:#ccc';
+      emptyHint.innerHTML=`<svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="4" stroke="#ddd" stroke-width="2" stroke-dasharray="6 3"/><path d="M24 16v16M16 24h16" stroke="#ddd" stroke-width="2" stroke-linecap="round"/></svg>
+        <div style="font-size:13px;font-family:Arial">Drag fields from the palette, or click <strong>Default layout</strong></div>`;
+      canvas.appendChild(emptyHint);
+    }
+  } else if(emptyHint){
+    emptyHint.remove();
+  }
+
+  cvApplyZoom();
+  const defLbl = document.getElementById('cv-ppv-defect-label');
+  if(defLbl) defLbl.textContent = cvPpvShowDefects ? '− Defects' : '+ Defects';
+  cvUpdateStatusBar();
+
+  // Weld-map wiring: only attach to SVGs without listeners (data-wm-attached
+  // flag prevents double-binding when reconciliation skips existing blocks).
+  if(!cvPreview){
+    canvas.querySelectorAll('svg.cv-weldmap-svg:not([data-wm-attached])').forEach(svg => {
+      svg.setAttribute('data-wm-attached', '1');
+      const blockId = svg.dataset.blockId;
+      svg.addEventListener('click', evt => {
+        evt.stopPropagation();
+        cvWeldMapClick(blockId, evt);
+      });
+      svg.querySelectorAll('.cv-weldmark').forEach(g => {
+        const idx = parseInt(g.dataset.markerIdx);
+        g.addEventListener('mousedown', evt => cvWeldMapMarkerDragStart(blockId, idx, evt));
+        g.addEventListener('contextmenu', async evt => {
+          evt.preventDefault();
+          if(await vxConfirm({ message: 'Are you sure you want to remove this marker?', okLabel: t('vxc.remove','Remove'), danger: true })) cvWeldMapMarkerRemove(blockId, idx);
+        });
+      });
+    });
+  }
+}
+
+// V25 — Build a single block's DOM element. Extracted from cvRenderCanvas so
+// reconciliation can call it on demand. All side effects (event listener
+// attachments, badge/FAB appends) are scoped to the returned element.
+function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
+  const elDiv = document.createElement('div');
+  elDiv.id = 'cblk-'+block.id;
+  elDiv.dataset.blockId = block.id;
+  const isLocked = block.locked;
+  const isHidden = !cvPreview && !passesShowWhen;
+  const hasComments = block.comments && block.comments.some(c => !c.resolved);
+
+  // V24 accessibility
+  if(!cvPreview){
+    const fieldDef = block.isLayout
+      ? CV_LAYOUT_ITEMS.find(x => x.key === block.key)
+      : CV_FIELD_DEFS[block.key];
+    const baseLbl = fieldDef
+      ? (block.isLayout ? _cvLayoutLabel(fieldDef) : _cvFieldLabel(block.key, fieldDef))
+      : (block.text || block.key || 'Block');
+    const lockedSuffix = isLocked ? ', ' + t('pe.prop.locked', 'Locked').toLowerCase() : '';
+    elDiv.setAttribute('role', 'button');
+    elDiv.setAttribute('tabindex', '0');
+    elDiv.setAttribute('aria-label', baseLbl + lockedSuffix +
+      ' (' + Math.round(block.x) + ', ' + Math.round(block.y) + ')');
+    if(isSel) elDiv.setAttribute('aria-selected', 'true');
+  }
+
+  // SECURITY: block.bgColor/borderColor/fontSize/color/align are user-editable
+  // (properties panel + imported template JSON). They're being assigned to
+  // style.cssText which the browser CSS-parses, so the worst case is CSS
+  // injection rather than JS XSS — but a value like `transparent; position:
+  // fixed; top:0; left:0; width:100vw; height:100vh; z-index:99999` could
+  // still overlay the whole editor. Whitelist each value to its valid shape.
+  const _safeCssColor = (v, fb) => (typeof v === 'string' && /^(?:#[0-9a-fA-F]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(?:0|1|0?\.\d+)\s*\)|transparent)$/.test(v.trim())) ? v.trim() : fb;
+  const _safeCssFs = (v, fb) => (typeof v === 'string' && /^\d+(?:\.\d+)?(?:px|pt|em|rem|%)$/.test(v.trim())) ? v.trim() : fb;
+  const _safeCssAlign = (v) => (v === 'center' || v === 'right' || v === 'left' || v === 'justify') ? v : 'left';
+  const _bg = _safeCssColor(block.bgColor, 'transparent');
+  const _bc = _safeCssColor(block.borderColor, '#ccc');
+  const _fc = _safeCssColor(block.color, '#000');
+  const _fs = _safeCssFs(block.fontSize, '8.5px');
+  const _ta = _safeCssAlign(block.align);
+  const _zi = Number.isFinite(+block.zIndex) ? +block.zIndex : 1;
+
+  elDiv.style.cssText = [
+    `position:absolute`,
+    `left:${+block.x||0}px`, `top:${+block.y||0}px`,
+    `width:${+block.w||0}px`, `height:${+block.h||0}px`,
+    `background:${_bg}`,
+    `border:${block.showBorder?`0.5px solid ${_bc}`:'none'}`,
+    `font-size:${_fs}`,
+    `font-weight:${block.bold?'bold':'normal'}`,
+    `font-style:${block.italic?'italic':'normal'}`,
+    `color:${_fc}`,
+    `text-align:${_ta}`,
+    `box-sizing:border-box`, `overflow:hidden`,
+    `cursor:${cvPreview?'default':isLocked?'not-allowed':'move'}`,
+    `z-index:${_zi}`,
+    `user-select:none`,
+    // Selection visual — only when showBorder is on. The previous behaviour
+    // (always showing a box-shadow ring around selected blocks) was read by
+    // users as "the border is still there" when they unchecked Show border.
+    // When showBorder is off, we rely on the FAB buttons floating above the
+    // selected block (and the properties panel content) as the only visual
+    // cue of selection. No outline, no shadow, no ring, no glow.
+    (isSel && block.showBorder) ? `box-shadow:0 0 0 2px ${isLocked?'#f5a623':'#4f8ef7'},0 0 12px 2px ${isLocked?'rgba(245,166,35,.35)':'rgba(79,142,247,.35)'};` : '',
+    isLocked && !cvPreview ? 'opacity:0.85;' : '',
+    // Hidden-block indicator also respects showBorder for the same reason.
+    (isHidden && block.showBorder) ? 'opacity:0.4;box-shadow:0 0 0 1.5px #a78bfa;' : (isHidden ? 'opacity:0.4;' : ''),
+  ].join(';');
+
+  // AUDIT-FIX #11: tolerate per-block render errors. Previously a single
+  // throwing block would crash the whole cvRenderCanvas pass, leaving the
+  // editor blank with the error only visible in the dev console. Now the
+  // failed block shows a small inline warning in its slot — the rest of
+  // the canvas renders normally and the user can click into the bad block
+  // to diagnose and fix the source data.
+  try {
+    elDiv.innerHTML = cvRenderBlockContent(block, report, cvPreview);
+  } catch(e) {
+    console.warn('Render error for block', block.id, e);
+    elDiv.innerHTML = `<div style="height:100%;background:rgba(220,38,38,.08);border:1px dashed rgba(220,38,38,.4);color:#991b1b;font-size:10px;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;box-sizing:border-box">⚠ Render error<br><span style="font-size:8px;font-family:monospace;opacity:.7">${escapeHtml(block.id || '?')}</span></div>`;
+  }
+
+  // V24 a11y: Enter / Space select the focused block
+  if(!cvPreview){
+    elDiv.addEventListener('keydown', kE => {
+      if(kE.key === 'Enter' || kE.key === ' '){
+        kE.preventDefault();
+        cvSelectBlock(block.id);
+      }
+    });
+  }
+
+  // Visibility-rule badge
+  if(!cvPreview && block.showWhen && block.showWhen.field){
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position:absolute;top:-1px;left:-1px;background:rgba(167,139,250,.9);color:#fff;font-size:8px;font-weight:600;padding:1px 4px;border-radius:0 0 4px 0;z-index:401;pointer-events:none;font-family:monospace';
+    badge.textContent = '⚡ '+(block.showWhen.field)+' '+(block.showWhen.op||'=')+' '+(block.showWhen.value||'');
+    elDiv.appendChild(badge);
+  }
+
+  // V29: zone badge for blocks in header/footer bands
+  if(!cvPreview && (block.zone === 'header' || block.zone === 'footer')){
+    const zb = document.createElement('div');
+    const isHdr = block.zone === 'header';
+    zb.style.cssText = `position:absolute;${isHdr?'top':'bottom'}:-1px;left:-1px;background:${isHdr?'rgba(79,142,247,.9)':'rgba(245,166,35,.95)'};color:#fff;font-size:7.5px;font-weight:700;padding:1px 5px;border-radius:0 0 4px 0;z-index:401;pointer-events:none;font-family:monospace;letter-spacing:.04em`;
+    zb.textContent = isHdr ? 'HDR ↻' : 'FTR ↻';
+    zb.title = isHdr
+      ? t('pe.header.label','HEADER — repeats on every page')
+      : t('pe.footer.label','FOOTER — repeats on every page');
+    elDiv.appendChild(zb);
+  }
+
+  // Comment indicator
+  if(!cvPreview && hasComments){
+    const commentDot = document.createElement('div');
+    commentDot.style.cssText = 'position:absolute;top:-7px;right:14px;background:#f5a623;color:#000;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;z-index:401;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4)';
+    commentDot.textContent = block.comments.filter(c=>!c.resolved).length;
+    commentDot.title = 'Unresolved comments';
+    commentDot.onclick = (ev) => { ev.stopPropagation(); cvSelectBlock(block.id); };
+    elDiv.appendChild(commentDot);
+  }
+
+  if(!cvPreview){
+    elDiv.addEventListener('mousedown', e=>{
+      if(e.target.classList.contains('cblk-rh') || e.target.closest('.cblk-fab-btn') || e.target.closest('.cblk-del-btn')) return;
+      e.stopPropagation();
+      if(e.shiftKey){
+        if(cvSelectedIds.includes(block.id)){
+          cvSelectedIds = cvSelectedIds.filter(x=>x!==block.id);
+          _cvPrimaryToLast();   // most-recently-remaining becomes primary
+        } else {
+          cvSelectedIds.push(block.id);
+          _cvPrimaryToLast();   // just-added becomes primary
+        }
+        cvUpdateSelectionUI();
+        cvRenderProps(cvSelectedId);
+        return;
+      }
+      if(!cvSelectedIds.includes(block.id)){
+        _cvSelectSingle(block.id);
+        cvUpdateSelectionUI();
+        cvRenderProps(block.id);
+      }
+      if(isLocked) return;
+      const canvas = document.getElementById('cv-canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+      cvDragging = {
+        ids: [...cvSelectedIds],
+        startPositions: cvSelectedIds.map(sid => { const sb=cvBlocks.find(bb=>bb.id===sid); return sb?{id:sid,x:sb.x,y:sb.y}:null; }).filter(Boolean),
+        anchorX: (e.clientX - canvasRect.left) / cvZoom,
+        anchorY: (e.clientY - canvasRect.top)  / cvZoom,
+      };
+      cvDragUndoPushed = false;
+      document.body.style.cursor='move'; document.body.style.userSelect='none';
+      cvAttachDragListeners();
+    });
+
+    // Delete button
+    const delBtn = document.createElement('button');
+    delBtn.className = 'cblk-del-btn';
+    delBtn.textContent = '✕';
+    delBtn.style.cssText='position:absolute;top:-1px;right:-1px;width:18px;height:18px;background:rgba(242,92,92,.85);color:#fff;border:none;border-radius:0 0 0 4px;font-size:10px;line-height:1;cursor:pointer;z-index:400;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .12s;pointer-events:auto';
+    delBtn.addEventListener('click', e=>{ e.stopPropagation(); cvDeleteBlock(block.id); });
+    elDiv.addEventListener('mouseenter', ()=>{ if(!cvPreview) delBtn.style.opacity='1'; });
+    elDiv.addEventListener('mouseleave', ()=>{ delBtn.style.opacity='0'; });
+    elDiv.appendChild(delBtn);
+
+    // Resize handle
+    if(!isLocked){
+      const rh = document.createElement('div');
+      rh.className = 'cblk-rh';
+      rh.style.cssText='position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:se-resize;background:linear-gradient(135deg,transparent 40%,rgba(79,142,247,.7) 40%);z-index:200';
+      rh.addEventListener('mousedown', e=>{
+        e.stopPropagation();
+        cvSelectBlock(block.id);
+        cvResizing = {id:block.id, startX:e.clientX, startY:e.clientY, startW:block.w, startH:block.h};
+        cvDragUndoPushed = false;
+        document.body.style.cursor='se-resize'; document.body.style.userSelect='none';
+        cvAttachDragListeners();
+      });
+      elDiv.appendChild(rh);
+    }
+
+    // FAB buttons on single-selected
+    if(isSel && cvSelectedIds.length <= 1){
+      const fab = document.createElement('div');
+      fab.className = 'cblk-fab-btn';
+      fab.style.cssText='position:absolute;top:-24px;right:0;display:flex;gap:2px;z-index:300';
+      fab.innerHTML=`
+        <button class="cblk-fab-btn" data-action="cvDuplicateBlock" data-args="'${block.id}'" title="${escapeHtml(t('pe.fab.duplicate','Duplicate (Ctrl+D)'))}" style="background:var(--panel);border:1px solid var(--border2);color:var(--t2);font-size:10px;padding:2px 6px;border-radius:3px;cursor:pointer;line-height:1">⧉</button>
+        <button class="cblk-fab-btn" data-action="cvToggleLock" data-args="'${block.id}'" title="${escapeHtml(t(isLocked?'pe.fab.unlock':'pe.fab.lock', (isLocked?'Unlock':'Lock')+' position'))}" style="background:var(--panel);border:1px solid var(--border2);color:${isLocked?'var(--amber)':'var(--t2)'};font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;line-height:1">${isLocked?'🔒':'🔓'}</button>
+        <button class="cblk-fab-btn" data-action="cvMoveZ" data-args="'${block.id}',1" title="${escapeHtml(t('pe.fab.forward','Forward'))}" style="background:var(--panel);border:1px solid var(--border2);color:var(--t2);font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;line-height:1">↑z</button>
+        <button class="cblk-fab-btn" data-action="cvMoveZ" data-args="'${block.id}',-1" title="${escapeHtml(t('pe.fab.back','Back'))}" style="background:var(--panel);border:1px solid var(--border2);color:var(--t2);font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;line-height:1">↓z</button>
+        <button class="cblk-fab-btn" data-action="cvDeleteBlock" data-args="'${block.id}'" title="Delete" style="background:rgba(242,92,92,.15);border:1px solid rgba(242,92,92,.3);color:#f87171;font-size:10px;padding:2px 6px;border-radius:3px;cursor:pointer;line-height:1">✕</button>`;
+      elDiv.appendChild(fab);
+    }
+  }
+
+  return elDiv;
+}
+
+// ── Block content renderer ───────────────────────────────────────────
+function cvRenderBlockContent(block, report, preview){
+  const key = block.key;
+  const co = ls(KEYS.company, {});
+  // SECURITY: block.text, block.customValue, block.c[n]l/v, block.bgColor/
+  // color/borderColor/fontSize and the company name all originate from
+  // free-form user input (properties panel + imported/shared template JSON +
+  // company settings) and are injected via innerHTML below. Without these
+  // sanitisers a crafted value like `"><img src=x onerror=alert(1)>` in any
+  // colour/text field would execute. Whitelist colours and font sizes to
+  // their valid CSS shapes; escape every text interpolation.
+  const _h = (v) => escapeHtml(v == null ? '' : String(v));
+  const _safeColor = (v, fb) => (typeof v === 'string' && /^(?:#[0-9a-fA-F]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(?:0|1|0?\.\d+)\s*\)|transparent)$/.test(v.trim())) ? v.trim() : fb;
+  const _safeFs    = (v, fb) => (typeof v === 'string' && /^\d+(?:\.\d+)?(?:px|pt|em|rem|%)$/.test(v.trim())) ? v.trim() : fb;
+  const _safeAlign = (v) => (v === 'center' || v === 'right' || v === 'left' || v === 'justify') ? v : 'left';
+  const _safeUrl   = (v) => {
+    if(typeof v !== 'string') return '';
+    const s = v.trim();
+    if(/^(?:https?:|data:image\/(?:png|jpeg|jpg|gif|svg\+xml|webp);)/i.test(s)) return s.replace(/"/g, '%22');
+    return '';
+  };
+  const coName = _h(co.name || 'NDT Inspect');
+
+  // ── Helpers for consistent property propagation ──
+  const al = _safeAlign(block.align);
+  const jc = al==='center'?'center':al==='right'?'flex-end':'flex-start';  // justify-content
+  const fs = _safeFs(block.fontSize, '8.5px');
+  const fc = _safeColor(block.color, '#000');
+  const bg = _safeColor(block.bgColor, 'transparent');
+  const bc = _safeColor(block.borderColor, '#ccc');
+  const fw = block.bold ? 'bold' : 'normal';
+  const fi = block.italic ? 'italic' : 'normal';
+
+  if(block.isLayout){
+    switch(key){
+      case 'accent-bar':
+        return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;
+      case 'h-line':
+        return `<div style="height:100%;display:flex;align-items:center"><div style="width:100%;border-top:0.5px solid ${bc}"></div></div>`;
+      case 'section-header':
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:0 8px;background:${_safeColor(block.bgColor,'#404040')};color:${_safeColor(block.color,'#fff')};font-weight:${fw};font-style:${fi};font-size:${fs};text-align:${al}">${_h(block.text||'Section header')}</div>`;
+      case 'logo-co':{
+        // V29: per-template tplLogo wins; otherwise fall back to the live
+        // company profile logo so users who've uploaded a logo in Settings →
+        // Company don't have to re-upload it inside the editor.
+        const src = _safeUrl(cvTplCfg.tplLogo || co.logo);
+        return src
+          ? `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:4px"><img src="${src}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`
+          : `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🖼</span>Company logo<span style="font-size:7.5px;color:#999">Upload in Settings → Company</span></div>`;
+      }
+      case 'logo-client':{
+        const src = _safeUrl(cvTplCfg.tplLogo2);
+        return src
+          ? `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:4px"><img src="${src}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`
+          : `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🖼</span>Client logo</div>`;
+      }
+      case 'photo-box':
+        return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;gap:4px"><span style="font-size:24px">📷</span><span style="font-size:8.5px">${_h(block.text||'Photo placeholder')}</span></div>`;
+      case 'photo-page':{
+        const repNo = _h(preview&&report ? (report.reportNo||'') : '[Report No.]');
+        const boxes = Array.from({length:6},(_,i)=>`<div style="flex:1;min-height:120px;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`).join('');
+        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5"><span style="font-size:9px;font-weight:600;color:#333">Photo attachment sheet</span><span style="font-size:7px;color:#777;font-family:monospace">${repNo}</span></div><div style="flex:1;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">${boxes}</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
+      }
+      case 'additional-page':
+        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5;font-size:9px;font-weight:600;color:#333;text-align:${al}">${_h(block.text||'Additional information')}</div><div style="flex:1;padding:12px 8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;border:1px dashed #ddd;margin:8px;border-radius:3px">Place blocks inside for custom content</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
+      case 'defect-table':{
+        if(preview && report && report.defects && report.defects.length){
+          const rows = report.defects.map(d=>`<tr><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.type||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd;font-weight:bold;color:${d.sev==='High'?'#991b1b':'#065f46'}">${_h(d.sev||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.loc||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.depth||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.len||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.disp||'—')}</td></tr>`).join('');
+          return `<table style="width:100%;border-collapse:collapse;font-size:7.5px"><thead><tr style="background:#404040;color:#fff"><th scope="col" style="padding:3px 5px;text-align:left">Type</th><th scope="col" style="padding:3px 5px;text-align:left">Sev.</th><th scope="col" style="padding:3px 5px;text-align:left">Location</th><th scope="col" style="padding:3px 5px;text-align:left">Depth</th><th scope="col" style="padding:3px 5px;text-align:left">Length</th><th scope="col" style="padding:3px 5px;text-align:left">Disposition</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }
+        return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;font-size:8.5px;gap:3px"><span style="font-size:20px">⊟</span>Defect / indication table</div>`;
+      }
+      case 'method-block':{
+        if(preview && report && report.methodData){
+          const md = report.methodData;
+          const entries = Object.entries(md);
+          if(entries.length){
+            const mFields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[cvPpvMethod]) ? TPL_FIELDS[cvPpvMethod] : [];
+            const cells = entries.map(([k,v])=>{
+              const fdef = mFields.find(f=>f.id===k);
+              const label = fdef ? fdef.label : k;
+              return `<div style="padding:2px 5px;min-width:0"><div style="font-size:6.5px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_h(label)}</div><div style="font-size:8px;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_h(v)}</div></div>`;
+            }).join('');
+            return `<div style="height:100%;box-sizing:border-box;padding:3px"><div style="font-size:7px;color:#555;font-weight:600;margin-bottom:2px;padding:0 5px">${_h(cvPpvMethod)} Equipment</div><div style="display:flex;flex-wrap:wrap;gap:1px">${cells}</div></div>`;
+          }
+        }
+        return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;font-size:8.5px;gap:3px"><span style="font-size:18px">⚙</span>Method-specific equipment data (${_h(cvPpvMethod)})</div>`;
+      }
+      case 'sig-block':{
+        const hh = Math.max(0, block.h-32);
+        return `<div style="height:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px 8px;font-size:7.5px;color:#555;box-sizing:border-box"><div><div style="font-size:7px;color:#888;margin-bottom:3px">Inspector</div><div style="height:${hh}px;border-bottom:0.5px solid #000;margin-bottom:3px"></div><div>Name: _______________________</div><div style="margin-top:2px">Date: _______________________</div></div><div><div style="font-size:7px;color:#888;margin-bottom:3px">Client</div><div style="height:${hh}px;border-bottom:0.5px solid #000;margin-bottom:3px"></div><div>Name: _______________________</div><div style="margin-top:2px">Date: _______________________</div></div></div>`;
+      }
+      case 'page-footer':
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:${_safeColor(block.bgColor,'#f5f5f5')};color:${_safeColor(block.color,'#888')};font-size:${_safeFs(block.fontSize,'7px')};font-weight:${fw};font-style:${fi};border-top:0.5px solid #ddd;box-sizing:border-box"><span>${coName} · ${_h(new Date().toLocaleDateString())}</span><span>Page ${cvCurrentPage+1} of ${cvPages.length}</span></div>`;
+      case 'text-block':
+        return `<div style="height:100%;padding:4px 7px;font-size:${fs};color:${_safeColor(block.color,'#333')};font-weight:${fw};font-style:${fi};text-align:${al};white-space:pre-wrap;word-break:break-word;line-height:1.5">${_h(block.text||'Free text — edit in Properties')}</div>`;
+      default:
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:4px 7px;color:#aaa;font-size:8.5px;text-align:${al}">${_h(block.text||key)}</div>`;
+    }
+  }
+
+  // ── Blank / custom place cards ─────────────────────────────────────
+  if(key === 'blank-field'){
+    const lblRaw = block.text || 'Custom label';
+    const valRaw = block.customValue || (preview ? '—' : '');
+    const lbl = _h(lblRaw);
+    const val = _h(valRaw);
+    return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;text-align:${al}">
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview&&valRaw?'transparent':'#ddd'};`:''};min-height:11px;color:${valRaw?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val||'————'}</div>
+    </div>`;
+  }
+  if(key === 'blank-multiline'){
+    const lblRaw = block.text || 'Custom label';
+    const valRaw = block.customValue || (preview ? '—' : '');
+    const lbl = _h(lblRaw);
+    const val = _h(valRaw);
+    return `<div style="height:100%;padding:3px 7px;box-sizing:border-box;text-align:${al}">
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px">${lbl}</div>
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};color:${valRaw?'#000':'#bbb'};${block.showBorder?`border-bottom:0.5px solid ${preview&&valRaw?'transparent':'#ddd'};`:''};min-height:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${val||'————'}</div>
+    </div>`;
+  }
+  if(key.startsWith('blank-row-')){
+    const cols = parseInt(key.replace('blank-row-','')) || 2;
+    const cells = Array.from({length:cols}, (_,i) => {
+      const lblRaw = block['c'+(i+1)+'l'] || `Label ${i+1}`;
+      const valRaw = block['c'+(i+1)+'v'] || (preview ? '—' : '');
+      const lbl = _h(lblRaw);
+      const val = _h(valRaw);
+      return `<div style="flex:1;padding:3px 6px;min-width:0;text-align:${al};${(i>0 && block.showBorder)?'border-left:0.5px solid #ddd':''}">
+        <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
+        <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview&&valRaw?'transparent':'#ddd'};`:''};min-height:11px;color:${valRaw?'#000':'#bbb'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val||'————'}</div>
+      </div>`;
+    });
+    return `<div style="height:100%;display:flex;align-items:stretch;box-sizing:border-box">${cells.join('')}</div>`;
+  }
+
+  // ── Data field blocks ──────────────────────────────────────────────
+  const def = CV_FIELD_DEFS[key];
+  if(!def) return '';
+
+  // V3: Smart-link blocks (procedure/cert/calib/accept-eval)
+  if(def.smartLink){
+    // V29: Company-scoped smart-link fields render the live company profile
+    // value at preview AND in design mode (their value is always available).
+    if(def.smartLink === 'company'){
+      const co2 = _cvCompany();
+      // Company logo: live image render
+      if(def.isLogo){
+        const src = _safeUrl(co2.logo);
+        if(src){
+          return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:4px"><img src="${src}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`;
+        }
+        return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🏢</span>Company logo<span style="font-size:7.5px;color:#999">Upload in Settings → Company</span></div>`;
+      }
+      // Composite "info block": multi-line company identity (name + address + phone)
+      if(def.isCompanyBlock){
+        const lines = [
+          co2.name,
+          co2.addr1, co2.addr2,
+          [co2.post, co2.city].filter(Boolean).join(' '),
+          co2.country,
+          [co2.phone, co2.email].filter(Boolean).join(' · '),
+          co2.web,
+        ].filter(s => s && s.trim());
+        const content = lines.length
+          ? lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
+          : `<div style="color:#999;font-style:italic">Fill in Settings → Company to populate</div>`;
+        return `<div style="height:100%;padding:4px 7px;box-sizing:border-box;line-height:1.4;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al}">${content}</div>`;
+      }
+      // Single-value field (name, phone, email, etc.): use the def.get() result directly
+      const value = def.get(report) || '—';
+      return `<div style="height:100%;padding:4px 7px;box-sizing:border-box;display:flex;align-items:center;justify-content:${jc};white-space:pre-wrap;line-height:1.35;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al}">${escapeHtml(value)}</div>`;
+    }
+    // Existing non-company smart-link fallback (procedure / cert / calib / accept)
+    const inner = preview && report
+      ? cvResolveSmartLink(block, report)
+      : `<div style="display:flex;align-items:center;gap:6px;height:100%">
+          <span style="background:rgba(167,139,250,.15);color:#6d28d9;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">⚡ SMART</span>
+          <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(def.label)}</div><div style="font-size:8px;color:#666">Resolves at preview/export</div></div>
+        </div>`;
+    return `<div style="height:100%;padding:4px 7px;box-sizing:border-box">${inner}</div>`;
+  }
+
+  // V3: QR code
+  if(def.qr){
+    const payload = block.qrPayload || (report ? `${location.origin || 'https://verify.veritix'}/r/${report.reportNo||report.id||'sample'}` : 'sample-qr');
+    const size = Math.min(block.w, block.h) - 6;
+    return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px;box-sizing:border-box">
+      ${cvRenderQR(payload, size)}
+    </div>`;
+  }
+
+  // V3: Weld / defect map
+  if(def.weldMap){
+    return cvRenderWeldMap(block, report);
+  }
+
+  // V3: Scan image (A/B/C-scan)
+  if(def.scanImg){
+    const src = _safeUrl(block.scanSrc);
+    if(src){
+      return `<div style="height:100%;position:relative;background:#000;display:flex;align-items:center;justify-content:center"><img src="${src}" style="max-width:100%;max-height:100%;object-fit:contain"/>
+        ${(block.scanAnnotations||[]).map((a,i)=>`<div style="position:absolute;left:${(Number(a.x)||0.5)*100}%;top:${(Number(a.y)||0.5)*100}%;background:rgba(255,80,80,.85);color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;transform:translate(-50%,-50%);border:2px solid #fff;pointer-events:none">${escapeHtml(a.label||'I'+(i+1))}</div>`).join('')}
+      </div>`;
+    }
+    return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed #ccc;color:#999;font-size:8px;background:#fafafa;gap:6px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <div>Scan image (A/B/C-scan)</div>
+      <div style="font-size:7px;color:#bbb">Add image URL in properties</div>
+    </div>`;
+  }
+
+  // V3: Defect-row repeating loop
+  if(def.repeat === 'defects'){
+    return cvRenderDefectLoop(block, report);
+  }
+
+  // V3: Cross-reference
+  if(def.xref){
+    const ref = block.xrefTarget || 'defect-1';
+    const resolved = cvCrossRefMap[ref] || 'pending';
+    return `<div style="height:100%;display:flex;align-items:center;padding:3px 7px;text-align:${al};font-size:${fs};color:${_safeColor(block.color,'#0066cc')};text-decoration:underline;font-style:italic">
+      ${_h(block.text || 'See ')}${_h(ref.replace('-',' '))}${preview ? ' on '+_h(resolved) : ''}
+    </div>`;
+  }
+
+  let value = preview && report ? (() => { try{ return def.get(report); }catch(e){ return '—'; } })() : def.ph||'';
+
+  // V3: Apply format string if set
+  if(block.format && value !== '' && value !== '—'){
+    value = cvFormatValue(value, block.format);
+  }
+
+  // V3: Apply language label override
+  if(block.langLabel && cvPpvLanguage !== 'en'){
+    const labelKey = block.langLabel;
+    const langLabels = CV_LANG_LABELS[cvPpvLanguage] || CV_LANG_LABELS.en;
+    if(langLabels[labelKey]) block.text = langLabels[labelKey];
+  }
+  // SECURITY: value comes from report data (free-form user input), so escape
+  // it before injecting into the field renderers below. The block label
+  // (block.text||def.label) is also escaped — def.label is from constants
+  // today, but the same render path would propagate any future user-editable
+  // override unsafely.
+  const vEsc = _h(value);
+  const lblEsc = _h(block.text||def.label);
+  if(def.computed){
+    // Render computed/calculated field with a subtle distinguishing accent
+    return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al};box-sizing:border-box">
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">∑ ${lblEsc}</div>
+      <div style="font-size:${fs};font-weight:${fw||'600'};font-style:${fi};border-bottom:0.5px dashed ${preview?'transparent':'#a78bfa'};min-height:11px;color:${preview?'#0d9488':'#a78bfa'};padding-bottom:1px">${vEsc}</div>
+    </div>`;
+  }
+
+  if(def.result){
+    const rcolor = {Pass:'#065f46',Fail:'#991b1b',Monitor:'#92400e',Acceptable:'#065f46','Not acceptable':'#991b1b',Inconclusive:'#92400e'};
+    const rbg    = {Pass:'#d1fae5',Fail:'#fee2e2',Monitor:'#fef3c7',Acceptable:'#d1fae5','Not acceptable':'#fee2e2',Inconclusive:'#fef3c7'};
+    const rk = preview ? (report.result||report.verdict||'') : '';
+    const rc = rcolor[rk]||'#555'; const rb = rbg[rk]||'#f9f9f9';
+    return `<div style="height:100%;padding:4px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:3px">${lblEsc}</div>
+      <div style="padding:3px 10px;border:1.5px solid ${rc};color:${rc};background:${rb};font-weight:bold;font-style:${fi};font-size:${fs};display:inline-block">${vEsc}</div>
+    </div>`;
+  }
+  if(def.sig){
+    const sh = Math.max(0, block.h-26);
+    return `<div style="height:100%;padding:3px 7px;text-align:${al}">
+      <div style="font-size:7px;color:#777;margin-bottom:3px">${lblEsc}</div>
+      <div style="height:${sh}px;${block.showBorder?'border-bottom:0.5px solid #000;':''}"></div>
+    </div>`;
+  }
+  if(def.multi){
+    return `<div style="height:100%;padding:3px 7px;text-align:${al}">
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px">${lblEsc}</div>
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};color:${preview?'#000':'#bbb'};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};padding-bottom:2px;line-height:1.5;word-break:break-word">${vEsc}</div>
+    </div>`;
+  }
+
+  // Standard labeled field
+  return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
+    <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
+    <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};min-height:11px;color:${preview?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${vEsc}</div>
+  </div>`;
+}
+
+
+// ── Selection & properties ───────────────────────────────────────────
+function cvSelectBlock(id){
+  _cvSelectSingle(id);
+  // V23: lightweight selection update — no full canvas re-render. The block
+  // contents don't change; only outline state and FAB visibility do.
+  cvUpdateSelectionUI();
+  cvRenderProps(id);
+}
+
+// V23: incrementally update outline + FAB visibility on already-rendered
+// blocks without a full canvas re-render. Used by selection clicks and
+// keyboard nudges. Falls back to a full render if any block element is
+// missing (e.g. blocks were added since the last render).
+function cvUpdateSelectionUI(){
+  const canvas = document.getElementById('cv-canvas');
+  if(!canvas){ return; }
+
+  // Remove any existing FAB containers — only the currently-selected block
+  // (if single-select) should have them.
+  canvas.querySelectorAll('.cblk-fab-btn').forEach(node => {
+    // Only remove the wrapper FAB containers, not individual buttons inside
+    if(node.querySelector('.cblk-fab-btn')) node.remove();
+  });
+
+  // Iterate every block and update its outline state.
+  cvBlocks.forEach(block => {
+    const elB = document.getElementById('cblk-' + block.id);
+    if(!elB){
+      // Element missing — block must have been added after last render.
+      // Bail out and trigger a full re-render to stay correct.
+      cvRenderCanvas();
+      return;
+    }
+    const isSel = (cvSelectedId === block.id) || cvSelectedIds.includes(block.id);
+    const isLocked = !!block.locked;
+    if(isSel && block.showBorder){
+      // Match the selection visual in _cvBuildBlockElement — box-shadow
+      // glow rather than CSS outline. Only applied when showBorder is on,
+      // so unchecking "Show border" leaves no visible frame whatsoever.
+      elB.style.boxShadow = `0 0 0 2px ${isLocked?'#f5a623':'#4f8ef7'},0 0 12px 2px ${isLocked?'rgba(245,166,35,.35)':'rgba(79,142,247,.35)'}`;
+    } else {
+      elB.style.boxShadow = '';
+    }
+    elB.style.outline = '';
+    elB.style.outlineOffset = '';
+  });
+
+  // Add FAB buttons to the single-selected block (if exactly one selected).
+  if(!cvPreview && cvSelectedIds.length === 1){
+    const sid = cvSelectedIds[0];
+    const block = cvBlocks.find(b => b.id === sid);
+    const elB = document.getElementById('cblk-' + sid);
+    if(block && elB){
+      const isLocked = !!block.locked;
+      const fab = document.createElement('div');
+      fab.className = 'cblk-fab-btn';
+      fab.style.cssText = 'position:absolute;top:-24px;right:0;display:flex;gap:2px;z-index:300';
+      fab.innerHTML = `
+        <button class="cblk-fab-btn" data-action="cvDuplicateBlock" data-args="'${block.id}'" title="${escapeHtml(t('pe.fab.duplicate','Duplicate (Ctrl+D)'))}" style="background:var(--panel);border:1px solid var(--border2);color:var(--t2);font-size:10px;padding:2px 6px;border-radius:3px;cursor:pointer;line-height:1">⧉</button>
+        <button class="cblk-fab-btn" data-action="cvToggleLock" data-args="'${block.id}'" title="${escapeHtml(t(isLocked?'pe.fab.unlock':'pe.fab.lock', (isLocked?'Unlock':'Lock')+' position'))}" style="background:var(--panel);border:1px solid var(--border2);color:${isLocked?'var(--amber)':'var(--t2)'};font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;line-height:1">${isLocked?'🔒':'🔓'}</button>
+        <button class="cblk-fab-btn" data-action="cvMoveZ" data-args="'${block.id}',1" title="${escapeHtml(t('pe.fab.forward','Forward'))}" style="background:var(--panel);border:1px solid var(--border2);color:var(--t2);font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;line-height:1">↑z</button>
+        <button class="cblk-fab-btn" data-action="cvMoveZ" data-args="'${block.id}',-1" title="${escapeHtml(t('pe.fab.back','Back'))}" style="background:var(--panel);border:1px solid var(--border2);color:var(--t2);font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;line-height:1">↓z</button>
+        <button class="cblk-fab-btn" data-action="cvDeleteBlock" data-args="'${block.id}'" title="Delete" style="background:rgba(242,92,92,.15);border:1px solid rgba(242,92,92,.3);color:#f87171;font-size:10px;padding:2px 6px;border-radius:3px;cursor:pointer;line-height:1">✕</button>`;
+      elB.appendChild(fab);
+    }
+  }
+  // V25: refresh persistent alignment guides whenever selection changes
+  _cvRefreshAlignGuides();
+}
+
+function cvRenderProps(id){
+  const panel = document.getElementById('cv-props-body');
+  if(!panel) return;
+  if(!id){ panel.innerHTML='<div style="font-size:12px;color:var(--t3);text-align:center;margin-top:28px;line-height:1.8">Select a block<br>to edit properties</div>'; return; }
+
+  // Multi-select info
+  if(cvSelectedIds.length > 1){
+    panel.innerHTML = `
+      <div style="font-size:11px;font-weight:600;color:var(--t1);margin-bottom:11px;padding-bottom:8px;border-bottom:1px solid var(--border)">${cvSelectedIds.length} blocks selected</div>
+      <div style="font-size:10px;color:var(--t3);margin-bottom:12px">Shift+click to add/remove from selection</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;margin-bottom:3px">Align selected</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <button data-action="cvAlignSelected" data-args="'left'" class="btn btn-sm" style="font-size:10px">⬅ Left</button>
+          <button data-action="cvAlignSelected" data-args="'right'" class="btn btn-sm" style="font-size:10px">➡ Right</button>
+          <button data-action="cvAlignSelected" data-args="'top'" class="btn btn-sm" style="font-size:10px">⬆ Top</button>
+          <button data-action="cvAlignSelected" data-args="'bottom'" class="btn btn-sm" style="font-size:10px">⬇ Bottom</button>
+          <button data-action="cvDistributeSelected" data-args="'h'" class="btn btn-sm" style="font-size:10px;grid-column:span 2">↔ Distribute horiz.</button>
+          <button data-action="cvDistributeSelected" data-args="'v'" class="btn btn-sm" style="font-size:10px;grid-column:span 2">↕ Distribute vert.</button>
+        </div>
+        <button data-action="cvDeleteSelected" class="btn btn-sm" style="font-size:11px;width:100%;background:rgba(242,92,92,.12);color:var(--red);border-color:rgba(242,92,92,.25);margin-top:8px">✕ Delete all selected</button>
+      </div>`;
+    return;
+  }
+
+  const block = cvBlocks.find(b=>b.id===id);
+  if(!block){ panel.innerHTML=''; return; }
+  const def = !block.isLayout ? CV_FIELD_DEFS[block.key] : null;
+  const title = def ? def.label.split('/')[0].trim() : block.key.replace(/-/g,' ');
+
+  const row = (lbl, content) => `<div style="margin-bottom:9px"><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">${lbl}</div>${content}</div>`;
+  // FIX: this helper was generating
+  //   data-args="'${id}','${prop}'.value"
+  // which the dispatcher's args parser does NOT evaluate — `.value` was
+  // passed as a literal string suffix, so cvUpdateBlock received garbage
+  // and every text field in the properties panel did nothing. Route
+  // through the existing typed wrappers (_wCvUpdateBlockValue / Number)
+  // which read el.value themselves — same pattern the checkbox / colour /
+  // numRow helpers below already use.
+  const input = (prop, val, type='text') => {
+    const handler = type === 'number' ? '_wCvUpdateBlockNumber' : '_wCvUpdateBlockValue';
+    return `<input type="${type}" value="${String(val||'').replace(/"/g,'&quot;')}" data-prop="${prop}"
+      style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px;font-family:var(--font);box-sizing:border-box"
+      data-on-change="${handler}" data-pass-el="1" data-args="'${id}','${prop}'"
+      data-on-input="${handler}"  data-pass-el="1" data-args="'${id}','${prop}'"/>`;
+  };
+  const check = (prop, val, lbl) =>
+    `<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;margin-bottom:5px">
+      <input type="checkbox" ${val?'checked':''} data-on-change="_wCvUpdateBlockChecked" data-pass-el="1" data-args="'${id}','${prop}'"/> ${lbl}
+    </label>`;
+  const colorPick = (prop, val) =>
+    `<div style="display:flex;gap:6px;align-items:center"><input type="color" value="${val||'#000000'}" style="width:30px;height:24px;border-radius:3px;border:1px solid var(--border);padding:1px;cursor:pointer" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','${prop}'"/><span style="font-size:9px;font-family:var(--mono);color:var(--t3)">${val||'#000'}</span></div>`;
+  const numRow = (prop, val) =>
+    `<input type="number" value="${val||0}" data-prop="${prop}" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px;box-sizing:border-box" data-on-change="_wCvUpdateBlockNumber" data-pass-el="1" data-args="'${id}','${prop}'"/>`;
+
+  // Field mapping info
+  const mapInfo = def && def.mapTo ? `<div style="margin-bottom:9px;padding:5px 7px;background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:4px;font-size:10px;color:var(--blue)">📎 Maps to: <span style="font-family:var(--mono)">${def.mapTo}</span></div>` : '';
+
+  // V3 — Smart-link configuration UI (for accept-eval block, the user can enter measurement/criterion)
+  let smartLinkUI = '';
+  if(def && def.smartLink === 'accept'){
+    smartLinkUI = `
+      <div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:4px;padding:7px 8px;margin-bottom:9px">
+        <div style="font-size:9px;font-family:var(--mono);color:#a78bfa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">⚡ Acceptance check</div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr 1fr;gap:4px;align-items:center;margin-bottom:5px">
+          ${input('measurement', block.measurement||'', 'number')}
+          <select data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','evalOp'" style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 4px">
+            ${['<=','<','>=','>','='].map(o=>`<option ${block.evalOp===o?'selected':''}>${o}</option>`).join('')}
+          </select>
+          ${input('criterion', block.criterion||'', 'number')}
+          ${input('unit', block.unit||'mm')}
+        </div>
+        ${row('Standard / source', input('standard', block.standard||''))}
+      </div>`;
+  }
+  if(def && (def.smartLink === 'procedure' || def.smartLink === 'cert' || def.smartLink === 'calib')){
+    smartLinkUI = `<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:4px;padding:7px 8px;margin-bottom:9px;font-size:10px;color:#a78bfa">
+      ⚡ <strong>Smart link</strong> — auto-resolves from ${def.smartLink === 'procedure' ? 'procedures store' : def.smartLink === 'cert' ? 'inspector directory' : 'equipment calibration data'} at preview/export
+    </div>`;
+  }
+
+  // QR payload field
+  let qrUI = '';
+  if(def && def.qr){
+    qrUI = row('QR payload (URL or text)', input('qrPayload', block.qrPayload||''));
+  }
+  // Cross-ref target
+  let xrefUI = '';
+  if(def && def.xref){
+    xrefUI = row('Reference target', `<select data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','xrefTarget'" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px">
+      ${['defect-1','defect-2','defect-3','defect-4','defect-5'].map(t=>`<option value="${t}" ${block.xrefTarget===t?'selected':''}>${t}</option>`).join('')}
+    </select>`);
+  }
+  // Scan image source
+  let scanUI = '';
+  if(def && def.scanImg){
+    scanUI = row('Scan image URL', input('scanSrc', block.scanSrc||''));
+  }
+
+  // V3 — Format string for data fields
+  let formatUI = '';
+  if(def && !def.smartLink && !def.qr && !def.weldMap && !def.scanImg && !def.repeat && !def.xref){
+    const presets = ['', 'DD-MMM-YYYY', 'YYYY-MM-DD', 'DD/MM/YYYY', 'MMM YYYY', 'upper', 'lower', '0.00', '0'];
+    formatUI = `
+      <div style="background:rgba(20,184,166,.05);border:1px solid rgba(20,184,166,.18);border-radius:4px;padding:7px 8px;margin-bottom:9px">
+        <div style="font-size:9px;font-family:var(--mono);color:#14b8a6;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">⚙ Format</div>
+        <select data-on-change="_wCvUpdateBlockFormat" data-args="'${id}'" data-pass-el="1" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px;margin-bottom:4px">
+          ${presets.map(p=>`<option value="${p}" ${block.format===p?'selected':''}>${p||'(none)'}</option>`).join('')}
+        </select>
+        <input id="cv-fmt-custom-${id}" type="text" placeholder="Custom format…" value="${block.format||''}" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','format'" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px;font-family:var(--mono);box-sizing:border-box"/>
+      </div>`;
+  }
+
+  // V3 — Conditional visibility (show-when rule)
+  const swRule = block.showWhen || {};
+  const fieldOptions = ['','method','verdict','result','client','indications','defectCount','heatTreat','material'];
+  const showWhenUI = `
+    <div style="background:rgba(79,142,247,.05);border:1px solid rgba(79,142,247,.18);border-radius:4px;padding:7px 8px;margin-bottom:9px">
+      <div style="font-size:9px;font-family:var(--mono);color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between">
+        <span>⚡ Show only when…</span>
+        ${swRule.field ? `<button data-action="cvUpdateBlock" data-args="'${id}','showWhen',null" style="background:none;border:none;color:var(--red);font-size:10px;cursor:pointer;padding:0">clear</button>` : ''}
+      </div>
+      <div style="display:grid;grid-template-columns:1.1fr 0.8fr 1.1fr;gap:3px;margin-bottom:4px">
+        <select data-on-change="_wCvSetShowWhenValue" data-pass-el="1" data-args="'${id}','field'" style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 4px">
+          ${fieldOptions.map(f=>`<option value="${f}" ${swRule.field===f?'selected':''}>${f||'(off)'}</option>`).join('')}
+        </select>
+        <select data-on-change="_wCvSetShowWhenValue" data-pass-el="1" data-args="'${id}','op'" style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 4px">
+          ${['=','!=','contains','>','<','>=','<=','empty','notEmpty'].map(o=>`<option ${swRule.op===o?'selected':''}>${o}</option>`).join('')}
+        </select>
+        <input type="text" value="${(swRule.value||'').replace(/"/g,'&quot;')}" placeholder="value" data-on-input="_wCvSetShowWhenValue" data-pass-el="1" data-args="'${id}','value'" style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 4px;font-family:var(--mono)"/>
+      </div>
+      <div style="font-size:9px;color:var(--t3);line-height:1.3">e.g. <code>method = RT</code>, <code>defectCount &gt; 0</code>, <code>verdict = Not acceptable</code></div>
+    </div>`;
+
+  // V3 — Comments
+  const comments = block.comments || [];
+  const commentsUI = `
+    <div style="background:rgba(245,166,35,.05);border:1px solid rgba(245,166,35,.18);border-radius:4px;padding:7px 8px;margin-bottom:9px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:9px;font-family:var(--mono);color:var(--amber);text-transform:uppercase;letter-spacing:.06em">💬 Comments (${comments.length})</span>
+        <button data-action="cvAddCommentToBlock" data-args="'${id}'" style="background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);color:var(--amber);font-size:10px;padding:2px 7px;border-radius:3px;cursor:pointer">+ Add</button>
+      </div>
+      ${comments.map((c,ci)=>`
+        <div style="background:var(--bg2);border-radius:4px;padding:5px 7px;margin-bottom:3px;${c.resolved?'opacity:0.55':''}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+            <span style="font-size:9px;font-weight:600;color:var(--t2)">${escapeHtml(c.author)}</span>
+            <div style="display:flex;gap:3px">
+              <button data-action="cvResolveComment" data-args="'${id}',${ci}" title="${c.resolved?'Reopen':'Resolve'}" style="background:none;border:none;color:${c.resolved?'var(--green)':'var(--t3)'};font-size:11px;cursor:pointer;padding:0">${c.resolved?'✓':'○'}</button>
+              <button data-action="cvDeleteComment" data-args="'${id}',${ci}" title="Delete" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:0">✕</button>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--t1);line-height:1.4;${c.resolved?'text-decoration:line-through':''}">${escapeHtml(c.text)}</div>
+          <div style="font-size:8.5px;color:var(--t3);margin-top:2px;font-family:var(--mono)">${new Date(c.timestamp).toLocaleString()}</div>
+        </div>`).join('')}
+    </div>`;
+
+  panel.innerHTML = `
+    <div style="font-size:11px;font-weight:600;color:var(--t1);margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border);line-height:1.4">${title}${block.locked?' 🔒':''}</div>
+    ${mapInfo}
+    ${smartLinkUI}
+    ${qrUI}
+    ${xrefUI}
+    ${scanUI}
+    ${block.key && block.key.startsWith('blank-row-') ? (() => {
+      const cols = parseInt(block.key.replace('blank-row-','')) || 2;
+      return Array.from({length:cols}, (_,i) => `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:7px 8px;margin-bottom:7px">
+          <div style="font-size:8.5px;font-family:var(--mono);color:var(--blue);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Column ${i+1}</div>
+          ${row('Label', input('c'+(i+1)+'l', block['c'+(i+1)+'l']||''))}
+          ${row('Value', input('c'+(i+1)+'v', block['c'+(i+1)+'v']||''))}
+        </div>`).join('');
+    })() : (block.key === 'blank-field' || block.key === 'blank-multiline') ? `
+      ${row('Label', input('text', block.text||''))}
+      ${row('Value text', block.key === 'blank-multiline'
+        ? `<textarea style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px;font-family:var(--font);box-sizing:border-box;resize:vertical;min-height:52px" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','customValue'">${escapeHtml(block.customValue||'')}</textarea>`
+        : input('customValue', block.customValue||'')
+      )}` : row('Label / text', input('text', block.text))
+    }
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px">
+      ${['x','y','w','h'].map(p=>`<div><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);margin-bottom:2px;text-transform:uppercase">${p.toUpperCase()}</div>${numRow(p,block[p])}</div>`).join('')}
+    </div>
+    ${row('Font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontSize'">
+      ${['6px','7px','7.5px','8px','8.5px','9px','10px','11px','12px','14px','16px','20px'].map(s=>`<option value="${s}" ${block.fontSize===s?'selected':''}>${s}</option>`).join('')}
+    </select>`)}
+    ${check('bold',block.bold,'Bold')}
+    ${check('italic',block.italic,'Italic')}
+    ${check('showBorder',block.showBorder,'Show border')}
+    ${check('locked',block.locked,'Lock position 🔒')}
+    ${row('Alignment',`<div style="display:flex;gap:3px">
+      ${['left','center','right'].map(a=>`<button data-action="cvUpdateBlock" data-args="'${id}','align','${a}'" style="flex:1;padding:4px 2px;font-size:11px;border-radius:3px;border:1px solid var(--border);cursor:pointer;background:${block.align===a?'var(--blue)':'var(--bg2)'};color:${block.align===a?'#fff':'var(--t2)'}">${a==='left'?'⬅':a==='center'?'↔':'➡'}</button>`).join('')}
+    </div>`)}
+    ${row('Text colour', colorPick('color', block.color||'#000000'))}
+    ${row('Background',  colorPick('bgColor', block.bgColor||'transparent'))}
+    ${block.showBorder ? row('Border colour', colorPick('borderColor', block.borderColor||'#cccccc')) : ''}
+    ${formatUI}
+    ${showWhenUI}
+    ${commentsUI}
+    <div style="display:flex;flex-direction:column;gap:5px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      <button data-action="cvDuplicateBlock" data-args="'${id}'" class="btn btn-sm" style="font-size:11px;width:100%">⧉ Duplicate (Ctrl+D)</button>
+      <div style="display:flex;gap:5px">
+        <button data-action="cvMoveZ" data-args="'${id}',1" class="btn btn-sm" style="font-size:11px;flex:1">↑ Front</button>
+        <button data-action="cvMoveZ" data-args="'${id}',-1" class="btn btn-sm" style="font-size:11px;flex:1">↓ Back</button>
+      </div>
+      <button data-action="cvDeleteBlock" data-args="'${id}'" class="btn btn-sm" style="font-size:11px;width:100%;background:rgba(242,92,92,.12);color:var(--red);border-color:rgba(242,92,92,.25)">✕ Delete block (Del)</button>
+    </div>`;
+}
+
+// V3: helper to set a key on the showWhen rule object
+function cvSetShowWhen(id, key, value){
+  const block = cvBlocks.find(b=>b.id===id);
+  if(!block) return;
+  if(!block.showWhen) block.showWhen = { field:'', op:'=', value:'' };
+  block.showWhen[key] = value;
+  // If field is cleared, drop the rule
+  if(key === 'field' && !value) block.showWhen = null;
+  cvSaveLayout();
+  cvRenderCanvas();
+  cvRenderProps(id);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// V3 LAYERS PANEL — tab switcher and z-order list
+// ════════════════════════════════════════════════════════════════════
+function cvSwitchRsbTab(which){
+  const tabs = ['props', 'layers'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('cv-rsb-tab-'+t);
+    const body = document.getElementById('cv-'+t+'-body');
+    if(t === which){
+      if(btn){ btn.classList.add('active'); btn.style.color='var(--t1)'; btn.style.borderBottomColor='var(--cyan)'; }
+      if(body) body.style.display = 'block';
+    } else {
+      if(btn){ btn.classList.remove('active'); btn.style.color='var(--t3)'; btn.style.borderBottomColor='transparent'; }
+      if(body) body.style.display = 'none';
+    }
+  });
+  if(which === 'layers') cvRenderLayers();
+}
+
+function cvBlockDisplayName(b){
+  if(b.isLayout){
+    const item = CV_LAYOUT_ITEMS.find(i => i.key === b.key);
+    return item ? item.label : b.key.replace(/-/g,' ');
+  }
+  const def = CV_FIELD_DEFS[b.key];
+  if(def) return def.label.split(' / ')[0].split(' ').slice(0,4).join(' ');
+  return b.key.replace(/-/g,' ');
+}
+
+function cvBlockTypeIcon(b){
+  if(b.isLayout) return '▢';
+  const def = CV_FIELD_DEFS[b.key];
+  if(!def) return '·';
+  if(def.smartLink) return '⚡';
+  if(def.computed)  return '∑';
+  if(def.qr)        return '▦';
+  if(def.weldMap)   return '⊕';
+  if(def.scanImg)   return '▤';
+  if(def.repeat)    return '↻';
+  if(def.xref)      return '↗';
+  if(def.sig)       return '✍';
+  if(def.result)    return '★';
+  if(def.blank || def.blankRow) return '✦';
+  if(def.multi)     return '¶';
+  return 'f';
+}
+
+function cvRenderLayers(){
+  const body = document.getElementById('cv-layers-body');
+  const countEl = document.getElementById('cv-layers-count');
+  if(!body) return;
+  if(countEl) countEl.textContent = '('+cvBlocks.length+')';
+  if(!cvBlocks.length){
+    body.innerHTML = '<div style="padding:30px 16px;font-size:12px;color:var(--t3);text-align:center;line-height:1.7">No blocks on this page.<br>Drag from the palette →</div>';
+    return;
+  }
+  // Sort by zIndex desc (front-most first)
+  const sorted = [...cvBlocks].sort((a,b) => (b.zIndex||0) - (a.zIndex||0));
+  let html = `<div style="padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg2);font-size:9px;color:var(--t3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between">
+    <span>${cvBlocks.length} blocks · top → bottom</span>
+    <button data-action="cvSelectAllBlocks" style="background:none;border:none;color:var(--cyan);font-size:9px;cursor:pointer;padding:0;text-transform:uppercase">Select all</button>
+  </div>`;
+  sorted.forEach(b => {
+    const sel = b.id === cvSelectedId || cvSelectedIds.includes(b.id);
+    const icon = cvBlockTypeIcon(b);
+    const name = cvBlockDisplayName(b);
+    const hasComment = b.comments && b.comments.some(c => !c.resolved);
+    const hasShowWhen = b.showWhen && b.showWhen.field;
+    html += `<div data-action="cvLayerSelect" data-pass-event="1" data-args="'${b.id}'" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-bottom:1px solid var(--border);transition:background var(--motion-fast);${sel?'background:rgba(0,212,255,.10);box-shadow:inset 2px 0 0 var(--cyan)':''}" onmouseenter="if(!this.dataset.sel)this.style.background='var(--panel2)'" onmouseleave="if(!this.dataset.sel)this.style.background=''" ${sel?'data-sel="1"':''}>
+      <span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.04);color:var(--t2);border-radius:3px;flex-shrink:0">${icon}</span>
+      <span style="flex:1;min-width:0;font-size:11px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${b.locked?'opacity:.6':''}">${escapeHtml(name)}</span>
+      ${hasComment ? '<span title="Has unresolved comment" style="color:var(--amber);font-size:10px">●</span>' : ''}
+      ${hasShowWhen ? '<span title="Conditional visibility" style="color:var(--blue);font-size:10px">⚡</span>' : ''}
+      <button data-action="cvToggleLock" data-args="'${b.id}'" data-stop-prop="1" title="${b.locked?'Unlock':'Lock'}" style="background:none;border:none;color:${b.locked?'var(--amber)':'var(--t3)'};font-size:11px;cursor:pointer;padding:1px 3px;line-height:1;opacity:${b.locked?'1':'.55'}">${b.locked?'🔒':'🔓'}</button>
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <button data-action="cvMoveZ" data-args="'${b.id}',1" data-stop-prop="1" title="Bring forward" style="background:none;border:none;color:var(--t3);font-size:8px;cursor:pointer;padding:0 2px;line-height:1;opacity:.7">▲</button>
+        <button data-action="cvMoveZ" data-args="'${b.id}',-1" data-stop-prop="1" title="Send backward" style="background:none;border:none;color:var(--t3);font-size:8px;cursor:pointer;padding:0 2px;line-height:1;opacity:.7">▼</button>
+      </div>
+    </div>`;
+  });
+  body.innerHTML = html;
+}
+
+function cvLayerSelect(id, evt){
+  if(evt && evt.shiftKey){
+    // Multi-select toggle
+    const i = cvSelectedIds.indexOf(id);
+    if(i >= 0) cvSelectedIds.splice(i, 1);
+    else cvSelectedIds.push(id);
+    _cvPrimaryToLast();   // toggle convention: last-touched becomes primary
+  } else {
+    _cvSelectSingle(id);
+    cvSwitchRsbTab('props');
+  }
+  cvRenderCanvas();
+  cvRenderProps(cvSelectedId);
+  cvRenderLayers();
+}
+
+function cvSelectAllBlocks(){
+  cvSelectedIds = cvBlocks.map(b => b.id);
+  _cvPrimaryToFirst();    // batch convention: first-in-document becomes primary
+  cvRenderCanvas();
+  cvRenderProps(cvSelectedId);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// V3 RIBBON HELPERS — preview source, language, find/replace, history
+// ════════════════════════════════════════════════════════════════════
+
+function cvSetPreviewSource(reportNo){
+  cvPpvReportId = reportNo || null;
+  // If a report is selected, infer method/result from it for the preview
+  if(cvPpvReportId){
+    const reports = ls(KEYS.reports, []);
+    const r = reports.find(x => x.reportNo === cvPpvReportId || x.id === cvPpvReportId);
+    if(r){
+      if(r.method) cvPpvMethod = r.method;
+      cvPpvResult = r.verdict === 'Acceptable' ? 'Pass' : r.verdict === 'Not acceptable' ? 'Fail' : 'Monitor';
+      const sel = document.getElementById('cv-method-select'); if(sel) sel.value = r.method || cvPpvMethod;
+      cvRenderMethodBtns();
+    }
+  }
+  // Always end up in preview mode so the user can see the result
+  if(!cvPreview && cvPpvReportId){
+    cvPreview = true;
+    const btn=document.getElementById('cv-mode-btn');
+    if(btn){ btn.classList.add('on'); btn.textContent='✏️ Edit'; }
+  }
+  // Update the preview badge
+  const badge = document.getElementById('cv-preview-badge');
+  if(badge){
+    if(cvPpvReportId){
+      badge.style.display = 'inline-block';
+      badge.textContent = '⚡ Live: ' + cvPpvReportId;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  cvRenderCanvas();
+}
+
+function cvRefreshPreviewSource(){
+  const sel = document.getElementById('cv-ppv-source');
+  if(!sel) return;
+  const reports = (typeof ls === 'function') ? ls(KEYS.reports, []) : [];
+  const recent = reports.slice(-30).reverse();
+  const cur = cvPpvReportId || '';
+  sel.innerHTML = '<option value="">Sample data</option>' + recent.map(r => {
+    const id = r.reportNo || r.id || '';
+    const v = r.verdict === 'Acceptable' ? '✓' : r.verdict === 'Not acceptable' ? '✕' : '·';
+    const subj = (r.subject || r.client || '—').slice(0, 24);
+    return `<option value="${escapeHtml(id)}" ${id===cur?'selected':''}>${v} ${escapeHtml(id)} — ${escapeHtml(subj)}</option>`;
+  }).join('');
+}
+
+function cvOpenSelectedReport(){
+  if(!cvPpvReportId){ toast(t('toast.no_report','No report selected.'), 'warn'); return; }
+  toast(t('toast.switch_to_reports','Switch to Reports page to view this report.'), 'info');
+}
+
+function cvSetLanguage(lang){
+  cvPpvLanguage = lang;
+  if(cvPreview) cvRenderCanvas();
+  toast(tf('toast.preview_language','Preview language: {lang}', {lang: lang.toUpperCase()}), 'info');
+}
+
+// ── FIND & REPLACE MODAL ──────────────────────────────────────────
+function cvOpenFindReplace(){
+  let modal = document.getElementById('cv-fr-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'cv-fr-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:440px;max-width:96vw;box-shadow:var(--sh-xl);overflow:hidden">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;font-weight:600;color:var(--t1)">Find &amp; replace in template</div>
+        <button data-action="_wRemoveById" data-args="\'cv-fr-modal\'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:18px">
+        <div style="font-size:11px;font-weight:500;color:var(--t2);margin-bottom:5px">Find</div>
+        <input id="cv-fr-find" type="text" placeholder="Text to find…" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--t1);font-size:13px;padding:9px 11px;margin-bottom:12px;font-family:var(--font);box-sizing:border-box"/>
+        <div style="font-size:11px;font-weight:500;color:var(--t2);margin-bottom:5px">Replace with</div>
+        <input id="cv-fr-rep" type="text" placeholder="Replacement text…" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--t1);font-size:13px;padding:9px 11px;margin-bottom:14px;font-family:var(--font);box-sizing:border-box"/>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'cv-fr-modal\'">Cancel</button>
+          <button class="btn btn-sm" data-action="cvDoFindReplace" data-args="false">Replace once</button>
+          <button class="btn btn-sm btn-primary" data-action="cvDoFindReplace" data-args="true">Replace all</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    openA11yModal(modal);
+    requestAnimationFrame(() => document.getElementById('cv-fr-find')?.focus());
+  }
+}
+function cvDoFindReplace(all){
+  const find = document.getElementById('cv-fr-find').value;
+  const rep  = document.getElementById('cv-fr-rep').value;
+  if(!find){ toast(t('toast.find_text_required','Enter find text.'), 'warn'); return; }
+  cvPushUndo();
+  const n = cvFindReplace(find, rep, all);
+  toast(n ? `${n} replacement${n!==1?'s':''} made` : 'No matches', n ? 'success' : 'info');
+  document.getElementById('cv-fr-modal').remove();
+}
+
+// ── VERSION HISTORY MODAL ─────────────────────────────────────────
+function cvOpenHistory(){
+  // Save current as snapshot first if changed
+  cvSaveSnapshot('Before opening history');
+  const list = ls(CV_HISTORY_KEY, []).slice().reverse();
+  let modal = document.getElementById('cv-hist-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'cv-hist-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  const items = list.length ? list.map(s => {
+    const blocks = (s.pages||[]).reduce((a,p)=>a+(p.blocks?.length||0),0);
+    return `<div style="padding:11px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;transition:background var(--motion-fast)" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;color:var(--t1);font-weight:500">${escapeHtml(s.label||'Snapshot')}</div>
+        <div style="font-size:11px;color:var(--t3);font-family:var(--mono);margin-top:2px">${new Date(s.timestamp).toLocaleString()} · ${s.user||'Anonymous'} · ${blocks} blocks · ${s.pages?.length||1} page(s)</div>
+      </div>
+      <button class="btn btn-sm" data-action="_wCvLoadSnapshotAndClose" data-args="${s.timestamp}">Restore</button>
+    </div>`;
+  }).join('') : '<div style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No saved versions yet.<br><span style="font-size:11px">Snapshots save automatically.</span></div>';
+  modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:540px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--sh-xl);overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:14px;font-weight:600;color:var(--t1)">Version history (${list.length})</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm btn-primary" data-action="_wCvSaveSnapshotPrompt">+ Save snapshot now</button>
+        <button data-action="_wRemoveById" data-args="\'cv-hist-modal\'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div style="overflow-y:auto;flex:1">${items}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  openA11yModal(modal);
+}
+
+// ── COMMENTS MODAL (all-comments view) ────────────────────────────
+function cvOpenComments(){
+  const all = cvAllComments();
+  let modal = document.getElementById('cv-com-modal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'cv-com-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  const items = all.length ? all.map(c => `
+    <div style="padding:11px 14px;border-bottom:1px solid var(--border);${c.resolved?'opacity:.55':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:600;color:var(--t1)">${escapeHtml(c.author)} <span style="color:var(--t3);font-weight:normal">on</span> <code style="font-size:10px;color:var(--cyan)">${escapeHtml(c.blockText||c.blockId).slice(0,40)}</code></span>
+        <span style="font-size:10px;color:var(--t3);font-family:var(--mono)">${new Date(c.timestamp).toLocaleString()}</span>
+      </div>
+      <div style="font-size:13px;color:var(--t1);line-height:1.5;${c.resolved?'text-decoration:line-through':''}">${escapeHtml(c.text)}</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn btn-xs" data-action="_wCvJumpToComment" data-args="${c.pageIdx},'${c.blockId}'">Go to block</button>
+        <button class="btn btn-xs" data-action="_wCvResolveCommentAndReopen" data-args="'${c.blockId}',${c.commentIdx}">${c.resolved?'Reopen':'Resolve'}</button>
+      </div>
+    </div>`).join('') : '<div style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No comments yet.<br><span style="font-size:11px">Click any block then add a comment from its properties panel.</span></div>';
+  modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:560px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--sh-xl);overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:14px;font-weight:600;color:var(--t1)">Comments (${all.length} total · ${all.filter(c=>!c.resolved).length} unresolved)</div>
+      <button data-action="_wRemoveById" data-args="\'cv-com-modal\'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1">${items}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  openA11yModal(modal);
+}
+
+// ── Block operations ─────────────────────────────────────────────────
+//
+// Typed wrappers for the property-panel inputs. The dispatcher's args
+// parser treats `'foo'.checked` and `'bar'.value` as opaque strings — it
+// does NOT evaluate `el.checked` or `el.value` for you. So every checkbox
+// / select / colour-picker / number input in the properties panel needs a
+// wrapper that reads the value from the element and forwards it correctly
+// to cvUpdateBlock or cvSetShowWhen. Previously this was attempted inline
+// via `data-args="'showBorder'.checked"` which silently set the block
+// property to the literal string `"'showBorder'.checked"` instead of the
+// boolean — making the "Show border" toggle and every other property
+// control effectively non-functional.
+function _wCvUpdateBlockChecked(id, prop, el) { cvUpdateBlock(id, prop, el.checked); }
+function _wCvUpdateBlockValue  (id, prop, el) { cvUpdateBlock(id, prop, el.value);   }
+function _wCvUpdateBlockNumber (id, prop, el) { cvUpdateBlock(id, prop, +el.value);  }
+function _wCvSetShowWhenValue  (id, key,  el) { cvSetShowWhen(id, key, el.value);    }
+
+// Same dispatcher-args-parser issue applied to three other handlers.
+// cvExecCmd is wired to font-name / font-size selects in the rich-text
+// toolbar. apSetSeverity is wired to the four severity colour pickers in
+// Appearance settings. captureWizardSetVal is wired to every field in the
+// capture wizard modal. Without these wrappers each handler was receiving
+// the DOM element where a string was expected, causing silent failure of
+// the font picker, severity colours, and capture-wizard input persistence.
+function _wCvExecCmdValue       (cmd,    el) { cvExecCmd(cmd, el.value);             }
+function _wApSetSeverityValue   (level,  el) { apSetSeverity(level, el.value);       }
+function _wCaptureWizardSetValue(target, el) { captureWizardSetVal(target, el.value);}
+
+// Reads the method select's current value and loads the matching template.
+// Replaces the broken `data-args="document.getElementById(...).value"`
+// markup pattern (the args parser doesn't evaluate JS expressions).
+function _wCvLoadMethodTplFromSelect(){
+  const sel = document.getElementById('cv-method-select');
+  if(sel) cvLoadMethodTpl(sel.value);
+}
+
+// File-input wrappers — reads element.files instead of relying on a broken
+// `data-args=".files"` / `data-args=".files[0]"` expression that the args
+// parser cannot evaluate. The wrappers handle the empty-selection case
+// (user opened the picker then cancelled).
+function _wProcHandleFiles(el){
+  if(el && el.files && el.files.length) procHandleFiles(el.files);
+}
+function _wApImportThemeFile(el){
+  const f = el && el.files && el.files[0];
+  if(f) apImportTheme(f);
+}
+
+// "New report" from the empty-overview state. Picks the first active
+// method (configured under Settings → Methods) or falls back to UT.
+// Replaces a `data-args="(getActiveMethods()[0]||{}).id||'UT'"` callsite
+// that tried to evaluate JS in the markup — the args parser cannot.
+function _wOvNewReportFromActiveMethod(){
+  let methodId = 'UT';
+  try {
+    const active = (typeof getActiveMethods === 'function') ? getActiveMethods() : [];
+    if(active && active[0] && active[0].id) methodId = active[0].id;
+  } catch(e){}
+  ovNewReport(methodId);
+}
+
+function cvUpdateBlock(id, prop, value){
+  const block = cvBlocks.find(b=>b.id===id);
+  if(!block) return;
+  // FIX: push undo for property edits (debounced — only on first change per interaction)
+  if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; setTimeout(()=>{ cvDragUndoPushed=false; }, 800); }
+  if(['x','y','w','h'].includes(prop)) value = cvSnap(Math.max(prop==='x'||prop==='y'?0:16, +value));
+  block[prop] = value;
+  cvRenderCanvas();
+  cvSaveLayout();
+}
+function cvDeleteBlock(id){ cvPushUndo(); cvPages[cvCurrentPage].blocks=cvPages[cvCurrentPage].blocks.filter(b=>b.id!==id); cvSync(); if(cvSelectedId===id){cvSelectedId=null;cvSelectedIds=cvSelectedIds.filter(x=>x!==id);} cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout(); }
+function cvDeleteSelected(){
+  if(!cvSelectedIds.length) return;
+  cvPushUndo();
+  cvPages[cvCurrentPage].blocks = cvPages[cvCurrentPage].blocks.filter(b=>!cvSelectedIds.includes(b.id));
+  cvSync(); cvSelectedId=null; cvSelectedIds=[];
+  cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+}
+function cvDuplicateBlock(id){ cvPushUndo(); const b=cvBlocks.find(b=>b.id===id); if(!b) return; const nb=_cvCloneBlock(b); cvBlocks.push(nb); _cvSelectSingle(nb.id); cvRenderCanvas(); cvRenderProps(nb.id); cvSaveLayout(); }
+function cvMoveZ(id,dir){ const b=cvBlocks.find(b=>b.id===id); if(!b) return; b.zIndex=(b.zIndex||1)+dir; cvRenderCanvas(); cvSaveLayout(); }
+function cvToggleLock(id){ const b=cvBlocks.find(b=>b.id===id); if(!b) return; b.locked=!b.locked; cvRenderCanvas(); cvRenderProps(id); cvSaveLayout(); toast(b.locked ? t('pe.toast.block_locked','Block locked') : t('pe.toast.block_unlocked','Block unlocked')); }
+
+// ── Multi-select alignment ───────────────────────────────────────────
+function cvAlignSelected(edge){
+  if(cvSelectedIds.length < 2) return;
+  cvPushUndo();
+  const blocks = cvSelectedIds.map(sid=>cvBlocks.find(b=>b.id===sid)).filter(Boolean);
+  if(edge==='left')   { const minX=Math.min(...blocks.map(b=>b.x)); blocks.forEach(b=>b.x=minX); }
+  if(edge==='right')  { const maxR=Math.max(...blocks.map(b=>b.x+b.w)); blocks.forEach(b=>b.x=maxR-b.w); }
+  if(edge==='top')    { const minY=Math.min(...blocks.map(b=>b.y)); blocks.forEach(b=>b.y=minY); }
+  if(edge==='bottom') { const maxB=Math.max(...blocks.map(b=>b.y+b.h)); blocks.forEach(b=>b.y=maxB-b.h); }
+  cvRenderCanvas(); cvSaveLayout();
+}
+function cvDistributeSelected(axis){
+  if(cvSelectedIds.length < 3) return;
+  cvPushUndo();
+  const blocks = cvSelectedIds.map(sid=>cvBlocks.find(b=>b.id===sid)).filter(Boolean);
+  if(axis==='h'){
+    blocks.sort((a,b)=>a.x-b.x);
+    const minX=blocks[0].x, maxR=blocks[blocks.length-1].x+blocks[blocks.length-1].w;
+    const totalW=blocks.reduce((s,b)=>s+b.w,0);
+    const gap=(maxR-minX-totalW)/(blocks.length-1);
+    let cx=minX;
+    blocks.forEach(b=>{ b.x=Math.round(cx); cx+=b.w+gap; });
+  } else {
+    blocks.sort((a,b)=>a.y-b.y);
+    const minY=blocks[0].y, maxB=blocks[blocks.length-1].y+blocks[blocks.length-1].h;
+    const totalH=blocks.reduce((s,b)=>s+b.h,0);
+    const gap=(maxB-minY-totalH)/(blocks.length-1);
+    let cy=minY;
+    blocks.forEach(b=>{ b.y=Math.round(cy); cy+=b.h+gap; });
+  }
+  cvRenderCanvas(); cvSaveLayout();
+}
+
+// ── Copy / Paste ─────────────────────────────────────────────────────
+function cvCopySelected(){
+  const ids = cvSelectedIds.length ? cvSelectedIds : (cvSelectedId ? [cvSelectedId] : []);
+  if(!ids.length) return;
+  cvClipboard = ids.map(sid=>{ const b=cvBlocks.find(bb=>bb.id===sid); return b?JSON.parse(JSON.stringify(b)):null; }).filter(Boolean);
+  toast(tf('toast.copied_n','Copied {n} block(s)', {n: cvClipboard.length}));
+}
+function cvPasteClipboard(){
+  if(!cvClipboard || !cvClipboard.length) return;
+  cvPushUndo();
+  const newIds = [];
+  cvClipboard.forEach(b => {
+    const nb = _cvCloneBlock(b);
+    cvBlocks.push(nb);
+    newIds.push(nb.id);
+  });
+  cvSelectedIds = newIds;
+  _cvPrimaryToFirst();    // batch convention: first pasted block becomes primary
+  cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout();
+  toast(tf('toast.pasted_n','Pasted {n} block(s)', {n: newIds.length}));
+}
+
+// ── Mouse interaction ────────────────────────────────────────────────
+function cvBgMouseDown(e){
+  if(e.target.id==='cv-canvas'||e.target.id==='cv-grid-overlay'){
+    cvSelectedId=null; cvSelectedIds=[];
+    cvUpdateSelectionUI();   // V23: no full re-render on background click
+    cvRenderProps(null);
+  }
+}
+function cvMouseMove(e){
+  if(cvDragging){
+    if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; }
+    const canvas = document.getElementById('cv-canvas');
+    if(!canvas) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - canvasRect.left) / cvZoom;
+    const my = (e.clientY - canvasRect.top)  / cvZoom;
+    const dx = mx - cvDragging.anchorX;
+    const dy = my - cvDragging.anchorY;
+
+    // Move all dragged blocks
+    cvDragging.startPositions.forEach(sp => {
+      const b = cvBlocks.find(bb=>bb.id===sp.id);
+      if(!b || b.locked) return;
+      let newX = cvSnap(Math.max(0, sp.x + dx));
+      let newY = cvSnap(Math.max(0, sp.y + dy));
+
+      // Smart snap alignment (only for single block drag)
+      if(cvDragging.ids.length === 1){
+        const snaps = cvCalcSnapLines(b.id, newX, newY, b.w, b.h);
+        // Apply strongest snap
+        const vSnap = snaps.find(s=>s.axis==='v');
+        const hSnap = snaps.find(s=>s.axis==='h');
+        if(vSnap){
+          if(vSnap.edge==='l') newX = vSnap.pos;
+          else if(vSnap.edge==='r') newX = vSnap.pos - b.w;
+          else if(vSnap.edge==='cx') newX = vSnap.pos - b.w/2;
+        }
+        if(hSnap){
+          if(hSnap.edge==='t') newY = hSnap.pos;
+          else if(hSnap.edge==='b') newY = hSnap.pos - b.h;
+          else if(hSnap.edge==='cy') newY = hSnap.pos - b.h/2;
+        }
+        cvDrawSnapLines(snaps.filter(s=>(s===vSnap||s===hSnap)));
+      }
+
+      b.x = newX; b.y = newY;
+      const elB = document.getElementById('cblk-'+b.id);
+      if(elB){ elB.style.left=b.x+'px'; elB.style.top=b.y+'px'; }
+    });
+
+    // FIX: Update properties panel live during drag
+    cvUpdatePropsPositionLive();
+  }
+  if(cvResizing){
+    if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; }
+    const b=cvBlocks.find(b=>b.id===cvResizing.id); if(!b) return;
+    b.w=cvSnap(Math.max(32, cvResizing.startW+(e.clientX-cvResizing.startX)/cvZoom));
+    b.h=cvSnap(Math.max(16, cvResizing.startH+(e.clientY-cvResizing.startY)/cvZoom));
+    const elB=document.getElementById('cblk-'+b.id); if(elB){elB.style.width=b.w+'px';elB.style.height=b.h+'px';}
+    cvUpdatePropsPositionLive();
+  }
+}
+function cvMouseUp(){
+  // V25: blocks whose x/y/w/h were mutated during drag have stale cached
+  // signatures. Invalidate them so the next cvRenderCanvas pass rebuilds
+  // their elements to match the current state.
+  if(cvDragging){
+    // V29: re-detect zone for every dragged block based on its final position.
+    // A block dragged from the body into the header band becomes a header block;
+    // dragged out of the band, it returns to the body.
+    cvDragging.ids.forEach(id => {
+      _cvBlockElCache.delete(id);
+      const b = cvBlocks.find(bb => bb.id === id);
+      if(b){
+        const newZone = _cvDetectZone(b.y, b.h);
+        if(b.zone !== newZone){
+          b.zone = newZone;
+        }
+      }
+    });
+  }
+  if(cvResizing){
+    _cvBlockElCache.delete(cvResizing.id);
+    const b = cvBlocks.find(bb => bb.id === cvResizing.id);
+    if(b){
+      const newZone = _cvDetectZone(b.y, b.h);
+      if(b.zone !== newZone) b.zone = newZone;
+    }
+  }
+  if(cvDragging||cvResizing) cvSaveLayout();
+  cvDragging=null; cvResizing=null; cvDragUndoPushed=false;
+  document.body.style.cursor=''; document.body.style.userSelect='';
+  // Clear snap lines
+  document.querySelectorAll('.cv-snap-line').forEach(e=>e.remove());
+  // FIX V22: detach document-level listeners
+  cvDetachDragListeners();
+  // V25: persistent alignment guides may need updating — positions changed
+  _cvRefreshAlignGuides();
+}
+
+// V22: document-level drag listeners. Without these, dragging a block past
+// the canvas edge freezes — mousemove only fires while over the canvas.
+// We bind on drag/resize start and unbind on mouseup so we don't pay event-
+// handler cost when nothing is being dragged.
+function cvAttachDragListeners(){
+  if(cvAttachDragListeners._on) return;  // idempotent
+  cvAttachDragListeners._on = true;
+  document.addEventListener('mousemove', cvMouseMove);
+  document.addEventListener('mouseup',   cvMouseUp);
+}
+function cvDetachDragListeners(){
+  if(!cvAttachDragListeners._on) return;
+  cvAttachDragListeners._on = false;
+  document.removeEventListener('mousemove', cvMouseMove);
+  document.removeEventListener('mouseup',   cvMouseUp);
+}
+
+// FIX: Live-update position inputs in properties panel during drag
+function cvUpdatePropsPositionLive(){
+  if(!cvSelectedId) return;
+  const b = cvBlocks.find(bb=>bb.id===cvSelectedId);
+  if(!b) return;
+  const panel = document.getElementById('cv-props-body');
+  if(!panel) return;
+  ['x','y','w','h'].forEach(p=>{
+    const inp = panel.querySelector(`input[data-prop="${p}"]`);
+    if(inp && document.activeElement !== inp) inp.value = b[p];
+  });
+}
+
+document.addEventListener('mouseup', ()=>{ if(cvDragging||cvResizing){cvMouseUp();} });
+
+// ── Keyboard shortcuts ───────────────────────────────────────────────
+document.addEventListener('keydown', e=>{
+  const pdfSec = document.getElementById('ss-pdfeditor');
+  if(!pdfSec || !pdfSec.classList.contains('active')) return;
+  if(cvPreview) return;
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+
+  // Respect global shortcuts toggle
+  const settings = ls(KEYS.settings, {});
+  if(settings.shortcutsEnabled === false) return;
+
+  // V5: registry-driven (each may be rebound or disabled by the user)
+  // Delete
+  if(matchShortcut(e, getShortcutKey('delete-block')) && (cvSelectedId || cvSelectedIds.length)){
+    e.preventDefault();
+    if(cvSelectedIds.length > 1) cvDeleteSelected();
+    else if(cvSelectedId) cvDeleteBlock(cvSelectedId);
+  }
+  // Undo/Redo
+  if(matchShortcut(e, getShortcutKey('undo'))){ e.preventDefault(); cvUndo(); }
+  if(matchShortcut(e, getShortcutKey('redo'))){ e.preventDefault(); cvRedo(); }
+  // Copy/Paste/Duplicate
+  if(matchShortcut(e, getShortcutKey('copy'))){ e.preventDefault(); cvCopySelected(); }
+  if(matchShortcut(e, getShortcutKey('paste'))){ e.preventDefault(); cvPasteClipboard(); }
+  if(matchShortcut(e, getShortcutKey('duplicate'))){ e.preventDefault(); if(cvSelectedId) cvDuplicateBlock(cvSelectedId); }
+  // Find & replace
+  if(matchShortcut(e, getShortcutKey('find-replace'))){ e.preventDefault(); cvOpenFindReplace(); }
+  // Save snapshot
+  if(matchShortcut(e, getShortcutKey('snapshot'))){ e.preventDefault(); cvSaveSnapshot('Manual snapshot ('+new Date().toLocaleTimeString()+')'); toast(t('toast.snapshot_saved','Snapshot saved.'), 'success'); }
+  // Select all
+  if(matchShortcut(e, getShortcutKey('select-all'))){ e.preventDefault(); cvSelectedIds=cvBlocks.map(b=>b.id); _cvPrimaryToFirst(); cvRenderCanvas(); cvRenderProps(cvSelectedId); }
+  // Arrow key nudge — not user-rebindable, hard-coded
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key) && cvSelectedId){
+    e.preventDefault();
+    const step = e.shiftKey ? CV_GRID * 4 : CV_GRID;
+    const ids = cvSelectedIds.length ? cvSelectedIds : [cvSelectedId];
+    ids.forEach(sid=>{
+      const b = cvBlocks.find(bb=>bb.id===sid);
+      if(!b || b.locked) return;
+      if(e.key==='ArrowLeft')  b.x = Math.max(0, b.x - step);
+      if(e.key==='ArrowRight') b.x = b.x + step;
+      if(e.key==='ArrowUp')    b.y = Math.max(0, b.y - step);
+      if(e.key==='ArrowDown')  b.y = b.y + step;
+    });
+    cvRenderCanvas(); cvSaveLayout();
+  }
+});
+
+// ── Zoom ─────────────────────────────────────────────────────────────
+function cvApplyZoom(){
+  const wrap=document.getElementById('cv-scale-wrap');
+  const canvas=document.getElementById('cv-canvas');
+  const label=document.getElementById('cv-zoom-label');
+  const label2=document.getElementById('cv-zoom-label-rib');
+  if(label) label.textContent=Math.round(cvZoom*100)+'%';
+  if(label2) label2.textContent=Math.round(cvZoom*100)+'%';
+  if(canvas) canvas.style.transform=`scale(${cvZoom})`;
+  if(canvas&&wrap){
+    wrap.style.width =Math.ceil(CV_PAGE_WIDTH_PX*cvZoom)+'px';
+    wrap.style.height=Math.ceil((canvas.scrollHeight||CV_PAGE_HEIGHT_PX)*cvZoom)+'px';
+  }
+}
+function cvZoomStep(delta){
+  const area = document.getElementById('cv-scroll-area');
+  const oldZoom = cvZoom;
+  cvZoom = Math.max(0.25, Math.min(2.0, cvZoom + delta));
+  if(!area){ cvApplyZoom(); return; }
+  // Viewport center in scroll coordinates before zoom
+  const cx = area.scrollLeft + area.clientWidth / 2;
+  const cy = area.scrollTop + area.clientHeight / 2;
+  const ratio = cvZoom / oldZoom;
+  cvApplyZoom();
+  // Scroll so the same canvas point stays at viewport center
+  area.scrollLeft = cx * ratio - area.clientWidth / 2;
+  area.scrollTop  = cy * ratio - area.clientHeight / 2;
+}
+function cvFitToView(){
+  const area = document.getElementById('cv-scroll-area') || document.getElementById('cv-canvas-outer');
+  if(!area) return;
+  const margin = 32;
+  const avail = area.clientWidth - margin * 2;
+  cvZoom = Math.max(0.3, Math.min(2.0, avail / CV_PAGE_WIDTH_PX));
+  cvApplyZoom();
+  area.scrollLeft = 0;
+  area.scrollTop  = 0;
+}
+
+// Ctrl+Wheel zoom toward cursor position
+document.addEventListener('wheel', function(e){
+  const area = document.getElementById('cv-scroll-area');
+  if(!area || !area.contains(e.target)) return;
+  if(!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const oldZoom = cvZoom;
+  const delta = e.deltaY > 0 ? -0.1 : 0.1;
+  cvZoom = Math.max(0.25, Math.min(2.0, cvZoom + delta));
+  // Cursor position relative to scroll area viewport
+  const rect = area.getBoundingClientRect();
+  const mx = e.clientX - rect.left + area.scrollLeft;
+  const my = e.clientY - rect.top  + area.scrollTop;
+  const ratio = cvZoom / oldZoom;
+  cvApplyZoom();
+  // Keep cursor point stationary
+  area.scrollLeft = mx * ratio - (e.clientX - rect.left);
+  area.scrollTop  = my * ratio - (e.clientY - rect.top);
+}, {passive:false});
+
+// ── Preview mode ─────────────────────────────────────────────────────
+function cvToggleMode(){
+  cvPreview=!cvPreview;
+  const btn=document.getElementById('cv-mode-btn');
+  if(btn){ btn.classList.toggle('on',cvPreview); btn.textContent=cvPreview?'✏️ Edit':'👁 Preview'; }
+  cvRenderCanvas();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V26 — Responsive drawer toggles for narrow viewports
+// ══════════════════════════════════════════════════════════════════════════
+// At desktop widths (>1100px) both side panels are always visible. Below
+// 1100px the palette becomes a slide-in drawer; below 900px the properties
+// panel also becomes a drawer. The toggles below are no-ops on desktop
+// (panels never have transform:translateX set without the media query) but
+// behave as expected on tablet/phone.
+
+function cvTogglePaletteDrawer(){
+  const palette = document.getElementById('cv-field-palette');
+  if(!palette) return;
+  const open = !palette.classList.contains('cv-drawer-open');
+  // Close the other drawer first — only one open at a time
+  document.getElementById('cv-props-panel')?.classList.remove('cv-drawer-open');
+  palette.classList.toggle('cv-drawer-open', open);
+  _cvUpdateBackdrop();
+}
+
+function cvTogglePropsDrawer(){
+  const props = document.getElementById('cv-props-panel');
+  if(!props) return;
+  const open = !props.classList.contains('cv-drawer-open');
+  document.getElementById('cv-field-palette')?.classList.remove('cv-drawer-open');
+  props.classList.toggle('cv-drawer-open', open);
+  _cvUpdateBackdrop();
+}
+
+function cvCloseAllDrawers(){
+  document.getElementById('cv-field-palette')?.classList.remove('cv-drawer-open');
+  document.getElementById('cv-props-panel')?.classList.remove('cv-drawer-open');
+  _cvUpdateBackdrop();
+}
+
+/** Show backdrop iff at least one drawer is open. */
+function _cvUpdateBackdrop(){
+  const backdrop = document.getElementById('cv-drawer-backdrop');
+  if(!backdrop) return;
+  const anyOpen = document.querySelector('#cv-field-palette.cv-drawer-open, #cv-props-panel.cv-drawer-open');
+  backdrop.classList.toggle('cv-active', !!anyOpen);
+}
+
+// Auto-close drawers when viewport widens past breakpoints — prevents the
+// awkward state where a tablet rotates to landscape with the drawer still
+// "open" (now visible inline as it used to be, but with the .cv-drawer-open
+// class lingering).
+var _cvLastWidth = window.innerWidth;
+window.addEventListener('resize', () => {
+  const w = window.innerWidth;
+  // Crossed up past 1100 → palette becomes inline again, clear drawer state
+  if(w > 1100 && _cvLastWidth <= 1100){
+    document.getElementById('cv-field-palette')?.classList.remove('cv-drawer-open');
+  }
+  if(w > 900 && _cvLastWidth <= 900){
+    document.getElementById('cv-props-panel')?.classList.remove('cv-drawer-open');
+  }
+  _cvUpdateBackdrop();
+  _cvLastWidth = w;
+});
+
+// Escape key closes any open drawer (a11y + power-user convenience)
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
+    const palette = document.getElementById('cv-field-palette');
+    const props   = document.getElementById('cv-props-panel');
+    if(palette?.classList.contains('cv-drawer-open') || props?.classList.contains('cv-drawer-open')){
+      e.preventDefault();
+      cvCloseAllDrawers();
+    }
+  }
+});
+
+// ── Status bar ───────────────────────────────────────────────────────
+function cvUpdateStatusBar(){
+  // Inject status bar into canvas toolbar area if not present
+  let bar = document.getElementById('cv-status-bar');
+  const outer = document.getElementById('cv-canvas-outer');
+  if(!outer) return;
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'cv-status-bar';
+    bar.style.cssText='padding:3px 10px;background:var(--panel);border-top:1px solid var(--border);font-size:10px;font-family:var(--mono);color:var(--t3);display:flex;gap:16px;flex-shrink:0';
+    outer.appendChild(bar);
+  }
+  const total = cvBlocks.length;
+  const fields = cvBlocks.filter(b=>!b.isLayout).length;
+  const layouts = cvBlocks.filter(b=>b.isLayout).length;
+  const sel = cvSelectedIds.length;
+  bar.innerHTML = `<span>Page ${cvCurrentPage+1}/${cvPages.length}</span><span>${total} blocks (${fields} fields, ${layouts} layout)</span>${sel>1?`<span style="color:var(--blue)">${sel} selected</span>`:''}`;
+}
+
+// ── Persist ──────────────────────────────────────────────────────────
+// V22: route canvas storage through ls/lss helpers. These hand off to the
+// vxEntityStore for keys in VX_ENTITY_KEYS — meaning canvas-layout-v1
+// and per-method templates now live in IndexedDB (canonical) with a
+// localStorage hot cache. Layouts with inline base64 images no longer hit
+// the ~5 MB localStorage quota; IDB practical limit is hundreds of MB.
+// V25: autosave timestamp tracking. cvSaveLayout records when it last wrote,
+// the indicator in the canvas top bar reads this and updates its label every
+// few seconds. _cvSavePendingFlash gives a brief "Saving…" visual on every save.
+var _cvLastSaveTime = 0;
+var _cvSavePendingFlash = 0;
+
+function cvSaveLayout(){
+  try {
+    _cvSavePendingFlash = Date.now();
+    _cvRefreshSaveIndicator();   // immediate "Saving…" feedback
+    lss(CV_KEY, { pages: cvPages, currentPage: cvCurrentPage, nextId: cvNextId });
+    _cvLastSaveTime = Date.now();
+    setTimeout(_cvRefreshSaveIndicator, 350);   // settle to "Saved · just now"
+  } catch(e) { console.warn('cvSaveLayout failed', e); }
+}
+
+/** Update the autosave indicator's label based on time since last save. */
+function _cvRefreshSaveIndicator(){
+  const el = document.getElementById('cv-autosave-text');
+  if(!el) return;
+  const dot = document.getElementById('cv-autosave-dot');
+  if(!_cvLastSaveTime){ el.textContent = ''; if(dot) dot.style.background='var(--t3)'; return; }
+  const now = Date.now();
+  const dt  = now - _cvLastSaveTime;
+  // Still mid-save (within 350ms of cvSaveLayout call)
+  if(_cvSavePendingFlash && (now - _cvSavePendingFlash) < 300){
+    el.textContent = t('pe.autosave.saving','Saving…');
+    if(dot){ dot.style.background = 'var(--amber)'; dot.style.animation = 'cv-pulse 0.8s ease-in-out infinite'; }
+    return;
+  }
+  // Just saved (within 4s) → "just now"
+  if(dt < 4000){
+    el.textContent = t('pe.autosave.saved_just','Saved · just now');
+  } else if(dt < 60000){
+    el.textContent = tf('pe.autosave.saved_ago','Saved · {n}s ago', { n: Math.floor(dt/1000) });
+  } else {
+    el.textContent = tf('pe.autosave.saved_min','Saved · {n} min ago', { n: Math.floor(dt/60000) });
+  }
+  if(dot){ dot.style.background = 'var(--green)'; dot.style.animation = ''; }
+}
+
+// Refresh every 5s so the "X seconds ago" label stays current.
+setInterval(_cvRefreshSaveIndicator, 5000);
+function cvLoadLayout(){
+  try {
+    const d = ls(CV_KEY, null);
+    if(d){
+      if(d.pages){ cvPages = d.pages; cvCurrentPage = d.currentPage || 0; }
+      else if(d.blocks){ cvPages = [{ label: 'Page 1', blocks: d.blocks }]; cvCurrentPage = 0; }
+      cvNextId = d.nextId || (cvPages.reduce((s,p)=>s+p.blocks.length, 0) + 1);
+    }
+  } catch(e) { console.warn('cvLoadLayout failed', e); }
+}
+async function cvClearCanvas(){ if(cvPages[cvCurrentPage].blocks.length && !(await vxConfirm({ message: 'Are you sure you want to clear all blocks from this page?', okLabel: t('vxc.clear','Clear'), danger: true }))) return; cvAutoSnapshot('Before clear'); cvPushUndo(); cvPages[cvCurrentPage].blocks=[];cvSync();cvSelectedId=null;cvSelectedIds=[];cvNextId=1;cvSaveLayout();cvRenderCanvas();cvRenderProps(null);toast(t('toast.page_cleared','Page cleared.')); }
+
+// ── Undo / Redo ──────────────────────────────────────────────────────
+function cvPushUndo(){
+  cvUndoStack.push(JSON.stringify(cvPages));
+  if(cvUndoStack.length>50) cvUndoStack.shift();
+  cvRedoStack = [];
+}
+function cvUndo(){
+  if(!cvUndoStack.length){ toast(t('toast.nothing_to_undo', 'Nothing to undo')); return; }
+  cvRedoStack.push(JSON.stringify(cvPages));
+  cvPages = JSON.parse(cvUndoStack.pop());
+  cvSync(); cvSelectedId=null; cvSelectedIds=[];
+  cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+}
+function cvRedo(){
+  if(!cvRedoStack.length){ toast(t('toast.nothing_to_redo', 'Nothing to redo')); return; }
+  cvUndoStack.push(JSON.stringify(cvPages));
+  cvPages = JSON.parse(cvRedoStack.pop());
+  cvSync(); cvSelectedId=null; cvSelectedIds=[];
+  cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+}
+
+// ── Method template storage ──────────────────────────────────────────
+// V22: now uses ls/lss → IndexedDB. Per-method templates can be heavy
+// (a single template can include dozens of blocks with inline signatures
+// and logos) so localStorage quota was a real risk.
+function cvSaveMethodTpl(method){
+  if(!method){ toast(t('toast.no_method', 'No method selected')); return; }
+  const data = { pages: cvPages, nextId: cvNextId, savedAt: new Date().toISOString() };
+  try { lss(CV_METHOD_TPL_PREFIX + method, data); toast(tf('pe.toast.tpl_saved','{method} template saved',{method})); cvRenderTplCards(); }
+  catch(e){ toast(t('toast.template_save_failed','Could not save template.')); }
+}
+function cvLoadMethodTpl(method){
+  if(!method){ toast(t('toast.no_method', 'No method selected')); return; }
+  try {
+    const d = ls(CV_METHOD_TPL_PREFIX + method, null);
+    if(!d){ toast(t('toast.no_saved_template','No saved template for this method.')); return; }
+    if(d.pages){
+      cvPushUndo();
+      cvPages = d.pages; cvCurrentPage = 0;
+      cvNextId = d.nextId || (cvPages.reduce((s,p)=>s+p.blocks.length,0)+1);
+      cvSync(); cvSelectedId = null; cvSelectedIds = [];
+      cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+      toast(tf('pe.toast.tpl_loaded','{method} template loaded',{method}));
+    }
+  } catch(e){ toast(t('toast.template_load_failed','Could not load template.')); }
+}
+async function cvDeleteMethodTpl(method){
+  if(!await vxConfirm({ message: `Are you sure you want to delete the saved ${method} template?`, okLabel: t('vxc.delete','Delete'), danger: true })) return;
+  // V22: lss with null clears the value through both IDB and localStorage paths
+  try { lss(CV_METHOD_TPL_PREFIX + method, null); } catch(e){}
+  try { localStorage.removeItem(CV_METHOD_TPL_PREFIX + method); } catch(e){}
+  toast(tf('pe.toast.tpl_deleted','{method} template deleted',{method})); cvRenderTplCards();
+}
+function cvGetMethodTplInfo(method){
+  try {
+    const d = ls(CV_METHOD_TPL_PREFIX + method, null);
+    if(!d) return null;
+    return { pages: d.pages?.length||0, blocks: d.pages?.reduce((s,p)=>s+p.blocks.length,0)||0, date: d.savedAt ? new Date(d.savedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—' };
+  } catch(e){ return null; }
+}
+async function cvSaveAsMethodTpl(){
+  const allBlocks = cvPages.reduce((a,p)=>a.concat(p.blocks),[]);
+  if(!allBlocks.length){ toast(t('toast.design_template_first','Design a template first.')); return; }
+  const sel = document.getElementById('cv-method-select');
+  const method = sel ? sel.value : 'UT';
+  if(await vxConfirm({ message: `Save the current layout as the ${method} template?`, okLabel: t('vxc.save','Save') })) cvSaveMethodTpl(method);
+}
+
+// V25: copy current layout to another method's template slot. Opens a small
+// modal with a method picker so the user can target a specific destination
+// (vs the "Save for method" button which always uses the visible dropdown).
+var CV_KNOWN_METHODS = ['UT','MT','VT','PT','RT','ET','PMI','HT','RFT'];
+
+function cvOpenCopyToMethod(){
+  const allBlocks = cvPages.reduce((a,p)=>a.concat(p.blocks),[]);
+  if(!allBlocks.length){
+    toast(t('toast.design_template_first','Design a template first.'));
+    return;
+  }
+  // Build the dropdown options. Highlight which methods already have a saved
+  // template so the user knows when they'd be replacing something.
+  const optsHtml = CV_KNOWN_METHODS.map(m => {
+    const info = (typeof cvGetMethodTplInfo === 'function') ? cvGetMethodTplInfo(m) : null;
+    const has  = !!info;
+    const suffix = has ? ` — ${info.pages}p · ${info.blocks}b` : '';
+    return `<option value="${m}"${has?' data-has="1"':''}>${m}${suffix}</option>`;
+  }).join('');
+
+  const title    = t('pe.copy.title',       'Copy current layout to another method');
+  const subtitle = t('pe.copy.subtitle',    "Saves this layout as the selected method's template. The destination's existing template (if any) will be replaced.");
+  const lbl      = t('pe.copy.method_label','Destination method');
+  const okLbl    = t('pe.copy.confirm',     'Copy');
+  const cancelLbl= t('pe.copy.cancel',      'Cancel');
+
+  const html = `
+    <div style="padding:18px 20px 16px;max-width:440px">
+      <div style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:6px">${escapeHtml(title)}</div>
+      <div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:14px">${escapeHtml(subtitle)}</div>
+      <label style="display:block;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${escapeHtml(lbl)}</label>
+      <select id="cv-copy-method-sel" style="width:100%;padding:7px 9px;font-size:13px;background:var(--bg2);color:var(--t1);border:1px solid var(--border2);border-radius:4px">${optsHtml}</select>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+        <button data-action="_wCloseModal" data-args="'cv-copy-modal'" style="padding:7px 14px;font-size:12px;background:transparent;color:var(--t2);border:1px solid var(--border2);border-radius:4px;cursor:pointer">${escapeHtml(cancelLbl)}</button>
+        <button data-action="_wCvCopyToMethodConfirm" style="padding:7px 16px;font-size:12px;background:var(--blue);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600">${escapeHtml(okLbl)}</button>
+      </div>
+    </div>`;
+
+  _cvShowSimpleModal('cv-copy-modal', html);
+}
+
+async function _wCvCopyToMethodConfirm(){
+  const sel = document.getElementById('cv-copy-method-sel');
+  if(!sel) return;
+  const method = sel.value;
+  const opt = sel.options[sel.selectedIndex];
+  const hasExisting = opt && opt.dataset.has === '1';
+  // If destination already has a template, warn before replacing
+  if(hasExisting){
+    const warn = tf('pe.copy.replace_warn','{method} already has a template. Replace it?', { method });
+    if(!await vxConfirm({ message: warn, okLabel: t('vxc.replace','Replace'), danger: true })) return;
+  }
+  // Re-use existing save logic — same code path as Save for method, but
+  // explicit destination chosen via the modal.
+  try {
+    cvSaveMethodTpl(method);   // this also fires its own toast
+    // Override the generic toast with a more specific one for this flow:
+    toast(tf('pe.copy.success','Layout copied to {method}', { method }), 'success');
+  } catch(e){
+    console.error('cvOpenCopyToMethod confirm failed', e);
+  }
+  _wCloseModal('cv-copy-modal');
+}
+
+/** Lightweight modal helper used by cvOpenCopyToMethod (and reusable). */
+function _cvShowSimpleModal(id, innerHtml){
+  // Clean up any prior instance
+  const prior = document.getElementById(id);
+  if(prior) prior.remove();
+  const overlay = document.createElement('div');
+  overlay.id = id;
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;animation:helpFadeIn .15s ease';
+  overlay.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:8px;box-shadow:0 16px 64px rgba(0,0,0,.5);animation:helpScaleIn .18s ease">${innerHtml}</div>`;
+  // Close on backdrop click
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  // Close on Escape
+  overlay.addEventListener('keydown', e => { if(e.key === 'Escape') overlay.remove(); });
+  document.body.appendChild(overlay);
+  // Focus the first interactive element for keyboard users
+  setTimeout(() => {
+    const first = overlay.querySelector('select, input, button');
+    if(first) first.focus();
+  }, 50);
+}
+function _wCloseModal(id){ const m = document.getElementById(id); if(m) m.remove(); }
+
+
+// ── Ribbon ───────────────────────────────────────────────────────────
+function switchRibbonTab(id, el){
+  document.querySelectorAll('#tpl-toolbar .ribbon-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#tpl-toolbar .ribbon-panel').forEach(p=>p.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const panel = document.getElementById('ribbon-'+id);
+  if(panel) panel.classList.add('active');
+  if(id==='tpl-saved') cvRenderTplCards();
+}
+
+function cvRenderTplCards(){
+  const container = document.getElementById('cv-ribbon-tpl-cards');
+  if(!container) return;
+  const methods = NDT_METHODS.map(m=>m.id);
+  container.innerHTML = methods.map(m=>{
+    const info = cvGetMethodTplInfo(m);
+    const c = (NDT_METHODS.find(x=>x.id===m)||{}).color||'#4f8ef7';
+    if(info){
+      return `<div style="min-width:130px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;flex-shrink:0"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${c}"></div><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-family:var(--mono);font-size:12px;font-weight:600;color:${c}">${m}</span><span style="font-size:9px;font-family:var(--mono);color:var(--green)">● saved</span></div><div style="font-size:10px;color:var(--t3)">${info.pages} pg · ${info.blocks} blocks</div><div style="font-size:9px;color:var(--t3);font-family:var(--mono)">${info.date}</div><div style="display:flex;gap:3px;margin-top:2px"><button class="btn btn-sm" style="flex:1;font-size:10px;padding:3px 0" data-action="_wCvLoadMethodAndSwitchTab" data-args="'${m}'">Load</button><button class="btn btn-sm" style="font-size:10px;padding:3px 6px;background:rgba(242,92,92,.12);color:var(--red);border-color:rgba(242,92,92,.25)" data-action="cvDeleteMethodTpl" data-args="'${m}'">✕</button></div></div>`;
+    } else {
+      return `<div style="min-width:130px;background:var(--panel);border:1px dashed var(--border);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;flex-shrink:0;opacity:0.6"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${c};opacity:0.3"></div><div style="font-family:var(--mono);font-size:12px;font-weight:600;color:${c}">${m}</div><div style="font-size:10px;color:var(--t3)">No template</div><div style="margin-top:auto"><button class="btn btn-sm" style="width:100%;font-size:10px;padding:3px 0" data-action="_wCvSaveAsMethodWithSelect" data-args="'${m}'">Save current</button></div></div>`;
+    }
+  }).join('');
+}
+
+function cvRenderMethodBtns(){
+  const container = document.getElementById('cv-ppv-method-btns');
+  if(!container) return;
+  container.innerHTML = NDT_METHODS.map(m=>`<button class="tbe" data-action="cvSetPpvMethod" data-args="'${m.id}'" style="font-size:11px;color:${m.color}">${m.id}</button>`).join('');
+}
+function cvSetPpvMethod(m){ cvPpvMethod=m; cvRenderCanvas(); }
+function cvSetPpvResult(r){ cvPpvResult=r; cvRenderCanvas(); }
+
+// ── Template config ──────────────────────────────────────────────────
+function cvSaveTplConfig(){
+  try{ localStorage.setItem(CV_TPL_KEY, JSON.stringify(cvTplCfg)); }catch(e){}
+  cvSaveLayout();
+  toast(t('toast.template_saved','Template saved.'));
+}
+async function cvResetTplConfig(){
+  if(!await vxConfirm({ message: 'Are you sure you want to reset the template configuration?', okLabel: t('vxc.reset','Reset'), danger: true })) return;
+  cvTplCfg = { sectionColor:'#404040', margin:'8px', baseSize:'8.5px', showLogo:true, showFooter:true, tplLogo:null, logoPos:'left', logoSize:'md', tplLogo2:null, logo2Pos:'right', logo2Size:'md', content:{}, header:{enabled:false,heightPx:100,bgColor:'transparent'}, footer:{enabled:false,heightPx:60,bgColor:'transparent'} };
+  localStorage.removeItem(CV_TPL_KEY);
+  cvRenderCanvas();
+  toast(t('toast.template_reset', 'Template config reset'));
+}
+function cvLoadTplConfig(){
+  try{ const raw=localStorage.getItem(CV_TPL_KEY); if(raw) cvTplCfg = Object.assign({}, cvTplCfg, JSON.parse(raw)); }catch(e){}
+}
+
+// ── Logo handlers ────────────────────────────────────────────────────
+// V24: unified logo handling — replaces the previous duplicate
+// cvHandleLogoUpload/cvHandleLogo2Upload + cvClearLogo/cvClearLogo2 pair.
+// `slot` is 'company' (default, → tplLogo) or 'client' (→ tplLogo2). The
+// public function names with the '2' suffix remain as legacy wrappers so
+// existing data-action="cvClearLogo2" markup keeps working.
+var _CV_LOGO_FIELDS = { company: 'tplLogo', client: 'tplLogo2' };
+
+function _cvLogoToast(slot, kind){
+  // slot ∈ {'company','client'}, kind ∈ {'uploaded','removed'}
+  const isClient = slot === 'client';
+  const key = isClient
+    ? (kind === 'uploaded' ? 'toast.logo_uploaded' : 'toast.logo_removed')
+    : (kind === 'uploaded' ? 'toast.logo_uploaded' : 'toast.logo_removed');
+  const fb = (isClient ? 'Client logo ' : 'Logo ') + (kind === 'uploaded' ? 'uploaded.' : 'removed.');
+  toast(t(key, fb));
+}
+
+function _cvUploadLogo(slot, file){
+  if(!file) return;
+  const field = _CV_LOGO_FIELDS[slot];
+  if(!field) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    cvTplCfg[field] = e.target.result;
+    cvUpdateLogoThumb();
+    cvRenderCanvas();
+    _cvLogoToast(slot, 'uploaded');
+  };
+  reader.readAsDataURL(file);
+}
+
+function _cvClearLogo(slot){
+  const field = _CV_LOGO_FIELDS[slot];
+  if(!field) return;
+  cvTplCfg[field] = null;
+  cvUpdateLogoThumb();
+  cvRenderCanvas();
+  _cvLogoToast(slot, 'removed');
+}
+
+// Public API (wrappers preserve existing data-action handles in the HTML)
+function cvHandleLogoUpload(file){  _cvUploadLogo('company', file); }
+function cvHandleLogo2Upload(file){ _cvUploadLogo('client',  file); }
+
+// Typed wrappers — the bare `cvHandleLogoUpload` callsites in the markup
+// used `data-args=".files[0]"` which the dispatcher's args parser passed
+// through as a literal string instead of evaluating it. These wrappers
+// read the actual file from the input element instead, fixing logo upload
+// in the PDF editor toolbar (separate from the company-profile logo flow,
+// which uses _wireLogoSection's direct addEventListener path).
+function _wCvHandleLogoUpload (el){ const f = el && el.files && el.files[0];  if(f) cvHandleLogoUpload(f);  }
+function _wCvHandleLogo2Upload(el){ const f = el && el.files && el.files[0];  if(f) cvHandleLogo2Upload(f); }
+function cvClearLogo(){  _cvClearLogo('company'); }
+function cvClearLogo2(){ _cvClearLogo('client');  }
+
+function cvSetLogoPos(pos){
+  cvTplCfg.logoPos = pos;
+  ['left','center','right'].forEach(p=>{ const b=document.getElementById('cv-logo-pos-'+p); if(b) b.classList.toggle('active',p===pos); });
+  cvRenderCanvas();
+}
+function cvSetLogoSize(sz){ cvTplCfg.logoSize = sz; cvRenderCanvas(); }
+function cvUpdateLogoThumb(){
+  const update = (imgId, phId, src) => {
+    const img=document.getElementById(imgId); const ph=document.getElementById(phId);
+    if(!img) return;
+    if(src){ img.src=src; img.style.display=''; if(ph) ph.style.display='none'; }
+    else    { img.src=''; img.style.display='none'; if(ph) ph.style.display=''; }
+  };
+  update('cv-logo-thumb','cv-logo-thumb-ph', cvTplCfg.tplLogo);
+  update('cv-logo2-thumb','cv-logo2-thumb-ph', cvTplCfg.tplLogo2);
+}
+
+// ── Design helpers ───────────────────────────────────────────────────
+function cvSetSectionColor(c){
+  cvTplCfg.sectionColor = c;
+  const el = document.getElementById('cv-sec-custom'); if(el) el.value = c;
+  cvBlocks.forEach(b=>{ if(b.isLayout && b.key==='section-header') b.bgColor=c; });
+  cvRenderCanvas(); cvSaveLayout();
+}
+
+function cvInsertTable(){ cvAddBlockDefault('text-block',true); toast(t('toast.table_edit_hint', 'Table: edit the text block content in Properties')); }
+function cvInsertHRule(){ cvAddBlockDefault('h-line',true); }
+function cvInsertSigBlock(){ cvAddBlockDefault('sig-block',true); }
+function cvInsertPageBreak(){ cvAddPage(); }
+
+// V24: cvExecCmd — text-formatting commands for the contenteditable text-block.
+//
+// document.execCommand is officially deprecated but still works in every
+// current browser. We wrap it in a small abstraction so the eventual Range-API
+// migration is a one-function change. Console warnings let us monitor if a
+// browser drops support before we've migrated.
+//
+// Migration plan (when execCommand stops working):
+//   1. For bold/italic/underline/strikeThrough: wrap selection in <span> with
+//      the corresponding CSS via Range.surroundContents().
+//   2. For justifyLeft/Center/Right/Full: walk to nearest block ancestor and
+//      set textAlign style.
+//   3. For insertUnordered/OrderedList: convert selection into <ul>/<ol> via
+//      Range API + DOM manipulation.
+//   4. For outdent/indent: adjust margin-left or list nesting depth.
+//   5. For removeFormat: strip all formatting spans within the selection.
+// Reference implementations: rich-text editor libraries like Tiptap, Slate,
+// and Lexical all handle these via Range API. If we ever pull one in, this
+// wrapper becomes a no-op pass-through.
+function cvExecCmd(cmd, val){
+  try {
+    const ok = document.execCommand(cmd, false, val || null);
+    if(!ok && typeof console !== 'undefined'){
+      console.warn('[cvExecCmd] command "' + cmd + '" returned false — may be unsupported.');
+    }
+  } catch(e){
+    console.error('[cvExecCmd] threw for "' + cmd + '":', e);
+    // Future: route to Range-API fallback once implemented.
+  }
+}
+
+// ── Full-page overlay mode ───────────────────────────────────────────
+function cvOpenFullPage(){
+  const pdfSec = document.getElementById('ss-pdfeditor');
+  if(!pdfSec || pdfSec._fsActive) return;
+  pdfSec._fsActive = true;
+
+  // Store originals
+  const toolbar = document.getElementById('tpl-toolbar');
+  const frame   = document.getElementById('cv-editor-frame');
+  pdfSec._orig  = pdfSec.getAttribute('style')||'';
+  if(toolbar) toolbar._orig = toolbar.getAttribute('style')||'';
+  if(frame)   frame._orig   = frame.getAttribute('style')||'';
+
+  // Hide section header
+  const sh = pdfSec.querySelector('.sh');
+  if(sh) sh.style.display = 'none';
+
+  // Section → fixed full viewport
+  pdfSec.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;padding:0;margin:0';
+
+  // Toolbar → remove rounded corners and margin for edge-to-edge
+  if(toolbar) toolbar.style.cssText = (toolbar._orig||'').replace(/border-radius[^;]*/g,'border-radius:0').replace(/margin[^;]*/g,'margin:0') + ';flex-shrink:0';
+
+  // 3-panel frame → fill remaining height
+  if(frame) frame.style.cssText = 'display:flex;flex:1;overflow:hidden;background:var(--bg);border:none;border-radius:0;margin:0;height:auto;min-height:0';
+
+  // Close button
+  if(!document.getElementById('cv-fs-close')){
+    const cb = document.createElement('button');
+    cb.id = 'cv-fs-close';
+    cb.style.cssText = 'position:fixed;top:8px;right:12px;z-index:10001;padding:5px 14px;border-radius:6px;border:1px solid rgba(242,92,92,.35);background:rgba(13,18,25,.95);color:#f87171;font-size:12px;font-family:var(--mono);cursor:pointer;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);transition:all .15s';
+    cb.innerHTML = '<span style="font-size:14px">\u2715</span> Close editor';
+    cb.onmouseenter = function(){ this.style.background='rgba(242,92,92,.2)'; };
+    cb.onmouseleave = function(){ this.style.background='rgba(13,18,25,.95)'; };
+    cb.onclick = cvCloseFullPage;
+    document.body.appendChild(cb);
+  }
+
+  // Fit canvas after layout settles
+  setTimeout(()=>{ cvFitToView(); }, 150);
+  setTimeout(()=>{ cvFitToView(); }, 400);
+}
+
+function cvCloseFullPage(){
+  const pdfSec = document.getElementById('ss-pdfeditor');
+  if(!pdfSec) return;
+  pdfSec._fsActive = false;
+
+  // Restore header
+  const sh = pdfSec.querySelector('.sh');
+  if(sh) sh.style.display = '';
+
+  // Restore styles
+  pdfSec.setAttribute('style', pdfSec._orig||'');
+  const toolbar = document.getElementById('tpl-toolbar');
+  if(toolbar && toolbar._orig !== undefined) toolbar.setAttribute('style', toolbar._orig);
+  const frame = document.getElementById('cv-editor-frame');
+  if(frame && frame._orig !== undefined) frame.setAttribute('style', frame._orig);
+
+  // Remove close button
+  const cb = document.getElementById('cv-fs-close');
+  if(cb) cb.remove();
+
+  setTimeout(()=>{ cvFitToView(); }, 100);
+}
+
+document.addEventListener('fullscreenchange', ()=>{ if(!document.fullscreenElement) cvCloseFullPage(); });
+
+// Escape key closes the full-page editor
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    const pdfSec = document.getElementById('ss-pdfeditor');
+    if(pdfSec && pdfSec._fsActive){ e.preventDefault(); cvCloseFullPage(); }
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// V23 PDF EDITOR KEYBOARD SHORTCUTS
+// ══════════════════════════════════════════════════════════════════════════
+// All shortcuts gate on: (1) PDF editor is the visible page, (2) focus is
+// not inside an input/textarea/contenteditable. The second guard means a
+// user typing in the palette search box, the find-replace dialog, a property
+// input, or directly inside a text-block (contenteditable) gets the native
+// keyboard behaviour. Outside those, the canvas owns the shortcut.
+//
+// Implemented:
+//   Delete / Backspace  → delete selected blocks
+//   Ctrl/Cmd + D        → duplicate selected
+//   Ctrl/Cmd + A        → select all blocks on current page
+//   Ctrl/Cmd + C / X    → copy / cut selected
+//   Ctrl/Cmd + V        → paste clipboard
+//   Ctrl/Cmd + Z        → undo
+//   Ctrl/Cmd + Shift + Z   or   Ctrl/Cmd + Y  → redo
+//   Ctrl/Cmd + S        → save layout (with toast)
+//   Ctrl/Cmd + P        → print / export PDF
+//   Arrow keys          → nudge selected by 1 px
+//   Shift + Arrow keys  → nudge by 10 px
+//   Escape              → deselect all (or close full-page if active)
+
+/** Is the PDF editor the visible context? */
+function _cvIsActive(){
+  const ed = document.getElementById('ss-pdfeditor');
+  return !!ed && (ed.classList.contains('active') || ed._fsActive);
+}
+
+/** Is the user typing in a text input we shouldn't override? */
+function _cvFocusIsTyping(){
+  const el = document.activeElement;
+  if(!el) return false;
+  const tag = el.tagName;
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if(el.isContentEditable) return true;
+  return false;
+}
+
+/** Nudge selected blocks by (dx, dy) pixels. */
+function _cvNudge(dx, dy){
+  const ids = cvSelectedIds.length ? cvSelectedIds : (cvSelectedId ? [cvSelectedId] : []);
+  if(!ids.length) return false;
+  cvPushUndo();
+  ids.forEach(id => {
+    const b = cvBlocks.find(bb => bb.id === id);
+    if(!b || b.locked) return;
+    b.x = Math.max(0, b.x + dx);
+    b.y = Math.max(0, b.y + dy);
+  });
+  // Update positions in-place without full re-render
+  ids.forEach(id => {
+    const b = cvBlocks.find(bb => bb.id === id);
+    const el = document.getElementById('cblk-' + id);
+    if(b && el){ el.style.left = b.x + 'px'; el.style.top = b.y + 'px'; }
+    // V25: invalidate cache — block JSON changed, sig is now stale
+    _cvBlockElCache.delete(id);
+  });
+  cvUpdatePropsPositionLive();
+  cvSaveLayout();
+  // V25: refresh persistent alignment guides — positions changed
+  _cvRefreshAlignGuides();
+  return true;
+}
+
+/** Cut = copy then delete. */
+function cvCutSelected(){
+  cvCopySelected();
+  cvDeleteSelected();
+}
+
+document.addEventListener('keydown', e => {
+  if(!_cvIsActive()) return;
+  if(_cvFocusIsTyping()){
+    // Inside a text input — only special-case Escape and Ctrl+P which we
+    // intercept regardless because they're unambiguous user intents.
+    if(e.key === 'Escape'){
+      // Let Escape blur the input naturally; don't return — fall through
+      // so the full-page exit check below still applies.
+    } else if((e.ctrlKey || e.metaKey) && e.key === 'p' && !e.shiftKey && !e.altKey){
+      // Still intercept Ctrl+P — print intent is unambiguous
+    } else {
+      return;
+    }
+  }
+
+  const mod = e.ctrlKey || e.metaKey;
+
+  // ── Save: Ctrl/Cmd + S ──
+  if(mod && e.key === 's' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    try { cvSaveLayout(); toast(t('pe.toast.layout_saved','Layout saved.')); } catch(err){ console.error(err); }
+    return;
+  }
+
+  // ── Print: Ctrl/Cmd + P ──
+  if(mod && e.key === 'p' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    cvPrintOrExport();
+    return;
+  }
+
+  // ── Undo / Redo ──
+  if(mod && e.key === 'z' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    cvUndo();
+    return;
+  }
+  if(mod && ((e.key === 'z' && e.shiftKey) || (e.key === 'y' && !e.shiftKey))){
+    e.preventDefault();
+    cvRedo();
+    return;
+  }
+
+  // ── Select all ──
+  if(mod && e.key === 'a' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    cvSelectAllBlocks();
+    return;
+  }
+
+  // ── Copy / Cut / Paste ──
+  if(mod && e.key === 'c' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    cvCopySelected();
+    return;
+  }
+  if(mod && e.key === 'x' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    cvCutSelected();
+    return;
+  }
+  if(mod && e.key === 'v' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    cvPasteClipboard();
+    return;
+  }
+
+  // ── Duplicate: Ctrl/Cmd + D ──
+  if(mod && e.key === 'd' && !e.shiftKey && !e.altKey){
+    e.preventDefault();
+    const ids = cvSelectedIds.length ? cvSelectedIds : (cvSelectedId ? [cvSelectedId] : []);
+    if(ids.length){
+      // Duplicate each — cvDuplicateBlock pushes its own undo per call;
+      // wrap in a batch undo for "duplicate 5 at once" → single undo step.
+      cvPushUndo();
+      const before = cvBlocks.length;
+      ids.forEach(id => {
+        const b = cvBlocks.find(bb => bb.id === id);
+        if(!b) return;
+        cvBlocks.push(_cvCloneBlock(b));
+      });
+      const newBlocks = cvBlocks.slice(before);
+      cvSelectedIds = newBlocks.map(b => b.id);
+      _cvPrimaryToFirst();    // batch convention: first new copy becomes primary
+      cvRenderCanvas();
+      cvRenderProps(cvSelectedId);
+      cvSaveLayout();
+    }
+    return;
+  }
+
+  // ── Delete ──
+  if(e.key === 'Delete' || e.key === 'Backspace'){
+    const hasSelection = cvSelectedIds.length || cvSelectedId;
+    if(hasSelection){
+      e.preventDefault();
+      cvDeleteSelected();
+    }
+    return;
+  }
+
+  // ── Escape ──
+  if(e.key === 'Escape'){
+    // First priority: close full-page editor (handled by earlier listener)
+    const pdfSec = document.getElementById('ss-pdfeditor');
+    if(pdfSec && pdfSec._fsActive){
+      // Earlier handler covers this; don't double-handle
+      return;
+    }
+    // Otherwise: deselect
+    if(cvSelectedIds.length || cvSelectedId){
+      e.preventDefault();
+      cvSelectedId = null;
+      cvSelectedIds = [];
+      cvUpdateSelectionUI();   // V23: lightweight update; no full re-render
+      cvRenderProps(null);
+    }
+    return;
+  }
+
+  // ── Arrow keys: nudge ──
+  if(e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+    const step = e.shiftKey ? 10 : 1;
+    const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+    const dy = e.key === 'ArrowUp'   ? -step : e.key === 'ArrowDown'  ? step : 0;
+    if(_cvNudge(dx, dy)) e.preventDefault();
+    return;
+  }
+});
+

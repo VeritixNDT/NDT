@@ -177,6 +177,12 @@ window.vxSupabaseConfigured = vxSupabaseConfigured;
 async function _vxApplySupabaseSession(session){
   if(!session){
     vxPlatformSet({ accessToken: null, refreshToken: null, tokenExpiry: null });
+    try {
+      var sbOut = _vxSupabase();
+      if(sbOut && sbOut.realtime && typeof sbOut.realtime.setAuth === 'function'){
+        sbOut.realtime.setAuth(null);
+      }
+    } catch(e){}
     return;
   }
   var patch = {
@@ -187,6 +193,17 @@ async function _vxApplySupabaseSession(session){
     emailVerified: !!session.user?.email_confirmed_at,
     emailVerifiedAt: session.user?.email_confirmed_at || null,
   };
+  // Push the JWT into the Realtime client BEFORE vxPlatformSet fires the
+  // vx:platform-change event (which calls vxRealtimeConnect). Without this,
+  // the very first realtime channel join at boot uses the anon token; the
+  // channel reports SUBSCRIBED but RLS filters out every row event so
+  // nothing ever reaches the handler. See the post-mortem for V44.4.
+  try {
+    var sbAuth = _vxSupabase();
+    if(sbAuth && sbAuth.realtime && typeof sbAuth.realtime.setAuth === 'function'){
+      sbAuth.realtime.setAuth(session.access_token);
+    }
+  } catch(e){ console.warn('vx: realtime setAuth failed', e); }
   vxPlatformSet(patch);
   // Resolve orgId via the membership table. If the user has no membership
   // (signed up under email-confirm-on so vxApi.register returned early
@@ -1826,8 +1843,21 @@ function vxRealtimeConnect() {
   if(!sb) return;
   var cfg = vxPlatformConfig();
   if(!cfg.orgId) return;
-  // Already subscribed?
-  if(_vxWs && _vxWs.state && _vxWs.state !== 'closed') return;
+  // Always tear down before reconnecting (V44.4). Reasons:
+  //   1. An early boot subscribe may have joined the channel with the anon
+  //      token before _vxApplySupabaseSession pushed the JWT into sb.realtime.
+  //      Such channels report state='joined' but never receive any RLS-gated
+  //      row events — the only fix is rebuild from scratch with the JWT in
+  //      hand.
+  //   2. Idempotent reconnect lets TOKEN_REFRESHED handlers re-bind cleanly
+  //      without worrying about stale-channel state.
+  if(_vxWs) {
+    try {
+      if(typeof sb.removeChannel === 'function') sb.removeChannel(_vxWs);
+      else if(typeof _vxWs.unsubscribe === 'function') _vxWs.unsubscribe();
+    } catch(e){}
+    _vxWs = null;
+  }
 
   var channelName = 'org:' + cfg.orgId;
   try {

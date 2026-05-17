@@ -1,33 +1,14 @@
-// ── Veritix branded confirm dialog ──────────────────────────────────
+// ── Native confirm() rebrand ────────────────────────────────────────
+// The opts-aware vxConfirm() lives further down the file; an older IIFE
+// that used to live here exported a single-string `show(msg)` to
+// `window.vxConfirm`, which shadowed the real one. Every callsite that
+// passed an opts bag (`vxConfirm({message, okLabel, danger})`) ended up
+// in the native confirm fallback with `msg` = the opts object, which
+// renders as "[object Object]". The shadow is gone now; vxConfirm({...})
+// flows to the proper modal. We still keep the small native-confirm
+// rebrand below so any stray `confirm()` call shows "Veritix" instead of
+// the browser's "[site] says" header.
 (function(){
-  let _resolve = null;
-  const show = (msg) => {
-    return new Promise(resolve => {
-      _resolve = resolve;
-      const overlay = document.getElementById('vx-confirm-overlay');
-      const msgEl = document.getElementById('vx-confirm-msg');
-      if(!overlay || !msgEl){ resolve(confirm(msg)); return; }
-      msgEl.textContent = msg;
-      overlay.style.display = 'flex';
-      document.getElementById('vx-confirm-ok').focus();
-    });
-  };
-  document.addEventListener('click', e => {
-    if(e.target.id === 'vx-confirm-ok' || e.target.id === 'vx-confirm-cancel'){
-      const overlay = document.getElementById('vx-confirm-overlay');
-      if(overlay) overlay.style.display = 'none';
-      if(_resolve) _resolve(e.target.id === 'vx-confirm-ok');
-      _resolve = null;
-    }
-  });
-  document.addEventListener('keydown', e => {
-    const overlay = document.getElementById('vx-confirm-overlay');
-    if(!overlay || overlay.style.display === 'none') return;
-    if(e.key === 'Enter'){ e.preventDefault(); overlay.style.display='none'; if(_resolve)_resolve(true); _resolve=null; }
-    if(e.key === 'Escape'){ e.preventDefault(); overlay.style.display='none'; if(_resolve)_resolve(false); _resolve=null; }
-  });
-  window.vxConfirm = show;
-  // Override native confirm to use branded dialog (sync fallback)
   const _native = window.confirm.bind(window);
   window.confirm = function(msg){ return _native('Veritix\n\n' + msg); };
 })();

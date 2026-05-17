@@ -3804,15 +3804,17 @@ a { color: var(--cyan); text-decoration: none; }
   padding: 16px 20px 4px 20px;
 }
 .vx-confirm-brand {
-  width: 24px; height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, var(--blue) 0%, #4f8ef7 100%);
-  display: flex; align-items: center; justify-content: center;
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
+  /* Holds the Veritix shield+checkmark SVG. No background — the logo
+     carries its own visual identity (blue shield, red check), matching
+     the topbar and login mark exactly. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 26px;
+  height: 28px;
 }
+.vx-confirm-brand svg { display: block; }
 .vx-confirm-title {
   font-size: 14px;
   font-weight: 600;
@@ -3833,9 +3835,8 @@ a { color: var(--cyan); text-decoration: none; }
   gap: 8px;
   background: rgba(0,0,0,.18);
 }
-.vx-confirm.danger .vx-confirm-brand {
-  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
-}
+/* Danger variant: the destructive button colour already signals intent,
+   so the logo stays untinted — same brand mark in confirm and prompt. */
 .crop-modal-inner {
   width: 100%;
   max-width: 780px;

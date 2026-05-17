@@ -3755,7 +3755,10 @@ a { color: var(--cyan); text-decoration: none; }
 .crop-modal {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.88);
-  z-index: 2000;
+  /* Above the PDF editor's full-page mode (z-index 9999) so logo cropping
+     works while the editor is open. Kept below .vx-confirm (10500) so any
+     confirm dialog opened from inside the crop flow still surfaces on top. */
+  z-index: 10100;
   display: none;
   align-items: center;
   justify-content: center;

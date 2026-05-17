@@ -975,18 +975,26 @@ var _cropRatio = 0; // 0=free, otherwise w/h
 // Drag state
 var _drag = null; // { type:'img'|'box'|'nw'|'ne'|'sw'|'se', sx,sy, ox,oy,ow,oh,ix,iy }
 
-function openCropModal() {
+// Caller-supplied callback. When set, cropApply hands the cropped dataURL
+// to this function and skips the default company-logo save path. Cleared
+// after each apply or cancel so the next opener starts clean.
+var _cropOnApply = null;
+var _cropOnCancel = null;
+
+function openCropModal(opts) {
   const modal = el('crop-modal');
   if(!modal) { console.warn('[crop] crop-modal element missing'); return; }
   _cropCanvas = el('crop-canvas');
   _cropWrap   = el('crop-canvas-wrap');
   _cropBox    = el('crop-box');
-  const src = _cropSrcURL || _logoDataURL;
+  const src = (opts && opts.src) || _cropSrcURL || _logoDataURL;
   if(!src) {
-    console.warn('[crop] no source — neither _cropSrcURL nor _logoDataURL is set');
+    console.warn('[crop] no source — neither opts.src, _cropSrcURL, nor _logoDataURL is set');
     toast(t('toast.no_logo_to_crop', 'Upload a logo first before cropping.'), 'info');
     return;
   }
+  _cropOnApply  = (opts && typeof opts.onApply  === 'function') ? opts.onApply  : null;
+  _cropOnCancel = (opts && typeof opts.onCancel === 'function') ? opts.onCancel : null;
   console.log('[crop] opening modal with source length', src.length);
 
   const img = new Image();
@@ -1012,6 +1020,13 @@ function openCropModal() {
 
 function closeCropModal() {
   el('crop-modal').classList.remove('open');
+  // If the modal was opened by a custom caller, let it know the user
+  // bailed out so it can discard whatever state was in flight (e.g.
+  // the editor's pending logo upload).
+  const onCancel = _cropOnCancel;
+  _cropOnApply  = null;
+  _cropOnCancel = null;
+  if(onCancel) try { onCancel(); } catch(e){ console.warn('[crop] onCancel threw', e); }
 }
 
 function cropReset() {
@@ -1191,7 +1206,18 @@ function cropApply() {
   ctx.drawImage(_cropImg, sx, sy, sw, sh, 0, 0, out.width, out.height);
 
   const dataURL = out.toDataURL('image/png');
-  // V12: store on the synced company entity, not as standalone key
+  // If a custom caller registered an onApply, hand them the cropped
+  // dataURL and skip the default company-logo save path.
+  if(_cropOnApply){
+    const cb = _cropOnApply;
+    _cropOnApply  = null;
+    _cropOnCancel = null;          // success path → suppress cancel callback
+    el('crop-modal').classList.remove('open');
+    try { cb(dataURL); }
+    catch(e){ console.error('[crop] onApply callback threw', e); }
+    return;
+  }
+  // Default: settings → company logo
   const company = ls(KEYS.company, {});
   company.logo = dataURL;
   lss(KEYS.company, company);

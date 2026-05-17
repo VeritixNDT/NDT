@@ -3418,23 +3418,37 @@ var CV_LOGO_LIB_MAX = 12;
 
 function cvHandleLogoUpload(file){
   if(!file) return;
+  const fallbackName = (file.name || 'Logo').replace(/\.[^.]+$/, '').trim().slice(0, 40) || 'Logo';
   const reader = new FileReader();
   reader.onload = e => {
-    const dataUrl = e.target.result;
-    // Default name = filename without extension, trimmed to something sane.
-    const fallback = (file.name || 'Logo').replace(/\.[^.]+$/, '').trim().slice(0, 40) || 'Logo';
-    const name = (prompt(t('pe.logo_lib.name_prompt','Name this logo:'), fallback) || '').trim();
-    if(name === '') return;  // user cancelled or cleared → discard upload
-    cvTplCfg.tplLogo = dataUrl;
-    _cvPersistTplCfg();
-    cvLogoLibAdd(dataUrl, name);
-    cvUpdateLogoThumb();
-    cvRenderLogoLib();
-    cvRenderPalette('');   // refresh palette so the new logo's place card appears
-    cvRenderCanvas();
-    toast(t('toast.logo_uploaded', 'Logo uploaded.'));
+    const rawDataUrl = e.target.result;
+    // Route through the existing crop modal so the user can trim/adjust
+    // the image before it lands in the library. Fall back to saving raw
+    // if the crop engine isn't available (page partially loaded).
+    if(typeof openCropModal !== 'function'){
+      _cvFinishLogoUpload(rawDataUrl, fallbackName);
+      return;
+    }
+    openCropModal({
+      src: rawDataUrl,
+      onApply: croppedDataUrl => _cvFinishLogoUpload(croppedDataUrl, fallbackName),
+      onCancel: () => {},        // user bailed → discard upload silently
+    });
   };
   reader.readAsDataURL(file);
+}
+
+function _cvFinishLogoUpload(dataUrl, fallbackName){
+  const name = (prompt(t('pe.logo_lib.name_prompt','Name this logo:'), fallbackName) || '').trim();
+  if(name === '') return;  // user cancelled or cleared → discard
+  cvTplCfg.tplLogo = dataUrl;
+  _cvPersistTplCfg();
+  cvLogoLibAdd(dataUrl, name);
+  cvUpdateLogoThumb();
+  cvRenderLogoLib();
+  cvRenderPalette('');   // refresh palette so the new logo's place card appears
+  cvRenderCanvas();
+  toast(t('toast.logo_uploaded', 'Logo uploaded.'));
 }
 
 // The bare `cvHandleLogoUpload` callsite in the markup uses data-pass-el="1",

@@ -1139,8 +1139,16 @@ function cvRenderPalette(filter){
     } else if(grp.isLayout){
       items.forEach(it => {
         const lbl = _cvLayoutLabel(it);
+        // Library-derived cards get a × delete button that removes the
+        // underlying library entry (and so the card itself). data-stop-prop
+        // keeps the click from also firing the row's add-block action.
+        const isLibCard = it.key && it.key.startsWith('logo-lib:');
+        const libId = isLibCard ? it.key.slice('logo-lib:'.length) : '';
+        const removeBtn = isLibCard
+          ? `<button data-action="_wCvDeleteLogoLibCard" data-args="'${escapeHtml(libId)}'" data-stop-prop="1" title="${escapeHtml(t('pe.logo_lib.remove','Remove from library'))}" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:1px 4px;opacity:.7;margin-left:auto">✕</button>`
+          : '';
         html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
-          <span style="font-size:13px;width:16px;text-align:center;flex-shrink:0;opacity:.65">${cvGetLayoutIcon(it.key)}</span><span>${escapeHtml(lbl)}</span>
+          <span style="font-size:13px;width:16px;text-align:center;flex-shrink:0;opacity:.65">${cvGetLayoutIcon(it.key)}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(lbl)}</span>${removeBtn}
         </div>`;
       });
     } else {
@@ -3422,9 +3430,9 @@ function cvHandleLogoUpload(file){
   const reader = new FileReader();
   reader.onload = e => {
     const rawDataUrl = e.target.result;
-    // Route through the existing crop modal so the user can trim/adjust
-    // the image before it lands in the library. Fall back to saving raw
-    // if the crop engine isn't available (page partially loaded).
+    // Route through the existing crop modal. If it's not available (e.g.
+    // page partially loaded), fall back to saving the raw image so the
+    // upload still works end-to-end.
     if(typeof openCropModal !== 'function'){
       _cvFinishLogoUpload(rawDataUrl, fallbackName);
       return;
@@ -3432,7 +3440,8 @@ function cvHandleLogoUpload(file){
     openCropModal({
       src: rawDataUrl,
       onApply: croppedDataUrl => _cvFinishLogoUpload(croppedDataUrl, fallbackName),
-      onCancel: () => {},        // user bailed → discard upload silently
+      // Cancel → discard upload silently. The user explicitly bailed out.
+      onCancel: () => {},
     });
   };
   reader.readAsDataURL(file);
@@ -3522,6 +3531,20 @@ function cvLogoLibRemove(id){
   cvRenderLogoLib();
   cvRenderPalette('');     // the place card for this logo disappears too
   cvRenderCanvas();        // any logo-lib:<id> blocks now render as missing
+}
+
+// Palette card delete handler — same destination as the ribbon × button
+// but goes through vxConfirm so a stray click doesn't nuke a saved logo.
+async function _wCvDeleteLogoLibCard(id){
+  const entry = cvLogoLibLoad().find(e => e && e.id === id);
+  const name = (entry && entry.name) || 'this logo';
+  const ok = await vxConfirm({
+    message: t('pe.logo_lib.confirm_remove', 'Remove "' + name + '" from your logo library? Blocks already placed on the canvas will show a placeholder.'),
+    okLabel: t('vxc.remove', 'Remove'),
+    danger: true,
+  });
+  if(!ok) return;
+  cvLogoLibRemove(id);
 }
 function cvRenderLogoLib(){
   const host = document.getElementById('cv-logo-lib');

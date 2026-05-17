@@ -997,6 +997,7 @@ function cvInitCanvas(){
 
 // ── Palette ──────────────────────────────────────────────────────────
 function cvGetLayoutIcon(k){
+  if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
     'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','method-block':'⚙','sig-block':'✍',
     'accent-bar':'█','page-footer':'▭'}[k]||'□';
@@ -1008,7 +1009,26 @@ function cvGetLayoutIcon(k){
 //             palette group id 'identity'            → t('pe.group.identity', grp.label)
 //             group 'advanced' maps to 'advanced_out' key (name collision with ribbon group)
 var _CV_GROUP_KEY_MAP = { 'advanced': 'pe.group.advanced_out' };
-function _cvLayoutLabel(it){ return t('pe.lay.' + it.key, it.label); }
+function _cvLayoutLabel(it){
+  // Library-derived items already carry the user-supplied name in `label`
+  // and have no fixed i18n key, so skip the lookup for them.
+  if(it.key && it.key.startsWith('logo-lib:')) return it.label;
+  return t('pe.lay.' + it.key, it.label);
+}
+
+// Returns the static layout items plus a virtual item per saved-logo
+// library entry. Each library entry becomes its own draggable palette card
+// keyed `logo-lib:<id>` so the canvas block remembers which logo it holds.
+function _cvAllLayoutItems(){
+  const lib = (typeof cvLogoLibLoad === 'function') ? cvLogoLibLoad() : [];
+  const libItems = lib.map(e => ({
+    key:   'logo-lib:' + e.id,
+    label: (e.name || 'Logo'),
+    w: 140, h: 56,
+    isLogoLibCard: true,
+  }));
+  return CV_LAYOUT_ITEMS.concat(libItems);
+}
 function _cvFieldLabel(fk, def){ return t('cv.fld.' + fk, def.label); }
 function _cvGroupLabel(grp){ return t(_CV_GROUP_KEY_MAP[grp.id] || ('pe.group.' + grp.id), grp.label); }
 
@@ -1054,9 +1074,10 @@ function cvRenderPalette(filter){
           <svg style="width:9px;height:9px;opacity:.5;transition:transform .15s;${collapsed?'transform:rotate(-90deg)':''}" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
         <div style="${collapsed?'display:none':''}">`;
+      const allLayout = _cvAllLayoutItems();
       recents.forEach(r => {
         if(r.isLayout){
-          const it = CV_LAYOUT_ITEMS.find(x => x.key === r.key);
+          const it = allLayout.find(x => x.key === r.key);
           if(!it) return;
           const lbl = _cvLayoutLabel(it);
           html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
@@ -1079,7 +1100,7 @@ function cvRenderPalette(filter){
   CV_PALETTE_GROUPS.forEach(grp => {
     let items;
     if(grp.isLayout){
-      items = CV_LAYOUT_ITEMS.filter(it => !q || _cvLayoutLabel(it).toLowerCase().includes(q) || it.key.includes(q));
+      items = _cvAllLayoutItems().filter(it => !q || _cvLayoutLabel(it).toLowerCase().includes(q) || it.key.includes(q));
     } else if(grp.isComponents){
       items = (cvComponents || []).filter(c => !q || c.name.toLowerCase().includes(q));
     } else {
@@ -1180,7 +1201,7 @@ function cvAddBlockDefault(key, isLayout){
 // ── Block creation ───────────────────────────────────────────────────
 function cvAddBlock(key, isLayout, x, y){
   cvPushUndo();
-  const def = isLayout ? CV_LAYOUT_ITEMS.find(it=>it.key===key) : CV_FIELD_DEFS[key];
+  const def = isLayout ? _cvAllLayoutItems().find(it=>it.key===key) : CV_FIELD_DEFS[key];
   const id  = _cvBlockId();
   let bgColor='transparent', color='#000', bold=false, showBorder=true, fontSize='8.5px';
   if(isLayout){
@@ -1600,7 +1621,7 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
   // V24 accessibility
   if(!cvPreview){
     const fieldDef = block.isLayout
-      ? CV_LAYOUT_ITEMS.find(x => x.key === block.key)
+      ? _cvAllLayoutItems().find(x => x.key === block.key)
       : CV_FIELD_DEFS[block.key];
     const baseLbl = fieldDef
       ? (block.isLayout ? _cvLayoutLabel(fieldDef) : _cvFieldLabel(block.key, fieldDef))
@@ -1822,6 +1843,18 @@ function cvRenderBlockContent(block, report, preview){
   const fi = block.italic ? 'italic' : 'normal';
 
   if(block.isLayout){
+    // Saved-logo library cards: key is `logo-lib:<id>`, render the bound
+    // library entry's image. If the entry is gone (user deleted it from
+    // the library) we show a placeholder so the block stays selectable
+    // instead of vanishing silently.
+    if(key.startsWith('logo-lib:')){
+      const id = key.slice('logo-lib:'.length);
+      const entry = (typeof cvLogoLibLoad === 'function') ? cvLogoLibLoad().find(e => e && e.id === id) : null;
+      if(entry && entry.dataUrl){
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:4px"><img src="${entry.dataUrl}" alt="${_h(entry.name||'Logo')}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`;
+      }
+      return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🖼</span>${_h(block.text||'Saved logo (removed)')}</div>`;
+    }
     switch(key){
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;
@@ -2380,7 +2413,7 @@ function cvSwitchRsbTab(which){
 
 function cvBlockDisplayName(b){
   if(b.isLayout){
-    const item = CV_LAYOUT_ITEMS.find(i => i.key === b.key);
+    const item = _cvAllLayoutItems().find(i => i.key === b.key);
     return item ? item.label : b.key.replace(/-/g,' ');
   }
   const def = CV_FIELD_DEFS[b.key];
@@ -3388,11 +3421,16 @@ function cvHandleLogoUpload(file){
   const reader = new FileReader();
   reader.onload = e => {
     const dataUrl = e.target.result;
+    // Default name = filename without extension, trimmed to something sane.
+    const fallback = (file.name || 'Logo').replace(/\.[^.]+$/, '').trim().slice(0, 40) || 'Logo';
+    const name = (prompt(t('pe.logo_lib.name_prompt','Name this logo:'), fallback) || '').trim();
+    if(name === '') return;  // user cancelled or cleared → discard upload
     cvTplCfg.tplLogo = dataUrl;
     _cvPersistTplCfg();
-    cvLogoLibAdd(dataUrl);
+    cvLogoLibAdd(dataUrl, name);
     cvUpdateLogoThumb();
     cvRenderLogoLib();
+    cvRenderPalette('');   // refresh palette so the new logo's place card appears
     cvRenderCanvas();
     toast(t('toast.logo_uploaded', 'Logo uploaded.'));
   };
@@ -3447,10 +3485,11 @@ function cvLogoLibSave(lib){
   try { localStorage.setItem(CV_LOGO_LIB_KEY, JSON.stringify(lib)); }
   catch(e){ console.warn('logo library save failed (quota?)', e); }
 }
-function cvLogoLibAdd(dataUrl){
+function cvLogoLibAdd(dataUrl, name){
   if(!dataUrl) return;
+  const safeName = (name && String(name).trim()) || 'Logo';
   let lib = cvLogoLibLoad().filter(e => e && e.dataUrl !== dataUrl);
-  lib.unshift({ id: 'l_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), dataUrl, addedAt: Date.now() });
+  lib.unshift({ id: 'l_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), dataUrl, name: safeName, addedAt: Date.now() });
   if(lib.length > CV_LOGO_LIB_MAX) lib = lib.slice(0, CV_LOGO_LIB_MAX);
   cvLogoLibSave(lib);
 }
@@ -3467,6 +3506,8 @@ function cvLogoLibRemove(id){
   const lib = cvLogoLibLoad().filter(e => e && e.id !== id);
   cvLogoLibSave(lib);
   cvRenderLogoLib();
+  cvRenderPalette('');     // the place card for this logo disappears too
+  cvRenderCanvas();        // any logo-lib:<id> blocks now render as missing
 }
 function cvRenderLogoLib(){
   const host = document.getElementById('cv-logo-lib');
@@ -3477,14 +3518,14 @@ function cvRenderLogoLib(){
     return;
   }
   const active = cvTplCfg.tplLogo;
-  const pickTitle   = escapeHtml(t('pe.logo_lib.pick',   'Click to use'));
+  const pickTitle   = t('pe.logo_lib.pick',   'Click to use');
   const removeTitle = escapeHtml(t('pe.logo_lib.remove', 'Remove from library'));
   host.innerHTML = lib.map(e => {
     const isActive = e.dataUrl === active;
     const ring = isActive ? 'border:1.5px solid var(--blue);box-shadow:0 0 0 1px var(--blue) inset' : 'border:1px solid var(--border2)';
-    // dataUrl is safe in a src attribute (it's a data: URI we generated), but
-    // the id goes through data-args so we keep escaping for defence in depth.
-    return `<div class="cv-logo-lib-item" style="position:relative;width:36px;height:28px;border-radius:3px;${ring};overflow:hidden;flex-shrink:0;background:#fff" title="${pickTitle}">
+    const name = e.name || 'Logo';
+    const title = escapeHtml(name + ' — ' + pickTitle);
+    return `<div class="cv-logo-lib-item" style="position:relative;width:36px;height:28px;border-radius:3px;${ring};overflow:hidden;flex-shrink:0;background:#fff" title="${title}">
       <img src="${e.dataUrl}" data-action="cvLogoLibPick" data-args="'${escapeHtml(e.id)}'" style="width:100%;height:100%;object-fit:contain;display:block;cursor:pointer"/>
       <button class="tbe" data-action="cvLogoLibRemove" data-args="'${escapeHtml(e.id)}'" style="position:absolute;top:-1px;right:-1px;padding:0;width:14px;height:14px;border-radius:0 3px 0 3px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;line-height:14px;border:none;cursor:pointer" title="${removeTitle}">×</button>
     </div>`;

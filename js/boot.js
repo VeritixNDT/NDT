@@ -131,6 +131,26 @@ function bootApp() {
               vxStore.pullAll().catch(function(e){ console.warn('pullAll on boot failed', e); });
             }
           } catch(e){ console.warn('vx: pullAll dispatch failed', e); }
+        } else if(typeof vxIsAuthenticated === 'function' && vxIsAuthenticated()){
+          // V44.6: Session-mismatch recovery. localStorage's vx-platform-v1
+          // says we're authenticated (accessToken + userId set), but the
+          // Supabase SDK has no session — its own storage was wiped while
+          // ours survived. Common causes:
+          //   - Edge / Brave / Firefox tracking prevention sandboxing the
+          //     SDK's storage between tab closes.
+          //   - InPrivate / Incognito mode + tab reopen.
+          //   - User manually cleared site data for *.supabase.co but not
+          //     for the app's own origin.
+          // Without this branch the user is stuck: vxIsAuthenticated()
+          // returns true so the sign-in form is hidden, but every Supabase
+          // query fails RLS because auth.uid() is null server-side. Clear
+          // the local auth state so the welcome / sign-in screen renders
+          // and they can recover by signing in fresh.
+          console.warn('vx: session mismatch detected — clearing local auth state');
+          vxPlatformSet({
+            accessToken: null, refreshToken: null, tokenExpiry: null,
+            userId: null, orgId: null, role: null,
+          });
         }
         // Reactive auth state. SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED,
         // USER_UPDATED, USER_DELETED, PASSWORD_RECOVERY all flow here.

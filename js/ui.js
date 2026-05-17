@@ -231,8 +231,10 @@ function _wCvLoadSnapshotAndClose(ts) {
   cvLoadSnapshot(ts);
   const m = document.getElementById('cv-hist-modal'); if(m) m.remove();
 }
-function _wCvSaveSnapshotPrompt() {
-  const label = prompt('Snapshot label:', 'Manual snapshot') || 'Manual snapshot';
+async function _wCvSaveSnapshotPrompt() {
+  const raw = await vxPrompt({ message: t('pe.snap.label_prompt','Snapshot label:'), defaultValue: 'Manual snapshot' });
+  if(raw === null) return;          // cancelled
+  const label = raw.trim() || 'Manual snapshot';
   cvSaveSnapshot(label);
   const m = document.getElementById('cv-hist-modal'); if(m) m.remove();
   cvOpenHistory();

@@ -681,7 +681,7 @@ function cvRenderWeldMap(block, report){
 }
 
 // Weld map marker editing: handle click on map (place new marker)
-function cvWeldMapClick(blockId, evt){
+async function cvWeldMapClick(blockId, evt){
   const block = cvBlocks.find(b => b.id === blockId);
   if(!block || cvPreview) return;
   // Resolve click coords to relative 0–1
@@ -693,7 +693,7 @@ function cvWeldMapClick(blockId, evt){
   // Don't add when clicking an existing marker (handled separately)
   if(evt.target.closest('.cv-weldmark')) return;
   if(!block.weldMarkers) block.weldMarkers = [];
-  const label = prompt('Marker label:', 'D'+(block.weldMarkers.length+1));
+  const label = await vxPrompt({ message: t('pe.weld.marker_label','Marker label:'), defaultValue: 'D'+(block.weldMarkers.length+1) });
   if(label === null) return;
   cvPushUndo();
   block.weldMarkers.push({ x: relX, y: relY, label: label.trim() || 'D'+(block.weldMarkers.length+1) });
@@ -773,9 +773,9 @@ function cvRenderDefectLoop(block, report){
 var CV_COMP_KEY = 'vx-canvas-components-v1';
 function cvLoadComponents(){ cvComponents = ls(CV_COMP_KEY, []); }
 function cvSaveComponents(){ lss(CV_COMP_KEY, cvComponents); }
-function cvSaveAsComponent(){
+async function cvSaveAsComponent(){
   if(!cvSelectedIds.length){ toast(t('toast.select_blocks_first','Select one or more blocks first.'), 'warn'); return; }
-  const name = prompt('Component name:', 'My component '+(cvComponents.length+1));
+  const name = await vxPrompt({ message: t('pe.comp.name_prompt','Component name:'), defaultValue: 'My component '+(cvComponents.length+1) });
   if(!name || !name.trim()) return;
   // Find bounding origin
   const blocks = cvSelectedIds.map(id => cvBlocks.find(b=>b.id===id)).filter(Boolean);
@@ -825,10 +825,10 @@ async function cvDeleteComponent(compId){
 }
 
 // ── COMMENTS ──────────────────────────────────────────────────────
-function cvAddCommentToBlock(blockId){
+async function cvAddCommentToBlock(blockId){
   const block = cvBlocks.find(b => b.id === blockId);
   if(!block) return;
-  const text = prompt('Comment:');
+  const text = await vxPrompt({ message: t('pe.comment.prompt','Comment:'), inputType: 'textarea', placeholder: t('pe.comment.placeholder','Write your comment…') });
   if(!text || !text.trim()) return;
   if(!block.comments) block.comments = [];
   const author = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.name : 'Anonymous';
@@ -947,8 +947,8 @@ async function cvDeletePage(idx){
   cvSync(); cvSelectedId=null; cvSelectedIds=[];
   cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
 }
-function cvRenamePage(idx){
-  const name=prompt('Page name:',cvPages[idx].label);
+async function cvRenamePage(idx){
+  const name = await vxPrompt({ message: t('pe.page.rename_prompt','Page name:'), defaultValue: cvPages[idx].label });
   if(name&&name.trim()){ cvPages[idx].label=name.trim(); cvRenderPageTabs(); cvSaveLayout(); }
 }
 function cvRenderPageTabs(){
@@ -3447,9 +3447,11 @@ function cvHandleLogoUpload(file){
   reader.readAsDataURL(file);
 }
 
-function _cvFinishLogoUpload(dataUrl, fallbackName){
-  const name = (prompt(t('pe.logo_lib.name_prompt','Name this logo:'), fallbackName) || '').trim();
-  if(name === '') return;  // user cancelled or cleared → discard
+async function _cvFinishLogoUpload(dataUrl, fallbackName){
+  const raw = await vxPrompt({ message: t('pe.logo_lib.name_prompt','Name this logo:'), defaultValue: fallbackName });
+  if(raw === null) return;          // user cancelled → discard
+  const name = raw.trim();
+  if(name === '') return;           // empty → discard
   cvTplCfg.tplLogo = dataUrl;
   _cvPersistTplCfg();
   cvLogoLibAdd(dataUrl, name);

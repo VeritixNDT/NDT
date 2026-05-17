@@ -345,8 +345,8 @@ function apUpdateBrandPreview(){
 // Saved presets
 var AP_PRESETS_KEY = 'vx-theme-presets-v1';
 function apListPresets(){ return ls(AP_PRESETS_KEY, []); }
-function apSavePreset(){
-  const name = prompt('Preset name:', 'My theme '+(apListPresets().length+1));
+async function apSavePreset(){
+  const name = await vxPrompt({ message: t('ap.preset.name_prompt','Preset name:'), defaultValue: 'My theme '+(apListPresets().length+1) });
   if(!name || !name.trim()) return;
   const s = ls(KEYS.settings, {});
   // Snapshot only the appearance-related keys

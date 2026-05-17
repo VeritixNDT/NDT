@@ -1367,10 +1367,16 @@ async function vxRefreshPlan() {
   }
 }
 
-function vxOpenForgotPassword() {
-  const email = prompt('Enter your account email — we\'ll send a password reset link:');
-  if(!email) return;
-  vxApi.request('/auth/forgot-password', { method: 'POST', body: { email } }).then(r => {
+async function vxOpenForgotPassword() {
+  const email = await vxPrompt({
+    title: t('auth.forgot.title', 'Reset password'),
+    message: t('auth.forgot.prompt', 'Enter your account email — we\'ll send a password reset link:'),
+    inputType: 'email',
+    placeholder: 'you@example.com',
+    okLabel: t('auth.forgot.send', 'Send link'),
+  });
+  if(!email || !email.trim()) return;
+  vxApi.request('/auth/forgot-password', { method: 'POST', body: { email: email.trim() } }).then(r => {
     if(r.ok) toast(t('toast.reset_link_sent','Reset link sent. Check your inbox.'), 'success');
     else toast('Couldn\'t send reset link: ' + (r.error || 'unknown'), 'error');
   });

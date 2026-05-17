@@ -387,11 +387,11 @@ function rptApplyFilters(filters){
   if(el('rpt-f-dateto'))   el('rpt-f-dateto').value   = filters.dateTo    || '';
 }
 
-function rptSaveCurrentView(){
+async function rptSaveCurrentView(){
   const filters = rptCollectFilters();
   const activeCount = Object.values(filters).filter(Boolean).length;
   if(activeCount === 0){ toast(t('toast.set_filter_first','Set at least one filter before saving a view.'), 'warn'); return; }
-  const name = prompt('Name this view:', 'My filter ' + (rptListSavedViews().length + 1));
+  const name = await vxPrompt({ message: t('rpt.view.name_prompt','Name this view:'), defaultValue: 'My filter ' + (rptListSavedViews().length + 1) });
   if(!name || !name.trim()) return;
   const list = rptListSavedViews();
   const item = { id: 'view-' + Date.now(), name: name.trim(), filters, view: _rptView };
@@ -1232,12 +1232,17 @@ async function inboxApprove(idx){
     inboxRender();
   }
 }
-function inboxReject(idx){
+async function inboxReject(idx){
   if(!vxIsSeniorOrAdmin()){
     toast(t('toast.approver_required', 'Senior Inspector or Admin role required to approve.'), 'error');
     return;
   }
-  const reason = prompt(t('inb.prompt.reject','Reason for rejection (will be added to the audit log):'));
+  const reason = await vxPrompt({
+    title: t('inb.reject.title','Reject report'),
+    message: t('inb.prompt.reject','Reason for rejection (will be added to the audit log):'),
+    inputType: 'textarea',
+    okLabel: t('inb.reject.ok','Send back to Draft'),
+  });
   if(reason === null) return;
   // Move back to Draft, attach reason
   if(setReportStage(idx, 'Draft', reason || '')){
@@ -1500,7 +1505,7 @@ function defOpenPhotoView(photo){
   else img.addEventListener('load', sync);
   // Drawing handlers — coordinates are normalized 0–1 so they survive resize.
   let drawing = null;
-  canvas.addEventListener('mousedown', e => {
+  canvas.addEventListener('mousedown', async e => {
     if(modal._mode === 'view') return;
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
@@ -1508,7 +1513,7 @@ function defOpenPhotoView(photo){
     if(modal._mode === 'arrow' || modal._mode === 'circle'){
       drawing = { mode: modal._mode, x1:x, y1:y, x2:x, y2:y };
     } else if(modal._mode === 'text'){
-      const label = prompt('Label text:', 'D'+(modal._annotations.length+1));
+      const label = await vxPrompt({ message: t('def.annot.label_prompt','Label text:'), defaultValue: 'D'+(modal._annotations.length+1) });
       if(label !== null) {
         modal._annotations.push({ mode:'text', x, y, text: label });
         defAnnotRedraw();

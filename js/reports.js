@@ -1088,7 +1088,7 @@ function inboxRender(){
       <span class="inbox-section-count">${data.awaitingApproval.length}</span>
     </div>`;
   if(data.awaitingApproval.length === 0){
-    html += `<div class="inbox-empty"><div class="inbox-empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>${escapeHtml(t('inb.empty.approval','All clear — nothing waiting on you.'))}</div>`;
+    html += `<div class="inbox-empty"><div class="inbox-empty-icon">${vxShield({ size: 'lg' })}</div>${escapeHtml(t('inb.empty.approval','All clear — nothing waiting on you.'))}</div>`;
   } else {
     data.awaitingApproval.slice().sort((a,b) => timeOnStage(b) - timeOnStage(a)).forEach(r => {
       const md = NDT_METHODS.find(x => x.id === r.method);
@@ -1152,7 +1152,7 @@ function inboxRender(){
       <span class="inbox-section-count">${data.stale.length}</span>
     </div>`;
   if(data.stale.length === 0){
-    html += `<div class="inbox-empty"><div class="inbox-empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>${escapeHtml(t('inb.empty.stale','No stale reports.'))}</div>`;
+    html += `<div class="inbox-empty"><div class="inbox-empty-icon">${vxShield({ size: 'lg' })}</div>${escapeHtml(t('inb.empty.stale','No stale reports.'))}</div>`;
   } else {
     data.stale.slice().sort((a,b) => timeOnStage(b) - timeOnStage(a)).slice(0, 12).forEach(r => {
       const md = NDT_METHODS.find(x => x.id === r.method);

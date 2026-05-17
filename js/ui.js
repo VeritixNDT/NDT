@@ -611,6 +611,28 @@ function _wPwdModalBackdropClose(el,e)     { if(e.target === el) closePwdModal()
 function _wFocusInput(id) { const t = document.getElementById(id); if(t) t.focus(); }
 function _wClickInput(id) { const t = document.getElementById(id); if(t) t.click(); }
 
+// vxShield — returns an HTML string for the Veritix brand mark. Use anywhere
+// the shield should appear: empty states, success moments, watermarks. Pair
+// with .vx-shield--sm/md/lg/xl/watermark/ghost/draw modifiers from styles.css.
+//   vxShield()                            → default md size
+//   vxShield({ size: 'lg' })              → 64×74
+//   vxShield({ size: 'watermark' })       → 480×555 @ 5% opacity
+//   vxShield({ size: 'lg', draw: true })  → stroke-draws the checkmark on
+//                                            insert (success / saved moment)
+//   vxShield({ extra: 'my-class' })       → append a project-specific class
+function vxShield(opts) {
+  const o = opts || {};
+  const size  = o.size  ? ' vx-shield--' + o.size : ' vx-shield--md';
+  const ghost = o.ghost ? ' vx-shield--ghost' : '';
+  const draw  = o.draw  ? ' vx-shield--draw'  : '';
+  const extra = o.extra ? ' ' + o.extra : '';
+  return '<span class="vx-shield' + size + ghost + draw + extra + '" aria-hidden="true">'
+    + '<svg viewBox="0 0 52 60">'
+    + '<path class="vx-shield-body" d="M26 2 L50 14 L50 36 Q50 52 26 58 Q2 52 2 36 L2 14 Z"/>'
+    + '<path class="vx-shield-check" d="M17 30 L24 38 L36 22"/>'
+    + '</svg></span>';
+}
+
 // vxPlan method delegators (router uses window[action], can't traverse dots)
 function _wOpenBilling() { vxPlan.openBilling(); }
 

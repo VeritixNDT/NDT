@@ -1950,7 +1950,11 @@ a { color: var(--cyan); text-decoration: none; }
   color: var(--t1);
   text-transform: uppercase;
 }
-.logo-name .vr { color: var(--red); }
+/* .vr — global wordmark accent. Used wherever "Veritix" is written so the
+   first letter gets the brand-red checkmark colour. Was scoped to
+   .logo-name / .login-logo-name; promoted to a global rule so the same
+   wordmark works inside vxConfirm / vxPrompt headers too. */
+.vr { color: var(--red); }
 
 /* Workspace pill — sits between the Veritix wordmark and the topnav.
    Visually subordinate to the brand mark (no accent colour, lower weight)
@@ -3421,7 +3425,7 @@ a { color: var(--cyan); text-decoration: none; }
   color: var(--t1);
   text-transform: uppercase;
 }
-.login-logo-name .vr { color: var(--red); }
+/* .vr accent inherited from the global rule above */
 
 .login-panel {
   background: var(--panel);

@@ -77,8 +77,18 @@
   --sh-glow-cyan: 0 0 0 1px rgba(0,212,255,.2), 0 4px 20px rgba(0,212,255,.15);
   --sh-inset-top: inset 0 1px 0 rgba(255,255,255,.06);
 
-  --font:  'Outfit', sans-serif;
-  --mono:  'DM Mono', monospace;
+  /* Typography stack — Funnel Display for hero / display text, Geist for
+     body / UI, Geist Mono for technical strings. Geist's tabular-numeral
+     forms make data tables and metrics line up; Funnel Display gives
+     page titles a sharp, condensed industrial character that the previous
+     Outfit pairing lacked. */
+  --font:         'Geist', system-ui, sans-serif;
+  --font-display: 'Funnel Display', 'Geist', sans-serif;
+  --mono:         'Geist Mono', ui-monospace, monospace;
+  /* Numeric forms used wherever digits appear in a structured context
+     (stat tiles, metric values, table cells, kanban IDs). Aliased so a
+     future swap of feature-tags happens in one place. */
+  --num-features: tabular-nums slashed-zero;
 
   --sidebar-w: 232px;
   --topbar-h:  56px;
@@ -481,6 +491,7 @@
   font-size:10px;
   color:var(--cyan);
   font-weight:600;
+  font-variant-numeric: var(--num-features);
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
@@ -759,11 +770,13 @@
   .help-article { padding: 22px 22px 60px; font-size: 13.5px; }
 }
 .help-article h1 {
-  font-size: 26px;
+  font-family: var(--font-display);
+  font-size: 32px;
   font-weight: 600;
   color: var(--t1);
   margin: 0 0 6px;
-  letter-spacing: -.02em;
+  letter-spacing: -.03em;
+  line-height: 1.1;
 }
 .help-article .help-lede {
   font-size: 14px;
@@ -1249,7 +1262,7 @@
 }
 .inbox-tile-icon svg { width:18px; height:18px; }
 .inbox-tile-body { flex:1; min-width:0; }
-.inbox-tile-count { font-size:22px; font-weight:600; color:var(--t1); line-height:1; }
+.inbox-tile-count { font-family: var(--font-display); font-size:26px; font-weight:600; color:var(--t1); line-height:1; letter-spacing:-.02em; font-variant-numeric: var(--num-features); }
 .inbox-tile-label { font-size:12px; color:var(--t3); margin-top:2px; }
 
 .inbox-section {
@@ -1889,6 +1902,7 @@
   color: var(--t1);
   font-weight: 500;
   text-align: right;
+  font-variant-numeric: var(--num-features);
 }
 
 /* ══════════════════════════════════════════════
@@ -1943,12 +1957,12 @@ a { color: var(--cyan); text-decoration: none; }
   flex-shrink: 0;
 }
 .logo-name {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .08em;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.005em;
   color: var(--t1);
-  text-transform: uppercase;
+  text-transform: none;
 }
 /* .vr — global wordmark accent. Used wherever "Veritix" is written so the
    first letter gets the brand-red checkmark colour. Was scoped to
@@ -2326,13 +2340,14 @@ a { color: var(--cyan); text-decoration: none; }
 }
 .sh-left {}
 .sh-title {
-  font-size: var(--heading-size, 22px);
+  font-size: var(--heading-size, 26px);
   font-weight: 600;
-  letter-spacing: -.02em;
+  letter-spacing: -.025em;
   color: var(--heading-color, var(--t1));
-  font-family: var(--heading-font, var(--font));
+  /* Display face for page titles — overridable by user theme settings. */
+  font-family: var(--heading-font, var(--font-display));
   margin-bottom: 5px;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .sh-desc {
   font-size: var(--desc-size, 13px);
@@ -2411,12 +2426,13 @@ a { color: var(--cyan); text-decoration: none; }
   font-weight: 500;
 }
 .stat-val {
-  font-family: var(--font);
-  font-size: 26px;
+  font-family: var(--font-display);
+  font-size: 30px;
   font-weight: 600;
   line-height: 1;
   color: var(--t1);
-  letter-spacing: -.02em;
+  letter-spacing: -.025em;
+  font-variant-numeric: var(--num-features);
 }
 .stat-sub {
   font-size: var(--fs-xs);
@@ -2712,7 +2728,7 @@ a { color: var(--cyan); text-decoration: none; }
 .tbl tr:hover td { background: var(--hover-bg); }
 .tbl tr.selected td { background: rgba(0,212,255,.06); }
 .tbl tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
-.tbl .mono { font-family: var(--mono); font-size: var(--fs-sm); color: var(--t2); }
+.tbl .mono { font-family: var(--mono); font-size: var(--fs-sm); color: var(--t2); font-variant-numeric: var(--num-features); }
 .tbl .dim  { color: var(--t3); font-size: var(--fs-sm); }
 
 /* Pill area */
@@ -3007,12 +3023,13 @@ a { color: var(--cyan); text-decoration: none; }
 }
 .dash-met-icon svg { width: 16px; height: 16px; }
 .dash-met-val {
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 600;
   line-height: 1;
   color: var(--t1);
-  font-family: var(--font);
-  letter-spacing: -.02em;
+  font-family: var(--font-display);
+  letter-spacing: -.03em;
+  font-variant-numeric: var(--num-features);
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -3090,11 +3107,12 @@ a { color: var(--cyan); text-decoration: none; }
   box-shadow: var(--sh-md), var(--sh-inset-top);
 }
 .dash-mc-code {
-  font-family: var(--mono);
-  font-size: 22px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
   margin-bottom: 4px;
-  letter-spacing: .03em;
+  letter-spacing: -.005em;
+  font-variant-numeric: var(--num-features);
 }
 .dash-mc-name {
   font-size: var(--fs-md);
@@ -3138,7 +3156,7 @@ a { color: var(--cyan); text-decoration: none; }
 .sev-label { font-size: var(--fs-sm); color: var(--t2); width: 64px; flex-shrink: 0; font-weight: 500; }
 .sev-track { flex: 1; height: 8px; background: rgba(255,255,255,.04); border-radius: 4px; overflow: hidden; }
 .sev-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(0.4, 0, 0.2, 1); }
-.sev-count { font-family: var(--mono); font-size: var(--fs-sm); color: var(--t1); width: 28px; text-align: right; font-weight: 500; }
+.sev-count { font-family: var(--mono); font-size: var(--fs-sm); color: var(--t1); width: 28px; text-align: right; font-weight: 500; font-variant-numeric: var(--num-features); }
 
 /* Activity items */
 .act-item {
@@ -3418,12 +3436,12 @@ a { color: var(--cyan); text-decoration: none; }
   justify-content: center;
 }
 .login-logo-name {
-  font-family: var(--mono);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: .08em;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.01em;
   color: var(--t1);
-  text-transform: uppercase;
+  text-transform: none;
 }
 /* .vr accent inherited from the global rule above */
 
@@ -3820,10 +3838,11 @@ a { color: var(--cyan); text-decoration: none; }
 }
 .vx-confirm-brand svg { display: block; }
 .vx-confirm-title {
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-size: 16px;
   font-weight: 600;
   color: var(--t1);
-  letter-spacing: .2px;
+  letter-spacing: -.005em;
 }
 .vx-confirm-body {
   padding: 6px 20px 18px 56px;

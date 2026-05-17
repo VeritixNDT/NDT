@@ -839,8 +839,10 @@ function vxConfirm(opts) {
       return;
     }
 
-    // Populate
-    titleEl.textContent  = o.title    || t('vxc.title', 'Veritix');
+    // Populate. Custom titles go through textContent (safe). The default
+    // "Veritix" uses innerHTML so the wordmark's red V (.vr) renders.
+    if(o.title) titleEl.textContent = o.title;
+    else        titleEl.innerHTML   = '<span class="vr">V</span>eritix';
     msgEl.textContent    = o.message  || t('vxc.are_you_sure', 'Are you sure?');
     okBtn.textContent    = o.okLabel  || t('vxc.confirm', 'Confirm');
     cancelBtn.textContent = o.cancelLabel || t('vxc.cancel', 'Cancel');
@@ -918,7 +920,8 @@ function vxPrompt(opts) {
       return;
     }
 
-    titleEl.textContent   = o.title       || t('vxc.title',  'Veritix');
+    if(o.title) titleEl.textContent = o.title;
+    else        titleEl.innerHTML   = '<span class="vr">V</span>eritix';
     msgEl.textContent     = o.message     || '';
     okBtn.textContent     = o.okLabel     || t('vxc.ok',     'OK');
     cancelBtn.textContent = o.cancelLabel || t('vxc.cancel', 'Cancel');

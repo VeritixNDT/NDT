@@ -2929,6 +2929,28 @@
   </div>
 </div>
 
+<!-- ══ CUSTOM PROMPT MODAL ═════════════════════
+     Replaces native prompt() so the dialog header reads "Veritix" instead
+     of the browser-default "[site] says". Driven by vxPrompt({...}).
+     Reuses .vx-confirm styling — same shell, plus a text input/textarea. -->
+<div class="vx-confirm" id="vx-prompt" role="dialog" aria-modal="true" aria-labelledby="vx-prompt-title" aria-describedby="vx-prompt-message">
+  <div class="vx-confirm-inner">
+    <div class="vx-confirm-head">
+      <div class="vx-confirm-brand">V</div>
+      <div class="vx-confirm-title" id="vx-prompt-title">Veritix</div>
+    </div>
+    <div class="vx-confirm-body">
+      <div id="vx-prompt-message" style="margin-bottom:10px"></div>
+      <input id="vx-prompt-input" type="text" autocomplete="off" spellcheck="false" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:13px;padding:8px 10px;font-family:inherit;box-sizing:border-box"/>
+      <textarea id="vx-prompt-textarea" rows="4" style="display:none;width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:13px;padding:8px 10px;font-family:inherit;box-sizing:border-box;resize:vertical;min-height:80px"></textarea>
+    </div>
+    <div class="vx-confirm-foot">
+      <button type="button" class="btn btn-sm" id="vx-prompt-cancel">Cancel</button>
+      <button type="button" class="btn btn-sm btn-primary" id="vx-prompt-ok">OK</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ PROFILE MODAL ════════════════════════ -->
 <div class="pm-overlay" id="pm-overlay" data-action="_wProfileModalBackdropClose" data-pass-el="1" data-pass-event="1">
   <div class="pm-dialog">

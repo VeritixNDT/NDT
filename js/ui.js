@@ -877,6 +877,96 @@ function vxConfirm(opts) {
   });
 }
 
+// ══════════════════════════════════════════════
+// CUSTOM PROMPT DIALOG — replaces native prompt()
+// ══════════════════════════════════════════════
+// Same motivation as vxConfirm above — the browser's "[site] says" header
+// looks unprofessional. Returns a Promise that resolves to the entered
+// string, or null if the user cancelled (Escape, Cancel button, backdrop).
+//
+// Usage:
+//   const name = await vxPrompt({ message: 'Name this view:', defaultValue: 'My filter' });
+//   if(name == null) return;            // cancelled
+//   if(!name.trim()) return;            // empty
+//
+// Options:
+//   message      — label shown above the input (required)
+//   title        — header text (default: "Veritix")
+//   defaultValue — initial input value
+//   placeholder  — input placeholder
+//   okLabel      — confirm button text (default: "OK")
+//   cancelLabel  — cancel button text (default: "Cancel")
+//   inputType    — 'text' (default), 'email', or 'textarea' for multi-line
+var _vxPromptWired = false;
+var _vxPromptResolver = null;
+var _vxPromptIsTextarea = false;
+function vxPrompt(opts) {
+  const o = opts || {};
+  return new Promise((resolve) => {
+    const modal     = document.getElementById('vx-prompt');
+    const titleEl   = document.getElementById('vx-prompt-title');
+    const msgEl     = document.getElementById('vx-prompt-message');
+    const inp       = document.getElementById('vx-prompt-input');
+    const ta        = document.getElementById('vx-prompt-textarea');
+    const okBtn     = document.getElementById('vx-prompt-ok');
+    const cancelBtn = document.getElementById('vx-prompt-cancel');
+    if(!modal || !titleEl || !msgEl || !inp || !ta || !okBtn || !cancelBtn) {
+      console.warn('[vxPrompt] modal elements missing; falling back to native prompt');
+      resolve(window.prompt(o.message || '', o.defaultValue != null ? o.defaultValue : ''));
+      return;
+    }
+
+    titleEl.textContent   = o.title       || t('vxc.title',  'Veritix');
+    msgEl.textContent     = o.message     || '';
+    okBtn.textContent     = o.okLabel     || t('vxc.ok',     'OK');
+    cancelBtn.textContent = o.cancelLabel || t('vxc.cancel', 'Cancel');
+
+    const isTextarea = o.inputType === 'textarea';
+    _vxPromptIsTextarea = isTextarea;
+    inp.style.display = isTextarea ? 'none' : '';
+    ta.style.display  = isTextarea ? ''     : 'none';
+    const field = isTextarea ? ta : inp;
+    if(!isTextarea) inp.type = (o.inputType === 'email') ? 'email' : 'text';
+    field.value       = o.defaultValue != null ? o.defaultValue : '';
+    field.placeholder = o.placeholder || '';
+
+    _vxPromptResolver = resolve;
+    if(!_vxPromptWired) {
+      const close = (result) => {
+        modal.classList.remove('open');
+        const r = _vxPromptResolver;
+        _vxPromptResolver = null;
+        if(r) r(result);
+      };
+      const submit = () => {
+        const f = _vxPromptIsTextarea ? ta : inp;
+        close(f.value);
+      };
+      okBtn.addEventListener('click',     submit);
+      cancelBtn.addEventListener('click', () => close(null));
+      modal.addEventListener('click', (e) => { if(e.target === modal) close(null); });
+      // Enter submits in single-line mode. In textarea mode, Enter inserts
+      // a newline normally; Ctrl/Cmd+Enter submits.
+      document.addEventListener('keydown', (e) => {
+        if(!modal.classList.contains('open')) return;
+        if(e.key === 'Escape') { e.preventDefault(); close(null); return; }
+        if(e.key === 'Enter') {
+          if(_vxPromptIsTextarea && !(e.ctrlKey || e.metaKey)) return;
+          e.preventDefault();
+          submit();
+        }
+      });
+      _vxPromptWired = true;
+    }
+
+    modal.classList.add('open');
+    setTimeout(() => {
+      field.focus();
+      if(!isTextarea && typeof field.select === 'function') field.select();
+    }, 30);
+  });
+}
+
 // V4: Number formatter respecting decimal/thousands separator settings
 function fmtNumber(n, decimals){
   if(n == null || isNaN(n)) return '—';

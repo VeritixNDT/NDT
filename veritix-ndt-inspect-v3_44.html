@@ -1280,7 +1280,7 @@
                 <div class="fld form-row">
                     <label data-i18n="insp.lbl.signature">Signature</label>
                       <div class="sig-upload-zone" id="sig-upload-zone"
-                           data-action="_wClickInput" data-args="\'sig-file-inp\'"
+                           data-action="_wClickInput" data-args="'sig-file-inp'"
                            data-on-dragover="_wDragoverHighlight" data-pass-event="1" data-pass-el="1"
                            data-on-dragleave="_wDragleaveUnhighlight" data-pass-el="1"
                            data-on-drop="_wDropSigUpload" data-pass-event="1" data-pass-el="1">
@@ -1557,12 +1557,12 @@
               <div class="rbn-grp">
                 <input type="file" id="cv-logo-upload" accept="image/*" style="display:none" data-on-change="_wCvHandleLogoUpload" data-pass-el="1"/>
                 <div class="rbn-row" style="gap:4px;margin-top:2px">
-                  <div class="tpl-logo-drop" id="cv-logo-thumb-box" data-action="_wClickInput" data-args="\'cv-logo-upload\'" title="Upload logo">
+                  <div class="tpl-logo-drop" id="cv-logo-thumb-box" data-action="_wClickInput" data-args="'cv-logo-upload'" title="Upload logo">
                     <img id="cv-logo-thumb" style="display:none;max-width:100%;max-height:100%;object-fit:contain" alt=""/>
                     <span id="cv-logo-thumb-ph" style="font-size:9px;color:var(--t3);text-align:center;line-height:1.3" data-i18n="pe.lbl.upload_logo">Upload<br>logo</span>
                   </div>
                   <div class="rbn-col" style="gap:3px">
-                    <button class="tbe" data-action="_wClickInput" data-args="\'cv-logo-upload\'" style="font-size:11px" data-i18n="pe.btn.upload">📂 Upload</button>
+                    <button class="tbe" data-action="_wClickInput" data-args="'cv-logo-upload'" style="font-size:11px" data-i18n="pe.btn.upload">📂 Upload</button>
                     <button class="tbe" data-action="cvClearLogo" style="font-size:11px;color:var(--red)" data-i18n="pe.btn.remove">✕ Remove</button>
                   </div>
                 </div>
@@ -1583,12 +1583,12 @@
               <div class="rbn-grp">
                 <input type="file" id="cv-logo2-upload" accept="image/*" style="display:none" data-on-change="_wCvHandleLogo2Upload" data-pass-el="1"/>
                 <div class="rbn-row" style="gap:4px;margin-top:2px">
-                  <div class="tpl-logo-drop" id="cv-logo2-thumb-box" data-action="_wClickInput" data-args="\'cv-logo2-upload\'" title="Upload client logo">
+                  <div class="tpl-logo-drop" id="cv-logo2-thumb-box" data-action="_wClickInput" data-args="'cv-logo2-upload'" title="Upload client logo">
                     <img id="cv-logo2-thumb" style="display:none;max-width:100%;max-height:100%;object-fit:contain" alt=""/>
                     <span id="cv-logo2-thumb-ph" style="font-size:9px;color:var(--t3);text-align:center;line-height:1.3" data-i18n="pe.lbl.upload_logo">Upload<br>logo</span>
                   </div>
                   <div class="rbn-col" style="gap:3px">
-                    <button class="tbe" data-action="_wClickInput" data-args="\'cv-logo2-upload\'" style="font-size:11px">📂 Upload</button>
+                    <button class="tbe" data-action="_wClickInput" data-args="'cv-logo2-upload'" style="font-size:11px">📂 Upload</button>
                     <button class="tbe" data-action="cvClearLogo2" style="font-size:11px;color:var(--red)">✕ Remove</button>
                   </div>
                 </div>
@@ -1896,7 +1896,7 @@
                 <button class="btn btn-sm" data-action="procHideUpload" style="font-size:11px">✕ Cancel</button>
               </div>
               <div class="sc-body">
-                <div id="proc-dropzone" data-action="_wClickInput" data-args="\'proc-file-input\'"
+                <div id="proc-dropzone" data-action="_wClickInput" data-args="'proc-file-input'"
                   style="border:2px dashed var(--border2);border-radius:8px;padding:24px;text-align:center;cursor:pointer;margin-bottom:14px;transition:all .2s;background:rgba(79,142,247,.03)"
                   data-on-dragover="_wDragoverFileZone" data-pass-event="1" data-pass-el="1"
                   data-on-dragleave="_wDragleaveFileZone" data-pass-el="1"
@@ -2501,7 +2501,7 @@
               <div id="ap-presets-list"></div>
               <div style="display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
                 <button class="btn btn-sm" data-action="apExportTheme">⬇ Export theme JSON</button>
-                <button class="btn btn-sm" data-action="_wClickInput" data-args="\'ap-import-file\'">⬆ Import theme JSON</button>
+                <button class="btn btn-sm" data-action="_wClickInput" data-args="'ap-import-file'">⬆ Import theme JSON</button>
                 <input type="file" id="ap-import-file" accept=".json,application/json" style="display:none" data-on-change="_wApImportThemeFile" data-pass-el="1"/>
               </div>
             </div>
@@ -2674,7 +2674,7 @@
             <div class="sc-body">
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
                 <button class="btn" data-action="dbExport" data-i18n="db.btn.export">⬇ Export backup (.json)</button>
-                <button class="btn" data-action="_wClickInput" data-args="\'db-import-inp\'" data-i18n="db.btn.import">⬆ Import backup</button>
+                <button class="btn" data-action="_wClickInput" data-args="'db-import-inp'" data-i18n="db.btn.import">⬆ Import backup</button>
                 <input type="file" id="db-import-inp" accept=".json" style="display:none" data-on-change="dbImportFile" data-pass-el="1"/>
               </div>
               <div class="sep"></div>
@@ -2946,7 +2946,7 @@
 <div class="pm-overlay" id="pm-overlay" data-action="_wProfileModalBackdropClose" data-pass-el="1" data-pass-event="1">
   <div class="pm-dialog">
     <div class="pm-header">
-      <div class="pm-avatar-wrap" data-action="_wClickInput" data-args="\'pm-photo-file\'" title="Change profile photo">
+      <div class="pm-avatar-wrap" data-action="_wClickInput" data-args="'pm-photo-file'" title="Change profile photo">
         <div class="pm-avatar" id="pm-avatar"></div>
         <img id="pm-photo-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;inset:0"/>
         <div class="pm-avatar-overlay">
@@ -2988,7 +2988,7 @@
         <label>Signature image</label>
         <div style="display:flex;align-items:center;gap:8px">
           <div class="sig-upload-zone" id="pm-sig-zone" style="flex:1"
-               data-action="_wClickInput" data-args="\'pm-sig-file\'"
+               data-action="_wClickInput" data-args="'pm-sig-file'"
                data-on-dragover="_wDragoverHighlight" data-pass-event="1" data-pass-el="1"
                data-on-dragleave="_wDragleaveUnhighlight" data-pass-el="1"
                data-on-drop="_wDropPmSig" data-pass-event="1" data-pass-el="1">

@@ -1859,7 +1859,14 @@ function vxRealtimeConnect() {
     _vxWs = null;
   }
 
-  var channelName = 'org:' + cfg.orgId;
+  // Per-session channel name suffix (V44.5). The naïve 'org:<orgId>' name
+  // could be re-used across reconnects in a single tab; once it had been
+  // joined with anon auth the broker silently rejected all RLS-gated row
+  // events for that channel name even after setAuth pushed the real JWT.
+  // Fresh names with a timestamp suffix sidestep the broker's per-name
+  // auth context caching — verified empirically: identical bindings on a
+  // fresh name deliver events; on the reused name they don't.
+  var channelName = 'org:' + cfg.orgId + ':' + Date.now();
   try {
     _vxWs = sb.channel(channelName)
       .on('postgres_changes',

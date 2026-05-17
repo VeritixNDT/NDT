@@ -2441,6 +2441,69 @@ a { color: var(--cyan); text-decoration: none; }
 .sc-body { padding: 18px; }
 .sc-body.np { padding: 0; }
 
+/* ── Card hierarchy modifiers ──────────────────────────────────────
+   Layer on .sc to give a card a clearer role. The default .sc treats
+   every container with the same recipe; these modifiers establish a
+   visual difference between primary, dense-analytical, and narrative
+   surfaces without changing markup contracts. */
+
+/* HERO — primary featured content. Larger radius, deeper shadow, a
+   1px cyan top-edge that reads as a brand accent rather than another
+   panel. Use sparingly: 1-2 per page max. */
+.sc--hero {
+  border-radius: var(--r3);
+  border-color: var(--border2);
+  box-shadow: var(--sh-inset-top), var(--sh-md), 0 0 0 1px rgba(0,212,255,.06);
+  position: relative;
+}
+.sc--hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan) 30%, var(--cyan) 70%, transparent);
+  opacity: .55;
+  pointer-events: none;
+  border-radius: var(--r3) var(--r3) 0 0;
+}
+.sc--hero > .sc-head { padding: 18px 22px; }
+.sc--hero .sc-title { font-family: var(--font-display); font-size: 15px; letter-spacing: -.005em; }
+.sc--hero > .sc-body { padding: 22px; }
+
+/* DATA — dense analytical content (tables, leaderboards, schedules).
+   Sharper radius, no inset top highlight, tighter rhythm. Reads as
+   architectural / instrument-panel rather than soft card. */
+.sc--data {
+  border-radius: var(--r);
+  box-shadow: none;
+  background-image: none;
+}
+.sc--data > .sc-head {
+  padding: 10px 14px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border2);
+}
+.sc--data .sc-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--t2);
+}
+.sc--data > .sc-body { padding: 0; }
+
+/* SOFT — narrative content (intros, callouts, secondary info). Borderless,
+   larger radius, gentler shadow. Doesn't compete with primary content. */
+.sc--soft {
+  border: none;
+  border-radius: var(--r3);
+  background: var(--panel);
+  background-image: var(--grad-panel2);
+  box-shadow: var(--sh-sm);
+}
+.sc--soft > .sc-head { border-bottom: 1px solid var(--border); }
+
 /* Stat tiles */
 .stat-row {
   display: grid;

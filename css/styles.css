@@ -158,8 +158,17 @@
 [data-theme="light"] .toast { background: var(--panel); box-shadow: var(--sh-lg); }
 [data-theme="light"] .pd-head { background: linear-gradient(135deg, #f4f6f9 0%, rgba(0,153,204,.08) 100%); }
 [data-theme="light"] .notif-dropdown, [data-theme="light"] .profile-dropdown, [data-theme="light"] .cmdk { box-shadow: var(--sh-lg); }
-[data-theme="light"] #login-screen { background: radial-gradient(ellipse 800px 600px at 30% 20%, rgba(0,153,204,.06) 0%, transparent 60%), radial-gradient(ellipse 600px 500px at 75% 80%, rgba(79,142,247,.05) 0%, transparent 55%), var(--bg); }
-[data-theme="light"] #login-screen::before { background-image: linear-gradient(rgba(0,0,0,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.018) 1px, transparent 1px); }
+[data-theme="light"] #login-screen { background: radial-gradient(ellipse 800px 600px at 30% 20%, rgba(0,153,204,.08) 0%, transparent 60%), radial-gradient(ellipse 600px 500px at 75% 80%, rgba(79,142,247,.06) 0%, transparent 55%), var(--bg); }
+[data-theme="light"] #login-screen::before {
+  background-image:
+    linear-gradient(rgba(0,153,204,.06)  1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,153,204,.06)  1px, transparent 1px),
+    linear-gradient(rgba(0,153,204,.03)  1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,153,204,.03)  1px, transparent 1px);
+  background-size: 320px 320px, 320px 320px, 64px 64px, 64px 64px;
+}
+[data-theme="light"] .login-watermark { opacity: .85; }
+[data-theme="light"] .login-waveform { opacity: .85; }
 [data-theme="light"] body::before { display: none; }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -3449,8 +3458,8 @@ a { color: var(--cyan); text-decoration: none; }
 #login-screen {
   position: fixed; inset: 0;
   background:
-    radial-gradient(ellipse 800px 600px at 30% 20%, rgba(0,212,255,.08) 0%, transparent 60%),
-    radial-gradient(ellipse 600px 500px at 75% 80%, rgba(79,142,247,.06) 0%, transparent 55%),
+    radial-gradient(ellipse 800px 600px at 30% 20%, rgba(0,212,255,.10) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 500px at 75% 80%, rgba(79,142,247,.08) 0%, transparent 55%),
     var(--bg);
   z-index: 5000;
   display: flex;
@@ -3460,17 +3469,53 @@ a { color: var(--cyan); text-decoration: none; }
   gap: 0;
   overflow: hidden;
 }
+/* Blueprint grid — visible enough to read as technical drawing paper. Two
+   weights: faint 64px cells, slightly stronger 320px major rules. Cool
+   cyan-blue rather than pure white so it sits on the brand spectrum. */
 #login-screen::before {
   content: '';
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(rgba(0,212,255,.05)  1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.05)  1px, transparent 1px),
+    linear-gradient(rgba(0,212,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.025) 1px, transparent 1px);
+  background-size: 320px 320px, 320px 320px, 64px 64px, 64px 64px;
   pointer-events: none;
 }
 #login-screen.hidden { display: none; }
+
+/* Off-canvas brand watermark — anchors the top-right corner with the
+   Veritix shield bleeding off the page like a stamped seal on a report. */
+.login-watermark {
+  position: absolute;
+  top: -160px; right: -180px;
+  pointer-events: none;
+  z-index: 0;
+  transform: rotate(8deg);
+}
+.login-watermark .vx-shield-check { stroke: var(--red); }
+.login-watermark .vx-shield-body  { stroke: var(--cyan); }
+
+/* Ultrasonic waveform — single horizontal line across the lower viewport
+   with one defect indication spike. Sits behind the login panel; the
+   panel's box-shadow naturally separates them. Pure domain signal. */
+.login-waveform {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 56px;
+  height: 80px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .55;
+}
+.login-waveform svg { display: block; width: 100%; height: 100%; }
+.login-waveform .lw-line  { fill: none; stroke: var(--cyan); stroke-width: 1.25; opacity: .35; }
+.login-waveform .lw-spike { fill: none; stroke: var(--red);  stroke-width: 1.5;  opacity: .75; }
+.login-waveform .lw-baseline { stroke: var(--cyan); stroke-width: 1; opacity: .12; stroke-dasharray: 2 4; }
+.login-waveform .lw-tick    { stroke: var(--cyan); stroke-width: 1; opacity: .20; }
+.login-waveform .lw-tick-lbl{ font-family: var(--mono); font-size: 8px; fill: var(--t3); letter-spacing: .04em; }
 
 .login-container {
   width: 400px;

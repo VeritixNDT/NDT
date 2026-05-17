@@ -118,6 +118,44 @@
 
 <!-- ══ LOGIN SCREEN ═══════════════════════════ -->
 <div id="login-screen">
+  <!-- Off-canvas brand watermark — Veritix shield bleeding off the top-right
+       corner like a stamped seal. Pure brand presence, no functional role. -->
+  <div class="login-watermark" aria-hidden="true">
+    <span class="vx-shield vx-shield--watermark">
+      <svg viewBox="0 0 52 60">
+        <path class="vx-shield-body" d="M26 2 L50 14 L50 36 Q50 52 26 58 Q2 52 2 36 L2 14 Z"/>
+        <path class="vx-shield-check" d="M17 30 L24 38 L36 22"/>
+      </svg>
+    </span>
+  </div>
+
+  <!-- Ultrasonic waveform — single A-scan line with one defect indication
+       spike at ~62% width. Sits behind the login panel and signals the
+       NDT inspection domain without any explanatory copy. Pure visual ID. -->
+  <div class="login-waveform" aria-hidden="true">
+    <svg viewBox="0 0 1200 80" preserveAspectRatio="none">
+      <!-- Baseline / centre rule -->
+      <line class="lw-baseline" x1="0" y1="40" x2="1200" y2="40"/>
+      <!-- Calibration tick marks every 120px -->
+      <g>
+        <line class="lw-tick" x1="120"  y1="36" x2="120"  y2="44"/>
+        <line class="lw-tick" x1="240"  y1="36" x2="240"  y2="44"/>
+        <line class="lw-tick" x1="360"  y1="36" x2="360"  y2="44"/>
+        <line class="lw-tick" x1="480"  y1="36" x2="480"  y2="44"/>
+        <line class="lw-tick" x1="600"  y1="34" x2="600"  y2="46"/>
+        <line class="lw-tick" x1="720"  y1="36" x2="720"  y2="44"/>
+        <line class="lw-tick" x1="840"  y1="36" x2="840"  y2="44"/>
+        <line class="lw-tick" x1="960"  y1="36" x2="960"  y2="44"/>
+        <line class="lw-tick" x1="1080" y1="36" x2="1080" y2="44"/>
+        <text class="lw-tick-lbl" x="600" y="62" text-anchor="middle">50 mm</text>
+      </g>
+      <!-- Carrier signal (low-amplitude noise) -->
+      <path class="lw-line" d="M0 40 Q60 38 120 41 T240 39 T360 41 T480 40 T600 39 T720 40 T840 41 T960 39 T1080 40 T1200 41"/>
+      <!-- Defect indication — single spike at ~720px -->
+      <path class="lw-spike" d="M700 40 L715 40 L720 12 L725 40 L740 40"/>
+    </svg>
+  </div>
+
   <div class="login-container">
     <div class="login-logo">
       <svg width="34" height="40" viewBox="0 0 52 60" style="flex-shrink:0" aria-hidden="true">

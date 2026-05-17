@@ -126,10 +126,14 @@ vxTest('drawer: toggle functions defined', () => {
   vxAssertEq(typeof cvCloseAllDrawers, 'function');
 });
 
-// ── Logo dedup helpers ───────────────────────────────────────────────────
-vxTest('logos: _CV_LOGO_FIELDS has both slots', () => {
-  vxAssertEq(_CV_LOGO_FIELDS.company, 'tplLogo');
-  vxAssertEq(_CV_LOGO_FIELDS.client,  'tplLogo2');
+// ── Logo handlers + library ──────────────────────────────────────────────
+vxTest('logos: single-slot handlers + library API exist', () => {
+  vxAssertEq(typeof cvHandleLogoUpload, 'function');
+  vxAssertEq(typeof cvClearLogo,        'function');
+  vxAssertEq(typeof cvLogoLibLoad,      'function');
+  vxAssertEq(typeof cvLogoLibAdd,       'function');
+  vxAssertEq(typeof cvLogoLibPick,      'function');
+  vxAssertEq(typeof cvLogoLibRemove,    'function');
 });
 
 // ── Autosave indicator ───────────────────────────────────────────────────

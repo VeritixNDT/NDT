@@ -180,7 +180,6 @@ var CV_LAYOUT_ITEMS = [
   {key:'text-block',     label:'Free text / note',           w:360,h:48},
   {key:'h-line',         label:'Horizontal divider',         w:754,h:10},
   {key:'logo-co',        label:'Company logo',               w:140,h:56},
-  {key:'logo-client',    label:'Client logo',                w:140,h:56},
   {key:'photo-box',      label:'Photo placeholder',          w:220,h:150},
   {key:'photo-page',     label:'Photo page (6 slots)',       w:754,h:980},
   {key:'additional-page',label:'Additional page',            w:754,h:980},
@@ -328,7 +327,6 @@ var cvTplCfg = {
   sectionColor:'#404040', margin:'8px', baseSize:'8.5px',
   showLogo:true, showFooter:true,
   tplLogo:null, logoPos:'left', logoSize:'md',
-  tplLogo2:null, logo2Pos:'right', logo2Size:'md',
   content:{},
   // V29 — header/footer zones repeat on every page in print/export.
   // `enabled` toggles the zone on/off (no-cost when off).
@@ -965,6 +963,7 @@ function cvRenderPageTabs(){
 
 // ── Init ──────────────────────────────────────────────────────────────
 function cvInitCanvas(){
+  cvLoadTplConfig();    // pull persisted tplLogo/logoPos/etc before rendering
   cvLoadLayout();
   cvLoadComponents();   // V3: load saved components
   cvSync();
@@ -974,6 +973,8 @@ function cvInitCanvas(){
   cvFitToView();
   cvRenderMethodBtns();
   cvUpdateStatusBar();
+  cvUpdateLogoThumb();  // reflect persisted tplLogo in the ribbon thumb
+  cvRenderLogoLib();    // populate the saved-logo library
   setTimeout(() => cvRefreshPreviewSource(), 50);   // V3: populate report dropdown
   // V25: reflect saved alignment-guides toggle state on the button
   const alignBtn = document.getElementById('cv-align-toggle');
@@ -996,7 +997,7 @@ function cvInitCanvas(){
 
 // ── Palette ──────────────────────────────────────────────────────────
 function cvGetLayoutIcon(k){
-  return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼','logo-client':'🖼',
+  return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
     'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','method-block':'⚙','sig-block':'✍',
     'accent-bar':'█','page-footer':'▭'}[k]||'□';
 }
@@ -1836,12 +1837,6 @@ function cvRenderBlockContent(block, report, preview){
         return src
           ? `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:4px"><img src="${src}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`
           : `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🖼</span>Company logo<span style="font-size:7.5px;color:#999">Upload in Settings → Company</span></div>`;
-      }
-      case 'logo-client':{
-        const src = _safeUrl(cvTplCfg.tplLogo2);
-        return src
-          ? `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:4px"><img src="${src}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`
-          : `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🖼</span>Client logo</div>`;
       }
       case 'photo-box':
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;gap:4px"><span style="font-size:24px">📷</span><span style="font-size:8.5px">${_h(block.text||'Photo placeholder')}</span></div>`;
@@ -3362,14 +3357,17 @@ function cvSetPpvMethod(m){ cvPpvMethod=m; cvRenderCanvas(); }
 function cvSetPpvResult(r){ cvPpvResult=r; cvRenderCanvas(); }
 
 // ── Template config ──────────────────────────────────────────────────
-function cvSaveTplConfig(){
+function _cvPersistTplCfg(){
   try{ localStorage.setItem(CV_TPL_KEY, JSON.stringify(cvTplCfg)); }catch(e){}
+}
+function cvSaveTplConfig(){
+  _cvPersistTplCfg();
   cvSaveLayout();
   toast(t('toast.template_saved','Template saved.'));
 }
 async function cvResetTplConfig(){
   if(!await vxConfirm({ message: 'Are you sure you want to reset the template configuration?', okLabel: t('vxc.reset','Reset'), danger: true })) return;
-  cvTplCfg = { sectionColor:'#404040', margin:'8px', baseSize:'8.5px', showLogo:true, showFooter:true, tplLogo:null, logoPos:'left', logoSize:'md', tplLogo2:null, logo2Pos:'right', logo2Size:'md', content:{}, header:{enabled:false,heightPx:100,bgColor:'transparent'}, footer:{enabled:false,heightPx:60,bgColor:'transparent'} };
+  cvTplCfg = { sectionColor:'#404040', margin:'8px', baseSize:'8.5px', showLogo:true, showFooter:true, tplLogo:null, logoPos:'left', logoSize:'md', content:{}, header:{enabled:false,heightPx:100,bgColor:'transparent'}, footer:{enabled:false,heightPx:60,bgColor:'transparent'} };
   localStorage.removeItem(CV_TPL_KEY);
   cvRenderCanvas();
   toast(t('toast.template_reset', 'Template config reset'));
@@ -3378,61 +3376,46 @@ function cvLoadTplConfig(){
   try{ const raw=localStorage.getItem(CV_TPL_KEY); if(raw) cvTplCfg = Object.assign({}, cvTplCfg, JSON.parse(raw)); }catch(e){}
 }
 
-// ── Logo handlers ────────────────────────────────────────────────────
-// V24: unified logo handling — replaces the previous duplicate
-// cvHandleLogoUpload/cvHandleLogo2Upload + cvClearLogo/cvClearLogo2 pair.
-// `slot` is 'company' (default, → tplLogo) or 'client' (→ tplLogo2). The
-// public function names with the '2' suffix remain as legacy wrappers so
-// existing data-action="cvClearLogo2" markup keeps working.
-var _CV_LOGO_FIELDS = { company: 'tplLogo', client: 'tplLogo2' };
+// ── Logo handlers + saved-logo library ───────────────────────────────
+// Single active logo per template (cvTplCfg.tplLogo). Uploads are also
+// auto-added to a small cross-template library so the user can swap
+// between previously-used logos without re-uploading.
+var CV_LOGO_LIB_KEY = 'vx-logo-library-v1';
+var CV_LOGO_LIB_MAX = 12;
 
-function _cvLogoToast(slot, kind){
-  // slot ∈ {'company','client'}, kind ∈ {'uploaded','removed'}
-  const isClient = slot === 'client';
-  const key = isClient
-    ? (kind === 'uploaded' ? 'toast.logo_uploaded' : 'toast.logo_removed')
-    : (kind === 'uploaded' ? 'toast.logo_uploaded' : 'toast.logo_removed');
-  const fb = (isClient ? 'Client logo ' : 'Logo ') + (kind === 'uploaded' ? 'uploaded.' : 'removed.');
-  toast(t(key, fb));
-}
-
-function _cvUploadLogo(slot, file){
+function cvHandleLogoUpload(file){
   if(!file) return;
-  const field = _CV_LOGO_FIELDS[slot];
-  if(!field) return;
   const reader = new FileReader();
   reader.onload = e => {
-    cvTplCfg[field] = e.target.result;
+    const dataUrl = e.target.result;
+    cvTplCfg.tplLogo = dataUrl;
+    _cvPersistTplCfg();
+    cvLogoLibAdd(dataUrl);
     cvUpdateLogoThumb();
+    cvRenderLogoLib();
     cvRenderCanvas();
-    _cvLogoToast(slot, 'uploaded');
+    toast(t('toast.logo_uploaded', 'Logo uploaded.'));
   };
   reader.readAsDataURL(file);
 }
 
-function _cvClearLogo(slot){
-  const field = _CV_LOGO_FIELDS[slot];
-  if(!field) return;
-  cvTplCfg[field] = null;
-  cvUpdateLogoThumb();
-  cvRenderCanvas();
-  _cvLogoToast(slot, 'removed');
+// The bare `cvHandleLogoUpload` callsite in the markup uses data-pass-el="1",
+// which hands the dispatcher the input element. This wrapper pulls the
+// file off it before calling the real handler.
+function _wCvHandleLogoUpload(el){
+  const f = el && el.files && el.files[0];
+  if(f) cvHandleLogoUpload(f);
+  if(el) el.value = '';  // allow re-uploading the same filename
 }
 
-// Public API (wrappers preserve existing data-action handles in the HTML)
-function cvHandleLogoUpload(file){  _cvUploadLogo('company', file); }
-function cvHandleLogo2Upload(file){ _cvUploadLogo('client',  file); }
-
-// Typed wrappers — the bare `cvHandleLogoUpload` callsites in the markup
-// used `data-args=".files[0]"` which the dispatcher's args parser passed
-// through as a literal string instead of evaluating it. These wrappers
-// read the actual file from the input element instead, fixing logo upload
-// in the PDF editor toolbar (separate from the company-profile logo flow,
-// which uses _wireLogoSection's direct addEventListener path).
-function _wCvHandleLogoUpload (el){ const f = el && el.files && el.files[0];  if(f) cvHandleLogoUpload(f);  }
-function _wCvHandleLogo2Upload(el){ const f = el && el.files && el.files[0];  if(f) cvHandleLogo2Upload(f); }
-function cvClearLogo(){  _cvClearLogo('company'); }
-function cvClearLogo2(){ _cvClearLogo('client');  }
+function cvClearLogo(){
+  cvTplCfg.tplLogo = null;
+  _cvPersistTplCfg();
+  cvUpdateLogoThumb();
+  cvRenderLogoLib();   // re-render to drop the active-ring
+  cvRenderCanvas();
+  toast(t('toast.logo_removed', 'Logo removed.'));
+}
 
 function cvSetLogoPos(pos){
   cvTplCfg.logoPos = pos;
@@ -3441,14 +3424,71 @@ function cvSetLogoPos(pos){
 }
 function cvSetLogoSize(sz){ cvTplCfg.logoSize = sz; cvRenderCanvas(); }
 function cvUpdateLogoThumb(){
-  const update = (imgId, phId, src) => {
-    const img=document.getElementById(imgId); const ph=document.getElementById(phId);
-    if(!img) return;
-    if(src){ img.src=src; img.style.display=''; if(ph) ph.style.display='none'; }
-    else    { img.src=''; img.style.display='none'; if(ph) ph.style.display=''; }
-  };
-  update('cv-logo-thumb','cv-logo-thumb-ph', cvTplCfg.tplLogo);
-  update('cv-logo2-thumb','cv-logo2-thumb-ph', cvTplCfg.tplLogo2);
+  const img = document.getElementById('cv-logo-thumb');
+  const ph  = document.getElementById('cv-logo-thumb-ph');
+  if(!img) return;
+  if(cvTplCfg.tplLogo){
+    img.src = cvTplCfg.tplLogo;
+    img.style.display = '';
+    if(ph) ph.style.display = 'none';
+  } else {
+    img.removeAttribute('src');
+    img.style.display = 'none';
+    if(ph) ph.style.display = '';
+  }
+}
+
+// ── Logo library ─────────────────────────────────────────────────────
+function cvLogoLibLoad(){
+  try { return JSON.parse(localStorage.getItem(CV_LOGO_LIB_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function cvLogoLibSave(lib){
+  try { localStorage.setItem(CV_LOGO_LIB_KEY, JSON.stringify(lib)); }
+  catch(e){ console.warn('logo library save failed (quota?)', e); }
+}
+function cvLogoLibAdd(dataUrl){
+  if(!dataUrl) return;
+  let lib = cvLogoLibLoad().filter(e => e && e.dataUrl !== dataUrl);
+  lib.unshift({ id: 'l_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), dataUrl, addedAt: Date.now() });
+  if(lib.length > CV_LOGO_LIB_MAX) lib = lib.slice(0, CV_LOGO_LIB_MAX);
+  cvLogoLibSave(lib);
+}
+function cvLogoLibPick(id){
+  const entry = cvLogoLibLoad().find(e => e && e.id === id);
+  if(!entry) return;
+  cvTplCfg.tplLogo = entry.dataUrl;
+  _cvPersistTplCfg();
+  cvUpdateLogoThumb();
+  cvRenderLogoLib();
+  cvRenderCanvas();
+}
+function cvLogoLibRemove(id){
+  const lib = cvLogoLibLoad().filter(e => e && e.id !== id);
+  cvLogoLibSave(lib);
+  cvRenderLogoLib();
+}
+function cvRenderLogoLib(){
+  const host = document.getElementById('cv-logo-lib');
+  if(!host) return;
+  const lib = cvLogoLibLoad();
+  if(!lib.length){
+    host.innerHTML = `<div style="font-size:9px;color:var(--t3);padding:4px 2px;line-height:1.3">${escapeHtml(t('pe.logo_lib.empty','Uploaded logos appear here for reuse.'))}</div>`;
+    return;
+  }
+  const active = cvTplCfg.tplLogo;
+  const pickTitle   = escapeHtml(t('pe.logo_lib.pick',   'Click to use'));
+  const removeTitle = escapeHtml(t('pe.logo_lib.remove', 'Remove from library'));
+  host.innerHTML = lib.map(e => {
+    const isActive = e.dataUrl === active;
+    const ring = isActive ? 'border:1.5px solid var(--blue);box-shadow:0 0 0 1px var(--blue) inset' : 'border:1px solid var(--border2)';
+    // dataUrl is safe in a src attribute (it's a data: URI we generated), but
+    // the id goes through data-args so we keep escaping for defence in depth.
+    return `<div class="cv-logo-lib-item" style="position:relative;width:36px;height:28px;border-radius:3px;${ring};overflow:hidden;flex-shrink:0;background:#fff" title="${pickTitle}">
+      <img src="${e.dataUrl}" data-action="cvLogoLibPick" data-args="'${escapeHtml(e.id)}'" style="width:100%;height:100%;object-fit:contain;display:block;cursor:pointer"/>
+      <button class="tbe" data-action="cvLogoLibRemove" data-args="'${escapeHtml(e.id)}'" style="position:absolute;top:-1px;right:-1px;padding:0;width:14px;height:14px;border-radius:0 3px 0 3px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;line-height:14px;border:none;cursor:pointer" title="${removeTitle}">×</button>
+    </div>`;
+  }).join('');
 }
 
 // ── Design helpers ───────────────────────────────────────────────────

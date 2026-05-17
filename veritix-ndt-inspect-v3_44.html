@@ -1578,21 +1578,8 @@
                     <option value="sm" data-i18n="pe.btn.size_small">Small</option><option value="md" selected data-i18n="pe.btn.size_medium">Medium</option><option value="lg" data-i18n="pe.btn.size_large">Large</option>
                   </select>
                 </div>
-                <div class="rbn-lbl" data-i18n="pe.grp.company_logo">Company Logo</div>
-              </div>
-              <div class="rbn-grp">
-                <input type="file" id="cv-logo2-upload" accept="image/*" style="display:none" data-on-change="_wCvHandleLogo2Upload" data-pass-el="1"/>
-                <div class="rbn-row" style="gap:4px;margin-top:2px">
-                  <div class="tpl-logo-drop" id="cv-logo2-thumb-box" data-action="_wClickInput" data-args="'cv-logo2-upload'" title="Upload client logo">
-                    <img id="cv-logo2-thumb" style="display:none;max-width:100%;max-height:100%;object-fit:contain" alt=""/>
-                    <span id="cv-logo2-thumb-ph" style="font-size:9px;color:var(--t3);text-align:center;line-height:1.3" data-i18n="pe.lbl.upload_logo">Upload<br>logo</span>
-                  </div>
-                  <div class="rbn-col" style="gap:3px">
-                    <button class="tbe" data-action="_wClickInput" data-args="'cv-logo2-upload'" style="font-size:11px">📂 Upload</button>
-                    <button class="tbe" data-action="cvClearLogo2" style="font-size:11px;color:var(--red)">✕ Remove</button>
-                  </div>
-                </div>
-                <div class="rbn-lbl" data-i18n="pe.grp.client_logo">Client Logo</div>
+                <div class="rbn-row" id="cv-logo-lib" style="gap:3px;margin-top:4px;max-width:260px;flex-wrap:wrap"></div>
+                <div class="rbn-lbl" data-i18n="pe.grp.logo">Logo</div>
               </div>
               <div class="rbn-grp">
                 <div class="rbn-col" style="gap:3px;margin-top:2px">

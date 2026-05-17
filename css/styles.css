@@ -498,7 +498,9 @@
 .kb-card-id {
   font-family:var(--mono);
   font-size:10px;
-  color:var(--cyan);
+  /* Was cyan — pulled back to neutral so cyan reads as accent/action,
+     not as "every mono identifier in the app". */
+  color:var(--t2);
   font-weight:600;
   font-variant-numeric: var(--num-features);
   white-space:nowrap;
@@ -2742,6 +2744,22 @@ a { color: var(--cyan); text-decoration: none; }
 .badge-green  { background: rgba(62,207,142,.10);  color: var(--green);  box-shadow: inset 0 0 0 1px rgba(62,207,142,.2); }
 .badge-amber  { background: rgba(245,166,35,.10);  color: var(--amber);  box-shadow: inset 0 0 0 1px rgba(245,166,35,.2); }
 .badge-red    { background: rgba(242,92,92,.10);   color: var(--red);    box-shadow: inset 0 0 0 1px rgba(242,92,92,.22); }
+/* Verified — brand red used as an official-stamp signal, not as danger.
+   The Veritix mark's checkmark is red; this echoes it for surfaces that
+   represent "signed off / approved / officially issued". Uses a stronger
+   border + slight letter-spacing to read as a stamp, not just a tag. */
+.badge-verified {
+  background: rgba(242,92,92,.08);
+  color: var(--red);
+  box-shadow: inset 0 0 0 1.5px rgba(242,92,92,.45);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+}
+.badge-verified::before { content: '✓ '; font-weight: 700; opacity: .85; }
 /* V12 a11y: pair color with a non-color cue for colorblind users (WCAG 1.4.1) */
 .badge-green::before { content:"✓ "; font-weight:700; opacity:.85 }
 .badge-red::before   { content:"✕ "; font-weight:700; opacity:.85 }

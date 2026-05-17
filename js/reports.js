@@ -877,11 +877,16 @@ function rptClearFilters() {
 // ══════════════════════════════════════════════════════════════════════════
 var RPT_STAGES = ['Draft', 'Submitted', 'Reviewed', 'Approved', 'Archived'];
 var RPT_STAGE_COLORS = {
-  'Draft':     { bg:'rgba(127,140,170,.10)', fg:'var(--t2)',   accent:'#7f8caa' },
-  'Submitted': { bg:'rgba(0,212,255,.10)',   fg:'var(--cyan)', accent:'#00d4ff' },
+  'Draft':     { bg:'rgba(127,140,170,.10)', fg:'var(--t2)',     accent:'#7f8caa' },
+  'Submitted': { bg:'rgba(0,212,255,.10)',   fg:'var(--cyan)',   accent:'#00d4ff' },
   'Reviewed':  { bg:'rgba(167,139,250,.10)', fg:'var(--violet)', accent:'#a78bfa' },
-  'Approved':  { bg:'rgba(62,207,142,.10)',  fg:'var(--green)', accent:'#3ecf8e' },
-  'Archived':  { bg:'rgba(255,255,255,.04)', fg:'var(--t3)',   accent:'#5a6880' },
+  // Approved is the terminal "signed off / officially issued" state. Uses
+  // brand red — same colour as the checkmark in the Veritix shield — to
+  // echo the wordmark and treat the stage badge as an official stamp.
+  // Distinct from verdict colours (Pass = green, Fail = red) which signal
+  // technical inspection outcome rather than administrative workflow.
+  'Approved':  { bg:'rgba(242,92,92,.08)',   fg:'var(--red)',    accent:'#f25c5c' },
+  'Archived':  { bg:'rgba(255,255,255,.04)', fg:'var(--t3)',     accent:'#5a6880' },
 };
 function getReportStage(r){ return r.stage || 'Draft'; }
 
@@ -1272,7 +1277,7 @@ function inboxOpenAudit(idx){
   if(!log.length) logHtml = '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px">No audit history yet.</div>';
   else logHtml = log.map(entry => `
     <div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start">
-      <div style="width:8px;height:8px;border-radius:50%;background:${entry.action.startsWith('stage:Approved')?'var(--green)':entry.action.startsWith('stage:Draft')?'var(--t3)':'var(--cyan)'};margin-top:6px;flex-shrink:0"></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:${entry.action.startsWith('stage:Approved')?'var(--red)':entry.action.startsWith('stage:Draft')?'var(--t3)':'var(--cyan)'};margin-top:6px;flex-shrink:0"></div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;color:var(--t1)"><strong>${escapeHtml(entry.by||'—')}</strong> · ${escapeHtml(entry.action||'')}</div>
         ${entry.details?`<div style="font-size:12px;color:var(--t2);margin-top:3px;font-style:italic">"${escapeHtml(entry.details)}"</div>`:''}

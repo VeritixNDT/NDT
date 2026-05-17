@@ -4,6 +4,52 @@ This is the Phase 1 cloud-migration setup. Follow these steps in order. The
 whole thing takes about 10 minutes and the free tier is plenty for evaluation.
 When you're done, Veritix is a live, multi-device cloud app.
 
+## What's shipped vs deferred
+
+**Phase 1 (shipped):** transport-layer swap. The legacy `vxApi` contract
+is preserved; its internals call Supabase Client. Specifically working
+end-to-end:
+
+- Cloud signup + signin (Supabase Auth, email+password, RLS-enforced).
+- Auto-provision of `orgs` + `org_members` with the creator as admin.
+- Entity CRUD via `entities` jsonb blob store (one row per `org_id` + `key`).
+- Trial-data migration: pre-signup work in localStorage is uploaded to
+  the freshly-provisioned org on first signin with an immediate session.
+- Cross-device realtime sync — entity changes from one tab/user surface
+  on every other authenticated session in the same org via Supabase
+  Realtime postgres_changes.
+- Member invite flow via `pending_invites` (migration 0002) — admin
+  records an invite by email, invitee auto-joins the org on signup.
+- Photo upload to the private `photos` bucket with org-scoped storage
+  policies.
+- Role-based UI gating (admin / senior / inspector / observer) on both
+  client and DB sides.
+
+**Deferred (Phase 2):**
+
+- Normalised tables: `reports`, `defects`, `inspectors` get proper
+  columns instead of being smushed into the `entities` jsonb bag.
+- Email delivery for invites — currently the admin shares the signup
+  URL out-of-band. Phase 2 wires `pending_invites` to a Supabase Edge
+  Function that sends a real invite email.
+- Members listing UI (currently only pending invites are shown).
+- The following client surfaces still hit stub endpoints that soft-fail:
+  - `/account/plan` — plan refresh
+  - `/telemetry/error` — uncaught-error telemetry
+  - `/auth/forgot-password` — Supabase has `auth.resetPasswordForEmail`
+    but the UI hasn't been wired to it yet
+  - `/auth/resend-verification` — Supabase has `auth.resend` but the UI
+    hasn't been wired to it yet
+- Webhooks, plan billing, the Stripe portal link.
+
+**Deferred (Phase 3 — production hardening):**
+
+- Email confirmation ON (Phase 1 sets it OFF for evaluation UX).
+- Real Site URLs configured in Supabase Auth (currently localhost).
+- SRI hashes on CDN-loaded scripts.
+- Deploy pipeline to Vercel / Netlify / Cloudflare Pages.
+- Rate limits + abuse handling on signup.
+
 ## 1. Create a Supabase project
 
 1. Sign up (or sign in) at <https://supabase.com>.
@@ -131,15 +177,8 @@ uploads, and cross-device realtime all work end-to-end.
 
 ## What's not in Phase 1
 
-The following surfaces still hit a stub backend that returns soft
-failures (the UI tolerates them gracefully):
-
-- `/account/plan` — plan refresh
-- `/telemetry/error` — uncaught-error telemetry
-- `/auth/forgot-password` — Supabase has `auth.resetPasswordForEmail`
-  but the UI hasn't been wired to it yet
-- `/auth/resend-verification` — Supabase has `auth.resend` but the UI
-  hasn't been wired to it yet
-- Webhooks, plan billing, the Stripe portal link
-
-These are Phase 2 work and intentionally out of scope here.
+See the "What's shipped vs deferred" section at the top for the full
+Phase 2 / Phase 3 list. The short version: real email delivery,
+normalised tables, members listing UI, plan / billing surfaces, and
+production hardening (email-confirm, real Site URLs, SRI, deploy
+pipeline) are deferred.

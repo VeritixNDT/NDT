@@ -1856,7 +1856,26 @@
                 <span style="font-size:16px">📱</span>
                 <span data-i18n="pe.mobile.warning">The template editor works best on a desktop or tablet (1100px+). On smaller screens, use ☰ to access fields and ⚙ for properties.</span>
               </div>
-              <div class="canvas-page-tabs" id="cv-page-tabs"></div>
+              <!-- Persistent quick-action bar above the canvas. Undo / redo
+                   arrows sit here so they're always reachable, regardless of
+                   which ribbon tab is active. Buttons live outside #cv-page-tabs
+                   because that element gets fully innerHTML-replaced by
+                   cvRenderPageTabs on every page change. -->
+              <div class="canvas-toolbar-row">
+                <div class="cv-quick-actions" id="cv-undo-redo">
+                  <button class="cv-quick-action" id="cv-undo-btn" data-action="cvUndo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo" data-i18n-title="pe.btn.undo">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/>
+                    </svg>
+                  </button>
+                  <button class="cv-quick-action" id="cv-redo-btn" data-action="cvRedo" type="button" title="Redo (Ctrl+Y)" aria-label="Redo" data-i18n-title="pe.btn.redo">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="canvas-page-tabs" id="cv-page-tabs"></div>
+              </div>
               <div id="cv-scroll-area" style="flex:1;overflow:auto;padding:16px;display:flex">
                 <div id="cv-scale-wrap" style="flex-shrink:0;margin:auto;position:relative">
                   <div id="cv-canvas"

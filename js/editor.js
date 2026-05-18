@@ -1005,6 +1005,7 @@ function cvInitCanvas(){
   cvUpdateStatusBar();
   cvUpdateLogoThumb();  // reflect persisted tplLogo in the ribbon thumb
   cvRenderLogoLib();    // populate the saved-logo library
+  _cvRefreshUndoRedoUI();  // page-tabs-bar arrows start disabled at boot
   setTimeout(() => cvRefreshPreviewSource(), 50);   // V3: populate report dropdown
   // V25: reflect saved alignment-guides toggle state on the button
   const alignBtn = document.getElementById('cv-align-toggle');
@@ -3345,6 +3346,7 @@ function cvPushUndo(){
   cvUndoStack.push(JSON.stringify(cvPages));
   if(cvUndoStack.length>50) cvUndoStack.shift();
   cvRedoStack = [];
+  _cvRefreshUndoRedoUI();
 }
 function cvUndo(){
   if(!cvUndoStack.length){ toast(t('toast.nothing_to_undo', 'Nothing to undo')); return; }
@@ -3352,6 +3354,7 @@ function cvUndo(){
   cvPages = JSON.parse(cvUndoStack.pop());
   cvSync(); cvSelectedId=null; cvSelectedIds=[];
   cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+  _cvRefreshUndoRedoUI();
 }
 function cvRedo(){
   if(!cvRedoStack.length){ toast(t('toast.nothing_to_redo', 'Nothing to redo')); return; }
@@ -3359,6 +3362,16 @@ function cvRedo(){
   cvPages = JSON.parse(cvRedoStack.pop());
   cvSync(); cvSelectedId=null; cvSelectedIds=[];
   cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+  _cvRefreshUndoRedoUI();
+}
+
+// Sync the page-tabs-bar undo/redo arrow buttons to current stack state.
+// Disables the arrow when its stack is empty so the affordance is honest.
+function _cvRefreshUndoRedoUI(){
+  const u = document.getElementById('cv-undo-btn');
+  const r = document.getElementById('cv-redo-btn');
+  if(u) u.disabled = !cvUndoStack.length;
+  if(r) r.disabled = !cvRedoStack.length;
 }
 
 // ── Method template storage ──────────────────────────────────────────

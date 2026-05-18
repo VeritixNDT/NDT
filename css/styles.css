@@ -4396,7 +4396,52 @@ a { color: var(--cyan); text-decoration: none; }
 .tpl-logo-drop{width:52px;height:40px;border:1px dashed var(--border2);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .15s}
 .tpl-logo-drop:hover{border-color:var(--blue)}
 
-.canvas-page-tabs{display:flex;align-items:center;gap:0;padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--border);min-height:30px;flex-shrink:0;overflow-x:auto}
+/* Toolbar row above the canvas — wraps the quick-action arrows and the
+   page-tabs strip so they share a single thin band. The page-tabs strip
+   still owns its own background, but the wrapper provides the bottom
+   border so the two elements feel like one toolbar. */
+.canvas-toolbar-row {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  min-height: 30px;
+  flex-shrink: 0;
+}
+.cv-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cv-quick-action {
+  width: 26px;
+  height: 22px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--t2);
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color var(--motion-fast), background var(--motion-fast), border-color var(--motion-fast);
+  padding: 0;
+}
+.cv-quick-action:hover:not(:disabled) {
+  color: var(--cyan);
+  background: rgba(0,212,255,.08);
+  border-color: rgba(0,212,255,.18);
+}
+.cv-quick-action:active:not(:disabled) { transform: translateY(.5px); }
+.cv-quick-action:disabled {
+  color: var(--t4);
+  cursor: default;
+  opacity: .55;
+}
+.canvas-page-tabs{display:flex;align-items:center;gap:0;padding:0 8px;background:var(--bg2);min-height:30px;flex-shrink:0;overflow-x:auto;flex:1}
 .canvas-page-tab{padding:5px 14px;font-size:11px;font-family:var(--mono);cursor:pointer;color:var(--t3);border:none;background:none;border-bottom:2px solid transparent;transition:all .12s;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .canvas-page-tab:hover{color:var(--t1);background: var(--hover-bg)}
 .canvas-page-tab.active{color:var(--blue);border-bottom-color:var(--blue);background:rgba(79,142,247,.06)}

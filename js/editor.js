@@ -374,16 +374,19 @@ var cvTplCfg = {
   lockZones:false,
 };
 
-// Returns true if a block should be treated as locked right now. Three
-// inputs collapse to one effective state:
+// Returns true if a block should be treated as locked right now.
+// Inputs collapse to one effective state:
 //   1. Per-block .locked flag — user explicitly locked this block.
 //   2. cvTplCfg.lockZones + b.zone tag — set by auto-setup / dropped
 //      into the header/footer zone with an explicit tag.
-//   3. cvTplCfg.lockZones + position-based detection via _cvDetectZone
-//      — catches blocks the user dropped inside the band visually but
-//      that were never tagged with a zone (e.g. blocks placed before
-//      the zone system existed, or blocks dragged in from the palette
-//      with click-to-add which doesn't auto-tag).
+//   3. cvTplCfg.lockZones + position — anything whose midpoint sits
+//      inside the configured header/footer band height counts, even
+//      if the zone .enabled flag isn't on (so users who place a page
+//      number / footer line by hand without ever ticking the Footer
+//      checkbox still get them locked when Lock header & footer is on).
+//   4. cvTplCfg.lockZones + b.key === 'page-footer' — the layout
+//      "Page footer bar" block is conceptually a footer no matter
+//      where it lives on the page.
 // All drag / resize / keyboard-move gates and the on-canvas lock icon
 // read through this so the locking mechanisms can't drift.
 function _cvIsBlockLocked(b){
@@ -391,10 +394,15 @@ function _cvIsBlockLocked(b){
   if(b.locked) return true;
   if(cvTplCfg && cvTplCfg.lockZones){
     if(b.zone === 'header' || b.zone === 'footer') return true;
-    // Position fallback — a tag-less block sitting in the band still
-    // counts as part of the header/footer when zones are enabled.
-    const z = _cvDetectZone(b.y || 0, b.h || 0);
-    if(z === 'header' || z === 'footer') return true;
+    if(b.key === 'page-footer') return true;
+    // Position fallback — uses the configured band heights regardless
+    // of header/footer.enabled. Default 100px header / 60px footer if
+    // not configured. Blocks straddling are assigned by midpoint.
+    const midY = (+b.y || 0) + (+b.h || 0) / 2;
+    const hH = (cvTplCfg.header && +cvTplCfg.header.heightPx) || 100;
+    const fH = (cvTplCfg.footer && +cvTplCfg.footer.heightPx) || 60;
+    if(midY < hH) return true;
+    if(midY > CV_PAGE_HEIGHT_PX - fH) return true;
   }
   return false;
 }

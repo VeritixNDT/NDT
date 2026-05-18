@@ -1077,6 +1077,9 @@ function cvAddPage(){
 function cvSwitchPage(idx){
   if(idx<0||idx>=cvPages.length) return;
   cvCurrentPage=idx; cvSync(); cvSelectedId=null; cvSelectedIds=[];
+  // Reset the click-to-add anchor — the last-placed id is page-scoped,
+  // so a click on the new page should start a fresh column.
+  _cvLastPlacedId = null;
   cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null);
 }
 async function cvDeletePage(idx){
@@ -1345,6 +1348,13 @@ function cvDrop(e){
   }
   cvPaletteDrag = null;
 }
+// Tracks the most recent click-to-add block id so successive clicks
+// chain into a clean column — each new card sits directly under the
+// previous click, inheriting its x / width. Cleared when the block
+// is deleted (cvDeleteBlock / cvDeleteSelected) so the chain doesn't
+// dangle on a ghost id.
+var _cvLastPlacedId = null;
+
 function cvAddBlockDefault(key, isLayout){
   // Resolve the block's default width. Layout items go through
   // _cvAllLayoutItems so dynamic items (saved-logo cards) are considered
@@ -1353,43 +1363,58 @@ function cvAddBlockDefault(key, isLayout){
   const def = isLayout ? _cvAllLayoutItems().find(it=>it.key===key) : CV_FIELD_DEFS[key];
   const defaultW = (def && def.w) || 200;
   const defaultH = (def && def.h) || 38;
-  // Field blocks (non-layout) inherit x AND width from the bottommost
-  // block on the page so stacking builds a tidy aligned column instead of
-  // ragged-edge boxes. Layout blocks (section-header, accent-bar) keep
-  // their natural full-width sizing — inheriting a 90px column width for
-  // a section header would shrink it to a useless sliver.
-  let x, w;
-  const stackAbove = !isLayout ? _cvFindStackAnchor() : null;
-  if(stackAbove){
-    // Snap inherited values so a legacy block above with non-grid w
-    // doesn't drag the new card off-grid too.
-    x = cvSnap(stackAbove.x);
-    w = cvSnap(stackAbove.w);
+
+  // Body-zone bounds — header / footer get filtered out so a populated
+  // footer can't push new cards into the footer band, and the header
+  // height defines where the body actually starts.
+  const bodyTop    = (cvTplCfg.header && cvTplCfg.header.enabled) ? (+cvTplCfg.header.heightPx || 100) : 20;
+  const bodyBottom = (cvTplCfg.footer && cvTplCfg.footer.heightPx) ? (CV_PAGE_HEIGHT_PX - (+cvTplCfg.footer.heightPx || 60) - 40) : 1060;
+
+  // Anchor selection — prefer the LAST click-to-added block on this page
+  // so successive clicks chain into a column. Falls back to the visually
+  // bottom-most body field when there's no recent placement (e.g. first
+  // click, deleted anchor, switched pages).
+  let anchor = null;
+  if(_cvLastPlacedId){
+    anchor = cvBlocks.find(b =>
+      b.id === _cvLastPlacedId &&
+      !b.isLayout &&
+      b.zone !== 'header' && b.zone !== 'footer'
+    ) || null;
+  }
+  if(!anchor && !isLayout) anchor = _cvFindStackAnchor();
+
+  let x, w, y;
+  if(anchor){
+    // Snap inherited values so a legacy block with non-grid w doesn't
+    // pass its misalignment forward.
+    x = cvSnap(anchor.x);
+    w = cvSnap(anchor.w);
+    y = cvSnap(anchor.y + anchor.h + 4);
   } else {
     w = cvSnap(defaultW);
     x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - w) / 2));
+    y = bodyTop;
   }
-  // y stacks below existing BODY content. Header / footer zone blocks
-  // are excluded — without that, a page with a footer (page-num,
-  // confidentiality, …) would push every click-to-add into the footer
-  // band because the footer blocks sit near y=1080 and the calculation
-  // landed at y=1060+.
-  const bodyTop    = (cvTplCfg.header && cvTplCfg.header.enabled) ? (+cvTplCfg.header.heightPx || 100) : 20;
-  const bodyBottom = (cvTplCfg.footer && cvTplCfg.footer.heightPx) ? (CV_PAGE_HEIGHT_PX - (+cvTplCfg.footer.heightPx || 60) - 40) : 1060;
-  const bodyBlocks = cvBlocks.filter(b => b.zone !== 'header' && b.zone !== 'footer');
-  const lastY = bodyBlocks.reduce((m,b)=>Math.max(m,b.y+b.h+4), bodyTop);
-  const y = Math.min(lastY, bodyBottom);
+  // Keep the new card inside the body band — never let the chain march
+  // into the footer.
+  if(y > bodyBottom) y = bodyBottom;
+
   cvAddBlock(key, isLayout, x, y);
   // cvAddBlock seeds w from def — override on the just-pushed block so
   // the new card lines up with the column. cvAddBlock pushes to the end
   // of cvBlocks.
-  if(stackAbove && cvBlocks.length){
-    const newBlock = cvBlocks[cvBlocks.length - 1];
-    if(newBlock && newBlock.key === key && w && w !== defaultW){
+  const newBlock = cvBlocks.length ? cvBlocks[cvBlocks.length - 1] : null;
+  if(newBlock && newBlock.key === key){
+    if(anchor && w && w !== newBlock.w){
       newBlock.w = w;
       cvRenderCanvas();
       cvSaveLayout();
     }
+    // Remember this placement as the next click's anchor. Layout blocks
+    // (section headers, accent bars, h-lines) aren't useful anchors
+    // because they're full-width — chain only through real field cards.
+    if(!isLayout) _cvLastPlacedId = newBlock.id;
   }
 }
 
@@ -3099,11 +3124,12 @@ function cvUpdateBlock(id, prop, value){
   }
   cvSaveLayout();
 }
-function cvDeleteBlock(id){ cvPushUndo(); cvPages[cvCurrentPage].blocks=cvPages[cvCurrentPage].blocks.filter(b=>b.id!==id); cvSync(); if(cvSelectedId===id){cvSelectedId=null;cvSelectedIds=cvSelectedIds.filter(x=>x!==id);} cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout(); }
+function cvDeleteBlock(id){ cvPushUndo(); cvPages[cvCurrentPage].blocks=cvPages[cvCurrentPage].blocks.filter(b=>b.id!==id); cvSync(); if(cvSelectedId===id){cvSelectedId=null;cvSelectedIds=cvSelectedIds.filter(x=>x!==id);} if(_cvLastPlacedId === id) _cvLastPlacedId = null; cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout(); }
 function cvDeleteSelected(){
   if(!cvSelectedIds.length) return;
   cvPushUndo();
   cvPages[cvCurrentPage].blocks = cvPages[cvCurrentPage].blocks.filter(b=>!cvSelectedIds.includes(b.id));
+  if(cvSelectedIds.includes(_cvLastPlacedId)) _cvLastPlacedId = null;
   cvSync(); cvSelectedId=null; cvSelectedIds=[];
   cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
 }

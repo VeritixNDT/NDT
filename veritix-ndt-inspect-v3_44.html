@@ -1728,6 +1728,9 @@
                   </div>
                   <button class="tbe" data-action="cvAutoSetupFromCompany" style="font-size:10px;color:var(--cyan);margin-top:2px;white-space:nowrap" title="Build a default header + footer from your company profile" data-i18n="pe.btn.auto_setup">🪄 Auto-setup from company</button>
                   <button class="tbe" data-action="cvOpenHFDesigner" style="font-size:10px;color:var(--cyan);margin-top:2px;white-space:nowrap" title="Design the look of the header and footer (background, accent, border)" data-i18n="pe.btn.hf_designer">🎨 Designer…</button>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;white-space:nowrap;margin-top:2px" title="Lock every block tagged as header or footer so they can't be moved, resized, or deleted by accident">
+                    <input type="checkbox" id="cv-lock-zones" data-on-change="_wCvToggleLockZones" data-pass-el="1"> <span data-i18n="pe.btn.lock_zones">🔒 Lock header &amp; footer</span>
+                  </label>
                 </div>
                 <div class="rbn-lbl" data-i18n="pe.grp.header_footer">Header / Footer</div>
               </div>

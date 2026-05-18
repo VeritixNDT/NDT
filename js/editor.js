@@ -367,7 +367,24 @@ var cvTplCfg = {
     accentColor:'', accentThicknessPx:2, accentPos:'top',
     borderStyle:'none', borderColor:'', paddingPx:8,
   },
+  // Single template-wide flag — when on, every block tagged with zone
+  // 'header' or 'footer' is treated as locked regardless of its own
+  // .locked property. Lets users freeze the chrome with one click while
+  // still editing body blocks freely.
+  lockZones:false,
 };
+
+// Returns true if a block should be treated as locked right now — either
+// the per-block .locked flag, or the template-wide lockZones flag matched
+// to a header / footer zone. All drag / resize / keyboard-move gates,
+// and the on-canvas lock icon, read through this so the two locking
+// mechanisms can't drift.
+function _cvIsBlockLocked(b){
+  if(!b) return false;
+  if(b.locked) return true;
+  if(cvTplCfg && cvTplCfg.lockZones && (b.zone === 'header' || b.zone === 'footer')) return true;
+  return false;
+}
 
 // ── Sample data ──────────────────────────────────────────────────────
 var CV_SAMPLE = {
@@ -1233,8 +1250,18 @@ function cvDrop(e){
   cvPaletteDrag = null;
 }
 function cvAddBlockDefault(key, isLayout){
+  // Resolve the block's default width so the placement is horizontally
+  // centred on the page. Layout items go through _cvAllLayoutItems so
+  // dynamic items (saved-logo cards) are considered too; field items use
+  // CV_FIELD_DEFS. Falls back to 200px when neither lookup hits.
+  const def = isLayout ? _cvAllLayoutItems().find(it=>it.key===key) : CV_FIELD_DEFS[key];
+  const blockW = (def && def.w) || 200;
+  const x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - blockW) / 2));
+  // y still stacks below existing content so successive clicks don't
+  // pile blocks on top of each other. Capped near the page bottom so the
+  // first click into a busy page still lands somewhere visible.
   const lastY = cvBlocks.reduce((m,b)=>Math.max(m,b.y+b.h+4), 20);
-  cvAddBlock(key, isLayout, 20, Math.min(lastY, 1060));
+  cvAddBlock(key, isLayout, x, Math.min(lastY, 1060));
 }
 
 // ── Block creation ───────────────────────────────────────────────────
@@ -1730,7 +1757,7 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
   const elDiv = document.createElement('div');
   elDiv.id = 'cblk-'+block.id;
   elDiv.dataset.blockId = block.id;
-  const isLocked = block.locked;
+  const isLocked = _cvIsBlockLocked(block);
   const isHidden = !cvPreview && !passesShowWhen;
   const hasComments = block.comments && block.comments.some(c => !c.resolved);
 
@@ -2283,7 +2310,7 @@ function cvUpdateSelectionUI(){
       return;
     }
     const isSel = (cvSelectedId === block.id) || cvSelectedIds.includes(block.id);
-    const isLocked = !!block.locked;
+    const isLocked = _cvIsBlockLocked(block);
     if(isSel && block.showBorder){
       // Match the selection visual in _cvBuildBlockElement — box-shadow
       // glow rather than CSS outline. Only applied when showBorder is on,
@@ -2302,7 +2329,7 @@ function cvUpdateSelectionUI(){
     const block = cvBlocks.find(b => b.id === sid);
     const elB = document.getElementById('cblk-' + sid);
     if(block && elB){
-      const isLocked = !!block.locked;
+      const isLocked = _cvIsBlockLocked(block);
       const fab = document.createElement('div');
       fab.className = 'cblk-fab-btn';
       fab.style.cssText = 'position:absolute;top:-24px;right:0;display:flex;gap:2px;z-index:300';
@@ -2970,7 +2997,7 @@ function cvMouseMove(e){
     // Move all dragged blocks
     cvDragging.startPositions.forEach(sp => {
       const b = cvBlocks.find(bb=>bb.id===sp.id);
-      if(!b || b.locked) return;
+      if(!b || _cvIsBlockLocked(b)) return;
       let newX = cvSnap(Math.max(0, sp.x + dx));
       let newY = cvSnap(Math.max(0, sp.y + dy));
 
@@ -3119,7 +3146,7 @@ document.addEventListener('keydown', e=>{
     const ids = cvSelectedIds.length ? cvSelectedIds : [cvSelectedId];
     ids.forEach(sid=>{
       const b = cvBlocks.find(bb=>bb.id===sid);
-      if(!b || b.locked) return;
+      if(!b || _cvIsBlockLocked(b)) return;
       if(e.key==='ArrowLeft')  b.x = Math.max(0, b.x - step);
       if(e.key==='ArrowRight') b.x = b.x + step;
       if(e.key==='ArrowUp')    b.y = Math.max(0, b.y - step);
@@ -3566,6 +3593,7 @@ async function cvResetTplConfig(){
     content:{},
     header:{ enabled:false, heightPx:100, bgColor:'transparent', accentColor:'', accentThicknessPx:4, accentPos:'bottom', borderStyle:'none', borderColor:'', paddingPx:8 },
     footer:{ enabled:false, heightPx:60,  bgColor:'transparent', accentColor:'', accentThicknessPx:2, accentPos:'top',    borderStyle:'none', borderColor:'', paddingPx:8 },
+    lockZones:false,
   };
   localStorage.removeItem(CV_TPL_KEY);
   cvRenderCanvas();
@@ -4091,7 +4119,7 @@ function _cvNudge(dx, dy){
   cvPushUndo();
   ids.forEach(id => {
     const b = cvBlocks.find(bb => bb.id === id);
-    if(!b || b.locked) return;
+    if(!b || _cvIsBlockLocked(b)) return;
     b.x = Math.max(0, b.x + dx);
     b.y = Math.max(0, b.y + dy);
   });

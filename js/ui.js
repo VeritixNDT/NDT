@@ -312,6 +312,24 @@ function _wCvSetFooterHeight(el){
   cvSaveLayout();
 }
 
+// Lock-zones toggle handler. Wired to the Design ribbon's
+// "🔒 Lock header & footer" checkbox. Persists into cvTplCfg so the
+// state survives template save / reload, then re-renders the canvas so
+// every header/footer block immediately reflects the new locked state
+// (cursor:not-allowed + amber selection ring via _cvIsBlockLocked).
+function _wCvToggleLockZones(el){
+  if(typeof cvTplCfg !== 'object') return;
+  cvTplCfg.lockZones = !!(el && el.checked);
+  if(typeof _cvPersistTplCfg === 'function') _cvPersistTplCfg();
+  if(typeof cvRenderCanvas === 'function') cvRenderCanvas();
+  if(typeof toast === 'function') {
+    toast(t(cvTplCfg.lockZones
+      ? 'pe.toast.zones_locked'
+      : 'pe.toast.zones_unlocked',
+      cvTplCfg.lockZones ? 'Header & footer locked' : 'Header & footer unlocked'));
+  }
+}
+
 // V29 — Auto-setup header + footer from the company profile.
 // Reads vx-company-v1, and if the user has filled in anything, builds a
 // sensible default header (logo left, name center, address right) plus a
@@ -568,10 +586,12 @@ function _cvSyncHeaderFooterUI(){
   const fOn = document.getElementById('cv-footer-on');
   const hH  = document.getElementById('cv-header-h');
   const fH  = document.getElementById('cv-footer-h');
+  const lz  = document.getElementById('cv-lock-zones');
   if(hOn && cvTplCfg.header) hOn.checked = !!cvTplCfg.header.enabled;
   if(fOn && cvTplCfg.footer) fOn.checked = !!cvTplCfg.footer.enabled;
   if(hH  && cvTplCfg.header) hH.value    = cvTplCfg.header.heightPx || 100;
   if(fH  && cvTplCfg.footer) fH.value    = cvTplCfg.footer.heightPx || 60;
+  if(lz)                     lz.checked  = !!cvTplCfg.lockZones;
 }
 function _wCvUpdateBlockFormat(id, el) {
   cvUpdateBlock(id, 'format', el.value);

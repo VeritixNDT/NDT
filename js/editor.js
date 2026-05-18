@@ -374,15 +374,28 @@ var cvTplCfg = {
   lockZones:false,
 };
 
-// Returns true if a block should be treated as locked right now — either
-// the per-block .locked flag, or the template-wide lockZones flag matched
-// to a header / footer zone. All drag / resize / keyboard-move gates,
-// and the on-canvas lock icon, read through this so the two locking
-// mechanisms can't drift.
+// Returns true if a block should be treated as locked right now. Three
+// inputs collapse to one effective state:
+//   1. Per-block .locked flag — user explicitly locked this block.
+//   2. cvTplCfg.lockZones + b.zone tag — set by auto-setup / dropped
+//      into the header/footer zone with an explicit tag.
+//   3. cvTplCfg.lockZones + position-based detection via _cvDetectZone
+//      — catches blocks the user dropped inside the band visually but
+//      that were never tagged with a zone (e.g. blocks placed before
+//      the zone system existed, or blocks dragged in from the palette
+//      with click-to-add which doesn't auto-tag).
+// All drag / resize / keyboard-move gates and the on-canvas lock icon
+// read through this so the locking mechanisms can't drift.
 function _cvIsBlockLocked(b){
   if(!b) return false;
   if(b.locked) return true;
-  if(cvTplCfg && cvTplCfg.lockZones && (b.zone === 'header' || b.zone === 'footer')) return true;
+  if(cvTplCfg && cvTplCfg.lockZones){
+    if(b.zone === 'header' || b.zone === 'footer') return true;
+    // Position fallback — a tag-less block sitting in the band still
+    // counts as part of the header/footer when zones are enabled.
+    const z = _cvDetectZone(b.y || 0, b.h || 0);
+    if(z === 'header' || z === 'footer') return true;
+  }
   return false;
 }
 

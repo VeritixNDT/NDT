@@ -345,7 +345,6 @@ async function cvLoadDefaultLayout(){
   add('remarks',false,M,y,W,56); y+=56;
   add('result',false,M,y,col2-5,46); add('indications',false,M+col2-4,y,col2+11,46);
   y+=46;
-  add('sig-block',true,M,y,W,80,{showBorder:false}); y+=80;
   // page-footer block removed — the Header/Footer zone designer + auto-setup
   // covers everything this block did, and dual sources of footer truth
   // confuse users. The footer for a default layout comes from the zone.

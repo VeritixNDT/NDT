@@ -231,7 +231,6 @@ var CV_LAYOUT_ITEMS = [
   {key:'additional-page',label:'Additional page',            w:754,h:980},
   {key:'defect-table',   label:'Defect / indication table',  w:754,h:90},
   {key:'method-block',   label:'Method-specific data block', w:754,h:90},
-  {key:'sig-block',      label:'Signature block (2 col)',    w:754,h:80},
   {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
 ];
 
@@ -1163,7 +1162,7 @@ function cvInitCanvas(){
 function cvGetLayoutIcon(k){
   if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
-    'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','method-block':'⚙','sig-block':'✍',
+    'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','method-block':'⚙',
     'accent-bar':'█'}[k]||'□';
 }
 
@@ -2271,10 +2270,6 @@ function cvRenderBlockContent(block, report, preview){
           }
         }
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;font-size:8.5px;gap:3px"><span style="font-size:18px">⚙</span>Method-specific equipment data (${_h(cvPpvMethod)})</div>`;
-      }
-      case 'sig-block':{
-        const hh = Math.max(0, block.h-32);
-        return `<div style="height:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px 8px;font-size:7.5px;color:#555;box-sizing:border-box"><div><div style="font-size:7px;color:#888;margin-bottom:3px">Inspector</div><div style="height:${hh}px;border-bottom:0.5px solid #000;margin-bottom:3px"></div><div>Name: _______________________</div><div style="margin-top:2px">Date: _______________________</div></div><div><div style="font-size:7px;color:#888;margin-bottom:3px">Client</div><div style="height:${hh}px;border-bottom:0.5px solid #000;margin-bottom:3px"></div><div>Name: _______________________</div><div style="margin-top:2px">Date: _______________________</div></div></div>`;
       }
       case 'text-block':
         return `<div style="height:100%;padding:4px 7px;font-size:${fs};color:${_safeColor(block.color,'#333')};font-weight:${fw};font-style:${fi};text-align:${al};white-space:pre-wrap;word-break:break-word;line-height:1.5">${_h(block.text||'Free text — edit in Properties')}</div>`;
@@ -4241,7 +4236,6 @@ function cvSetSectionColor(c){
 
 function cvInsertTable(){ cvAddBlockDefault('text-block',true); toast(t('toast.table_edit_hint', 'Table: edit the text block content in Properties')); }
 function cvInsertHRule(){ cvAddBlockDefault('h-line',true); }
-function cvInsertSigBlock(){ cvAddBlockDefault('sig-block',true); }
 function cvInsertPageBreak(){ cvAddPage(); }
 
 // V24: cvExecCmd — text-formatting commands for the contenteditable text-block.

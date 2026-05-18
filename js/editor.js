@@ -1361,11 +1361,13 @@ function cvAddBlockDefault(key, isLayout){
   let x, w;
   const stackAbove = !isLayout ? _cvFindStackAnchor() : null;
   if(stackAbove){
-    x = stackAbove.x;
-    w = stackAbove.w;
+    // Snap inherited values so a legacy block above with non-grid w
+    // doesn't drag the new card off-grid too.
+    x = cvSnap(stackAbove.x);
+    w = cvSnap(stackAbove.w);
   } else {
-    w = defaultW;
-    x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - defaultW) / 2));
+    w = cvSnap(defaultW);
+    x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - w) / 2));
   }
   // y stacks below existing content so successive clicks don't pile blocks
   // on top of each other. Capped near the page bottom so the first click
@@ -1412,10 +1414,20 @@ function cvAddBlock(key, isLayout, x, y){
     else if(key==='h-line'){ showBorder=false; }
     else { showBorder=false; }
   }
+  // Snap default width/height to the grid at creation time. Several
+  // field defs carry non-grid sizes (part-exam at 380×44, subject at
+  // 260×38, …) which left newly placed blocks misaligned with the
+  // surrounding column. Layout blocks that span the full page width
+  // (754) keep their natural sizing — 754 isn't grid-aligned but the
+  // full-width usage is intentional.
+  const isFullWidth = def && def.w === 754;
+  const defW = def?.w || 160;
+  const defH = def?.h || 38;
   const block = {
     id, key, isLayout,
     x: Math.max(0,x), y: Math.max(0,y),
-    w: def?.w||160, h: def?.h||38,
+    w: isFullWidth ? defW : cvSnap(defW),
+    h: cvSnap(defH),
     // noLabel fields (e.g. method, tpl-number) skip the label row when text
     // is blank — seeding the label as block.text would defeat that and force
     // every drop to render with a "NDT Method:" / "Template no.:" prefix.

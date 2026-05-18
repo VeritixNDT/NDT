@@ -488,22 +488,17 @@ async function cvAutoSetupFromCompany(){
     });
   }
 
-  // Page number (center)
+  // Page number (right) — was previously the centre column with a
+  // separate Report No. block on the right. The auto Report No. block
+  // is dropped; the report number already lives in the body of the
+  // template via the user-placed report-no field, so duplicating it
+  // in the footer was noise. Page number takes over the right slot.
   newBlocks.push({
     id: _cvBlockId(), key: 'page-num', isLayout: false, zone: 'footer',
-    x: 357, y: footerY, w: 80, h: 24,
+    x: 514, y: footerY, w: 260, h: 24,
     text: 'Page', fontSize: '8px', bold: false, italic: false,
     color: '#666', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
-    align: 'center', zIndex: Z_FOOTER_BASE + 2, locked: false,
-  });
-
-  // Report ID (right)
-  newBlocks.push({
-    id: _cvBlockId(), key: 'report-no', isLayout: false, zone: 'footer',
-    x: 514, y: footerY, w: 260, h: 24,
-    text: 'Report No.', fontSize: '8px', bold: false, italic: false,
-    color: '#666', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
-    align: 'right', zIndex: Z_FOOTER_BASE + 3, locked: false,
+    align: 'right', zIndex: Z_FOOTER_BASE + 2, locked: false,
   });
 
   // Confidentiality statement (full-width, below the name/page/report row).

@@ -421,6 +421,24 @@ async function cvAutoSetupFromCompany(){
     });
   }
 
+  // Template number — sits as a small mono identifier under the company
+  // name. Only added when the active method has a templateNo configured at
+  // Settings → Report templates; otherwise the field is meaningless and
+  // would render as "—".
+  try {
+    const _td = (typeof ls === 'function' && typeof TPL_KEY === 'string') ? ls(TPL_KEY, {}) : {};
+    const _activeMethod = (typeof cvPpvMethod !== 'undefined' && cvPpvMethod) ? cvPpvMethod : 'UT';
+    if(_td && _td[_activeMethod] && _td[_activeMethod].templateNo){
+      newBlocks.push({
+        id: _cvBlockId(), key: 'tpl-number', isLayout: false, zone: 'header',
+        x: 297, y: headerY + 40, w: 200, h: 22,
+        text: 'Template no.', fontSize: '8px', bold: false, italic: false,
+        color: '#555', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
+        align: 'center', zIndex: Z_HEADER_BASE + 4, locked: false,
+      });
+    }
+  } catch(e){ /* silent — template number is a nice-to-have */ }
+
   // Thin accent bar at the bottom of the header to visually divide it from
   // the page body — uses the layout accent-bar block with the section colour.
   newBlocks.push({

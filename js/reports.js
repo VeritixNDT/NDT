@@ -166,9 +166,20 @@ function tplRenderDefaults(methodId, m) {
   const common = TPL_FIELDS._common;
   const specific = TPL_FIELDS[methodId] || [];
   const allFields = [...common, ...specific];
+  const isAdmin = (typeof vxIsAdmin === 'function') ? vxIsAdmin() : true;
   let html = `<div style="border-left:3px solid ${m.color};padding-left:14px;margin-bottom:16px">
     <div style="font-size:15px;font-weight:600;color:${m.color};margin-bottom:2px">${m.id} — ${escapeHtml(m.name)}</div>
     <div style="font-size:12px;color:var(--t3)">Configure default values for ${escapeHtml(m.name)} reports</div>
+  </div>`;
+  // Admin-only template number. Unique per method; surfaces in the PDF
+  // header via the `tpl-number` smart field and is appended to the
+  // exported file name.
+  html += `<div class="fg form-row" style="margin-bottom:10px">
+    <div class="fld">
+      <label>Template number <span style="font-size:10px;color:var(--t3);font-weight:400">· admin-only · used in header + filename</span></label>
+      <input id="tpl-${methodId}-templateNo" type="text" maxlength="60" placeholder="e.g. TPL-${methodId}-001" value="${escapeHtml(tpl.templateNo||'')}"${isAdmin?'':' disabled title="Admin only" style="opacity:.55;cursor:not-allowed"'}/>
+    </div>
+    <div></div>
   </div>`;
   for(let i=0;i<allFields.length;i+=2){
     const f1=allFields[i], f2=allFields[i+1];
@@ -302,6 +313,23 @@ function tplSave(methodId) {
   const tpl = {};
   [...common,...specific].forEach(f => { const inp=el(`tpl-${methodId}-${f.id}`); if(inp) tpl[f.id]=inp.value.trim(); });
   const rem=el(`tpl-${methodId}-remarks`); if(rem) tpl.remarks=rem.value.trim();
+  // Template number — admin-only. Non-admins see a disabled input so they
+  // can't change it in the UI; the action-level guard here is the
+  // belt-and-braces check (server-side RLS will be the eventual final
+  // enforcer when the field moves to Supabase).
+  const tno = el(`tpl-${methodId}-templateNo`);
+  if(tno){
+    const newVal = tno.value.trim();
+    const prevVal = (_tplData[methodId] && _tplData[methodId].templateNo) || '';
+    if(newVal !== prevVal){
+      const isAdmin = (typeof vxIsAdmin === 'function') ? vxIsAdmin() : true;
+      if(!isAdmin){
+        toast(t('rbac.admin_only_tpl_number', 'Only admins can change the template number.'), 'error');
+        return;
+      }
+    }
+    tpl.templateNo = newVal;
+  }
   _tplData[methodId]=tpl;
   saveTemplates();
   toast(`${m.id} template saved.`);

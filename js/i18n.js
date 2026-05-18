@@ -906,6 +906,7 @@ var STRINGS = {
     'pe.btn.hf_designer':   '🎨 Designer…',
     'pe.hfd.saved':         'Header & footer style saved.',
     'pe.hfd.confirm_reset': 'Reset header and footer style to defaults?',
+    'rbac.admin_only_tpl_number': 'Only admins can change the template number.',
     'pe.auto.title':        'Auto-setup template from company profile',
     'pe.auto.subtitle':     'Build a default header and footer using the data you have already entered in Settings → Company.',
     'pe.auto.no_company':   'Fill in your company profile first (Settings → Company), then come back to use auto-setup.',

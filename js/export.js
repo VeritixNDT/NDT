@@ -137,7 +137,24 @@ function cvBuildPrintHTML(report){
     </div>`;
   });
 
-  const title = escapeHtml((report && (report.reportNo||report.id)) || 'NDT Report');
+  // Filename surfaced to the browser's print-to-PDF dialog via <title>.
+  // Format: "<ReportNo> — <TemplateNo>" so the inspector can tell at a glance
+  // which method template generated the file. Template number prefers the
+  // value baked into the report; falls back to the live per-method config.
+  const _reportLabel = (report && (report.reportNo || report.id)) || 'NDT Report';
+  let _tplNo = (report && report.templateNo) || '';
+  if(!_tplNo){
+    try {
+      const _td = (typeof ls === 'function' && typeof TPL_KEY === 'string') ? ls(TPL_KEY, {}) : {};
+      const _m  = (report && report.method) || cvPpvMethod || '';
+      _tplNo = (_td && _td[_m] && _td[_m].templateNo) || '';
+    } catch(e){ _tplNo = ''; }
+  }
+  // Sanitize template number for filesystem-friendliness — browsers also
+  // strip / and other path separators from the suggested filename so this
+  // is a belt-and-braces clean-up.
+  _tplNo = String(_tplNo).replace(/[\\/:*?"<>|]/g, '').trim();
+  const title = escapeHtml(_tplNo ? `${_reportLabel} — ${_tplNo}` : _reportLabel);
   return `<!DOCTYPE html>
 <html lang="${vxLocale().split('-')[0]}">
 <head>

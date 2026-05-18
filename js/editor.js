@@ -5,6 +5,18 @@
 // ── Field definitions — maps to report data ────────────────────────────
 var CV_FIELD_DEFS = {
   'report-no':    {label:'Report No.',                    ph:'SV-2023-004-NDTD-REP-023-001', get:r=>r.reportNo||r.id||'—',        w:260,h:38, mapTo:'reportNo'},
+  // Template number — per-method, admin-set at Settings → Report templates.
+  // The smart getter prefers a value baked into the report (set when the
+  // report was created from the method template) but falls back to the live
+  // per-method template number so legacy reports still surface the field.
+  'tpl-number':   {label:'Template no.',                  ph:'TPL-UT-007',                    get:r=>{
+    if(r && r.templateNo) return r.templateNo;
+    try {
+      const td = (typeof ls === 'function' && typeof TPL_KEY === 'string') ? ls(TPL_KEY, {}) : {};
+      const m  = (r && r.method) || (typeof cvPpvMethod !== 'undefined' ? cvPpvMethod : '');
+      return (td && td[m] && td[m].templateNo) || '—';
+    } catch(e){ return '—'; }
+  }, w:150, h:38, mapTo:'templateNo'},
   'revision':     {label:'Revision',                      ph:'01',                            get:r=>r.revision||'—',              w:90, h:38, mapTo:'revision'},
   'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
   'rep-date':     {label:'Report date / Sign date',       ph:'2025-03-15',                    get:r=>r.signDate||r.repDate||'—',   w:140,h:38, mapTo:'signDate'},
@@ -193,7 +205,7 @@ var CV_LAYOUT_ITEMS = [
 var CV_PALETTE_GROUPS = [
   {id:'custom',    label:'✦ Custom / Blank',  fields:['blank-field','blank-multiline','blank-row-2','blank-row-3','blank-row-4']},
   {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block']},
-  {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','rep-date','method']},
+  {id:'identity',  label:'Identity',      fields:['report-no','tpl-number','revision','exam-date','rep-date','method']},
   {id:'client',    label:'Client info',   fields:['client','project','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','welders','weld-process','material','weld-prep','heat-treat','thickness','surf-cond','temperature','weld-pos','part-exam']},
   {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},

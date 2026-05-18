@@ -1419,13 +1419,16 @@ function cvAddBlockDefault(key, isLayout){
 }
 
 // The block to align a new click-to-add field below: the visually
-// bottommost FIELD on the page in the body zone. Excluded:
-//   • Layout blocks (section-header, accent-bar, …) — a full-width
-//     section-header above shouldn't force the next field to span
-//     the page too.
-//   • zone='header' / 'footer' blocks — those live in a different
-//     region of the page; inheriting their geometry would land the
-//     new card in the wrong area.
+// bottommost DATA-FIELD on the page in the body zone. Excluded:
+//   • Layout blocks (section-header, accent-bar, h-line, …) — full-
+//     width chrome shouldn't force a narrow field to span the page.
+//   • zone='header' / 'footer' blocks — different page region.
+//   • Non-field decorations (QR codes, weld maps, scan images, photo
+//     boxes, signature blocks, the company logo / info block) —
+//     these often sit in corners or span wide; anchoring under a
+//     bottom-right QR would land the next field crammed against the
+//     footer. Identifier: field defs without a `mapTo` are not
+//     data-bearing rows and shouldn't anchor the column.
 // Returns null when the body has no suitable anchor.
 function _cvFindStackAnchor(){
   if(!cvBlocks.length) return null;
@@ -1433,6 +1436,11 @@ function _cvFindStackAnchor(){
   cvBlocks.forEach(b => {
     if(b.isLayout) return;
     if(b.zone === 'header' || b.zone === 'footer') return;
+    const def = CV_FIELD_DEFS[b.key];
+    // Only anchor on data fields — defs without mapTo are decorations
+    // / composites (qr-code, weld-map, photo-box, co-block, co-logo-smart,
+    // sig-block, method-block, etc.).
+    if(!def || !def.mapTo) return;
     if(!bottom || (b.y + b.h) > (bottom.y + bottom.h)) bottom = b;
   });
   return bottom;

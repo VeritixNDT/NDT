@@ -19,7 +19,13 @@ var CV_FIELD_DEFS = {
   }, w:150, h:38, mapTo:'templateNo', noLabel:true},
   'revision':     {label:'Revision',                      ph:'00',                            get:r=>r.revision||'00',             w:90, h:38, mapTo:'revision'},
   'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
-  'rep-date':     {label:'Report date / Sign date',       ph:'2025-03-15',                    get:r=>r.signDate||r.repDate||'—',   w:140,h:38, mapTo:'signDate'},
+  // Report / sign date — uses the real report's signDate when present,
+  // otherwise falls back to today's date so design-mode templates and
+  // unsigned drafts show a sensible live value instead of '—'.
+  'rep-date':     {label:'Report date / Sign date',       ph:'15-Mar-2025',                   get:r=>{
+    if(r && (r.signDate || r.repDate)) return r.signDate || r.repDate;
+    return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  }, w:140,h:38, mapTo:'signDate'},
   // Method — renders the full method name (e.g.
   // "MAGNETIC PARTICLE EXAMINATION REPORT") from NDT_METHODS rather than
   // just the code "MT". Uppercased on render so the card reads as a
@@ -68,7 +74,12 @@ var CV_FIELD_DEFS = {
   'insp-level':   {label:'Level',                         ph:'UT Level II',                   get:r=>r.level||(r.method?r.method+' Level II':'—'), w:110,h:38, mapTo:'level'},
   'cert-auth':    {label:'Cert. Authority',               ph:'PCN:319222',                    get:r=>r.certAuth||'—',              w:160,h:38, mapTo:'certAuth'},
   'witness':      {label:'Witness / 3rd party',           ph:'Client representative',         get:r=>r.witness||'—',               w:175,h:38, mapTo:'witness'},
-  'sign-date':    {label:'Date signed',                   ph:'2025-03-15',                    get:r=>r.signDate||'—',              w:130,h:38, mapTo:'signDate'},
+  // Date signed — same live-fallback as rep-date so unsigned drafts and
+  // sample previews show today's date instead of an empty dash.
+  'sign-date':    {label:'Date signed',                   ph:'15-Mar-2025',                   get:r=>{
+    if(r && r.signDate) return r.signDate;
+    return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  }, w:130,h:38, mapTo:'signDate'},
   'insp-sig':     {label:'Inspector signature',           ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
   'client-sig':   {label:'Client signature',              ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
   // QC and Certifying Authority / Notified Body sign-off slots — same

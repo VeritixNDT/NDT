@@ -2015,12 +2015,26 @@ function cvRenderBlockContent(block, report, preview){
         //   1. block.text  — user typed a per-block override in the Properties panel
         //   2. co.footer   — "Standard footer text" from Settings → Company
         //   3. fallback    — company name · today's date (legacy behaviour)
-        // This lets templates carry an accreditation / contact line by default
-        // without forcing the user to retype it on every page-footer placement.
-        const leftRaw = (block.text && String(block.text).trim())
+        // co.confidstmt — "Confidentiality statement" from Settings → Company —
+        // renders as a second, smaller line beneath the primary line when set,
+        // unless the user has typed their own block.text override (in which
+        // case we assume they want full manual control).
+        const userOverride = block.text && String(block.text).trim();
+        const primary = userOverride
           || (co.footer && String(co.footer).trim())
           || ((co.name || 'NDT Inspect') + ' · ' + new Date().toLocaleDateString());
-        return `<div style="height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:${_safeColor(block.bgColor,'#f5f5f5')};color:${_safeColor(block.color,'#888')};font-size:${_safeFs(block.fontSize,'7px')};font-weight:${fw};font-style:${fi};border-top:0.5px solid #ddd;box-sizing:border-box;gap:8px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1">${_h(leftRaw)}</span><span style="flex-shrink:0">Page ${cvCurrentPage+1} of ${cvPages.length}</span></div>`;
+        const conf = (!userOverride && co.confidstmt && String(co.confidstmt).trim()) ? String(co.confidstmt).trim() : '';
+        const baseFs = _safeFs(block.fontSize,'7px');
+        // Confidentiality line gets ~85% of the primary size + italic, so the
+        // hierarchy is unambiguous when both lines render in the same block.
+        const confFs = (parseFloat(baseFs) * 0.85).toFixed(1) + 'px';
+        const leftCol = conf
+          ? `<div style="display:flex;flex-direction:column;min-width:0;flex:1;gap:1px;justify-content:center">
+              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:${baseFs}">${_h(primary)}</div>
+              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:${confFs};font-style:italic;opacity:.78">${_h(conf)}</div>
+            </div>`
+          : `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1">${_h(primary)}</span>`;
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:${_safeColor(block.bgColor,'#f5f5f5')};color:${_safeColor(block.color,'#888')};font-size:${baseFs};font-weight:${fw};font-style:${fi};border-top:0.5px solid #ddd;box-sizing:border-box;gap:8px">${leftCol}<span style="flex-shrink:0">Page ${cvCurrentPage+1} of ${cvPages.length}</span></div>`;
       }
       case 'text-block':
         return `<div style="height:100%;padding:4px 7px;font-size:${fs};color:${_safeColor(block.color,'#333')};font-weight:${fw};font-style:${fi};text-align:${al};white-space:pre-wrap;word-break:break-word;line-height:1.5">${_h(block.text||'Free text — edit in Properties')}</div>`;

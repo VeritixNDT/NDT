@@ -456,6 +456,7 @@ async function cvAutoSetupFromCompany(){
   // the legacy behaviour. Width bumps up to 340px when a footer line is used
   // because accreditation strings tend to be long.
   const hasFooterText = !!(co.footer && String(co.footer).trim());
+  const hasConfid     = !!(co.confidstmt && String(co.confidstmt).trim());
   if(hasFooterText){
     newBlocks.push({
       id: _cvBlockId(), key: 'text-block', isLayout: true, zone: 'footer',
@@ -492,6 +493,24 @@ async function cvAutoSetupFromCompany(){
     color: '#666', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
     align: 'right', zIndex: Z_FOOTER_BASE + 3, locked: false,
   });
+
+  // Confidentiality statement (full-width, below the name/page/report row).
+  // Only added when the user has filled it in at Settings → Company. Renders
+  // in smaller italic text — legally important but visually subordinate.
+  // When present, bump the footer band height so the new line clears the
+  // page margin instead of crashing into the page edge.
+  if(hasConfid){
+    newBlocks.push({
+      id: _cvBlockId(), key: 'text-block', isLayout: true, zone: 'footer',
+      x: X_MARGIN, y: footerY + 18, w: CV_PAGE_WIDTH_PX - (X_MARGIN * 2), h: 24,
+      text: String(co.confidstmt).trim(),
+      fontSize: '7px', bold: false, italic: true,
+      color: '#888', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
+      align: 'center', zIndex: Z_FOOTER_BASE + 4, locked: false,
+    });
+    // Bigger footer band so both lines fit comfortably above the page edge.
+    cvTplCfg.footer.heightPx = Math.max(cvTplCfg.footer.heightPx || 60, 88);
+  }
 
   // Add all new blocks to the target page
   targetPage.blocks = (targetPage.blocks || []).concat(newBlocks);

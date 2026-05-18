@@ -9,7 +9,7 @@ var CV_FIELD_DEFS = {
   // The smart getter prefers a value baked into the report (set when the
   // report was created from the method template) but falls back to the live
   // per-method template number so legacy reports still surface the field.
-  'tpl-number':   {label:'Template no.',                  ph:'TPL-UT-007',                    get:r=>{
+  'tpl-number':   {label:'📋 Report template no.',         ph:'TPL-UT-007',                    get:r=>{
     if(r && r.templateNo) return r.templateNo;
     try {
       const td = (typeof ls === 'function' && typeof TPL_KEY === 'string') ? ls(TPL_KEY, {}) : {};
@@ -204,7 +204,8 @@ var CV_LAYOUT_ITEMS = [
 var CV_PALETTE_GROUPS = [
   {id:'custom',    label:'✦ Custom / Blank',  fields:['blank-field','blank-multiline','blank-row-2','blank-row-3','blank-row-4']},
   {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block']},
-  {id:'identity',  label:'Identity',      fields:['report-no','tpl-number','revision','exam-date','rep-date','method']},
+  {id:'template',  label:'📋 Report template', fields:['tpl-number']},
+  {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','rep-date','method']},
   {id:'client',    label:'Client info',   fields:['client','project','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','welders','weld-process','material','weld-prep','heat-treat','thickness','surf-cond','temperature','weld-pos','part-exam']},
   {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},

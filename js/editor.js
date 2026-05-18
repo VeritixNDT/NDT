@@ -2110,14 +2110,18 @@ function cvRenderBlockContent(block, report, preview){
         }
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🏢</span>Company logo<span style="font-size:7.5px;color:#999">Upload in Settings → Company</span></div>`;
       }
-      // Composite "info block": multi-line company identity (name + address + phone)
+      // Composite "info block": multi-line company identity.
+      // Phone and email get their own lines so contact info reads as a
+      // proper two-line block (matches how an inspector glances at a
+      // header — phone in one row, email below).
       if(def.isCompanyBlock){
         const lines = [
           co2.name,
           co2.addr1, co2.addr2,
           [co2.post, co2.city].filter(Boolean).join(' '),
           co2.country,
-          [co2.phone, co2.email].filter(Boolean).join(' · '),
+          co2.phone,
+          co2.email,
           co2.web,
         ].filter(s => s && s.trim());
         const content = lines.length

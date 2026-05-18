@@ -1894,7 +1894,10 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
         cvUpdateSelectionUI();
         cvRenderProps(block.id);
       }
-      if(isLocked) return;
+      // Re-evaluate the locked state at mousedown time rather than reusing
+      // the closure-captured `isLocked` — when cvTplCfg.lockZones toggles
+      // while the block element is cached, the old isLocked value is stale.
+      if(_cvIsBlockLocked(block)) return;
       const canvas = document.getElementById('cv-canvas');
       const canvasRect = canvas.getBoundingClientRect();
       cvDragging = {
@@ -1913,7 +1916,16 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
     delBtn.className = 'cblk-del-btn';
     delBtn.textContent = '✕';
     delBtn.style.cssText='position:absolute;top:-1px;right:-1px;width:18px;height:18px;background:rgba(242,92,92,.85);color:#fff;border:none;border-radius:0 0 0 4px;font-size:10px;line-height:1;cursor:pointer;z-index:400;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .12s;pointer-events:auto';
-    delBtn.addEventListener('click', e=>{ e.stopPropagation(); cvDeleteBlock(block.id); });
+    delBtn.addEventListener('click', e=>{
+      e.stopPropagation();
+      // Respect the live lock state — zone-locked blocks shouldn't vanish
+      // via the corner ✕ either.
+      if(_cvIsBlockLocked(block)){
+        toast(t('pe.toast.zone_locked_block', 'Unlock header & footer first.'), 'warn');
+        return;
+      }
+      cvDeleteBlock(block.id);
+    });
     elDiv.addEventListener('mouseenter', ()=>{ if(!cvPreview) delBtn.style.opacity='1'; });
     elDiv.addEventListener('mouseleave', ()=>{ delBtn.style.opacity='0'; });
     elDiv.appendChild(delBtn);
@@ -1924,6 +1936,9 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
       rh.className = 'cblk-rh';
       rh.style.cssText='position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:se-resize;background:linear-gradient(135deg,transparent 40%,rgba(79,142,247,.7) 40%);z-index:200';
       rh.addEventListener('mousedown', e=>{
+        // Same stale-closure guard as the move-drag handler — check live
+        // lock state so zone-lock blocks can't be resized after toggling.
+        if(_cvIsBlockLocked(block)){ e.stopPropagation(); return; }
         e.stopPropagation();
         cvSelectBlock(block.id);
         cvResizing = {id:block.id, startX:e.clientX, startY:e.clientY, startW:block.w, startH:block.h};

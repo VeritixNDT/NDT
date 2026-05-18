@@ -321,6 +321,14 @@ function _wCvToggleLockZones(el){
   if(typeof cvTplCfg !== 'object') return;
   cvTplCfg.lockZones = !!(el && el.checked);
   if(typeof _cvPersistTplCfg === 'function') _cvPersistTplCfg();
+  // Invalidate cached block elements so the resize handle (which is only
+  // appended at element-build time when the block isn't locked) gets
+  // re-evaluated. Without this, toggling lockZones on after blocks are
+  // already cached would leave the SE-resize square visible — confusing,
+  // even though the underlying drag/resize gates would still refuse.
+  if(typeof _cvBlockElCache !== 'undefined' && _cvBlockElCache && typeof _cvBlockElCache.clear === 'function') {
+    _cvBlockElCache.clear();
+  }
   if(typeof cvRenderCanvas === 'function') cvRenderCanvas();
   if(typeof toast === 'function') {
     toast(t(cvTplCfg.lockZones

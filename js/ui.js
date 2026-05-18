@@ -319,13 +319,37 @@ function _wCvSetFooterHeight(el){
 // (cursor:not-allowed + amber selection ring via _cvIsBlockLocked).
 function _wCvToggleLockZones(el){
   if(typeof cvTplCfg !== 'object') return;
-  cvTplCfg.lockZones = !!(el && el.checked);
+  const turningOff = !(el && el.checked);
+  cvTplCfg.lockZones = !turningOff;
+
+  // When turning OFF, also clear any sticky per-block .locked on blocks
+  // that fall inside the header/footer zones. Two reasons:
+  //   1. Users who clicked the on-canvas FAB padlock while zone-lock was
+  //      on may have inadvertently set b.locked = true — without this
+  //      cleanup, the block stays locked after they tick the toggle off.
+  //   2. The mental model is "Lock header & footer = locked / unlocked
+  //      everywhere in those zones". Splitting the two flags surprises
+  //      users who don't know about per-block locks.
+  // Body blocks with explicit .locked = true are left alone.
+  if(turningOff && typeof cvBlocks !== 'undefined' && Array.isArray(cvPages)){
+    cvPages.forEach(page => {
+      (page.blocks || []).forEach(b => {
+        if(!b.locked) return;
+        const inHeader = b.zone === 'header'
+          || ((+b.y || 0) + (+b.h || 0) / 2) < ((cvTplCfg.header && +cvTplCfg.header.heightPx) || 100);
+        const inFooter = b.zone === 'footer'
+          || b.key === 'page-footer'
+          || ((+b.y || 0) + (+b.h || 0) / 2) > (CV_PAGE_HEIGHT_PX - ((cvTplCfg.footer && +cvTplCfg.footer.heightPx) || 60));
+        if(inHeader || inFooter) b.locked = false;
+      });
+    });
+  }
+
   if(typeof _cvPersistTplCfg === 'function') _cvPersistTplCfg();
-  // Invalidate cached block elements so the resize handle (which is only
-  // appended at element-build time when the block isn't locked) gets
-  // re-evaluated. Without this, toggling lockZones on after blocks are
-  // already cached would leave the SE-resize square visible — confusing,
-  // even though the underlying drag/resize gates would still refuse.
+  if(typeof cvSaveLayout === 'function') cvSaveLayout();   // persist b.locked changes
+  // Invalidate cached block elements — the resize handle is appended at
+  // element-build time based on the lock state, so the cache must rebuild
+  // when locks change to add/remove the handle.
   if(typeof _cvBlockElCache !== 'undefined' && _cvBlockElCache && typeof _cvBlockElCache.clear === 'function') {
     _cvBlockElCache.clear();
   }

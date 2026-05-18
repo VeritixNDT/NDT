@@ -2954,7 +2954,23 @@ function cvDeleteSelected(){
 }
 function cvDuplicateBlock(id){ cvPushUndo(); const b=cvBlocks.find(b=>b.id===id); if(!b) return; const nb=_cvCloneBlock(b); cvBlocks.push(nb); _cvSelectSingle(nb.id); cvRenderCanvas(); cvRenderProps(nb.id); cvSaveLayout(); }
 function cvMoveZ(id,dir){ const b=cvBlocks.find(b=>b.id===id); if(!b) return; b.zIndex=(b.zIndex||1)+dir; cvRenderCanvas(); cvSaveLayout(); }
-function cvToggleLock(id){ const b=cvBlocks.find(b=>b.id===id); if(!b) return; b.locked=!b.locked; cvRenderCanvas(); cvRenderProps(id); cvSaveLayout(); toast(b.locked ? t('pe.toast.block_locked','Block locked') : t('pe.toast.block_unlocked','Block unlocked')); }
+function cvToggleLock(id){
+  const b = cvBlocks.find(b => b.id === id); if(!b) return;
+  // If the block is currently locked solely because of the template-wide
+  // "Lock header & footer" toggle (zone lock), clicking the FAB padlock
+  // here would set b.locked = true — and the block would stay locked
+  // forever after the user later unticks the zone toggle. Bail with a
+  // hint so the user knows where to actually unlock it.
+  if(!b.locked && cvTplCfg && cvTplCfg.lockZones && _cvIsBlockLocked(b)){
+    toast(t('pe.toast.zone_locked_block_hint',
+      'This block is locked by "Lock header & footer". Untick that in Design to unlock.'),
+      'info');
+    return;
+  }
+  b.locked = !b.locked;
+  cvRenderCanvas(); cvRenderProps(id); cvSaveLayout();
+  toast(b.locked ? t('pe.toast.block_locked','Block locked') : t('pe.toast.block_unlocked','Block unlocked'));
+}
 
 // ── Multi-select alignment ───────────────────────────────────────────
 function cvAlignSelected(edge){

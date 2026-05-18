@@ -1915,8 +1915,18 @@ function cvRenderBlockContent(block, report, preview){
         const hh = Math.max(0, block.h-32);
         return `<div style="height:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px 8px;font-size:7.5px;color:#555;box-sizing:border-box"><div><div style="font-size:7px;color:#888;margin-bottom:3px">Inspector</div><div style="height:${hh}px;border-bottom:0.5px solid #000;margin-bottom:3px"></div><div>Name: _______________________</div><div style="margin-top:2px">Date: _______________________</div></div><div><div style="font-size:7px;color:#888;margin-bottom:3px">Client</div><div style="height:${hh}px;border-bottom:0.5px solid #000;margin-bottom:3px"></div><div>Name: _______________________</div><div style="margin-top:2px">Date: _______________________</div></div></div>`;
       }
-      case 'page-footer':
-        return `<div style="height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:${_safeColor(block.bgColor,'#f5f5f5')};color:${_safeColor(block.color,'#888')};font-size:${_safeFs(block.fontSize,'7px')};font-weight:${fw};font-style:${fi};border-top:0.5px solid #ddd;box-sizing:border-box"><span>${coName} · ${_h(new Date().toLocaleDateString())}</span><span>Page ${cvCurrentPage+1} of ${cvPages.length}</span></div>`;
+      case 'page-footer': {
+        // Resolution order for the left side of the page footer:
+        //   1. block.text  — user typed a per-block override in the Properties panel
+        //   2. co.footer   — "Standard footer text" from Settings → Company
+        //   3. fallback    — company name · today's date (legacy behaviour)
+        // This lets templates carry an accreditation / contact line by default
+        // without forcing the user to retype it on every page-footer placement.
+        const leftRaw = (block.text && String(block.text).trim())
+          || (co.footer && String(co.footer).trim())
+          || ((co.name || 'NDT Inspect') + ' · ' + new Date().toLocaleDateString());
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:${_safeColor(block.bgColor,'#f5f5f5')};color:${_safeColor(block.color,'#888')};font-size:${_safeFs(block.fontSize,'7px')};font-weight:${fw};font-style:${fi};border-top:0.5px solid #ddd;box-sizing:border-box;gap:8px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1">${_h(leftRaw)}</span><span style="flex-shrink:0">Page ${cvCurrentPage+1} of ${cvPages.length}</span></div>`;
+      }
       case 'text-block':
         return `<div style="height:100%;padding:4px 7px;font-size:${fs};color:${_safeColor(block.color,'#333')};font-weight:${fw};font-style:${fi};text-align:${al};white-space:pre-wrap;word-break:break-word;line-height:1.5">${_h(block.text||'Free text — edit in Properties')}</div>`;
       default:

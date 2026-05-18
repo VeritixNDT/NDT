@@ -450,8 +450,22 @@ async function cvAutoSetupFromCompany(){
     align: 'left', zIndex: Z_FOOTER_BASE, locked: false,
   });
 
-  // Company name (left)
-  if(co.name){
+  // Footer text (left) — prefers the "Standard footer text" from Settings →
+  // Company so accreditation / contact lines surface automatically. Falls back
+  // to the live company-name smart-field when no footer text is set, matching
+  // the legacy behaviour. Width bumps up to 340px when a footer line is used
+  // because accreditation strings tend to be long.
+  const hasFooterText = !!(co.footer && String(co.footer).trim());
+  if(hasFooterText){
+    newBlocks.push({
+      id: _cvBlockId(), key: 'text-block', isLayout: true, zone: 'footer',
+      x: X_MARGIN, y: footerY, w: 340, h: 24,
+      text: String(co.footer).trim(),
+      fontSize: '8px', bold: false, italic: false,
+      color: '#666', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
+      align: 'left', zIndex: Z_FOOTER_BASE + 1, locked: false,
+    });
+  } else if(co.name){
     newBlocks.push({
       id: _cvBlockId(), key: 'co-name-smart', isLayout: false, zone: 'footer',
       x: X_MARGIN, y: footerY, w: 260, h: 24,

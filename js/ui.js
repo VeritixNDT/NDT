@@ -399,16 +399,10 @@ async function cvAutoSetupFromCompany(){
     });
   }
 
-  // Company name (center) — uses co-name-smart
-  if(co.name){
-    newBlocks.push({
-      id: _cvBlockId(), key: 'co-name-smart', isLayout: false, zone: 'header',
-      x: 197, y: headerY + 10, w: 400, h: 28,
-      text: 'Company name', fontSize: '13px', bold: true, italic: false,
-      color: '#222', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
-      align: 'center', zIndex: Z_HEADER_BASE + 1, locked: false,
-    });
-  }
+  // Center column intentionally empty — the user asked for a logo-left /
+  // details-right header without a centred company-name block. The
+  // template number (added further down) still drops into the centre
+  // when configured.
 
   // Address block (right) — uses co-block (multi-line composite)
   if(co.addr1 || co.phone || co.email){

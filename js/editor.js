@@ -345,7 +345,42 @@ var cvClipboard = null;  // copy/paste
 var cvDragUndoPushed = false;  // prevent undo spam during drag
 var CV_GRID = 8;
 var CV_SNAP_THRESHOLD = 6;  // pixels for snap-to-edge
-function cvSnap(v){ return Math.round(v/CV_GRID)*CV_GRID; }
+// Snap-to-grid toggle — persisted across sessions. Default on so the
+// editor's existing behaviour is unchanged; flipping off lets the user
+// position pixel-perfectly without the grid rounding their drags.
+var _cvSnapOn = (function(){
+  try { return localStorage.getItem('vx-cv-snap') !== '0'; }
+  catch(e){ return true; }
+})();
+function _cvPersistSnap(){
+  try { localStorage.setItem('vx-cv-snap', _cvSnapOn ? '1' : '0'); }
+  catch(e){}
+}
+function cvSnap(v){ return _cvSnapOn ? Math.round(v/CV_GRID)*CV_GRID : Math.round(v); }
+function cvToggleSnap(){
+  _cvSnapOn = !_cvSnapOn;
+  _cvPersistSnap();
+  _cvSyncSnapButton();
+  _cvSyncGridOverlay();
+  if(typeof toast === 'function')
+    toast(t(_cvSnapOn ? 'pe.toast.snap_on' : 'pe.toast.snap_off',
+      _cvSnapOn ? 'Snap to grid: on' : 'Snap to grid: off'));
+}
+function _cvSyncSnapButton(){
+  const btn = document.getElementById('cv-snap-toggle');
+  if(!btn) return;
+  btn.classList.toggle('active', _cvSnapOn);
+  btn.style.background = _cvSnapOn ? 'rgba(79,142,247,.15)' : '';
+  btn.style.color      = _cvSnapOn ? 'var(--blue)' : '';
+  btn.title = _cvSnapOn
+    ? 'Snap to grid is ON — drags and resizes round to 8px. Click to disable.'
+    : 'Snap to grid is OFF — pixel-perfect positioning. Click to enable.';
+}
+// Show/hide the 8px grid overlay so the visual matches the snap state.
+function _cvSyncGridOverlay(){
+  const g = document.getElementById('cv-grid-overlay');
+  if(g) g.style.display = _cvSnapOn ? '' : 'none';
+}
 function cvSync(){ cvBlocks = cvPages[cvCurrentPage].blocks; }
 
 function cvGetCompanyColor(){
@@ -1082,6 +1117,8 @@ function cvInitCanvas(){
   cvUpdateLogoThumb();  // reflect persisted tplLogo in the ribbon thumb
   cvRenderLogoLib();    // populate the saved-logo library
   _cvRefreshUndoRedoUI();  // page-tabs-bar arrows start disabled at boot
+  _cvSyncSnapButton();     // reflect persisted snap-to-grid state
+  _cvSyncGridOverlay();    // hide the grid overlay when snap is off
   setTimeout(() => cvRefreshPreviewSource(), 50);   // V3: populate report dropdown
   // V25: reflect saved alignment-guides toggle state on the button
   const alignBtn = document.getElementById('cv-align-toggle');

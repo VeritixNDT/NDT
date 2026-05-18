@@ -337,7 +337,9 @@ async function cvLoadDefaultLayout(){
   add('result',false,M,y,col2-5,46); add('indications',false,M+col2-4,y,col2+11,46);
   y+=46;
   add('sig-block',true,M,y,W,80,{showBorder:false}); y+=80;
-  add('page-footer',true,M,y,W,22,{bgColor:'#f5f5f5',color:'#888',fontSize:'7px',showBorder:false});
+  // page-footer block removed — the Header/Footer zone designer + auto-setup
+  // covers everything this block did, and dual sources of footer truth
+  // confuse users. The footer for a default layout comes from the zone.
 
   cvSaveLayout(); cvRenderPageTabs(); cvRenderCanvas(); cvFitToView();
   toast(t('toast.layout_loaded','Default NDT layout loaded — customise freely.'));

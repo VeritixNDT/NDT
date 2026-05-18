@@ -338,7 +338,6 @@ function _wCvToggleLockZones(el){
         const inHeader = b.zone === 'header'
           || ((+b.y || 0) + (+b.h || 0) / 2) < ((cvTplCfg.header && +cvTplCfg.header.heightPx) || 100);
         const inFooter = b.zone === 'footer'
-          || b.key === 'page-footer'
           || ((+b.y || 0) + (+b.h || 0) / 2) > (CV_PAGE_HEIGHT_PX - ((cvTplCfg.footer && +cvTplCfg.footer.heightPx) || 60));
         if(inHeader || inFooter) b.locked = false;
       });

@@ -28,6 +28,7 @@ function loadSettings() {
   if(el('num-year'))    el('num-year').value      = s.numYear||'4';
   if(el('num-digits'))  el('num-digits').value    = s.numDigits||'3';
   if(el('num-next'))    el('num-next').value      = s.numNext||1;
+  if(el('num-method-pos')) el('num-method-pos').value = s.numMethodPos||'none';
   if(el('notif-cert'))  el('notif-cert').checked  = s.notifCert!==false;
   if(el('notif-calib')) el('notif-calib').checked = s.notifCalib!==false;
   if(el('notif-report'))el('notif-report').checked= !!s.notifReport;
@@ -2081,30 +2082,39 @@ function loadMethodOrder() {
 // REPORT NUMBERING
 // ══════════════════════════════════════════════
 function renderNumberingPreview() {
-  const pref   = (el('num-prefix')?.value||'INS').toUpperCase();
-  const sep    = el('num-sep')?.value||'-';
-  const year   = el('num-year')?.value||'4';
-  const digits = parseInt(el('num-digits')?.value||'3');
-  const next   = parseInt(el('num-next')?.value||'1');
+  const pref      = (el('num-prefix')?.value||'INS').toUpperCase();
+  const sep       = el('num-sep')?.value||'-';
+  const year      = el('num-year')?.value||'4';
+  const digits    = parseInt(el('num-digits')?.value||'3');
+  const next      = parseInt(el('num-next')?.value||'1');
+  const methodPos = el('num-method-pos')?.value||'none';
   const y = year==='4' ? new Date().getFullYear() : year==='2' ? String(new Date().getFullYear()).slice(-2) : '';
   const seq = String(next).padStart(digits,'0');
-  const parts = [pref, y, seq].filter(Boolean);
-  const preview = parts.join(sep);
-  set('num-preview-val', preview);
+  // 'MT' is just a stand-in for the preview — at save time each report
+  // substitutes its own method code into the same slot.
+  const sample = 'MT';
+  const parts = [pref];
+  if(methodPos === 'after-prefix') parts.push(sample);
+  if(y) parts.push(y);
+  if(methodPos === 'after-year') parts.push(sample);
+  parts.push(seq);
+  set('num-preview-val', parts.filter(Boolean).join(sep));
 }
-['num-prefix','num-sep','num-year','num-digits','num-next'].forEach(id => {
+['num-prefix','num-sep','num-year','num-digits','num-next','num-method-pos'].forEach(id => {
   document.addEventListener('DOMContentLoaded',()=>{
-    const e=el(id); if(e) e.addEventListener('input',renderNumberingPreview);
+    const e=el(id); if(e) e.addEventListener('input',  renderNumberingPreview);
+    if(e) e.addEventListener('change', renderNumberingPreview);
   });
 });
 
 function saveNumbering() {
   const s = ls(KEYS.settings,{});
-  s.numPrefix = el('num-prefix')?.value||'INS';
-  s.numSep    = el('num-sep')?.value;
-  s.numYear   = el('num-year')?.value||'4';
-  s.numDigits = el('num-digits')?.value||'3';
-  s.numNext   = parseInt(el('num-next')?.value||'1');
+  s.numPrefix    = el('num-prefix')?.value||'INS';
+  s.numSep       = el('num-sep')?.value;
+  s.numYear      = el('num-year')?.value||'4';
+  s.numDigits    = el('num-digits')?.value||'3';
+  s.numNext      = parseInt(el('num-next')?.value||'1');
+  s.numMethodPos = el('num-method-pos')?.value||'none';
   lss(KEYS.settings, s);
   toast(t('toast.numbering_saved', 'Numbering settings saved.'));
 }

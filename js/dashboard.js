@@ -986,17 +986,25 @@ function ovNewReport(methodId, btn) {
   // Merge: rptForm values override tpl values
   const merged = { ...rptForm };
 
-  // Generate report number
+  // Generate report number — pulls the per-report method code into the
+  // configured numMethodPos slot so each method (UT, MT, VT, …) shows up
+  // automatically in the report's identifier.
   const s = ls(KEYS.settings, {});
   const prefix = s.numPrefix || 'INS';
   const sep = s.numSep !== undefined ? s.numSep : '-';
   const yrDigits = parseInt(s.numYear || '4');
   const digits = parseInt(s.numDigits || '3');
   const next = parseInt(s.numNext || '1');
+  const methodPos = s.numMethodPos || 'none';
   const yr = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
   const seq = String(next).padStart(digits, '0');
-  const reportNo = [prefix, yr, seq].filter(Boolean).join(sep);
-  merged.reportNo = reportNo;
+  const mCode = (methodId || merged.method || '').toUpperCase();
+  const parts = [prefix];
+  if(methodPos === 'after-prefix' && mCode) parts.push(mCode);
+  if(yr) parts.push(yr);
+  if(methodPos === 'after-year' && mCode) parts.push(mCode);
+  parts.push(seq);
+  merged.reportNo = parts.filter(Boolean).join(sep);
   if(!merged.revision) merged.revision = '00';
 
   // Build form

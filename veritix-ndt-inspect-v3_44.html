@@ -1465,9 +1465,20 @@
                   </div>
                 </div>
               </div>
-              <div class="fld form-row">
-                <label data-i18n="num.lbl.next">Next number</label>
-                <input id="num-next" type="number" min="1" placeholder="1" style="max-width:140px"/>
+              <div class="fg form-row">
+                <div class="fld">
+                  <label data-i18n="num.lbl.method_pos">Include method code</label>
+                  <select id="num-method-pos">
+                    <option value="none" data-i18n="num.method.none">None</option>
+                    <option value="after-prefix" data-i18n="num.method.after_prefix">After prefix (INS-MT-2025-001)</option>
+                    <option value="after-year" data-i18n="num.method.after_year">After year (INS-2025-MT-001)</option>
+                  </select>
+                  <span class="fld-hint" data-i18n="num.hint.method_pos">Substituted with each report's NDT method code (UT, MT, VT, …) when saved</span>
+                </div>
+                <div class="fld">
+                  <label data-i18n="num.lbl.next">Next number</label>
+                  <input id="num-next" type="number" min="1" placeholder="1" style="max-width:140px"/>
+                </div>
               </div>
               <div class="info-box" id="num-preview" style="margin-bottom:0"><span data-i18n="num.preview">Preview:</span> <strong id="num-preview-val" style="font-family:var(--mono)">INS-2025-001</strong></div>
             </div>

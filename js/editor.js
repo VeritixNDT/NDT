@@ -488,15 +488,22 @@ function cvBuildReport(method, result, showDefects){
   // the existing sample). Same algorithm as dashboard.js ovBuildReport.
   try {
     const s = (typeof ls === 'function' && typeof KEYS !== 'undefined') ? ls(KEYS.settings, {}) : {};
-    if(s && (s.numPrefix || s.numSep != null || s.numYear || s.numDigits || s.numNext)){
-      const prefix   = (s.numPrefix || 'INS');
-      const sep      = (s.numSep != null) ? s.numSep : '-';
-      const yrDigits = parseInt(s.numYear || '4', 10);
-      const digits   = parseInt(s.numDigits || '3', 10);
-      const next     = parseInt(s.numNext || '1', 10);
+    if(s && (s.numPrefix || s.numSep != null || s.numYear || s.numDigits || s.numNext || s.numMethodPos)){
+      const prefix    = (s.numPrefix || 'INS');
+      const sep       = (s.numSep != null) ? s.numSep : '-';
+      const yrDigits  = parseInt(s.numYear || '4', 10);
+      const digits    = parseInt(s.numDigits || '3', 10);
+      const next      = parseInt(s.numNext || '1', 10);
+      const methodPos = s.numMethodPos || 'none';
       const yr  = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
       const seq = String(next).padStart(digits, '0');
-      b.reportNo = [prefix, yr, seq].filter(Boolean).join(sep);
+      const m   = (method || cvPpvMethod || '').toUpperCase();
+      const parts = [prefix];
+      if(methodPos === 'after-prefix' && m) parts.push(m);
+      if(yr) parts.push(yr);
+      if(methodPos === 'after-year' && m) parts.push(m);
+      parts.push(seq);
+      b.reportNo = parts.filter(Boolean).join(sep);
     }
   } catch(e){ /* keep sample reportNo */ }
   b.method = method; b.result = result;

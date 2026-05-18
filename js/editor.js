@@ -1369,11 +1369,16 @@ function cvAddBlockDefault(key, isLayout){
     w = cvSnap(defaultW);
     x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - w) / 2));
   }
-  // y stacks below existing content so successive clicks don't pile blocks
-  // on top of each other. Capped near the page bottom so the first click
-  // into a busy page still lands somewhere visible.
-  const lastY = cvBlocks.reduce((m,b)=>Math.max(m,b.y+b.h+4), 20);
-  const y = Math.min(lastY, 1060);
+  // y stacks below existing BODY content. Header / footer zone blocks
+  // are excluded — without that, a page with a footer (page-num,
+  // confidentiality, …) would push every click-to-add into the footer
+  // band because the footer blocks sit near y=1080 and the calculation
+  // landed at y=1060+.
+  const bodyTop    = (cvTplCfg.header && cvTplCfg.header.enabled) ? (+cvTplCfg.header.heightPx || 100) : 20;
+  const bodyBottom = (cvTplCfg.footer && cvTplCfg.footer.heightPx) ? (CV_PAGE_HEIGHT_PX - (+cvTplCfg.footer.heightPx || 60) - 40) : 1060;
+  const bodyBlocks = cvBlocks.filter(b => b.zone !== 'header' && b.zone !== 'footer');
+  const lastY = bodyBlocks.reduce((m,b)=>Math.max(m,b.y+b.h+4), bodyTop);
+  const y = Math.min(lastY, bodyBottom);
   cvAddBlock(key, isLayout, x, y);
   // cvAddBlock seeds w from def — override on the just-pushed block so
   // the new card lines up with the column. cvAddBlock pushes to the end
@@ -1389,14 +1394,20 @@ function cvAddBlockDefault(key, isLayout){
 }
 
 // The block to align a new click-to-add field below: the visually
-// bottommost field on the page. Layout blocks are skipped so a
-// full-width section-header above doesn't force the next field to span
-// the page too. Returns null when the page has no field anchor.
+// bottommost FIELD on the page in the body zone. Excluded:
+//   • Layout blocks (section-header, accent-bar, …) — a full-width
+//     section-header above shouldn't force the next field to span
+//     the page too.
+//   • zone='header' / 'footer' blocks — those live in a different
+//     region of the page; inheriting their geometry would land the
+//     new card in the wrong area.
+// Returns null when the body has no suitable anchor.
 function _cvFindStackAnchor(){
   if(!cvBlocks.length) return null;
   let bottom = null;
   cvBlocks.forEach(b => {
     if(b.isLayout) return;
+    if(b.zone === 'header' || b.zone === 'footer') return;
     if(!bottom || (b.y + b.h) > (bottom.y + bottom.h)) bottom = b;
   });
   return bottom;

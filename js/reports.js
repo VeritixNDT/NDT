@@ -173,11 +173,12 @@ function tplRenderDefaults(methodId, m) {
   </div>`;
   // Admin-only template number. Unique per method; surfaces in the PDF
   // header via the `tpl-number` smart field and is appended to the
-  // exported file name.
+  // exported file name. Free-form text — admins type whatever numbering
+  // scheme their organisation uses (no prescribed format / tokens).
   html += `<div class="fg form-row" style="margin-bottom:10px">
     <div class="fld">
       <label>Template number <span style="font-size:10px;color:var(--t3);font-weight:400">· admin-only · used in header + filename</span></label>
-      <input id="tpl-${methodId}-templateNo" type="text" maxlength="60" placeholder="e.g. TPL-${methodId}-001" value="${escapeHtml(tpl.templateNo||'')}"${isAdmin?'':' disabled title="Admin only" style="opacity:.55;cursor:not-allowed"'}/>
+      <input id="tpl-${methodId}-templateNo" type="text" maxlength="60" placeholder="Type your template / procedure number" value="${escapeHtml(tpl.templateNo||'')}"${isAdmin?'':' disabled title="Admin only" style="opacity:.55;cursor:not-allowed"'}/>
     </div>
     <div></div>
   </div>`;

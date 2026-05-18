@@ -80,10 +80,19 @@ function cvBuildPrintHTML(report){
   };
 
   // Pre-render the header/footer fragments once — they're identical on every page.
-  const hdrEnabled = cvTplCfg.header && cvTplCfg.header.enabled;
-  const ftrEnabled = cvTplCfg.footer && cvTplCfg.footer.enabled;
-  const hdrFragment = hdrEnabled ? headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
-  const ftrFragment = ftrEnabled ? footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
+  // Print rule: blocks tagged with zone='header' / 'footer' always print if
+  // they exist. The cvTplCfg.{header,footer}.enabled flag still controls
+  // whether the *chrome layer* (background fill, accent strip, divider)
+  // renders, but content blocks render regardless. Otherwise an unticked
+  // Header / Footer checkbox silently drops the address composite, the
+  // standard footer text, the confidentiality statement, etc. — content
+  // the user has plainly placed and expects on the printed page.
+  const hdrEnabled  = cvTplCfg.header && cvTplCfg.header.enabled;
+  const ftrEnabled  = cvTplCfg.footer && cvTplCfg.footer.enabled;
+  const hdrHasContent = headerBlocks.length > 0;
+  const ftrHasContent = footerBlocks.length > 0;
+  const hdrFragment = (hdrEnabled || hdrHasContent) ? headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
+  const ftrFragment = (ftrEnabled || ftrHasContent) ? footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
 
   // Chrome layer for each zone — background fill, accent strip, single-edge
   // divider border. Sits behind the zone blocks at z-index 0 so user content

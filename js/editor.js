@@ -20,15 +20,17 @@ var CV_FIELD_DEFS = {
   'revision':     {label:'Revision',                      ph:'00',                            get:r=>r.revision||'00',             w:90, h:38, mapTo:'revision'},
   'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
   'rep-date':     {label:'Report date / Sign date',       ph:'2025-03-15',                    get:r=>r.signDate||r.repDate||'—',   w:140,h:38, mapTo:'signDate'},
-  // Method — renders the full method name (e.g. "Magnetic Particle
-  // Examination") from NDT_METHODS rather than just the code "MT". Value-only
-  // (noLabel) so the card on the canvas is the readable method line itself.
-  'method':       {label:'NDT Method',                    ph:'Ultrasonic Examination',        get:r=>{
+  // Method — renders the full method name (e.g.
+  // "MAGNETIC PARTICLE EXAMINATION REPORT") from NDT_METHODS rather than
+  // just the code "MT". Uppercased on render so the card reads as a
+  // document title. Value-only (noLabel) so the card on the canvas is the
+  // readable method line itself.
+  'method':       {label:'NDT Method',                    ph:'ULTRASONIC EXAMINATION REPORT', get:r=>{
     const code = r && r.method;
     if(!code) return '—';
     const m = (typeof NDT_METHODS !== 'undefined') ? NDT_METHODS.find(x => x.id === code) : null;
-    return (m && m.name) || code;
-  }, w:220,h:38, mapTo:'method', noLabel:true},
+    return ((m && m.name) || code).toUpperCase();
+  }, w:260,h:38, mapTo:'method', noLabel:true},
   'client':       {label:'Client',                        ph:'Offshore Structures BV',        get:r=>r.client||'—',                w:200,h:38, mapTo:'client'},
   'project':      {label:'Project',                       ph:'Platform Alpha — Leg Inspection',get:r=>r.project||'—',              w:240,h:38, mapTo:'project'},
   'location':     {label:'Test location',                 ph:'Fabrication yard, Rotterdam',   get:r=>r.location||'—',              w:200,h:38, mapTo:'location'},

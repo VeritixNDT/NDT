@@ -16,7 +16,7 @@ var CV_FIELD_DEFS = {
       const m  = (r && r.method) || (typeof cvPpvMethod !== 'undefined' ? cvPpvMethod : '');
       return (td && td[m] && td[m].templateNo) || '—';
     } catch(e){ return '—'; }
-  }, w:150, h:38, mapTo:'templateNo'},
+  }, w:150, h:38, mapTo:'templateNo', noLabel:true},
   'revision':     {label:'Revision',                      ph:'01',                            get:r=>r.revision||'—',              w:90, h:38, mapTo:'revision'},
   'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
   'rep-date':     {label:'Report date / Sign date',       ph:'2025-03-15',                    get:r=>r.signDate||r.repDate||'—',   w:140,h:38, mapTo:'signDate'},
@@ -2273,7 +2273,16 @@ function cvRenderBlockContent(block, report, preview){
     </div>`;
   }
 
-  // Standard labeled field
+  // Standard labeled field. Fields tagged with def.noLabel render only the
+  // value (used by tpl-number — "Template no." would just duplicate what
+  // the value already conveys). Per-block block.text overrides still win:
+  // if the user typed a label in the Properties panel, we honour it.
+  const skipLabel = def.noLabel && !(block.text && String(block.text).trim());
+  if(skipLabel){
+    return `<div style="height:100%;padding:3px 7px;display:flex;align-items:center;justify-content:${jc};text-align:${al}">
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};color:${preview?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%">${vEsc}</div>
+    </div>`;
+  }
   return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
     <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
     <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};min-height:11px;color:${preview?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${vEsc}</div>

@@ -475,8 +475,10 @@ async function cvAutoSetupFromCompany(){
       newBlocks.push({
         id: _cvBlockId(), key: 'tpl-number', isLayout: false, zone: 'header',
         x: 297, y: headerY + 40, w: 200, h: 22,
-        text: 'Template no.', fontSize: '8px', bold: false, italic: false,
-        color: '#555', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
+        // No block.text — the field def carries noLabel:true so the card
+        // renders just the resolved template number value (no label row).
+        text: '', fontSize: '10px', bold: true, italic: false,
+        color: '#222', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
         align: 'center', zIndex: Z_HEADER_BASE + 4, locked: false,
       });
     }

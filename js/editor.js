@@ -66,13 +66,6 @@ var CV_FIELD_DEFS = {
   'inspector':    {label:'Inspector name',                ph:'Carl Cope',                     get:r=>r.inspector||'—',             w:160,h:38, mapTo:'inspector'},
   'insp-level':   {label:'Level',                         ph:'UT Level II',                   get:r=>r.level||(r.method?r.method+' Level II':'—'), w:110,h:38, mapTo:'level'},
   'cert-auth':    {label:'Cert. Authority',               ph:'PCN:319222',                    get:r=>r.certAuth||'—',              w:160,h:38, mapTo:'certAuth'},
-  'witness':      {label:'Witness / 3rd party',           ph:'Client representative',         get:r=>r.witness||'—',               w:175,h:38, mapTo:'witness'},
-  // Date signed — same live-fallback as rep-date so unsigned drafts and
-  // sample previews show today's date instead of an empty dash.
-  'sign-date':    {label:'Date signed',                   ph:'15-Mar-2025',                   get:r=>{
-    if(r && r.signDate) return r.signDate;
-    return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-  }, w:130,h:38, mapTo:'signDate'},
   'insp-sig':     {label:'Inspector signature',           ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
   'client-sig':   {label:'Client signature',              ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
   // QC and Certifying Authority / Notified Body sign-off slots — same
@@ -82,7 +75,6 @@ var CV_FIELD_DEFS = {
   'qc-sig':       {label:'QC signature',                  ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
   'cert-auth-sig':{label:'Cert. Authority / NoBo signature', ph:'',                           get:r=>'',                           w:200,h:60,sig:true},
   'insp-date':    {label:'Inspector date',                ph:'____/____/________',            get:r=>'',                           w:145,h:38},
-  'client-date':  {label:'Client date',                   ph:'____/____/________',            get:r=>'',                           w:145,h:38},
   'blank-field':     {label:'Blank field (single)',       ph:'Custom value',   get:r=>'',  blank:true,            w:200, h:38},
   'blank-multiline': {label:'Blank field (multi-line)',   ph:'Custom text…',   get:r=>'',  blank:true, multi:true, w:380, h:64},
   'blank-row-2':     {label:'Blank row — 2 columns',     ph:'',               get:r=>'',  blankRow:2,             w:400, h:38},
@@ -240,7 +232,7 @@ var CV_PALETTE_GROUPS = [
   {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
-  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','witness','sign-date','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','client-date']},
+  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date']},
   {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},
@@ -2277,34 +2269,34 @@ function cvRenderBlockContent(block, report, preview){
   // ── Blank / custom place cards ─────────────────────────────────────
   if(key === 'blank-field'){
     const lblRaw = block.text || 'Custom label';
-    const valRaw = block.customValue || (preview ? '—' : '');
+    const valRaw = block.customValue || (preview ? '' : '');
     const lbl = _h(lblRaw);
     const val = _h(valRaw);
     return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;text-align:${al}">
       <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
-      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview&&valRaw?'transparent':'#ddd'};`:''};min-height:11px;color:${valRaw?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val||'————'}</div>
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
     </div>`;
   }
   if(key === 'blank-multiline'){
     const lblRaw = block.text || 'Custom label';
-    const valRaw = block.customValue || (preview ? '—' : '');
+    const valRaw = block.customValue || (preview ? '' : '');
     const lbl = _h(lblRaw);
     const val = _h(valRaw);
     return `<div style="height:100%;padding:3px 7px;box-sizing:border-box;text-align:${al}">
       <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px">${lbl}</div>
-      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};color:${valRaw?'#000':'#bbb'};${block.showBorder?`border-bottom:0.5px solid ${preview&&valRaw?'transparent':'#ddd'};`:''};min-height:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${val||'————'}</div>
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};color:${valRaw?'#000':'#bbb'};min-height:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${val}</div>
     </div>`;
   }
   if(key.startsWith('blank-row-')){
     const cols = parseInt(key.replace('blank-row-','')) || 2;
     const cells = Array.from({length:cols}, (_,i) => {
       const lblRaw = block['c'+(i+1)+'l'] || `Label ${i+1}`;
-      const valRaw = block['c'+(i+1)+'v'] || (preview ? '—' : '');
+      const valRaw = block['c'+(i+1)+'v'] || (preview ? '' : '');
       const lbl = _h(lblRaw);
       const val = _h(valRaw);
-      return `<div style="flex:1;padding:3px 6px;min-width:0;text-align:${al};${(i>0 && block.showBorder)?'border-left:0.5px solid #ddd':''}">
+      return `<div style="flex:1;padding:3px 6px;min-width:0;text-align:${al}">
         <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
-        <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview&&valRaw?'transparent':'#ddd'};`:''};min-height:11px;color:${valRaw?'#000':'#bbb'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val||'————'}</div>
+        <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
       </div>`;
     });
     return `<div style="height:100%;display:flex;align-items:stretch;box-sizing:border-box">${cells.join('')}</div>`;

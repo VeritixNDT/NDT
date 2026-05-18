@@ -17,7 +17,7 @@ var CV_FIELD_DEFS = {
       return (td && td[m] && td[m].templateNo) || '—';
     } catch(e){ return '—'; }
   }, w:150, h:38, mapTo:'templateNo', noLabel:true},
-  'revision':     {label:'Revision',                      ph:'01',                            get:r=>r.revision||'—',              w:90, h:38, mapTo:'revision'},
+  'revision':     {label:'Revision',                      ph:'00',                            get:r=>r.revision||'00',             w:90, h:38, mapTo:'revision'},
   'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
   'rep-date':     {label:'Report date / Sign date',       ph:'2025-03-15',                    get:r=>r.signDate||r.repDate||'—',   w:140,h:38, mapTo:'signDate'},
   'method':       {label:'NDT Method',                    ph:'UT — Ultrasonic',               get:r=>r.method||'—',                w:120,h:38, mapTo:'method'},
@@ -406,7 +406,7 @@ function _cvIsBlockLocked(b){
 // ── Sample data ──────────────────────────────────────────────────────
 var CV_SAMPLE = {
   base: {
-    reportNo:'SV-2023-004-NDTD-REP-023-001', revision:'01',
+    reportNo:'SV-2023-004-NDTD-REP-023-001', revision:'00',
     client:'Offshore Structures BV', project:'Platform Alpha — Leg Inspection',
     location:'Fabrication yard — Rotterdam', svOrder:'SV-2023-004',
     orderNo:'PO-98271', requestNo:'REQ-2023-045', clientRef:'OSB-2023-PR-012',

@@ -1309,18 +1309,58 @@ function cvDrop(e){
   cvPaletteDrag = null;
 }
 function cvAddBlockDefault(key, isLayout){
-  // Resolve the block's default width so the placement is horizontally
-  // centred on the page. Layout items go through _cvAllLayoutItems so
-  // dynamic items (saved-logo cards) are considered too; field items use
-  // CV_FIELD_DEFS. Falls back to 200px when neither lookup hits.
+  // Resolve the block's default width. Layout items go through
+  // _cvAllLayoutItems so dynamic items (saved-logo cards) are considered
+  // too; field items use CV_FIELD_DEFS. Falls back to 200px when neither
+  // lookup hits.
   const def = isLayout ? _cvAllLayoutItems().find(it=>it.key===key) : CV_FIELD_DEFS[key];
-  const blockW = (def && def.w) || 200;
-  const x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - blockW) / 2));
-  // y still stacks below existing content so successive clicks don't
-  // pile blocks on top of each other. Capped near the page bottom so the
-  // first click into a busy page still lands somewhere visible.
+  const defaultW = (def && def.w) || 200;
+  const defaultH = (def && def.h) || 38;
+  // Field blocks (non-layout) inherit x AND width from the bottommost
+  // block on the page so stacking builds a tidy aligned column instead of
+  // ragged-edge boxes. Layout blocks (section-header, accent-bar) keep
+  // their natural full-width sizing — inheriting a 90px column width for
+  // a section header would shrink it to a useless sliver.
+  let x, w;
+  const stackAbove = !isLayout ? _cvFindStackAnchor() : null;
+  if(stackAbove){
+    x = stackAbove.x;
+    w = stackAbove.w;
+  } else {
+    w = defaultW;
+    x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - defaultW) / 2));
+  }
+  // y stacks below existing content so successive clicks don't pile blocks
+  // on top of each other. Capped near the page bottom so the first click
+  // into a busy page still lands somewhere visible.
   const lastY = cvBlocks.reduce((m,b)=>Math.max(m,b.y+b.h+4), 20);
-  cvAddBlock(key, isLayout, x, Math.min(lastY, 1060));
+  const y = Math.min(lastY, 1060);
+  cvAddBlock(key, isLayout, x, y);
+  // cvAddBlock seeds w from def — override on the just-pushed block so
+  // the new card lines up with the column. cvAddBlock pushes to the end
+  // of cvBlocks.
+  if(stackAbove && cvBlocks.length){
+    const newBlock = cvBlocks[cvBlocks.length - 1];
+    if(newBlock && newBlock.key === key && w && w !== defaultW){
+      newBlock.w = w;
+      cvRenderCanvas();
+      cvSaveLayout();
+    }
+  }
+}
+
+// The block to align a new click-to-add field below: the visually
+// bottommost field on the page. Layout blocks are skipped so a
+// full-width section-header above doesn't force the next field to span
+// the page too. Returns null when the page has no field anchor.
+function _cvFindStackAnchor(){
+  if(!cvBlocks.length) return null;
+  let bottom = null;
+  cvBlocks.forEach(b => {
+    if(b.isLayout) return;
+    if(!bottom || (b.y + b.h) > (bottom.y + bottom.h)) bottom = b;
+  });
+  return bottom;
 }
 
 // ── Block creation ───────────────────────────────────────────────────

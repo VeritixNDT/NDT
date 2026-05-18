@@ -521,11 +521,13 @@ async function cvAutoSetupFromCompany(){
   const hasFooterText = !!(co.footer && String(co.footer).trim());
   const hasConfid     = !!(co.confidstmt && String(co.confidstmt).trim());
   if(hasFooterText){
+    // Smart field that reads co.footer live at render time, so updates to
+    // Settings → Company appear on the next print without re-running
+    // auto-setup. Replaces the previous baked-text-block approach.
     newBlocks.push({
-      id: _cvBlockId(), key: 'text-block', isLayout: true, zone: 'footer',
+      id: _cvBlockId(), key: 'co-footer-smart', isLayout: false, zone: 'footer',
       x: X_MARGIN, y: footerY, w: 340, h: 24,
-      text: String(co.footer).trim(),
-      fontSize: '8px', bold: false, italic: false,
+      text: '', fontSize: '8px', bold: false, italic: false,
       color: '#666', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
       align: 'left', zIndex: Z_FOOTER_BASE + 1, locked: false,
     });
@@ -573,21 +575,18 @@ async function cvAutoSetupFromCompany(){
     });
   }
 
-  // Confidentiality statement (full-width, below the name/page/report row).
-  // Only added when the user has filled it in at Settings → Company. Renders
-  // in smaller italic text — legally important but visually subordinate.
-  // When present, bump the footer band height so the new line clears the
-  // page margin instead of crashing into the page edge.
+  // Confidentiality statement (full-width, below the name/page row).
+  // Only added when the user has filled it in at Settings → Company. Live
+  // smart field — edits to co.confidstmt reach the printed page on the
+  // next render. Bigger footer band so both lines fit above the page edge.
   if(hasConfid){
     newBlocks.push({
-      id: _cvBlockId(), key: 'text-block', isLayout: true, zone: 'footer',
+      id: _cvBlockId(), key: 'co-confidstmt-smart', isLayout: false, zone: 'footer',
       x: X_MARGIN, y: footerY + 18, w: CV_PAGE_WIDTH_PX - (X_MARGIN * 2), h: 24,
-      text: String(co.confidstmt).trim(),
-      fontSize: '7px', bold: false, italic: true,
+      text: '', fontSize: '7px', bold: false, italic: true,
       color: '#888', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
       align: 'center', zIndex: Z_FOOTER_BASE + 4, locked: false,
     });
-    // Bigger footer band so both lines fit comfortably above the page edge.
     cvTplCfg.footer.heightPx = Math.max(cvTplCfg.footer.heightPx || 60, 88);
   }
 

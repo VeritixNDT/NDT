@@ -114,6 +114,13 @@ var CV_FIELD_DEFS = {
   'co-vat-smart':     {label:'Company VAT/reg (live)', ph:'BE 0123.456.789',          get:r=>_cvCompany().reg||'—',          w:160,h:32, smartLink:'company', companyField:'reg'},
   'co-logo-smart':    {label:'Company logo (live)',    ph:'',                          get:r=>'',                             w:140,h:56, smartLink:'company', companyField:'logo', isLogo:true},
   'co-block':         {label:'Company info block',     ph:'Acme Inspection Ltd.\n1 NDT Street\n+32 3 123 45 67', get:r=>'',  w:280,h:90, smartLink:'company', companyField:'block', isCompanyBlock:true},
+  // Live company-text smart fields. Render the corresponding Settings →
+  // Company field at every read — so changing the standard footer text or
+  // confidentiality statement updates the printed output on the next
+  // render, without re-running auto-setup. noLabel so the card carries
+  // just the value (these are full lines of copy, not labelled fields).
+  'co-footer-smart':   {label:'Standard footer text',   ph:'Acme Inspection Ltd. — Accredited inspection body', get:r=>'', w:340,h:24, smartLink:'company', companyField:'footer',     isCompanyFooter:true,     noLabel:true},
+  'co-confidstmt-smart':{label:'Confidentiality statement', ph:'This report is confidential and intended solely for the named client.', get:r=>'', w:520,h:30, smartLink:'company', companyField:'confidstmt', isCompanyConfidStmt:true, noLabel:true},
 };
 
 // V29 — Company profile live-read helpers.
@@ -213,7 +220,7 @@ var CV_LAYOUT_ITEMS = [
 
 var CV_PALETTE_GROUPS = [
   {id:'custom',    label:'✦ Custom / Blank',  fields:['blank-field','blank-multiline','blank-row-2','blank-row-3','blank-row-4']},
-  {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block']},
+  {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block','co-footer-smart','co-confidstmt-smart']},
   {id:'template',  label:'📋 Report template', fields:['tpl-number']},
   {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','rep-date','method']},
   {id:'client',    label:'Client info',   fields:['client','project','location','sv-order','order-no','req-no','ref-client']},
@@ -2179,6 +2186,20 @@ function cvRenderBlockContent(block, report, preview){
           return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:4px"><img src="${src}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`;
         }
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🏢</span>Company logo<span style="font-size:7.5px;color:#999">Upload in Settings → Company</span></div>`;
+      }
+      // Standard footer text — single-line render of co.footer with a
+      // graceful placeholder when the field isn't filled in.
+      if(def.isCompanyFooter){
+        const txt = (co2.footer && String(co2.footer).trim()) || '';
+        if(txt) return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:3px 7px;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(txt)}</div>`;
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#bbb;font-style:italic;text-align:center;padding:0 8px">Standard footer text — fill in Settings → Company</div>`;
+      }
+      // Confidentiality statement — multi-line render of co.confidstmt.
+      // Uses pre-wrap so paragraph breaks in the source text survive.
+      if(def.isCompanyConfidStmt){
+        const txt = (co2.confidstmt && String(co2.confidstmt).trim()) || '';
+        if(txt) return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:3px 7px;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al};line-height:1.4;white-space:pre-wrap;overflow:hidden">${escapeHtml(txt)}</div>`;
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#bbb;font-style:italic;text-align:center;padding:0 8px">Confidentiality statement — fill in Settings → Company</div>`;
       }
       // Composite "info block": multi-line company identity.
       // Phone and email get their own lines so contact info reads as a

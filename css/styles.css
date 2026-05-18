@@ -4441,6 +4441,29 @@ a { color: var(--cyan); text-decoration: none; }
   cursor: default;
   opacity: .55;
 }
+
+/* Padlock animation — surfaces wherever a per-block lock can be toggled
+   (properties-panel header, layers-row right side, on-canvas FAB). Pulses
+   on toggle so the user gets visual confirmation that the click landed.
+   The class is added by cvToggleLock after the re-render finishes; a
+   reflow nudge restarts the keyframe if it was already on the element. */
+.cv-padlock-anim {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .18s ease, transform .18s ease;
+}
+.cv-padlock-anim:hover { transform: scale(1.08); }
+.cv-padlock-anim.is-locked { color: var(--amber); }
+@keyframes cvLockPulse {
+  0%   { transform: scale(1)    rotate(0deg); }
+  35%  { transform: scale(1.35) rotate(-8deg); }
+  70%  { transform: scale(0.95) rotate(4deg); }
+  100% { transform: scale(1)    rotate(0deg); }
+}
+.cv-padlock-anim--pulse {
+  animation: cvLockPulse 420ms cubic-bezier(.4, .0, .2, 1.6);
+}
 .canvas-page-tabs{display:flex;align-items:center;gap:0;padding:0 8px;background:var(--bg2);min-height:30px;flex-shrink:0;overflow-x:auto;flex:1}
 .canvas-page-tab{padding:5px 14px;font-size:11px;font-family:var(--mono);cursor:pointer;color:var(--t3);border:none;background:none;border-bottom:2px solid transparent;transition:all .12s;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .canvas-page-tab:hover{color:var(--t1);background: var(--hover-bg)}

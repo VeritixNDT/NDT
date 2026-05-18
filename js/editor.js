@@ -2551,8 +2551,15 @@ function cvRenderProps(id){
         </div>`).join('')}
     </div>`;
 
+  // Padlock at top-right of the panel header — animated, click to toggle
+  // the per-block lock. .cv-padlock-anim flags the element so cvToggleLock
+  // can pulse it after each toggle.
+  const padlock = `<button data-action="cvToggleLock" data-args="'${id}'" class="cv-padlock-anim ${block.locked?'is-locked':''}" title="${escapeHtml(block.locked?t('pe.fab.unlock','Unlock position'):t('pe.fab.lock','Lock position'))}" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;color:${block.locked?'var(--amber)':'var(--t3)'};margin-left:auto">${block.locked?'🔒':'🔓'}</button>`;
   panel.innerHTML = `
-    <div style="font-size:11px;font-weight:600;color:var(--t1);margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border);line-height:1.4">${title}${block.locked?' 🔒':''}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border);line-height:1.4">
+      <span style="font-size:11px;font-weight:600;color:var(--t1);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${title}</span>
+      ${padlock}
+    </div>
     ${mapInfo}
     ${smartLinkUI}
     ${qrUI}
@@ -2688,7 +2695,7 @@ function cvRenderLayers(){
       <span style="flex:1;min-width:0;font-size:11px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${b.locked?'opacity:.6':''}">${escapeHtml(name)}</span>
       ${hasComment ? '<span title="Has unresolved comment" style="color:var(--amber);font-size:10px">●</span>' : ''}
       ${hasShowWhen ? '<span title="Conditional visibility" style="color:var(--blue);font-size:10px">⚡</span>' : ''}
-      <button data-action="cvToggleLock" data-args="'${b.id}'" data-stop-prop="1" title="${b.locked?'Unlock':'Lock'}" style="background:none;border:none;color:${b.locked?'var(--amber)':'var(--t3)'};font-size:11px;cursor:pointer;padding:1px 3px;line-height:1;opacity:${b.locked?'1':'.55'}">${b.locked?'🔒':'🔓'}</button>
+      <button data-action="cvToggleLock" data-args="'${b.id}'" data-stop-prop="1" class="cv-padlock-anim" title="${b.locked?'Unlock':'Lock'}" style="background:none;border:none;color:${b.locked?'var(--amber)':'var(--t3)'};font-size:11px;cursor:pointer;padding:1px 3px;line-height:1;opacity:${b.locked?'1':'.55'}">${b.locked?'🔒':'🔓'}</button>
       <div style="display:flex;flex-direction:column;gap:1px">
         <button data-action="cvMoveZ" data-args="'${b.id}',1" data-stop-prop="1" title="Bring forward" style="background:none;border:none;color:var(--t3);font-size:8px;cursor:pointer;padding:0 2px;line-height:1;opacity:.7">▲</button>
         <button data-action="cvMoveZ" data-args="'${b.id}',-1" data-stop-prop="1" title="Send backward" style="background:none;border:none;color:var(--t3);font-size:8px;cursor:pointer;padding:0 2px;line-height:1;opacity:.7">▼</button>
@@ -2955,6 +2962,13 @@ function cvUpdateBlock(id, prop, value){
   if(['x','y','w','h'].includes(prop)) value = cvSnap(Math.max(prop==='x'||prop==='y'?0:16, +value));
   block[prop] = value;
   cvRenderCanvas();
+  // Properties panel needs to reflect the new value so e.g. alignment
+  // buttons highlight the active option, lock checkbox flips, etc. Skip
+  // text inputs while typing — the input keeps focus naturally and we
+  // don't want to re-render the field underneath the caret.
+  if(prop !== 'text' && prop !== 'customValue' && !prop.startsWith('c')) {
+    cvRenderProps(id);
+  }
   cvSaveLayout();
 }
 function cvDeleteBlock(id){ cvPushUndo(); cvPages[cvCurrentPage].blocks=cvPages[cvCurrentPage].blocks.filter(b=>b.id!==id); cvSync(); if(cvSelectedId===id){cvSelectedId=null;cvSelectedIds=cvSelectedIds.filter(x=>x!==id);} cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout(); }
@@ -2981,7 +2995,17 @@ function cvToggleLock(id){
     return;
   }
   b.locked = !b.locked;
-  cvRenderCanvas(); cvRenderProps(id); cvSaveLayout();
+  cvRenderCanvas(); cvRenderProps(id); cvRenderLayers(); cvSaveLayout();
+  // Pulse every visible padlock — properties header + layers row — so the
+  // user gets visual confirmation that the toggle landed. The class is
+  // applied after the re-render so the just-rendered element animates.
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.cv-padlock-anim').forEach(el => {
+      el.classList.remove('cv-padlock-anim--pulse');
+      void el.offsetWidth;  // reflow so the animation restarts on re-add
+      el.classList.add('cv-padlock-anim--pulse');
+    });
+  });
   toast(b.locked ? t('pe.toast.block_locked','Block locked') : t('pe.toast.block_unlocked','Block unlocked'));
 }
 

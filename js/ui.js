@@ -501,6 +501,27 @@ async function cvAutoSetupFromCompany(){
     align: 'right', zIndex: Z_FOOTER_BASE + 2, locked: false,
   });
 
+  // QR code — auto-placed verification mark on the cover page (page 0).
+  // Sits inside the page body at the bottom-right corner so it doesn't
+  // overlap the footer band; the footer height stays as configured. Uses
+  // the qr-code field's native 90×90 size so other blocks aren't shifted.
+  // No `zone` tag: QR lives on the cover, not the repeating footer chrome
+  // (a verification mark only needs to appear once per document).
+  {
+    const QR_SIZE = 90;
+    const QR_MARGIN = 18;
+    const footerH = (cvTplCfg.footer && cvTplCfg.footer.heightPx) || 60;
+    newBlocks.push({
+      id: _cvBlockId(), key: 'qr-code', isLayout: false,
+      x: CV_PAGE_WIDTH_PX - QR_SIZE - QR_MARGIN,
+      y: CV_PAGE_HEIGHT_PX - footerH - QR_SIZE - 6,
+      w: QR_SIZE, h: QR_SIZE,
+      text: 'Verify QR', fontSize: '8px', bold: false, italic: false,
+      color: '#000', bgColor: 'transparent', borderColor: '#cccccc', showBorder: false,
+      align: 'center', zIndex: Z_FOOTER_BASE + 5, locked: false,
+    });
+  }
+
   // Confidentiality statement (full-width, below the name/page/report row).
   // Only added when the user has filled it in at Settings → Company. Renders
   // in smaller italic text — legally important but visually subordinate.

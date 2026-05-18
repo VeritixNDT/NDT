@@ -2207,9 +2207,12 @@ function cvRenderBlockContent(block, report, preview){
   const vEsc = _h(value);
   const lblEsc = _h(block.text||def.label);
   if(def.computed){
-    // Render computed/calculated field with a subtle distinguishing accent
+    // Render computed/calculated field with a subtle distinguishing accent.
+    // The "computed" marker lives on the palette badge (∑ chip) — printing
+    // it again in front of every placed card was visual noise, especially
+    // in tight footer rows where "∑ Page" stacked above "Page 1 of 3".
     return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al};box-sizing:border-box">
-      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">∑ ${lblEsc}</div>
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
       <div style="font-size:${fs};font-weight:${fw||'600'};font-style:${fi};border-bottom:0.5px dashed ${preview?'transparent':'#a78bfa'};min-height:11px;color:${preview?'#0d9488':'#a78bfa'};padding-bottom:1px">${vEsc}</div>
     </div>`;
   }

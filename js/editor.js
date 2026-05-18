@@ -471,6 +471,24 @@ function cvBuildReport(method, result, showDefects){
   }
   // Fallback: synthetic sample data
   const b = Object.assign({}, CV_SAMPLE.base);
+  // Overlay the live "next report number" from Settings → Numbering so the
+  // report-no place card in design / preview mode shows what the next saved
+  // report will actually be labelled, instead of the static "SV-2023-004-…"
+  // sample. Only applied when the user has configured numbering (else keeps
+  // the existing sample). Same algorithm as dashboard.js ovBuildReport.
+  try {
+    const s = (typeof ls === 'function' && typeof KEYS !== 'undefined') ? ls(KEYS.settings, {}) : {};
+    if(s && (s.numPrefix || s.numSep != null || s.numYear || s.numDigits || s.numNext)){
+      const prefix   = (s.numPrefix || 'INS');
+      const sep      = (s.numSep != null) ? s.numSep : '-';
+      const yrDigits = parseInt(s.numYear || '4', 10);
+      const digits   = parseInt(s.numDigits || '3', 10);
+      const next     = parseInt(s.numNext || '1', 10);
+      const yr  = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
+      const seq = String(next).padStart(digits, '0');
+      b.reportNo = [prefix, yr, seq].filter(Boolean).join(sep);
+    }
+  } catch(e){ /* keep sample reportNo */ }
   b.method = method; b.result = result;
   b.id = b.reportNo;
   b.verdict = result==='Pass'?'Acceptable':result==='Fail'?'Not acceptable':result;

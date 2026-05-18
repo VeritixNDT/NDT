@@ -143,15 +143,20 @@ var KEYS = {
   inspectors:'vx-inspectors-v1',
 };
 
+// Method names use the formal "Examination" suffix per ASME / EN
+// inspection terminology (rather than the casual "Testing"). PMI keeps
+// "Identification" because that's the standard expansion of its
+// acronym; HT keeps "Testing" because "Hardness Examination" isn't
+// established terminology.
 var NDT_METHODS = [
-  { id:'UT',  name:'Ultrasonic Testing',        color:'#4f8ef7' },
-  { id:'MT',  name:'Magnetic Particle Testing', color:'#a78bfa' },
-  { id:'VT',  name:'Visual Testing',            color:'#3ecf8e' },
-  { id:'PT',  name:'Penetrant Testing',         color:'#f5a623' },
-  { id:'PMI', name:'Positive Material ID',      color:'#f25c5c' },
-  { id:'HT',  name:'Hardness Testing',          color:'#fb923c' },
-  { id:'RT',  name:'Radiographic Testing',      color:'#e879f9' },
-  { id:'ET',  name:'Eddy Current Testing',      color:'#34d399' },
+  { id:'UT',  name:'Ultrasonic Examination',         color:'#4f8ef7' },
+  { id:'MT',  name:'Magnetic Particle Examination',  color:'#a78bfa' },
+  { id:'VT',  name:'Visual Examination',             color:'#3ecf8e' },
+  { id:'PT',  name:'Penetrant Examination',          color:'#f5a623' },
+  { id:'PMI', name:'Positive Material Identification', color:'#f25c5c' },
+  { id:'HT',  name:'Hardness Testing',               color:'#fb923c' },
+  { id:'RT',  name:'Radiographic Examination',       color:'#e879f9' },
+  { id:'ET',  name:'Eddy Current Examination',       color:'#34d399' },
 ];
 
 var ACCENT_COLORS = [

@@ -20,7 +20,15 @@ var CV_FIELD_DEFS = {
   'revision':     {label:'Revision',                      ph:'00',                            get:r=>r.revision||'00',             w:90, h:38, mapTo:'revision'},
   'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
   'rep-date':     {label:'Report date / Sign date',       ph:'2025-03-15',                    get:r=>r.signDate||r.repDate||'—',   w:140,h:38, mapTo:'signDate'},
-  'method':       {label:'NDT Method',                    ph:'UT — Ultrasonic',               get:r=>r.method||'—',                w:120,h:38, mapTo:'method'},
+  // Method — renders the full method name (e.g. "Magnetic Particle
+  // Examination") from NDT_METHODS rather than just the code "MT". Value-only
+  // (noLabel) so the card on the canvas is the readable method line itself.
+  'method':       {label:'NDT Method',                    ph:'Ultrasonic Examination',        get:r=>{
+    const code = r && r.method;
+    if(!code) return '—';
+    const m = (typeof NDT_METHODS !== 'undefined') ? NDT_METHODS.find(x => x.id === code) : null;
+    return (m && m.name) || code;
+  }, w:220,h:38, mapTo:'method', noLabel:true},
   'client':       {label:'Client',                        ph:'Offshore Structures BV',        get:r=>r.client||'—',                w:200,h:38, mapTo:'client'},
   'project':      {label:'Project',                       ph:'Platform Alpha — Leg Inspection',get:r=>r.project||'—',              w:240,h:38, mapTo:'project'},
   'location':     {label:'Test location',                 ph:'Fabrication yard, Rotterdam',   get:r=>r.location||'—',              w:200,h:38, mapTo:'location'},
@@ -42,10 +50,6 @@ var CV_FIELD_DEFS = {
   'weld-pos':     {label:'Welding position',              ph:'PA',                            get:r=>r.weldPos||'—',               w:100,h:38, mapTo:'weldPos'},
   'part-exam':    {label:'Part examined',                  ph:'100% of weld seam incl. HAZ',   get:r=>r.partExam||'—',              w:380,h:44, mapTo:'partExam'},
   'exam-type':    {label:'Examination type',              ph:'Weld surface examination',      get:r=>r.examType||'—',              w:200,h:38, mapTo:'examType'},
-  // Technique — free-form descriptor (e.g. "Manual UT contact technique",
-  // "Phased Array sectorial scan"). Renders value-only on the canvas so
-  // it can sit next to e.g. exam-type without a redundant "Technique:" label.
-  'technique':    {label:'Technique',                      ph:'Manual UT contact technique',   get:r=>r.technique||'—',             w:240,h:38, mapTo:'technique', noLabel:true},
   'extent':       {label:'Extent',                        ph:'100% Weld and HAZ',             get:r=>r.extent||'—',                w:160,h:38, mapTo:'extent'},
   'spec':         {label:'Specification',                 ph:'EN-ISO 17640:2018',             get:r=>r.eq_spec||r.spec||'—',       w:185,h:38, mapTo:'eq_spec / spec'},
   'acc-crit':     {label:'Acceptance criteria',           ph:'EN-ISO 11666:2018 level 2',     get:r=>r.eq_acc||r.accCrit||'—',     w:200,h:38, mapTo:'eq_acc / accCrit'},
@@ -212,7 +216,7 @@ var CV_PALETTE_GROUPS = [
   {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','rep-date','method']},
   {id:'client',    label:'Client info',   fields:['client','project','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','welders','weld-process','material','weld-prep','heat-treat','thickness','surf-cond','temperature','weld-pos','part-exam']},
-  {id:'criteria',  label:'Criteria',      fields:['exam-type','technique','extent','spec','acc-crit','procedure','proc-rev','stage']},
+  {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','witness','sign-date','insp-sig','client-sig','insp-date','client-date']},

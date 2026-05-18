@@ -97,7 +97,6 @@ var RPT_FORM = {
   ],
   exam: [
     { id:'examType',   label:'Examination type',    placeholder:'e.g. Initial', options:['Weld surface examination','Surface examination','Crack examination','Forging examination','Casting examination','Positive Material Identification','Hardness test','Wall thickness measurements','Lamination examination','Ultrasonic examination'] },
-    { id:'technique',  label:'Technique',           placeholder:'e.g. Manual UT contact technique', options:['Manual UT contact technique','Phased Array sectorial scan','Phased Array linear scan','TOFD (Time-of-Flight Diffraction)','Automated UT','Pulse-echo','Through-transmission','Wet fluorescent magnetic particle','Dry visible magnetic particle','Visible dye penetrant','Fluorescent penetrant','Direct visual','Remote visual (borescope)','Radiography — X-ray','Radiography — gamma','Eddy current absolute','Eddy current differential'] },
     { id:'extent',     label:'Extent',               placeholder:'e.g. 100%', options:['100% Weld and HAZ','100% of the given weld','100% Surface examination','100% of the given surface','As requested by the client'] },
     { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
     { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },

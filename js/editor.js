@@ -19,13 +19,6 @@ var CV_FIELD_DEFS = {
   }, w:150, h:38, mapTo:'templateNo', noLabel:true},
   'revision':     {label:'Revision',                      ph:'00',                            get:r=>r.revision||'00',             w:90, h:38, mapTo:'revision'},
   'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
-  // Report / sign date — uses the real report's signDate when present,
-  // otherwise falls back to today's date so design-mode templates and
-  // unsigned drafts show a sensible live value instead of '—'.
-  'rep-date':     {label:'Report date / Sign date',       ph:'15-Mar-2025',                   get:r=>{
-    if(r && (r.signDate || r.repDate)) return r.signDate || r.repDate;
-    return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-  }, w:140,h:38, mapTo:'signDate'},
   // Method — renders the full method name (e.g.
   // "MAGNETIC PARTICLE EXAMINATION REPORT") from NDT_METHODS rather than
   // just the code "MT". Uppercased on render so the card reads as a
@@ -100,7 +93,10 @@ var CV_FIELD_DEFS = {
   'defect-count':    {label:'Defect count',          ph:'3',         get:r=>(r.defects||[]).length, w:100,h:38, computed:true, mapTo:'computed'},
   'pass-rate':       {label:'Pass rate %',           ph:'92%',       get:r=>{const rs=ls(KEYS.reports,[]);if(!rs.length)return'—';return Math.round(rs.filter(x=>x.verdict==='Acceptable').length/rs.length*100)+'%';}, w:120,h:38, computed:true},
   'rejected-count':  {label:'Rejected indications', ph:'1',         get:r=>(r.defects||[]).filter(d=>d.severity==='Critical'||d.severity==='High'||d.acceptance==='Reject').length, w:140,h:38, computed:true},
-  'today-date':      {label:'Today (auto)',          ph:'15-Mar-2025', get:r=>{const d=new Date();return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}, w:130,h:38, computed:true},
+  // Report / sign date (auto) — formerly "Today (auto)". Renders today's
+  // date as the live report / sign date. Keys / palette group unchanged
+  // so existing canvases with a today-date block keep working.
+  'today-date':      {label:'Report / sign (auto)',  ph:'15-Mar-2025', get:r=>{const d=new Date();return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}, w:140,h:38, computed:true},
   'page-num':        {label:'Page X of Y',           ph:'Page 1 of 3', get:r=>'Page 1 of '+(typeof cvPages!=='undefined'?cvPages.length:1), w:130,h:32, computed:true},
 
   // ── PROCEDURE / CERT / CALIBRATION STATUS ───────────────────────
@@ -238,7 +234,7 @@ var CV_PALETTE_GROUPS = [
   {id:'custom',    label:'✦ Custom / Blank',  fields:['blank-field','blank-multiline','blank-row-2','blank-row-3','blank-row-4']},
   {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block','co-footer-smart','co-confidstmt-smart']},
   {id:'template',  label:'📋 Report template', fields:['tpl-number']},
-  {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','rep-date','method']},
+  {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','method']},
   {id:'client',    label:'Client info',   fields:['client','project','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','welders','weld-process','material','weld-prep','heat-treat','thickness','surf-cond','temperature','weld-pos','part-exam']},
   {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},

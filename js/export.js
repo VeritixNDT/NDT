@@ -317,7 +317,7 @@ async function cvLoadDefaultLayout(){
   add('logo-co',true,M,y,130,52,{showBorder:false});
   add('report-no',false,M+134,y,330,26); add('revision',false,M+468,y,90,26); add('method',false,M+562,y,112,26);
   y+=28;
-  add('exam-date',false,M+134,y,190,24); add('rep-date',false,M+328,y,190,24);
+  add('exam-date',false,M+134,y,190,24); add('today-date',false,M+328,y,190,24);
   y+=30;
   add('section-header',true,M,y,W,22,{text:'Client information',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
   add('client',false,M,y,col4,36); add('project',false,M+col4+1,y,col4,36); add('sv-order',false,M+col4*2+2,y,col4-5,36); add('order-no',false,M+col4*3-1,y,col4+8,36);

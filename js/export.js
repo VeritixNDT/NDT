@@ -85,6 +85,34 @@ function cvBuildPrintHTML(report){
   const hdrFragment = hdrEnabled ? headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
   const ftrFragment = ftrEnabled ? footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
 
+  // Chrome layer for each zone — background fill, accent strip, single-edge
+  // divider border. Sits behind the zone blocks at z-index 0 so user content
+  // overlays it. _cvResolveZoneChrome lives in editor.js and is the same
+  // resolver design-mode bands use, so print matches the on-screen design.
+  const renderChrome = (zone) => {
+    const cfg = cvTplCfg[zone];
+    if(!cfg || !cfg.enabled) return '';
+    const chrome = (typeof _cvResolveZoneChrome === 'function') ? _cvResolveZoneChrome(zone) : null;
+    if(!chrome) return '';
+    const h = +cfg.heightPx || (zone === 'header' ? 100 : 60);
+    const sidePos = zone === 'header' ? 'top:0' : 'bottom:0';
+    let css = `position:absolute;left:0;right:0;${sidePos};height:${h}px;z-index:0;pointer-events:none;`;
+    if(chrome.bg && chrome.bg !== 'transparent')
+      css += 'background:' + _pSafeColor(chrome.bg,'transparent') + ';';
+    if(chrome.borderWidthPx){
+      const edge = chrome.borderEdge === 'top' ? 'border-top' : 'border-bottom';
+      css += edge + ':' + chrome.borderWidthPx + 'px solid ' + _pSafeColor(chrome.borderColor,'rgba(0,0,0,.18)') + ';';
+    }
+    let inner = '';
+    if(chrome.accentPos !== 'none' && chrome.accentThickness > 0){
+      const accentSide = chrome.accentPos === 'top' ? 'top:0' : 'bottom:0';
+      inner = `<div style="position:absolute;left:0;right:0;${accentSide};height:${chrome.accentThickness}px;background:${_pSafeColor(chrome.accentColor,'#404040')}"></div>`;
+    }
+    return `<div class="vx-print-zone-chrome" data-zone="${zone}" style="${css}">${inner}</div>`;
+  };
+  const hdrChromeFragment = renderChrome('header');
+  const ftrChromeFragment = renderChrome('footer');
+
   let pagesHtml = '';
   cvPages.forEach((page, pageIdx) => {
     // Body blocks only — exclude zone-tagged blocks, those are already in the
@@ -99,7 +127,10 @@ function cvBuildPrintHTML(report){
       .filter(b => b.zone !== 'header' && b.zone !== 'footer')
       .sort((a,b) => (a.zIndex||0) - (b.zIndex||0))
       .forEach(block => { bodyHtml += renderBlock(block); });
+    // Chrome first (z-index 0), then zone blocks + body blocks on top.
     pagesHtml += `<div class="vx-print-page" data-page-num="${pageIdx + 1}">
+      ${hdrChromeFragment}
+      ${ftrChromeFragment}
       ${hdrFragment}
       ${bodyHtml}
       ${ftrFragment}

@@ -328,15 +328,33 @@ var cvTplCfg = {
   showLogo:true, showFooter:true,
   tplLogo:null, logoPos:'left', logoSize:'md',
   content:{},
-  // V29 — header/footer zones repeat on every page in print/export.
-  // `enabled` toggles the zone on/off (no-cost when off).
-  // `heightPx` defines the band height in design pixels (1px ≈ 1 web px at zoom 1).
-  // Blocks placed inside the band are tagged with zone='header'|'footer' in the
-  // block JSON; at print time the pipeline injects them at the band position
-  // on every page. In design mode, the band is rendered with a tinted
-  // background and dashed boundary so the user can see the boundary.
-  header:{ enabled:false, heightPx:100, bgColor:'transparent' },
-  footer:{ enabled:false, heightPx:60,  bgColor:'transparent' },
+  // Header / footer zones repeat on every page in print/export.
+  //
+  //   enabled            — toggles the zone on/off (no-cost when off).
+  //   heightPx           — band height in design pixels.
+  //   bgColor            — chrome fill. 'transparent' = no fill.
+  //   accentColor        — accent strip colour. '' falls back to sectionColor.
+  //   accentThicknessPx  — accent strip thickness (0 = no strip).
+  //   accentPos          — 'top' | 'bottom' | 'none'.
+  //   borderStyle        — 'none' | 'thin' (1px) | 'heavy' (2px).
+  //   borderColor        — '' falls back to a tinted sectionColor.
+  //   paddingPx          — inner padding for blocks placed in the zone.
+  //
+  // Blocks placed inside the band are tagged with zone='header'|'footer' in
+  // the block JSON; at print time the pipeline injects them at the band
+  // position on every page. The chrome (bg, accent, border) renders behind
+  // those blocks both in design mode and in print, giving the zone a
+  // designed look without users having to wire it up block-by-block.
+  header:{
+    enabled:false, heightPx:100, bgColor:'transparent',
+    accentColor:'', accentThicknessPx:4, accentPos:'bottom',
+    borderStyle:'none', borderColor:'', paddingPx:8,
+  },
+  footer:{
+    enabled:false, heightPx:60, bgColor:'transparent',
+    accentColor:'', accentThicknessPx:2, accentPos:'top',
+    borderStyle:'none', borderColor:'', paddingPx:8,
+  },
 };
 
 // ── Sample data ──────────────────────────────────────────────────────
@@ -1444,25 +1462,102 @@ var _cvBlockElCache = new Map();
 // removed if present. In preview mode the band is always removed because
 // printed pages render the header/footer blocks themselves, not the visual
 // boundary indicator.
+// Pulls chrome styling out of a zone config so design-mode and print-time
+// renderers can build the same CSS string. Returns:
+//   {
+//     bg:           background colour or 'transparent',
+//     accentColor:  resolved accent strip colour (falls back to sectionColor),
+//     accentThickness, accentPos,
+//     borderWidthPx, borderColor, borderEdge ('top'|'bottom')
+//   }
+function _cvResolveZoneChrome(zone){
+  const cfg = cvTplCfg[zone] || {};
+  const section = cvTplCfg.sectionColor || '#404040';
+  const accentColor = (cfg.accentColor || '').trim() || section;
+  const accentThickness = Math.max(0, Math.min(12, +cfg.accentThicknessPx || 0));
+  const accentPos = (cfg.accentPos === 'top' || cfg.accentPos === 'bottom') ? cfg.accentPos : 'none';
+  const borderColor = (cfg.borderColor || '').trim() || 'rgba(0,0,0,.18)';
+  const borderWidthPx = cfg.borderStyle === 'heavy' ? 2 : (cfg.borderStyle === 'thin' ? 1 : 0);
+  // Header divides at its bottom; footer divides at its top. The single-edge
+  // border keeps prints clean — no full rectangle border, which would clash
+  // visually with the page edge on most paper sizes.
+  const borderEdge = zone === 'header' ? 'bottom' : 'top';
+  return {
+    bg: cfg.bgColor || 'transparent',
+    accentColor, accentThickness, accentPos,
+    borderColor, borderWidthPx, borderEdge,
+  };
+}
+
+// Build the inline CSS for a chrome layer (background, accent strip, single-
+// edge divider border). Used in design-mode band visualisation AND in the
+// print pipeline so design and print stay in sync.
+function _cvZoneChromeStyle(chrome, zone){
+  let css = '';
+  if(chrome.bg && chrome.bg !== 'transparent') css += 'background:' + chrome.bg + ';';
+  if(chrome.borderWidthPx) css += 'border-' + chrome.borderEdge + ':' + chrome.borderWidthPx + 'px solid ' + chrome.borderColor + ';';
+  return css;
+}
+
 function _cvUpsertZoneBand(zone, canvas){
   const cfg = cvTplCfg[zone];
   const id = 'cv-' + zone + '-band';
   // Per-zone visual config bundled into one object so the branches don't
   // have to fight over which colour goes where.
   const opts = zone === 'header'
-    ? { side:'top:0',    borderEdge:'border-bottom', rgb:'79,142,247',  labelAlpha:.8,  bgAlpha:.12, i18nKey:'pe.header.label', fallback:'HEADER — repeats on every page', defaultHeight:100 }
-    : { side:'bottom:0', borderEdge:'border-top',    rgb:'245,166,35', labelAlpha:.95, bgAlpha:.15, i18nKey:'pe.footer.label', fallback:'FOOTER — repeats on every page', defaultHeight:60  };
+    ? { side:'top:0',    rgb:'79,142,247',  labelAlpha:.8,  bgAlpha:.12, i18nKey:'pe.header.label', fallback:'HEADER — repeats on every page', defaultHeight:100 }
+    : { side:'bottom:0', rgb:'245,166,35',  labelAlpha:.95, bgAlpha:.15, i18nKey:'pe.footer.label', fallback:'FOOTER — repeats on every page', defaultHeight:60  };
   let band = document.getElementById(id);
   if(!cvPreview && cfg && cfg.enabled){
+    const chrome = _cvResolveZoneChrome(zone);
     if(!band){
       band = document.createElement('div');
       band.id = id;
-      band.style.cssText = `position:absolute;left:0;right:0;${opts.side};background:rgba(${opts.rgb},.05);${opts.borderEdge}:1px dashed rgba(${opts.rgb},.4);pointer-events:none;z-index:1;display:flex;align-items:flex-start;justify-content:flex-end;padding:3px 6px`;
+      band.style.cssText = `position:absolute;left:0;right:0;${opts.side};pointer-events:none;z-index:1;display:flex;align-items:flex-start;justify-content:flex-end;padding:3px 6px;overflow:hidden`;
       const lbl = document.createElement('div');
-      lbl.style.cssText = `font-size:8px;font-family:var(--mono);color:rgba(${opts.rgb},${opts.labelAlpha});background:rgba(${opts.rgb},${opts.bgAlpha});padding:1px 5px;border-radius:2px;letter-spacing:.05em`;
+      lbl.className = 'cv-zone-band-label';
+      lbl.style.cssText = `font-size:8px;font-family:var(--mono);color:rgba(${opts.rgb},${opts.labelAlpha});background:rgba(${opts.rgb},${opts.bgAlpha});padding:1px 5px;border-radius:2px;letter-spacing:.05em;position:relative;z-index:2`;
       lbl.textContent = t(opts.i18nKey, opts.fallback);
       band.appendChild(lbl);
       canvas.insertBefore(band, canvas.firstChild?.nextSibling || null);
+    }
+    // Always restyle — designer changes need to flow live to the band.
+    // When the user hasn't set any chrome, fall back to the tinted preview
+    // band (semi-transparent fill + dashed edge) so they can still see the
+    // boundary.
+    const hasChrome = chrome.bg !== 'transparent' || chrome.borderWidthPx > 0 || chrome.accentPos !== 'none';
+    if(hasChrome){
+      band.style.background = chrome.bg !== 'transparent' ? chrome.bg : 'transparent';
+      band.style.borderTop    = '';
+      band.style.borderBottom = '';
+      if(chrome.borderWidthPx){
+        band.style['border' + chrome.borderEdge.charAt(0).toUpperCase() + chrome.borderEdge.slice(1)]
+          = chrome.borderWidthPx + 'px solid ' + chrome.borderColor;
+      }
+    } else {
+      // Preview-only band — tinted fill + dashed edge so the user can see
+      // where their header/footer lives even without chrome configured.
+      band.style.background = `rgba(${opts.rgb},.05)`;
+      band.style.borderTop    = '';
+      band.style.borderBottom = '';
+      band.style['border' + (zone === 'header' ? 'Bottom' : 'Top')] = `1px dashed rgba(${opts.rgb},.4)`;
+    }
+    // Accent strip — rendered as an absolutely-positioned child so it
+    // overlays the band without affecting block-positioning math.
+    let strip = band.querySelector('.cv-zone-accent');
+    if(chrome.accentPos !== 'none' && chrome.accentThickness > 0){
+      if(!strip){
+        strip = document.createElement('div');
+        strip.className = 'cv-zone-accent';
+        strip.style.cssText = 'position:absolute;left:0;right:0;pointer-events:none;z-index:1';
+        band.appendChild(strip);
+      }
+      strip.style.height = chrome.accentThickness + 'px';
+      strip.style.background = chrome.accentColor;
+      strip.style.top    = chrome.accentPos === 'top'    ? '0' : '';
+      strip.style.bottom = chrome.accentPos === 'bottom' ? '0' : '';
+    } else if(strip){
+      strip.remove();
     }
     band.style.height = (cfg.heightPx || opts.defaultHeight) + 'px';
   } else if(band){
@@ -3418,13 +3513,216 @@ function cvSaveTplConfig(){
 }
 async function cvResetTplConfig(){
   if(!await vxConfirm({ message: 'Are you sure you want to reset the template configuration?', okLabel: t('vxc.reset','Reset'), danger: true })) return;
-  cvTplCfg = { sectionColor:'#404040', margin:'8px', baseSize:'8.5px', showLogo:true, showFooter:true, tplLogo:null, logoPos:'left', logoSize:'md', content:{}, header:{enabled:false,heightPx:100,bgColor:'transparent'}, footer:{enabled:false,heightPx:60,bgColor:'transparent'} };
+  cvTplCfg = {
+    sectionColor:'#404040', margin:'8px', baseSize:'8.5px',
+    showLogo:true, showFooter:true,
+    tplLogo:null, logoPos:'left', logoSize:'md',
+    content:{},
+    header:{ enabled:false, heightPx:100, bgColor:'transparent', accentColor:'', accentThicknessPx:4, accentPos:'bottom', borderStyle:'none', borderColor:'', paddingPx:8 },
+    footer:{ enabled:false, heightPx:60,  bgColor:'transparent', accentColor:'', accentThicknessPx:2, accentPos:'top',    borderStyle:'none', borderColor:'', paddingPx:8 },
+  };
   localStorage.removeItem(CV_TPL_KEY);
   cvRenderCanvas();
   toast(t('toast.template_reset', 'Template config reset'));
 }
 function cvLoadTplConfig(){
   try{ const raw=localStorage.getItem(CV_TPL_KEY); if(raw) cvTplCfg = Object.assign({}, cvTplCfg, JSON.parse(raw)); }catch(e){}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HEADER / FOOTER DESIGNER
+// Free-form per-zone style editor — opens a modal with two parallel
+// columns of controls (header + footer) covering height, background,
+// accent strip, border and padding. Live-applies to cvTplCfg as the
+// user edits; Apply persists template config; Cancel reverts to the
+// snapshot taken at open time.
+// ══════════════════════════════════════════════════════════════════
+var _cvHFDesignerSnapshot = null;   // JSON-clone of cvTplCfg.header + .footer at open time
+
+function _cvHFD_fieldIds(zone){
+  const p = zone === 'header' ? 'h' : 'f';
+  return {
+    enabled:      'hfd-' + p + '-enabled',
+    height:       'hfd-' + p + '-height',
+    bgColor:      'hfd-' + p + '-bg',
+    bgHex:        'hfd-' + p + '-bg-hex',
+    accentPos:    'hfd-' + p + '-accent-pos',
+    accentThick:  'hfd-' + p + '-accent-thick',
+    accentColor:  'hfd-' + p + '-accent-color',
+    accentHex:    'hfd-' + p + '-accent-hex',
+    borderStyle:  'hfd-' + p + '-border-style',
+    borderColor:  'hfd-' + p + '-border-color',
+    borderHex:    'hfd-' + p + '-border-hex',
+    padding:      'hfd-' + p + '-padding',
+  };
+}
+function _cvHFD_val(id){ const e = document.getElementById(id); return e ? e.value : ''; }
+function _cvHFD_setVal(id, v){ const e = document.getElementById(id); if(e) e.value = v == null ? '' : String(v); }
+function _cvHFD_setChecked(id, v){ const e = document.getElementById(id); if(e) e.checked = !!v; }
+function _cvHFD_getChecked(id){ const e = document.getElementById(id); return e ? !!e.checked : false; }
+
+// Load values from cvTplCfg into the form.
+function _cvHFD_loadZone(zone){
+  const cfg = cvTplCfg[zone] || {};
+  const ids = _cvHFD_fieldIds(zone);
+  _cvHFD_setChecked(ids.enabled, cfg.enabled);
+  _cvHFD_setVal(ids.height, cfg.heightPx || (zone === 'header' ? 100 : 60));
+  const bg = (cfg.bgColor && cfg.bgColor !== 'transparent') ? cfg.bgColor : '';
+  _cvHFD_setVal(ids.bgHex, bg || 'transparent');
+  if(bg && /^#[0-9a-fA-F]{6}$/.test(bg)) _cvHFD_setVal(ids.bgColor, bg);
+  _cvHFD_setVal(ids.accentPos,   cfg.accentPos   || 'none');
+  _cvHFD_setVal(ids.accentThick, cfg.accentThicknessPx != null ? cfg.accentThicknessPx : (zone === 'header' ? 4 : 2));
+  if(cfg.accentColor && /^#[0-9a-fA-F]{6}$/.test(cfg.accentColor)){
+    _cvHFD_setVal(ids.accentColor, cfg.accentColor);
+    _cvHFD_setVal(ids.accentHex,   cfg.accentColor);
+  } else {
+    _cvHFD_setVal(ids.accentColor, cvTplCfg.sectionColor || '#404040');
+    _cvHFD_setVal(ids.accentHex,   '');
+  }
+  _cvHFD_setVal(ids.borderStyle, cfg.borderStyle || 'none');
+  if(cfg.borderColor && /^#[0-9a-fA-F]{6}$/.test(cfg.borderColor)){
+    _cvHFD_setVal(ids.borderColor, cfg.borderColor);
+    _cvHFD_setVal(ids.borderHex,   cfg.borderColor);
+  } else {
+    _cvHFD_setVal(ids.borderColor, '#cccccc');
+    _cvHFD_setVal(ids.borderHex,   '');
+  }
+  _cvHFD_setVal(ids.padding, cfg.paddingPx != null ? cfg.paddingPx : 8);
+}
+
+// Read form values back into cvTplCfg (live-apply pattern). Returns the
+// resolved config so callers can decide whether to persist.
+function _cvHFD_readZone(zone){
+  const ids = _cvHFD_fieldIds(zone);
+  if(!cvTplCfg[zone]) cvTplCfg[zone] = {};
+  const cfg = cvTplCfg[zone];
+  cfg.enabled  = _cvHFD_getChecked(ids.enabled);
+  cfg.heightPx = Math.max(10, +_cvHFD_val(ids.height) || (zone === 'header' ? 100 : 60));
+  // Background: hex input wins when it parses; 'transparent' / empty resets.
+  const bgHex = (_cvHFD_val(ids.bgHex) || '').trim();
+  if(/^transparent$/i.test(bgHex) || bgHex === '') cfg.bgColor = 'transparent';
+  else if(/^#[0-9a-fA-F]{6}$/.test(bgHex)) cfg.bgColor = bgHex;
+  else cfg.bgColor = _cvHFD_val(ids.bgColor) || 'transparent';
+  cfg.accentPos         = _cvHFD_val(ids.accentPos)   || 'none';
+  cfg.accentThicknessPx = Math.max(0, Math.min(12, +_cvHFD_val(ids.accentThick) || 0));
+  const accHex = (_cvHFD_val(ids.accentHex) || '').trim();
+  cfg.accentColor = /^#[0-9a-fA-F]{6}$/.test(accHex) ? accHex : '';   // '' = inherit sectionColor
+  cfg.borderStyle = _cvHFD_val(ids.borderStyle) || 'none';
+  const brdHex = (_cvHFD_val(ids.borderHex) || '').trim();
+  cfg.borderColor = /^#[0-9a-fA-F]{6}$/.test(brdHex) ? brdHex : '';
+  cfg.paddingPx   = Math.max(0, Math.min(40, +_cvHFD_val(ids.padding) || 0));
+  return cfg;
+}
+
+// Wire change/input listeners so every edit live-applies to cvTplCfg and
+// re-renders the canvas bands. Wired once; subsequent opens just reload
+// values into the existing inputs.
+var _cvHFD_wired = false;
+function _cvHFD_wire(){
+  if(_cvHFD_wired) return;
+  ['header','footer'].forEach(zone => {
+    const ids = _cvHFD_fieldIds(zone);
+    Object.keys(ids).forEach(k => {
+      const el = document.getElementById(ids[k]);
+      if(!el) return;
+      const evt = (el.type === 'checkbox' || el.tagName === 'SELECT') ? 'change' : 'input';
+      el.addEventListener(evt, () => {
+        // Mirror color/hex pairs: editing the picker fills the hex input,
+        // editing the hex (when valid) updates the picker. Same idea used in
+        // the Settings → Company colour picker.
+        if(k === 'bgColor')     _cvHFD_setVal(ids.bgHex, el.value);
+        else if(k === 'bgHex' && /^#[0-9a-fA-F]{6}$/.test((el.value||'').trim())) _cvHFD_setVal(ids.bgColor, el.value.trim());
+        if(k === 'accentColor') _cvHFD_setVal(ids.accentHex, el.value);
+        else if(k === 'accentHex' && /^#[0-9a-fA-F]{6}$/.test((el.value||'').trim())) _cvHFD_setVal(ids.accentColor, el.value.trim());
+        if(k === 'borderColor') _cvHFD_setVal(ids.borderHex, el.value);
+        else if(k === 'borderHex' && /^#[0-9a-fA-F]{6}$/.test((el.value||'').trim())) _cvHFD_setVal(ids.borderColor, el.value.trim());
+        _cvHFD_readZone(zone);
+        cvRenderCanvas();
+        // Keep the ribbon's quick-toggles in sync too.
+        _cvSyncHeaderFooterUI();
+      });
+    });
+  });
+  _cvHFD_wired = true;
+}
+
+function cvOpenHFDesigner(){
+  const modal = document.getElementById('cv-hf-designer');
+  if(!modal) return;
+  // Snapshot current state so Cancel can revert.
+  _cvHFDesignerSnapshot = JSON.parse(JSON.stringify({
+    header: cvTplCfg.header || {},
+    footer: cvTplCfg.footer || {},
+  }));
+  _cvHFD_loadZone('header');
+  _cvHFD_loadZone('footer');
+  _cvHFD_wire();
+  modal.classList.add('open');
+}
+
+function cvCloseHFDesigner(){
+  const modal = document.getElementById('cv-hf-designer');
+  if(!modal) return;
+  // Revert to snapshot — every live edit since open is rolled back.
+  if(_cvHFDesignerSnapshot){
+    cvTplCfg.header = _cvHFDesignerSnapshot.header;
+    cvTplCfg.footer = _cvHFDesignerSnapshot.footer;
+    _cvHFDesignerSnapshot = null;
+    cvRenderCanvas();
+    _cvSyncHeaderFooterUI();
+  }
+  modal.classList.remove('open');
+}
+
+function cvSaveHFDesigner(){
+  const modal = document.getElementById('cv-hf-designer');
+  if(!modal) return;
+  // Edits are already live in cvTplCfg via the wired listeners. Just persist
+  // and drop the snapshot so close-via-X stops trying to revert.
+  _cvHFD_readZone('header');
+  _cvHFD_readZone('footer');
+  _cvPersistTplCfg();
+  _cvHFDesignerSnapshot = null;
+  modal.classList.remove('open');
+  toast(t('pe.hfd.saved', 'Header & footer style saved.'), 'success');
+}
+
+function cvHFDesignerMirror(){
+  // Copy every relevant header field onto the footer form, then sync.
+  const src = _cvHFD_fieldIds('header');
+  const dst = _cvHFD_fieldIds('footer');
+  ['bgColor','bgHex','accentColor','accentHex','accentThick','borderStyle','borderColor','borderHex','padding'].forEach(k => {
+    _cvHFD_setVal(dst[k], _cvHFD_val(src[k]));
+  });
+  // Accent position mirrors with a sensible default: if header has accent at
+  // the bottom (most common — divider between header and body), footer takes
+  // accent at the top (divider between body and footer).
+  const hAccPos = _cvHFD_val(src.accentPos);
+  _cvHFD_setVal(dst.accentPos, hAccPos === 'bottom' ? 'top' : hAccPos);
+  _cvHFD_readZone('footer');
+  cvRenderCanvas();
+}
+
+async function cvHFDesignerReset(){
+  if(!await vxConfirm({ message: t('pe.hfd.confirm_reset','Reset header and footer style to defaults?'), okLabel: t('vxc.reset','Reset'), danger: true })) return;
+  cvTplCfg.header = { enabled:false, heightPx:100, bgColor:'transparent', accentColor:'', accentThicknessPx:4, accentPos:'bottom', borderStyle:'none', borderColor:'', paddingPx:8 };
+  cvTplCfg.footer = { enabled:false, heightPx:60,  bgColor:'transparent', accentColor:'', accentThicknessPx:2, accentPos:'top',    borderStyle:'none', borderColor:'', paddingPx:8 };
+  _cvHFD_loadZone('header');
+  _cvHFD_loadZone('footer');
+  cvRenderCanvas();
+  _cvSyncHeaderFooterUI();
+}
+
+function _wHFDClearColor(slot){
+  // Bg-only clear button — wipes the hex field to 'transparent' and triggers
+  // the live-apply pipeline. Accent / border don't have a clear button (they
+  // have a select that already includes a "None / no accent" option).
+  const [p, kind] = slot.split('-');
+  const ids = _cvHFD_fieldIds(p === 'h' ? 'header' : 'footer');
+  if(kind === 'bg'){
+    _cvHFD_setVal(ids.bgHex, 'transparent');
+    document.getElementById(ids.bgHex).dispatchEvent(new Event('input', { bubbles: true }));
+  }
 }
 
 // ── Logo handlers + saved-logo library ───────────────────────────────

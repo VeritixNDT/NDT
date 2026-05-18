@@ -1323,7 +1323,10 @@ function cvAddBlock(key, isLayout, x, y){
     id, key, isLayout,
     x: Math.max(0,x), y: Math.max(0,y),
     w: def?.w||160, h: def?.h||38,
-    text: isLayout ? (def?.label||key) : (def?.label||key),
+    // noLabel fields (e.g. method, tpl-number) skip the label row when text
+    // is blank — seeding the label as block.text would defeat that and force
+    // every drop to render with a "NDT Method:" / "Template no.:" prefix.
+    text: (!isLayout && def?.noLabel) ? '' : (isLayout ? (def?.label||key) : (def?.label||key)),
     fontSize, bold, italic:false,
     color, bgColor, borderColor:'#cccccc', showBorder,
     align:'left', zIndex: cvBlocks.length+1,
@@ -2300,10 +2303,14 @@ function cvRenderBlockContent(block, report, preview){
   }
 
   // Standard labeled field. Fields tagged with def.noLabel render only the
-  // value (used by tpl-number — "Template no." would just duplicate what
-  // the value already conveys). Per-block block.text overrides still win:
-  // if the user typed a label in the Properties panel, we honour it.
-  const skipLabel = def.noLabel && !(block.text && String(block.text).trim());
+  // value (used by method, tpl-number — the default label would just
+  // duplicate what the value already conveys).
+  // A user override survives only if it differs from def.label — older
+  // blocks placed before noLabel was added carry block.text === def.label
+  // and we want those to honour the new no-label rendering too.
+  const blockTextRaw = block.text && String(block.text).trim();
+  const isDefaultLabel = blockTextRaw && blockTextRaw === String(def.label || '').trim();
+  const skipLabel = def.noLabel && (!blockTextRaw || isDefaultLabel);
   if(skipLabel){
     return `<div style="height:100%;padding:3px 7px;display:flex;align-items:center;justify-content:${jc};text-align:${al}">
       <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};color:${preview?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%">${vEsc}</div>

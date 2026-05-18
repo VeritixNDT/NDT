@@ -70,7 +70,13 @@ var CV_FIELD_DEFS = {
   'witness':      {label:'Witness / 3rd party',           ph:'Client representative',         get:r=>r.witness||'—',               w:175,h:38, mapTo:'witness'},
   'sign-date':    {label:'Date signed',                   ph:'2025-03-15',                    get:r=>r.signDate||'—',              w:130,h:38, mapTo:'signDate'},
   'insp-sig':     {label:'Inspector signature',           ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
-  'client-sig':   {label:'Client sign-off',               ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
+  'client-sig':   {label:'Client signature',              ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
+  // QC and Certifying Authority / Notified Body sign-off slots — same
+  // shape as the existing signature fields so they slot into the
+  // sig-block pattern transparently. Distinct keys so each can carry
+  // its own signature image / dated countersign on the report data.
+  'qc-sig':       {label:'QC signature',                  ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
+  'cert-auth-sig':{label:'Cert. Authority / NoBo signature', ph:'',                           get:r=>'',                           w:200,h:60,sig:true},
   'insp-date':    {label:'Inspector date',                ph:'____/____/________',            get:r=>'',                           w:145,h:38},
   'client-date':  {label:'Client date',                   ph:'____/____/________',            get:r=>'',                           w:145,h:38},
   'blank-field':     {label:'Blank field (single)',       ph:'Custom value',   get:r=>'',  blank:true,            w:200, h:38},
@@ -228,7 +234,7 @@ var CV_PALETTE_GROUPS = [
   {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
-  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','witness','sign-date','insp-sig','client-sig','insp-date','client-date']},
+  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','witness','sign-date','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','client-date']},
   {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},

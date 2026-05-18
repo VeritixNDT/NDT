@@ -3517,7 +3517,17 @@ function cvLoadMethodTpl(method){
       cvPages = d.pages; cvCurrentPage = 0;
       cvNextId = d.nextId || (cvPages.reduce((s,p)=>s+p.blocks.length,0)+1);
       cvSync(); cvSelectedId = null; cvSelectedIds = [];
+      // Sync the ribbon's method dropdown + the preview method so smart
+      // fields (template number, method name, method-specific equipment
+      // block) resolve against the template the user just loaded rather
+      // than whatever was previously selected.
+      const sel = document.getElementById('cv-method-select');
+      if(sel) sel.value = method;
+      cvPpvMethod = method;
       cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+      // Method tabs (Preview source) reflect cvPpvMethod's active state too —
+      // refresh them so the loaded method gets the active visual.
+      if(typeof cvRenderMethodBtns === 'function') cvRenderMethodBtns();
       toast(tf('pe.toast.tpl_loaded','{method} template loaded',{method}));
     }
   } catch(e){ toast(t('toast.template_load_failed','Could not load template.')); }

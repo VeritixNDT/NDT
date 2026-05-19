@@ -2320,11 +2320,14 @@ function cvRenderBlockContent(block, report, preview){
         }
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🏢</span>Company logo<span style="font-size:7.5px;color:#999">Upload in Settings → Company</span></div>`;
       }
-      // Standard footer text — single-line render of co.footer with a
-      // graceful placeholder when the field isn't filled in.
+      // Standard footer text — wraps to fit the block's width / height so
+      // accreditation lines that don't fit on one line break onto the next
+      // instead of ellipsing. pre-wrap preserves any newlines in the
+      // source text; word-break:break-word handles long unbroken tokens
+      // (URLs, hyphenated reg numbers).
       if(def.isCompanyFooter){
         const txt = (co2.footer && String(co2.footer).trim()) || '';
-        if(txt) return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:3px 7px;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(txt)}</div>`;
+        if(txt) return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:3px 7px;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al};line-height:1.35;white-space:pre-wrap;word-break:break-word;overflow:hidden">${escapeHtml(txt)}</div>`;
         return `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#bbb;font-style:italic;text-align:center;padding:0 8px">Standard footer text — fill in Settings → Company</div>`;
       }
       // Confidentiality statement — multi-line render of co.confidstmt.

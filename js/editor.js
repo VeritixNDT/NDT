@@ -2275,7 +2275,7 @@ function cvRenderBlockContent(block, report, preview){
     const val = _h(valRaw);
     return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;text-align:${al}">
       <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
-      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${val}</div>
     </div>`;
   }
   if(key === 'blank-multiline'){
@@ -2297,7 +2297,7 @@ function cvRenderBlockContent(block, report, preview){
       const val = _h(valRaw);
       return `<div style="flex:1;padding:3px 6px;min-width:0;text-align:${al}">
         <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
-        <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div>
+        <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${val}</div>
       </div>`;
     });
     return `<div style="height:100%;display:flex;align-items:stretch;box-sizing:border-box">${cells.join('')}</div>`;
@@ -2480,12 +2480,12 @@ function cvRenderBlockContent(block, report, preview){
   const skipLabel = def.noLabel && (!blockTextRaw || isDefaultLabel);
   if(skipLabel){
     return `<div style="height:100%;padding:3px 7px;display:flex;align-items:center;justify-content:${jc};text-align:${al}">
-      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};color:${preview?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%">${vEsc}</div>
+      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};color:${preview?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden;width:100%">${vEsc}</div>
     </div>`;
   }
   return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
     <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
-    <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};min-height:11px;color:${preview?'#000':'#bbb'};padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${vEsc}</div>
+    <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};min-height:11px;color:${preview?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${vEsc}</div>
   </div>`;
 }
 

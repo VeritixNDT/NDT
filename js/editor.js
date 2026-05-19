@@ -3255,8 +3255,11 @@ function cvMouseMove(e){
       let newX = cvSnap(Math.max(0, sp.x + dx));
       let newY = cvSnap(Math.max(0, sp.y + dy));
 
-      // Smart snap alignment (only for single block drag)
-      if(cvDragging.ids.length === 1){
+      // Smart snap alignment (only for single block drag). Hold Alt while
+      // dragging to bypass the alignment-line snap — useful when you want
+      // to drop a block fractionally off the column or to overlap edges
+      // intentionally. Grid snap still applies via cvSnap above.
+      if(cvDragging.ids.length === 1 && !e.altKey){
         const snaps = cvCalcSnapLines(b.id, newX, newY, b.w, b.h);
         // Apply strongest snap
         const vSnap = snaps.find(s=>s.axis==='v');
@@ -3272,6 +3275,10 @@ function cvMouseMove(e){
           else if(hSnap.edge==='cy') newY = hSnap.pos - b.h/2;
         }
         cvDrawSnapLines(snaps.filter(s=>(s===vSnap||s===hSnap)));
+      } else if(e.altKey){
+        // While bypassing, clear any guide lines still drawn from a
+        // previous move so the canvas reflects the freeform state.
+        cvDrawSnapLines([]);
       }
 
       b.x = newX; b.y = newY;

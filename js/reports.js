@@ -77,6 +77,7 @@ var RPT_FORM = {
     { id:'revision',   label:'Report revision',   placeholder:'00' },
     { id:'client',     label:'Client',             placeholder:'Client name' },
     { id:'project',    label:'Project',            placeholder:'Project name or number' },
+    { id:'projectNo',  label:'Project no.',        placeholder:'PRJ-2026-014' },
     { id:'location',   label:'Test location',      placeholder:'Site or facility' },
     { id:'svOrder',    label:'SV Order no.',        placeholder:'SV-XXXX' },
     { id:'orderNo',    label:'Order no.',           placeholder:'Order number' },

@@ -3827,7 +3827,8 @@ function switchRibbonTab(id, el){
 function cvRenderTplCards(){
   const container = document.getElementById('cv-ribbon-tpl-cards');
   if(!container) return;
-  const methods = NDT_METHODS.map(m=>m.id);
+  const orderedMethods = (typeof getActiveMethods === 'function') ? getActiveMethods() : NDT_METHODS;
+  const methods = orderedMethods.map(m=>m.id);
   container.innerHTML = methods.map(m=>{
     const info = cvGetMethodTplInfo(m);
     const c = (NDT_METHODS.find(x=>x.id===m)||{}).color||'#4f8ef7';
@@ -3842,7 +3843,8 @@ function cvRenderTplCards(){
 function cvRenderMethodBtns(){
   const container = document.getElementById('cv-ppv-method-btns');
   if(!container) return;
-  container.innerHTML = NDT_METHODS.map(m=>`<button class="tbe" data-action="cvSetPpvMethod" data-args="'${m.id}'" style="font-size:11px;color:${m.color}">${m.id}</button>`).join('');
+  const ppvMethods = (typeof getActiveMethods === 'function') ? getActiveMethods() : NDT_METHODS;
+  container.innerHTML = ppvMethods.map(m=>`<button class="tbe" data-action="cvSetPpvMethod" data-args="'${m.id}'" style="font-size:11px;color:${m.color}">${m.id}</button>`).join('');
 }
 function cvSetPpvMethod(m){ cvPpvMethod=m; cvRenderCanvas(); }
 function cvSetPpvResult(r){ cvPpvResult=r; cvRenderCanvas(); }

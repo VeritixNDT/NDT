@@ -12,11 +12,11 @@ function defInit(){
   const selForm = el('def-method');
   if(selFilter){
     const current = selFilter.value;
-    selFilter.innerHTML = '<option value="">All methods</option>' + NDT_METHODS.map(m=>`<option>${m.id}</option>`).join('');
+    selFilter.innerHTML = '<option value="">All methods</option>' + getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
     selFilter.value = current;
   }
   if(selForm){
-    selForm.innerHTML = NDT_METHODS.map(m=>`<option>${m.id}</option>`).join('');
+    selForm.innerHTML = getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
   }
   defRender();
 }
@@ -338,10 +338,10 @@ function procInit(){
   const selForm = el('proc-method');
   if(sel){
     const v = sel.value;
-    sel.innerHTML = '<option value="">All methods</option>' + NDT_METHODS.map(m=>`<option>${m.id}</option>`).join('');
+    sel.innerHTML = '<option value="">All methods</option>' + getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
     sel.value = v;
   }
-  if(selForm) selForm.innerHTML = NDT_METHODS.map(m=>`<option>${m.id}</option>`).join('');
+  if(selForm) selForm.innerHTML = getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
   procRender();
 }
 
@@ -350,7 +350,7 @@ function procInitView(){
   const sel = el('proc-view-f-method');
   if(sel){
     const v = sel.value;
-    sel.innerHTML = '<option value="">All methods</option>' + NDT_METHODS.map(m=>`<option>${m.id}</option>`).join('');
+    sel.innerHTML = '<option value="">All methods</option>' + getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
     sel.value = v;
   }
   procRenderView();
@@ -569,7 +569,7 @@ function procShowUpload(editIdx){
   const extractBanner = el('proc-extract-info');
 
   const mSel = el('proc-method');
-  if(mSel) mSel.innerHTML = NDT_METHODS.map(m=>`<option>${m.id}</option>`).join('');
+  if(mSel) mSel.innerHTML = getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
   if(extractBanner) extractBanner.style.display = 'none';
 
   if(_procEditIdx >= 0){

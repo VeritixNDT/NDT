@@ -1105,6 +1105,65 @@
   outline-offset: -1px;
 }
 
+/* PDF editor — field palette rows. Styling lives here rather than
+   inline on every row (cleaner, and no inline onmouseenter handlers,
+   which a strict CSP would block). A left accent bar slides in on
+   hover so the row the cursor is over reads clearly. */
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  cursor: grab;
+  color: var(--t2);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid transparent;
+  transition: background var(--motion-fast), border-left-color var(--motion-fast);
+}
+.palette-item:hover {
+  background: var(--panel2);
+  border-left-color: var(--cyan);
+}
+.palette-item:active { cursor: grabbing; }
+
+/* PDF editor — layers panel rows. Same move off inline styling /
+   handlers; the selected row is marked with [data-sel]. */
+.cv-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid transparent;
+  transition: background var(--motion-fast), border-left-color var(--motion-fast);
+}
+.cv-layer-row:not([data-sel]):hover { background: var(--panel2); }
+.cv-layer-row[data-sel] {
+  background: rgba(0,212,255,.10);
+  border-left-color: var(--cyan);
+}
+
+/* PDF editor — palette group headers (sticky collapse toggles). Style was
+   duplicated inline for the recents group and every field group. */
+.cv-pal-group-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px 4px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  transition: background var(--motion-fast);
+}
+.cv-pal-group-hdr:hover { background: var(--panel2); }
+
 .vx-mode-pill[data-state="trial"]   { color: var(--violet); border-color: rgba(167,139,250,.30); }
 .vx-mode-pill[data-state="synced"]  { color: var(--green);  border-color: rgba(62,207,142,.30); }
 .vx-mode-pill[data-state="syncing"] { color: var(--cyan);   border-color: rgba(0,212,255,.30); }

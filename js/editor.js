@@ -1297,7 +1297,7 @@ function cvRenderPalette(filter){
       const collapsed = cvPaletteCollapsed['recent'];
       const recentLabel = t('pe.palette.recently_used', '⏱ Recently used');
       html += `<div>
-        <div data-action="_wCvTogglePaletteGroup" data-args="'recent'" style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px 4px;cursor:pointer;user-select:none;background:var(--bg2);border-bottom:1px solid var(--border);border-top:1px solid var(--border);position:sticky;top:0;z-index:5">
+        <div data-action="_wCvTogglePaletteGroup" data-args="'recent'" class="cv-pal-group-hdr">
           <span style="font-size:9px;font-family:var(--mono);color:var(--cyan);text-transform:uppercase;letter-spacing:.08em">${escapeHtml(recentLabel)} (${recents.length})</span>
           <svg style="width:9px;height:9px;opacity:.5;transition:transform .15s;${collapsed?'transform:rotate(-90deg)':''}" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
@@ -1308,7 +1308,7 @@ function cvRenderPalette(filter){
           const it = allLayout.find(x => x.key === r.key);
           if(!it) return;
           const lbl = _cvLayoutLabel(it);
-          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}\nClick = stack below previous\nShift+Click = chain to the right" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}\nClick = stack below previous\nShift+Click = chain to the right">
             <span style="font-size:13px;width:16px;text-align:center;flex-shrink:0;opacity:.65">${cvGetLayoutIcon(it.key)}</span><span>${escapeHtml(lbl)}</span>
           </div>`;
         } else {
@@ -1316,7 +1316,7 @@ function cvRenderPalette(filter){
           const lbl = _cvFieldLabel(r.key, def);
           const short = lbl.split(' / ')[0].split(' ').slice(0,4).join(' ');
           const { badge, badgeStyle } = _cvFieldBadge(def);
-          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${r.key}',false" data-action="cvAddBlockDefault" data-args="'${r.key}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}\nClick = stack below previous\nShift+Click = chain to the right" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${r.key}',false" data-action="cvAddBlockDefault" data-args="'${r.key}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}\nClick = stack below previous\nShift+Click = chain to the right">
             <span style="font-size:8.5px;font-family:var(--mono);${badgeStyle};padding:1px 4px;border-radius:3px;flex-shrink:0">${badge}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(short)}</span>
           </div>`;
         }
@@ -1341,7 +1341,7 @@ function cvRenderPalette(filter){
     const collapsed = cvPaletteCollapsed[grp.id];
     const grpLabel = _cvGroupLabel(grp);
     html += `<div>
-      <div data-action="_wCvTogglePaletteGroup" data-args="'${grp.id}'" style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px 4px;cursor:pointer;user-select:none;background:var(--bg2);border-bottom:1px solid var(--border);border-top:1px solid var(--border);position:sticky;top:0;z-index:5">
+      <div data-action="_wCvTogglePaletteGroup" data-args="'${grp.id}'" class="cv-pal-group-hdr">
         <span style="font-size:9px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.08em">${escapeHtml(grpLabel)}${grp.isComponents?' ('+items.length+')':''}</span>
         <svg style="width:9px;height:9px;opacity:.5;transition:transform .15s;${collapsed?'transform:rotate(-90deg)':''}" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -1356,7 +1356,7 @@ function cvRenderPalette(filter){
         html += `<div style="padding:14px 10px;font-size:10px;color:var(--t3);text-align:center;font-style:italic;line-height:1.5">${escapeHtml(t('pe.palette.no_components','No components yet.\nSelect 1+ blocks and click\n"Save as component"')).replace(/\n/g,'<br>')}</div>`;
       } else {
         items.forEach(comp => {
-          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'comp:${comp.id}',false" data-action="cvInsertComponent" data-args="'${comp.id}'" title="Drag or click to insert: ${escapeHtml(comp.name)} (${comp.blocks.length} blocks)" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'comp:${comp.id}',false" data-action="cvInsertComponent" data-args="'${comp.id}'" title="Drag or click to insert: ${escapeHtml(comp.name)} (${comp.blocks.length} blocks)">
             <span style="font-size:8.5px;font-family:var(--mono);background:rgba(0,212,255,.15);color:var(--cyan);padding:1px 4px;border-radius:3px;flex-shrink:0">⬢</span>
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(comp.name)}</span>
             <span style="color:var(--t3);font-size:9px">${comp.blocks.length}</span>
@@ -1375,7 +1375,7 @@ function cvRenderPalette(filter){
         const removeBtn = isLibCard
           ? `<button data-action="_wCvDeleteLogoLibCard" data-args="'${escapeHtml(libId)}'" data-stop-prop="1" title="${escapeHtml(t('pe.logo_lib.remove','Remove from library'))}" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:1px 4px;opacity:.7;margin-left:auto">✕</button>`
           : '';
-        html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+        html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}">
           <span style="font-size:13px;width:16px;text-align:center;flex-shrink:0;opacity:.65">${cvGetLayoutIcon(it.key)}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(lbl)}</span>${removeBtn}
         </div>`;
       });
@@ -1385,7 +1385,7 @@ function cvRenderPalette(filter){
         const lbl = _cvFieldLabel(fk, def);
         const short = lbl.split(' / ')[0].split(' ').slice(0,4).join(' ');
         const { badge, badgeStyle } = _cvFieldBadge(def);
-        html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${fk}',false" data-action="cvAddBlockDefault" data-args="'${fk}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+        html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${fk}',false" data-action="cvAddBlockDefault" data-args="'${fk}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}">
           <span style="font-size:8.5px;font-family:var(--mono);${badgeStyle};padding:1px 4px;border-radius:3px;flex-shrink:0">${badge}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(short)}</span>
         </div>`;
       });
@@ -2966,7 +2966,14 @@ function cvUpdateSelectionUI(){
 function cvRenderProps(id){
   const panel = document.getElementById('cv-props-body');
   if(!panel) return;
-  if(!id){ panel.innerHTML='<div style="font-size:12px;color:var(--t3);text-align:center;margin-top:28px;line-height:1.8">Select a block<br>to edit properties</div>'; return; }
+  if(!id){
+    panel.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:9px;padding:44px 22px 0;text-align:center">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c2c7cf" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>
+      <div style="font-size:12px;font-weight:600;color:#9aa0aa">No block selected</div>
+      <div style="font-size:11px;color:var(--t3);line-height:1.5;max-width:190px">Click a card on the canvas to edit its properties, or drag a field in from the palette.</div>
+    </div>`;
+    return;
+  }
 
   // Multi-select info
   if(cvSelectedIds.length > 1){
@@ -3259,7 +3266,7 @@ function cvRenderLayers(){
     const name = cvBlockDisplayName(b);
     const hasComment = b.comments && b.comments.some(c => !c.resolved);
     const hasShowWhen = b.showWhen && b.showWhen.field;
-    html += `<div data-action="cvLayerSelect" data-pass-event="1" data-args="'${b.id}'" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-bottom:1px solid var(--border);transition:background var(--motion-fast);${sel?'background:rgba(0,212,255,.10);box-shadow:inset 2px 0 0 var(--cyan)':''}" onmouseenter="if(!this.dataset.sel)this.style.background='var(--panel2)'" onmouseleave="if(!this.dataset.sel)this.style.background=''" ${sel?'data-sel="1"':''}>
+    html += `<div class="cv-layer-row" data-action="cvLayerSelect" data-pass-event="1" data-args="'${b.id}'" ${sel?'data-sel="1"':''}>
       <span style="width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.04);color:var(--t2);border-radius:3px;flex-shrink:0">${icon}</span>
       <span style="flex:1;min-width:0;font-size:11px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${b.locked?'opacity:.6':''}">${escapeHtml(name)}</span>
       ${hasComment ? '<span title="Has unresolved comment" style="color:var(--amber);font-size:10px">●</span>' : ''}

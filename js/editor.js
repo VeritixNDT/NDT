@@ -533,7 +533,7 @@ var CV_SAMPLE = {
   },
   methodData: {
     UT:  {coup:'Waterbased', freq:'5 MHz', range:'0-100mm', probe:'Single crystal angle beam 70°', sens:'DAC + Transfer + 6dB', refblk:'K1 IIW 1', calblk:'EN-ISO 17640 32mm'},
-    MT:  {tech:'Indirect (yoke)', susp:'Magnaflux 7HF', cur:'AC', light:'UV-A > 1000 µW/cm²'},
+    MT:  {tech:'Yoke (AC)', mtmethod:'Wet fluorescent', syscontrol:'> 4,5 kg + ASTM Pie', demag:'Yes', curint:'2-3 Ampere', cur:'AC', susp:'Magnaflux 7HF', susptype:'Fluorescent water-based', contrast:'Not used'},
     VT:  {lux:'500', magn:'×2', dist:'600 mm max', vtequip:'Welding gauge set'},
     PT:  {pen:'Magnaflux ZL4C', pdwell:'15 mins', ddwell:'10-20 mins', clean:'Magnaflux SKC-S', dev:'Magnaflux SKD-S2'},
     PMI: {ctrl:'316L Reference block', mode:'Alloy ID', pmiequip:'X-MET 8000 Expert'},

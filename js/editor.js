@@ -78,6 +78,10 @@ var CV_FIELD_DEFS = {
   'equipment':    {label:'Equipment',                     ph:'SIUI Smartor 16',               get:r=>r.eq_equip||r.equip||_cvEqLookup(r,'name')||'—',     w:185,h:38, mapTo:'eq_equip / equip'},
   'sv-id':        {label:'SV-ID No.',                     ph:'SV-UT-004',                     get:r=>r.eq_svid||r.eqSvId||_cvEqLookup(r,'svId')||'—',     w:110,h:38, mapTo:'eq_svid'},
   'cal-date':     {label:'Calibration date',              ph:'2025-01-10',                    get:r=>r.eq_caldate||r.eqCalDate||_cvEqLookup(r,'calLastAt')||'—',w:130,h:38, mapTo:'eq_caldate'},
+  // Method-equipment cell — a single place card showing one method-data
+  // field (block.methodField). Free-drag; parents to a method-block
+  // container when dropped inside one. Custom render (def.methodCell).
+  'method-cell':  {label:'Method equipment cell',          ph:'',                              get:r=>'',                           w:150,h:40, methodCell:true},
   'stage':        {label:'Stage of examination',          ph:'Final',                         get:r=>r.stage||'—',                 w:140,h:38, mapTo:'stage'},
   'result':       {label:'Result / Verdict',              ph:'ACCEPTABLE',                    get:r=>{const v=r.verdict||r.result||'—'; return v==='Acceptable'||v==='Pass'?'ACCEPTABLE':v==='Not acceptable'||v==='Fail'?'NOT ACCEPTABLE':v==='Monitor'?'MONITOR':v;}, w:240,h:48,result:true, mapTo:'verdict'},
   'indications':  {label:'Reportable indications',        ph:'No / Nee',                      get:r=>r.indications||((r.verdict==='Not acceptable'||r.result==='Fail')?'Yes':'No'), w:155,h:38, mapTo:'indications'},
@@ -248,7 +252,7 @@ var CV_PALETTE_GROUPS = [
   {id:'client',    label:'Client info',   fields:['client','project','project-no','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','welders','weld-process','material','weld-prep','heat-treat','thickness','surf-cond','temperature','weld-pos','part-exam']},
   {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},
-  {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date']},
+  {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
   {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','accept-eval']},
@@ -1639,6 +1643,8 @@ function cvAddBlock(key, isLayout, x, y){
   // outside both bands get no zone (default = page body, single-page only).
   block.zone = _cvDetectZone(block.y, block.h);
   cvBlocks.push(block);
+  // A method-equipment cell dropped inside a container parents to it.
+  if(key === 'method-cell') _cvReparentCell(block);
   _cvSelectSingle(id);
   cvRenderCanvas();
   cvRenderProps(id);
@@ -2048,8 +2054,15 @@ function cvRenderCanvas(){
     // otherwise a card's collapsed border wouldn't refresh when a
     // *neighbour* moved (the card's own JSON is unchanged).
     const _col = block.showBorder ? _cvBorderCollapse(block) : null;
+    // A method-block container's empty-hint depends on how many cells are
+    // parented to it — its own JSON doesn't change when a child is added,
+    // so fold the child count into the signature (same idea as the
+    // border-collapse term above).
+    const _kids = block.key === 'method-block'
+      ? '|kids:' + cvBlocks.filter(b => b.parentId === block.id).length
+      : '';
     const sig = JSON.stringify(block) + '|s:' + isSel + '|h:' + (!passesShowWhen)
-      + (_col ? '|bc' + (_col.top?1:0) + (_col.left?1:0) : '') + previewSuffix;
+      + (_col ? '|bc' + (_col.top?1:0) + (_col.left?1:0) : '') + _kids + previewSuffix;
 
     const cached = _cvBlockElCache.get(block.id);
     if(cached && cached.sig === sig){
@@ -2335,6 +2348,18 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
         anchorX: (e.clientX - canvasRect.left) / cvZoom,
         anchorY: (e.clientY - canvasRect.top)  / cvZoom,
       };
+      // Parented cells ride along when their container is dragged — append
+      // each container's children to startPositions so cvMouseMove offsets
+      // them by the same delta. ids stays unchanged so single-block snap
+      // still applies to the container itself.
+      cvDragging.ids.forEach(did => {
+        const c = cvBlocks.find(b => b.id === did);
+        if(!c || c.key !== 'method-block') return;
+        _cvContainerChildren(did).forEach(ch => {
+          if(!cvDragging.startPositions.some(sp => sp.id === ch.id))
+            cvDragging.startPositions.push({ id: ch.id, x: ch.x, y: ch.y });
+        });
+      });
       cvDragUndoPushed = false;
       document.body.style.cursor='move'; document.body.style.userSelect='none';
       cvAttachDragListeners();
@@ -2671,20 +2696,29 @@ function cvRenderBlockContent(block, report, preview){
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;font-size:8.5px;gap:3px"><span style="font-size:20px">⊟</span>Defect / indication table</div>`;
       }
       case 'method-block':{
-        if(preview && report && report.methodData){
-          const md = report.methodData;
-          const entries = Object.entries(md);
-          if(entries.length){
-            const mFields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[cvPpvMethod]) ? TPL_FIELDS[cvPpvMethod] : [];
-            const cells = entries.map(([k,v])=>{
-              const fdef = mFields.find(f=>f.id===k);
-              const label = fdef ? fdef.label : k;
-              return `<div style="padding:2px 5px;min-width:0"><div style="font-size:6.5px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_h(label)}</div><div style="font-size:8px;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_h(v)}</div></div>`;
-            }).join('');
-            return `<div style="height:100%;box-sizing:border-box;padding:3px"><div style="font-size:7px;color:#555;font-weight:600;margin-bottom:2px;padding:0 5px">${_h(cvPpvMethod)} Equipment</div><div style="display:flex;flex-wrap:wrap;gap:1px">${cells}</div></div>`;
-          }
-        }
-        return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;font-size:8.5px;gap:3px"><span style="font-size:18px">⚙</span>Method-specific equipment data (${_h(cvPpvMethod)})</div>`;
+        // Titled container. The user drops "Method equipment cell" place
+        // cards inside it; those cells are separate blocks (parentId points
+        // here) and render on top. The container itself is just the section-
+        // coloured title strip + a bordered area.
+        const tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
+        const barColor = _safeColor(block.barColor, tplSectionColor);
+        const titleFs  = _safeFs(block.titleFontSize, '11px');
+        // Title defaults to "<METHOD> Equipment". block.text is only a
+        // custom title when the user has changed it from the palette
+        // label ("Method-specific data block") — a fresh drop carries
+        // that label and should still show the method name.
+        const _mbDefLbl = (CV_LAYOUT_ITEMS.find(it => it.key === 'method-block') || {}).label || '';
+        const _mbCustom = (block.text && block.text.trim() && block.text.trim() !== _mbDefLbl) ? block.text.trim() : '';
+        const title    = _h(_mbCustom || (cvPpvMethod + ' Equipment')).toUpperCase();
+        const barH     = _cvMethodBarHeight(block);
+        const childCount = !preview ? cvBlocks.filter(b => b.parentId === block.id).length : 0;
+        const body = (!preview && !childCount)
+          ? `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:8.5px;font-style:italic;text-align:center;padding:6px;gap:3px"><span style="font-size:16px">⚙</span> Drop method-equipment cells inside</div>`
+          : `<div style="flex:1"></div>`;
+        return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:${barH}px;box-sizing:border-box;padding:0 8px;background:${barColor};color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};letter-spacing:.06em;flex-shrink:0;display:flex;align-items:center;justify-content:center">${title}</div>
+          ${body}
+        </div>`;
       }
       case 'text-block':
         return `<div style="height:100%;padding:4px 7px;font-size:${fs};color:${_safeColor(block.color,'#333')};font-weight:${fw};font-style:${fi};text-align:${al};white-space:pre-wrap;word-break:break-word;line-height:1.5">${_h(block.text||'Free text — edit in Properties')}</div>`;
@@ -2696,6 +2730,22 @@ function cvRenderBlockContent(block, report, preview){
   // ── Data field blocks ──────────────────────────────────────────────
   const def = CV_FIELD_DEFS[key];
   if(!def) return '';
+
+  // Method-equipment cell — place-card render of one method-data field
+  // (block.methodField). The small grey label sits above the value
+  // resolved from report.methodData; word-break lets the value wrap.
+  if(def.methodCell){
+    const mFields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[cvPpvMethod]) ? TPL_FIELDS[cvPpvMethod] : [];
+    const fdef = mFields.find(f => f.id === block.methodField);
+    const label = fdef ? fdef.label : (block.methodField || 'Method field');
+    const val = (preview && report && report.methodData) ? (report.methodData[block.methodField] || '') : '';
+    const shown = val || (preview ? '—' : (block.methodField ? (fdef && fdef.placeholder || '') : 'Pick a field in Properties'));
+    const valColor = val ? '#000' : (preview ? '#999' : '#bbb');
+    return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;text-align:${al}">
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_h(label)}</div>
+      <div style="font-size:${fs};color:${valColor};line-height:1.3;word-break:break-word">${_h(shown)}</div>
+    </div>`;
+  }
 
   // V3: Smart-link blocks (procedure/cert/calib/accept-eval)
   if(def.smartLink){
@@ -3186,6 +3236,13 @@ function cvRenderProps(id){
     ${xrefUI}
     ${scanUI}
     ${row('Label / text', input('text', block.text))}
+    ${block.key === 'method-cell' ? row('Method field', (() => {
+      const mf = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[cvPpvMethod]) ? TPL_FIELDS[cvPpvMethod] : [];
+      return `<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','methodField'">
+        <option value="" ${!block.methodField?'selected':''}>— select —</option>
+        ${mf.map(f=>`<option value="${escapeHtml(f.id)}" ${block.methodField===f.id?'selected':''}>${escapeHtml(f.label)}</option>`).join('')}
+      </select>`;
+    })()) : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px">
       ${['x','y','w','h'].map(p=>`<div><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);margin-bottom:2px;text-transform:uppercase">${p.toUpperCase()}</div>${numRow(p,block[p])}</div>`).join('')}
     </div>
@@ -3196,7 +3253,7 @@ function cvRenderProps(id){
     ${row(block.key === 'items-table' ? 'Table font size' : 'Font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontSize'">
       ${['6px','7px','7.5px','8px','8.5px','9px','10px','11px','12px','14px','16px','20px'].map(s=>`<option value="${s}" ${block.fontSize===s?'selected':''}>${s}</option>`).join('')}
     </select>`)}
-    ${block.key === 'items-table' ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
+    ${(block.key === 'items-table' || block.key === 'method-block') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
     ${block.key === 'items-table' && typeof RPT_FORM !== 'undefined' && Array.isArray(RPT_FORM.items) ? (() => {
@@ -3716,12 +3773,82 @@ function _cvSyncRibbon(block){
   const bgP = document.getElementById('cv-bg-preview');
   if(bgP && /^#[0-9a-fA-F]{3,8}$/.test(block.bgColor||'')) bgP.style.background = block.bgColor;
 }
-function cvDeleteBlock(id){ cvPushUndo(); cvPages[cvCurrentPage].blocks=cvPages[cvCurrentPage].blocks.filter(b=>b.id!==id); cvSync(); if(cvSelectedId===id){cvSelectedId=null;cvSelectedIds=cvSelectedIds.filter(x=>x!==id);} if(_cvLastPlacedId === id) _cvLastPlacedId = null; cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout(); }
+// ── Method-block container parenting ────────────────────────────────────
+// 'method-cell' blocks carry a parentId pointing at a 'method-block'
+// container. Children ride along when the container is dragged, are
+// deleted with it, and are clamped inside its rectangle.
+function _cvContainerChildren(containerId){
+  return cvBlocks.filter(b => b.parentId === containerId);
+}
+// Height of a method-block container's title strip — a fixed 24px,
+// growing only if the Heading font size needs more room. Shared by the
+// render and the clamp so cells land exactly below the bar.
+function _cvMethodBarHeight(block){
+  const m = /^(\d+(?:\.\d+)?)px$/.exec((block && block.titleFontSize) || '');
+  const fs = m ? parseFloat(m[1]) : 11;
+  return Math.max(24, Math.round(fs * 1.2) + 5);
+}
+// Keep a cell inside its container's INNER area — below the title bar and
+// within the borders. A cell that lands near the bar snaps flush against
+// it, so place cards sit tight under the header instead of floating.
+function _cvClampToParent(cell, parent){
+  if(!cell || !parent) return;
+  const barH   = _cvMethodBarHeight(parent);
+  const innerX = parent.x;
+  const innerY = parent.y + barH;
+  const innerW = parent.w;
+  const innerH = Math.max(0, parent.h - barH);
+  cell.w = Math.min(cell.w, innerW);
+  cell.h = Math.min(cell.h, innerH);
+  cell.x = Math.min(Math.max(cell.x, innerX), innerX + innerW - cell.w);
+  cell.y = Math.min(Math.max(cell.y, innerY), innerY + innerH - cell.h);
+  // Snap flush to the header bar when the cell lands near the top.
+  const snapT = (typeof CV_SNAP_THRESHOLD === 'number') ? CV_SNAP_THRESHOLD : 12;
+  if(cell.y - innerY <= snapT) cell.y = innerY;
+}
+// Hit-test a cell's centre against every container and (re)assign its
+// parentId: inside a container → parent to it, lift above it, clamp
+// inside; inside none → un-parent. Lets the user drag a cell out of a
+// container to detach it, or into one to attach it.
+function _cvReparentCell(cell){
+  if(!cell || cell.key !== 'method-cell') return;
+  const cx = cell.x + cell.w / 2, cy = cell.y + cell.h / 2;
+  let parent = null;
+  cvBlocks.forEach(b => {
+    if(b.key !== 'method-block') return;
+    if(cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h){
+      if(!parent || (b.zIndex || 0) >= (parent.zIndex || 0)) parent = b;
+    }
+  });
+  cell.parentId = parent ? parent.id : null;
+  if(parent){
+    if((cell.zIndex || 0) <= (parent.zIndex || 0)) cell.zIndex = (parent.zIndex || 0) + 1;
+    _cvClampToParent(cell, parent);
+  }
+}
+function cvDeleteBlock(id){
+  cvPushUndo();
+  const target = cvBlocks.find(b => b.id === id);
+  const kill = new Set([id]);
+  if(target && target.key === 'method-block')
+    _cvContainerChildren(id).forEach(c => kill.add(c.id));
+  cvPages[cvCurrentPage].blocks = cvPages[cvCurrentPage].blocks.filter(b => !kill.has(b.id));
+  cvSync();
+  if(kill.has(cvSelectedId)) cvSelectedId = null;
+  cvSelectedIds = cvSelectedIds.filter(x => !kill.has(x));
+  if(kill.has(_cvLastPlacedId)) _cvLastPlacedId = null;
+  cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout();
+}
 function cvDeleteSelected(){
   if(!cvSelectedIds.length) return;
   cvPushUndo();
-  cvPages[cvCurrentPage].blocks = cvPages[cvCurrentPage].blocks.filter(b=>!cvSelectedIds.includes(b.id));
-  if(cvSelectedIds.includes(_cvLastPlacedId)) _cvLastPlacedId = null;
+  const kill = new Set(cvSelectedIds);
+  cvSelectedIds.forEach(sid => {
+    const b = cvBlocks.find(bb => bb.id === sid);
+    if(b && b.key === 'method-block') _cvContainerChildren(sid).forEach(c => kill.add(c.id));
+  });
+  cvPages[cvCurrentPage].blocks = cvPages[cvCurrentPage].blocks.filter(b => !kill.has(b.id));
+  if(kill.has(_cvLastPlacedId)) _cvLastPlacedId = null;
   cvSync(); cvSelectedId=null; cvSelectedIds=[];
   cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
 }
@@ -3828,6 +3955,11 @@ function cvMouseMove(e){
     const my = (e.clientY - canvasRect.top)  / cvZoom;
     const dx = mx - cvDragging.anchorX;
     const dy = my - cvDragging.anchorY;
+    // When a container is dragged, its parented children are appended to
+    // startPositions so they ride along. In that case the move must stay
+    // rigid (grid snap only) — alignment-line snap would pull the
+    // container and each child independently and desync the group.
+    const _rigidGroup = cvDragging.startPositions.length > cvDragging.ids.length;
 
     // Move all dragged blocks
     cvDragging.startPositions.forEach(sp => {
@@ -3836,11 +3968,11 @@ function cvMouseMove(e){
       let newX = cvSnap(Math.max(0, sp.x + dx));
       let newY = cvSnap(Math.max(0, sp.y + dy));
 
-      // Smart snap alignment (only for single block drag). Hold Alt while
-      // dragging to bypass the alignment-line snap — useful when you want
-      // to drop a block fractionally off the column or to overlap edges
-      // intentionally. Grid snap still applies via cvSnap above.
-      if(cvDragging.ids.length === 1 && !e.altKey){
+      // Smart snap alignment (only when dragging a single block on its
+      // own). Hold Alt while dragging to bypass the alignment-line snap —
+      // useful when you want to drop a block fractionally off the column
+      // or to overlap edges intentionally. Grid snap still applies above.
+      if(cvDragging.ids.length === 1 && b.id === cvDragging.ids[0] && !_rigidGroup && !e.altKey){
         const snaps = cvCalcSnapLines(b.id, newX, newY, b.w, b.h);
         // Pick the snap with the SMALLEST delta on each axis so the
         // closest target wins (previously: first in iteration order,
@@ -3860,9 +3992,10 @@ function cvMouseMove(e){
           else if(hSnap.edge==='cy') newY = hSnap.pos - b.h/2;
         }
         cvDrawSnapLines(snaps.filter(s=>(s===vSnap||s===hSnap)));
-      } else if(e.altKey){
-        // While bypassing, clear any guide lines still drawn from a
-        // previous move so the canvas reflects the freeform state.
+      } else {
+        // Smart snap didn't run (Alt bypass, rigid group move, or multi-
+        // select) — clear any guide lines still drawn from a previous
+        // move so the canvas reflects the freeform state.
         cvDrawSnapLines([]);
       }
 
@@ -3923,6 +4056,14 @@ function cvMouseUp(){
         if(b.zone !== newZone){
           b.zone = newZone;
         }
+        // A cell dragged into a container attaches to it; dragged out of
+        // every container, it detaches. Gate on a REAL position change —
+        // a plain click (even with the 1px jitter the grid-snap absorbs)
+        // leaves x/y untouched and must not snap the cell anywhere.
+        if(b.key === 'method-cell'){
+          const sp = cvDragging.startPositions.find(s => s.id === id);
+          if(sp && (sp.x !== b.x || sp.y !== b.y)) _cvReparentCell(b);
+        }
       }
     });
   }
@@ -3932,6 +4073,15 @@ function cvMouseUp(){
     if(b){
       const newZone = _cvDetectZone(b.y, b.h);
       if(b.zone !== newZone) b.zone = newZone;
+      // Keep parented cells inside their container after a real resize —
+      // skip when the size is unchanged (a click on the resize handle).
+      const _resized = (b.w !== cvResizing.startW || b.h !== cvResizing.startH);
+      if(_resized && b.key === 'method-block'){
+        _cvContainerChildren(b.id).forEach(ch => { _cvClampToParent(ch, b); _cvBlockElCache.delete(ch.id); });
+      } else if(_resized && b.key === 'method-cell' && b.parentId){
+        const p = cvBlocks.find(x => x.id === b.parentId);
+        if(p) _cvClampToParent(b, p);
+      }
     }
   }
   const _moved = !!(cvDragging || cvResizing);
@@ -4247,6 +4397,19 @@ function cvLoadLayout(){
       cvNextId = d.nextId || (cvPages.reduce((s,p)=>s+p.blocks.length, 0) + 1);
     }
   } catch(e) { console.warn('cvLoadLayout failed', e); }
+  // Re-clamp parented cells into their container's inner area — fixes any
+  // cell saved before the title-bar inset existed (it would otherwise
+  // keep overlapping the header until next dragged).
+  try {
+    cvPages.forEach(pg => {
+      (pg.blocks || []).forEach(b => {
+        if(b && b.key === 'method-cell' && b.parentId){
+          const parent = (pg.blocks || []).find(x => x.id === b.parentId);
+          if(parent) _cvClampToParent(b, parent);
+        }
+      });
+    });
+  } catch(e) { console.warn('cvLoadLayout parenting normalise failed', e); }
 }
 async function cvClearCanvas(){ if(cvPages[cvCurrentPage].blocks.length && !(await vxConfirm({ message: 'Are you sure you want to clear all blocks from this page?', okLabel: t('vxc.clear','Clear'), danger: true }))) return; cvAutoSnapshot('Before clear'); cvPushUndo(); cvPages[cvCurrentPage].blocks=[];cvSync();cvSelectedId=null;cvSelectedIds=[];cvNextId=1;cvSaveLayout();cvRenderCanvas();cvRenderProps(null);toast(t('toast.page_cleared','Page cleared.')); }
 

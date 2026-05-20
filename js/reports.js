@@ -1092,14 +1092,18 @@ function inboxBuild(){
     return stageHealthy(r) === 'critical';
   });
 
-  // 4. Cert expiry within 60 days
+  // 4. Cert expiry within 60 days — one entry per expiring method cert
+  // (per-method certs mean an inspector can surface several rows).
   const now = Date.now();
   const sixtyDays = 60 * 24 * 60 * 60 * 1000;
-  const certsExpiring = inspectors.map((ins, idx) => ({ ins, idx })).filter(({ins}) => {
-    if(!ins.certExpiry) return false;
-    const ms = new Date(ins.certExpiry).getTime();
-    if(isNaN(ms)) return false;
-    return (ms - now) < sixtyDays;
+  const certsExpiring = [];
+  inspectors.forEach((ins, idx) => {
+    (typeof _inspCertList === 'function' ? _inspCertList(ins) : []).forEach(c => {
+      if(!c.expiry) return;
+      const ms = new Date(c.expiry).getTime();
+      if(isNaN(ms)) return;
+      if((ms - now) < sixtyDays) certsExpiring.push({ ins, idx, cert: c });
+    });
   });
 
   // 5. Calibration due — currently no equipment store; placeholder for future
@@ -1272,19 +1276,19 @@ function inboxRender(){
   if(data.certsExpiring.length === 0){
     html += `<div class="inbox-empty">${escapeHtml(t('inb.empty.certs','No certifications expiring soon.'))}</div>`;
   } else {
-    data.certsExpiring.forEach(({ins}) => {
-      const days = Math.round((new Date(ins.certExpiry).getTime() - Date.now()) / (1000*60*60*24));
+    data.certsExpiring.forEach(({ins, cert}) => {
+      const days = Math.round((new Date(cert.expiry).getTime() - Date.now()) / (1000*60*60*24));
       const expired = days < 0;
       html += `<div class="inbox-row">
         <div class="inbox-row-meta">
           <div class="inbox-row-primary">
             <span style="color:var(--t1);font-weight:500">${escapeHtml(ins.name||'—')}</span>
-            <span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${(ins.methods||[]).join(', ')||escapeHtml(t('inb.row.no_methods','No methods'))}</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${escapeHtml(cert.method)}${cert.certNo?' · '+escapeHtml(cert.certNo):''}</span>
           </div>
           <div class="inbox-row-secondary">
             ${expired
               ? `<span style="color:var(--red);font-weight:500">${escapeHtml(tf('inb.row.expired_ago','EXPIRED {n} day(s) ago',{n:Math.abs(days)}))}</span>`
-              : `${escapeHtml(tf('inb.row.expires','Expires {date}',{date:fmtDate(ins.certExpiry)}))} · <span style="color:${days<14?'var(--red)':'var(--amber)'};font-family:var(--mono);font-size:10px">${escapeHtml(tf('inb.row.days_left','{n} day(s)',{n:days}))}</span>`
+              : `${escapeHtml(tf('inb.row.expires','Expires {date}',{date:fmtDate(cert.expiry)}))} · <span style="color:${days<14?'var(--red)':'var(--amber)'};font-family:var(--mono);font-size:10px">${escapeHtml(tf('inb.row.days_left','{n} day(s)',{n:days}))}</span>`
             }
           </div>
         </div>

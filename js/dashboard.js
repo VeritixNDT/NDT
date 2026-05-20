@@ -418,12 +418,16 @@ function ovRenderExpiryTimeline(){
   const horizon = now + horizonMs;
   const items = [];
   inspectors.forEach(ins => {
-    if(!ins.certExpiry) return;
-    const expMs = new Date(ins.certExpiry).getTime();
-    if(isNaN(expMs)) return;
-    if(expMs < now - 30*24*60*60*1000) return;
-    if(expMs > horizon) return;
-    items.push({ kind: 'cert', name: ins.name, label: 'Cert · ' + ((ins.methods||[]).join(',')||'general'), expMs });
+    // One alert per method certificate — per-method certs mean an
+    // inspector can have several expiry dates, each tracked separately.
+    _inspCertList(ins).forEach(c => {
+      if(!c.expiry) return;
+      const expMs = new Date(c.expiry).getTime();
+      if(isNaN(expMs)) return;
+      if(expMs < now - 30*24*60*60*1000) return;
+      if(expMs > horizon) return;
+      items.push({ kind: 'cert', name: ins.name, label: 'Cert · ' + c.method, expMs });
+    });
   });
   if(!items.length){
     wrap.innerHTML = '<div style="font-size:12px;color:var(--t3);text-align:center;padding:24px">No certifications expiring in the next 6 months — all clear.</div>';
@@ -806,21 +810,23 @@ function generateIcsForCerts(){
   const inspectors = ls(KEYS.inspectors, []);
   const events = [];
   inspectors.forEach(ins => {
-    if(!ins.certExpiry) return;
-    const d = new Date(ins.certExpiry);
-    if(isNaN(d)) return;
-    events.push({
-      uid: 'cert-' + (ins.id || ins.name) + '@veritix-ndt',
-      title: `Cert expires — ${escapeHtml(ins.name)}`,
-      desc: `Certification expires for ${escapeHtml(ins.name)}. Methods: ${(ins.methods||[]).join(', ') || 'general'}.`,
-      date: d
-    });
-    const reminder = new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000);
-    events.push({
-      uid: 'cert-warn-' + (ins.id || ins.name) + '@veritix-ndt',
-      title: `30-day cert renewal reminder — ${escapeHtml(ins.name)}`,
-      desc: `Certification renewal due in 30 days for ${escapeHtml(ins.name)}.`,
-      date: reminder
+    _inspCertList(ins).forEach(c => {
+      if(!c.expiry) return;
+      const d = new Date(c.expiry);
+      if(isNaN(d)) return;
+      events.push({
+        uid: 'cert-' + (ins.id || ins.name) + '-' + c.method + '@veritix-ndt',
+        title: `${c.method} cert expires — ${escapeHtml(ins.name)}`,
+        desc: `${c.method} certification expires for ${escapeHtml(ins.name)}.${c.certNo?' Cert no. '+escapeHtml(c.certNo)+'.':''}`,
+        date: d
+      });
+      const reminder = new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000);
+      events.push({
+        uid: 'cert-warn-' + (ins.id || ins.name) + '-' + c.method + '@veritix-ndt',
+        title: `30-day ${c.method} cert renewal reminder — ${escapeHtml(ins.name)}`,
+        desc: `${c.method} certification renewal due in 30 days for ${escapeHtml(ins.name)}.`,
+        date: reminder
+      });
     });
   });
   if(!events.length){ toast(t('toast.no_cert_dates','No certification dates to export.'), 'warn'); return; }
@@ -1168,16 +1174,18 @@ function exportCertIcs(){
   const inspectors = ls(KEYS.inspectors, []);
   const events = [];
   inspectors.forEach(ins => {
-    if(!ins.certExpiry) return;
-    const d = new Date(ins.certExpiry);
-    if(isNaN(d)) return;
-    events.push({
-      uid: 'cert-'+(ins.id||ins.name).replace(/[^a-z0-9]/gi,'')+'@veritix',
-      start: d,
-      end: new Date(d.getTime() + 24*60*60*1000),
-      title: 'Cert expiry — ' + (ins.name||'?'),
-      description: 'Methods: ' + ((ins.methods||[]).join(', ') || 'none') + '\\nCert authority: ' + (ins.certAuthority||'—'),
-      alarm: 30,
+    _inspCertList(ins).forEach(c => {
+      if(!c.expiry) return;
+      const d = new Date(c.expiry);
+      if(isNaN(d)) return;
+      events.push({
+        uid: 'cert-'+(ins.id||ins.name).replace(/[^a-z0-9]/gi,'')+'-'+c.method+'@veritix',
+        start: d,
+        end: new Date(d.getTime() + 24*60*60*1000),
+        title: c.method + ' cert expiry — ' + (ins.name||'?'),
+        description: 'Method: ' + c.method + '\\nCert no.: ' + (c.certNo||'—') + '\\nAuthority: ' + (c.authority||'—'),
+        alarm: 30,
+      });
     });
   });
   if(!events.length){ toast(t('toast.no_certs_to_export','No certifications with expiry dates to export.'), 'warn'); return; }

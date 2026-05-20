@@ -1268,6 +1268,52 @@ function certStatus(dateStr) {
   if(d <= 60)    return 'expiring';
   return 'valid';
 }
+
+// Per-method certifications. An inspector's `methodCerts` is an object
+// keyed by method code — { UT:{certNo,level,authority,expiry}, … }.
+// This helper returns it, lazily migrating legacy records that still
+// carry a single inspector-wide cert (certNum / certExpiry / certAuth /
+// level): the legacy cert is copied into every method the inspector
+// was already marked for, as a starting point the admin can correct.
+// Pure — never mutates the stored record.
+function _inspMethodCerts(ins) {
+  if(!ins) return {};
+  if(ins.methodCerts && typeof ins.methodCerts === 'object') return ins.methodCerts;
+  const migrated = {};
+  (ins.methods || []).forEach(m => {
+    migrated[m] = {
+      certNo:    ins.certNum    || '',
+      level:     ins.level      || '',
+      authority: ins.certAuth   || '',
+      expiry:    ins.certExpiry || '',
+    };
+  });
+  return migrated;
+}
+
+// Flatten an inspector's per-method certs into an array of
+// { method, certNo, level, authority, expiry }. Convenient for the
+// dashboard cert-expiry widget, calendar export and inbox — each of
+// which wants one alert per method certificate, not per inspector.
+function _inspCertList(ins) {
+  const certs = _inspMethodCerts(ins);
+  return Object.keys(certs).map(m => Object.assign({ method: m }, certs[m]));
+}
+
+// Worst-case cert status across all of an inspector's method certs —
+// 'expired' beats 'expiring' beats 'valid' beats 'none'. Drives the
+// roster filter and the summary badge so a single out-of-date method
+// flags the whole inspector.
+function _inspWorstCertStatus(ins) {
+  const certs = _inspMethodCerts(ins);
+  const order = { expired:3, expiring:2, valid:1, none:0 };
+  let worst = 'none';
+  Object.values(certs).forEach(c => {
+    const s = certStatus(c && c.expiry);
+    if(order[s] > order[worst]) worst = s;
+  });
+  return worst;
+}
 function certBadge(dateStr) {
   if(!dateStr) return '<span class="badge badge-muted">No date</span>';
   const d = daysUntil(dateStr), fmt = fmtDate(dateStr);
@@ -1278,16 +1324,19 @@ function certBadge(dateStr) {
 
 function inspUpdateStats() {
   set('insp-stat-total',    INSPECTORS.length);
-  set('insp-stat-cert',     INSPECTORS.filter(i => i.certExpiry).length);
-  set('insp-stat-expiring', INSPECTORS.filter(i => certStatus(i.certExpiry) === 'expiring').length);
-  set('insp-stat-expired',  INSPECTORS.filter(i => certStatus(i.certExpiry) === 'expired').length);
+  set('insp-stat-cert',     INSPECTORS.filter(i => Object.keys(_inspMethodCerts(i)).length).length);
+  set('insp-stat-expiring', INSPECTORS.filter(i => _inspWorstCertStatus(i) === 'expiring').length);
+  set('insp-stat-expired',  INSPECTORS.filter(i => _inspWorstCertStatus(i) === 'expired').length);
 }
 
 function inspBuildMethodFilter() {
   const sel = el('insp-filter-method'); if(!sel) return;
   const cur = sel.value;
+  // getMethodList() keeps the user's custom order AND includes disabled
+  // methods (they're rendered with the `disabled` attribute) so old
+  // records filed under a now-disabled method can still be filtered.
   sel.innerHTML = '<option value="">All methods</option>' +
-    NDT_METHODS.map(m => `<option value="${m.id}"${_methodActive[m.id]===false?' disabled':''}>${m.id} — ${escapeHtml(m.name)}</option>`).join('');
+    getMethodList().map(m => `<option value="${m.id}"${_methodActive[m.id]===false?' disabled':''}>${m.id} — ${escapeHtml(m.name)}</option>`).join('');
   sel.value = cur;
 }
 
@@ -1324,9 +1373,11 @@ function inspRender() {
     const status = el('insp-filter-status')?.value || '';
 
     const list = INSPECTORS.filter(ins => {
-      const mq = !q || (ins.name||'').toLowerCase().includes(q) || (ins.certNum||'').toLowerCase().includes(q);
+      const certs = _inspMethodCerts(ins);
+      const certNos = Object.values(certs).map(c => (c.certNo||'').toLowerCase()).join(' ');
+      const mq = !q || (ins.name||'').toLowerCase().includes(q) || certNos.includes(q);
       const mm = !method || (ins.methods||[]).includes(method);
-      const ms = !status || certStatus(ins.certExpiry) === status;
+      const ms = !status || _inspWorstCertStatus(ins) === status;
       return mq && mm && ms;
     });
 
@@ -1340,10 +1391,20 @@ function inspRender() {
     wrap.innerHTML = list.map(ins => {
       const i  = INSPECTORS.indexOf(ins);
       const av = uaGrad(ins.name);
-      const mds = (ins.methods||[]).map(m => {
-        const md = NDT_METHODS.find(x => x.id === m);
+      const certs = _inspMethodCerts(ins);
+      // One row per certified method — method chip + level + cert no.
+      // + expiry badge. This is the "divided per method" view.
+      const certRows = Object.keys(certs).map(mid => {
+        const c  = certs[mid] || {};
+        const md = NDT_METHODS.find(x => x.id === mid);
         const color = md ? md.color : 'var(--t2)';
-        return `<span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${color};background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:2px 7px;border-radius:4px">${m}</span>`;
+        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
+          <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${color};background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:2px 7px;border-radius:4px;min-width:34px;text-align:center">${escapeHtml(mid)}</span>
+          ${c.level ? `<span style="color:var(--t2)">${escapeHtml(c.level)}</span>` : ''}
+          ${c.authority ? `<span style="color:var(--t3)">${escapeHtml(c.authority)}</span>` : ''}
+          ${c.certNo ? `<span style="font-family:var(--mono);color:var(--t3)">${escapeHtml(c.certNo)}</span>` : ''}
+          ${certBadge(c.expiry)}
+        </div>`;
       }).join('');
       const sigHtml = ins.signature
         ? `<img src="${ins.signature}" alt="Sig" style="height:36px;max-width:120px;object-fit:contain;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:3px 6px;vertical-align:middle"/>`
@@ -1353,16 +1414,12 @@ function inspRender() {
           <div style="display:flex;align-items:flex-start;gap:14px">
             <div style="width:44px;height:44px;border-radius:50%;background:${av};color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:600;flex-shrink:0">${initials(ins.name)}</div>
             <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
                 <span style="font-weight:600;font-size:14px;color:var(--t1)">${escapeHtml(ins.name)}</span>
-                ${ins.level ? `<span class="badge badge-blue">${ins.level}</span>` : ''}
               </div>
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
-                ${ins.certAuth ? `<span style="font-size:12px;color:var(--t2)">${escapeHtml(ins.certAuth)}</span>` : ''}
-                ${ins.certNum  ? `<span style="font-family:var(--mono);font-size:11px;color:var(--t3)">${escapeHtml(ins.certNum)}</span>` : ''}
-                ${certBadge(ins.certExpiry)}
-              </div>
-              ${mds ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${mds}</div>` : ''}
+              ${certRows
+                ? `<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">${certRows}</div>`
+                : `<div style="font-size:11px;color:var(--t3);font-style:italic;margin-bottom:8px">No method certifications on file</div>`}
               <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
                 ${ins.email ? `<span style="font-size:11px;font-family:var(--mono);color:var(--t3)">✉ ${escapeHtml(ins.email)}</span>` : ''}
                 ${ins.notes ? `<span style="font-size:11px;color:var(--t3);font-style:italic">${escapeHtml(ins.notes.slice(0,60))}${ins.notes.length>60?'…':''}</span>` : ''}
@@ -1383,28 +1440,73 @@ function inspRender() {
   }
 }
 
-function inspBuildMethodsGrid() {
-  const grid = el('if-methods-grid'); if(!grid) return;
-  const ins      = _inspEditIdx !== null ? (INSPECTORS[_inspEditIdx] || {}) : {};
-  const current  = ins.methods || [];
-  const stdIds   = NDT_METHODS.map(m => m.id);
-  _inspCustomMethods = current.filter(id => !stdIds.includes(id));
-  grid.innerHTML = getActiveMethods().map(m => `
-    <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--t2)">
-      <input type="checkbox" value="${m.id}" ${current.includes(m.id)?'checked':''} style="accent-color:${m.color}"/>
-      <span style="font-family:var(--mono);font-weight:600;color:${m.color}">${m.id}</span>
-    </label>`).join('');
-  inspRenderCustomChips();
+// Render one cert card per method — a checkbox for "certified for this
+// method", and (when ticked) the four cert fields. `seedCerts` lets
+// callers re-render while preserving in-progress edits (used when a
+// custom method is added mid-edit); when omitted the data comes from
+// the inspector record being edited.
+function inspBuildMethodCerts(seedCerts) {
+  const container = el('if-method-certs'); if(!container) return;
+  const ins = _inspEditIdx !== null ? (INSPECTORS[_inspEditIdx] || {}) : {};
+  const certs = seedCerts || _inspMethodCerts(ins);
+  const stdIds = NDT_METHODS.map(m => m.id);
+  // Custom methods = anything with a cert / membership that isn't a
+  // standard NDT method. Tracked so the custom-add row can extend it.
+  const fromCerts = Object.keys(certs).filter(id => !stdIds.includes(id));
+  const fromList  = (ins.methods || []).filter(id => !stdIds.includes(id));
+  _inspCustomMethods = Array.from(new Set([..._inspCustomMethods, ...fromCerts, ...fromList]));
+  const methodList = [
+    ...getActiveMethods(),
+    ..._inspCustomMethods.map(id => ({ id, name:'Custom method', color:'var(--t2)' })),
+  ];
+  container.innerHTML = methodList.map(m => {
+    const c = certs[m.id] || {};
+    const checked = !!certs[m.id];
+    const color = m.color || 'var(--t2)';
+    const fld = (f, label, ph, type) =>
+      `<div class="fld"><label>${label}</label><input data-mcert="${escapeHtml(m.id)}" data-mfield="${f}" type="${type||'text'}" value="${escapeHtml(c[f]||'')}" placeholder="${escapeHtml(ph||'')}"/></div>`;
+    return `<div class="insp-mcert" style="border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;background:var(--bg2)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" class="insp-mcert-cb" data-method="${escapeHtml(m.id)}" ${checked?'checked':''} style="accent-color:${color}" data-on-change="inspMcertToggle" data-args="'${escapeHtml(m.id)}'"/>
+        <span style="font-family:var(--mono);font-weight:700;color:${color}">${escapeHtml(m.id)}</span>
+        <span style="font-size:11px;color:var(--t3)">${escapeHtml(m.name||'')}</span>
+      </label>
+      <div class="insp-mcert-fields" data-method="${escapeHtml(m.id)}" style="display:${checked?'grid':'none'};grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        ${fld('certNo','Cert no.','PCN/'+m.id+'/2/12345')}
+        ${fld('level','Level','Level II')}
+        ${fld('authority','Authority','PCN, CSWIP, ISO 9712…')}
+        ${fld('expiry','Expiry','','date')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function inspRenderCustomChips() {
-  const wrap = el('if-custom-methods-wrap'); if(!wrap) return;
-  if(!_inspCustomMethods.length) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = _inspCustomMethods.map((id, i) => `
-    <span class="custom-method-chip">
-      ${id}
-      <span class="cx" data-action="inspRemoveCustomMethod" data-args="${i}" title="Remove">×</span>
-    </span>`).join('');
+// Reads the current cert cards out of the DOM into a methodCerts
+// object. Only ticked methods are included.
+function _inspCollectMethodCerts() {
+  const out = {};
+  document.querySelectorAll('.insp-mcert-cb:checked').forEach(cb => {
+    const mid = cb.dataset.method;
+    const card = cb.closest('.insp-mcert'); if(!card) return;
+    const get = f => {
+      const i = card.querySelector(`[data-mcert="${mid}"][data-mfield="${f}"]`);
+      return i ? i.value.trim() : '';
+    };
+    out[mid] = {
+      certNo:    get('certNo'),
+      level:     get('level'),
+      authority: get('authority'),
+      expiry:    get('expiry') || null,
+    };
+  });
+  return out;
+}
+
+// Show / hide a method's cert fields when its checkbox is toggled.
+function inspMcertToggle(method) {
+  const fields = document.querySelector(`.insp-mcert-fields[data-method="${method}"]`);
+  const cb     = document.querySelector(`.insp-mcert-cb[data-method="${method}"]`);
+  if(fields && cb) fields.style.display = cb.checked ? 'grid' : 'none';
 }
 
 function inspAddCustomMethod() {
@@ -1416,12 +1518,10 @@ function inspAddCustomMethod() {
   }
   _inspCustomMethods.push(val);
   inp.value = '';
-  inspRenderCustomChips();
-}
-
-function inspRemoveCustomMethod(i) {
-  _inspCustomMethods.splice(i, 1);
-  inspRenderCustomChips();
+  // Re-render the cert cards so the new method gets its own card,
+  // seeding from the current DOM state so in-progress edits to other
+  // methods aren't lost.
+  inspBuildMethodCerts(_inspCollectMethodCerts());
 }
 
 // ── Select add/remove options ──
@@ -1528,16 +1628,12 @@ function sigReset(existingDataURL) {
 function inspOpenForm(idx) {
   if(!inspIsAdmin()) { toast(t('toast.admin_required','Admin access required.'), 'error'); return; }
   _inspEditIdx = idx;
+  _inspCustomMethods = [];
   const ins = idx !== null ? (INSPECTORS[idx] || {}) : {};
-  el('if-name').value       = ins.name       || '';
-  el('if-email').value      = ins.email      || '';
-  el('if-certauth').value   = ins.certAuth   || '';
-  el('if-certnum').value    = ins.certNum    || '';
-  el('if-expiry').value     = ins.certExpiry || '';
-  el('if-notes').value      = ins.notes      || '';
-  const lvl = el('if-level');
-  if(lvl) { const o = Array.from(lvl.options).find(x => x.value === ins.level); lvl.value = o ? o.value : ''; }
-  inspBuildMethodsGrid();
+  el('if-name').value  = ins.name  || '';
+  el('if-email').value = ins.email || '';
+  el('if-notes').value = ins.notes || '';
+  inspBuildMethodCerts();
   el('insp-form-title').textContent = idx !== null ? 'Edit inspector' : 'Add inspector';
   const wrap = el('insp-form-wrap');
   wrap.style.display = 'block';
@@ -1555,19 +1651,19 @@ function inspSave() {
   if(!inspIsAdmin()) { toast(t('toast.admin_required','Admin access required.'), 'error'); return; }
   const name = el('if-name').value.trim();
   if(!name) { toast(t('toast.name_required', 'Name is required.'), 'error'); return; }
-  const stdMethods = Array.from(el('if-methods-grid').querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+  const methodCerts = _inspCollectMethodCerts();
   const record = {
-    id:         (_inspEditIdx !== null && INSPECTORS[_inspEditIdx]?.id) || ('insp_' + Date.now()),
+    id:          (_inspEditIdx !== null && INSPECTORS[_inspEditIdx]?.id) || ('insp_' + Date.now()),
     name,
-    email:      el('if-email').value.trim(),
-    certAuth:   el('if-certauth').value.trim(),
-    certNum:    el('if-certnum').value.trim(),
-    certExpiry: el('if-expiry').value || null,
-    level:      el('if-level').value  || '',
-    notes:      el('if-notes').value.trim(),
-    methods:    [...stdMethods, ..._inspCustomMethods],
-    signature:  sigGetData() || (_inspEditIdx !== null ? INSPECTORS[_inspEditIdx]?.signature : null),
-    updatedAt:  new Date().toISOString(),
+    email:       el('if-email').value.trim(),
+    notes:       el('if-notes').value.trim(),
+    // Per-method certifications keyed by method code. `methods` is
+    // derived from the keys so the rest of the app (filters, smart
+    // cards) has a flat list to read without knowing the cert shape.
+    methodCerts,
+    methods:     Object.keys(methodCerts),
+    signature:   sigGetData() || (_inspEditIdx !== null ? INSPECTORS[_inspEditIdx]?.signature : null),
+    updatedAt:   new Date().toISOString(),
   };
   if(_inspEditIdx !== null) { INSPECTORS[_inspEditIdx] = record; }
   else { INSPECTORS.push(record); }

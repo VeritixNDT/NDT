@@ -684,18 +684,40 @@ function cvResolveSmartLink(block, report){
     const list = (typeof INSPECTORS !== 'undefined') ? INSPECTORS : (typeof ls==='function' ? ls('vx-inspectors-v1',[]) : []);
     const match = list.find(i => i.name === insp);
     const examDate = report?.examDate ? new Date(report.examDate) : new Date();
+    const reportMethod = report?.method || '';
     if(match){
-      const expiry = match.certExpiry ? new Date(match.certExpiry) : null;
-      const expired = expiry && examDate > expiry;
-      const lvl = match.level || (report?.method+' Level II');
-      const cert = match.certNo || match.certAuthority || '—';
-      const cls = expired
-        ? 'background:rgba(242,92,92,.15);color:#991b1b'
-        : 'background:rgba(62,207,142,.15);color:#16a34a';
-      const lbl = expired ? '⚠ EXPIRED' : '✓ VALID';
+      // Resolve the inspector's certification FOR THIS REPORT'S METHOD.
+      // methodCerts is keyed by method code; legacy records (single
+      // inspector-wide cert) are migrated by _inspMethodCerts so old
+      // data still resolves. Falls back to the first cert on file if
+      // the report has no method set.
+      const certs = (typeof _inspMethodCerts === 'function')
+        ? _inspMethodCerts(match)
+        : (match.methodCerts || {});
+      let cert = reportMethod ? certs[reportMethod] : null;
+      let methodLabel = reportMethod;
+      if(!cert){
+        const firstKey = Object.keys(certs)[0];
+        if(firstKey){ cert = certs[firstKey]; methodLabel = firstKey; }
+      }
+      if(cert){
+        const expiry = cert.expiry ? new Date(cert.expiry) : null;
+        const expired = expiry && examDate > expiry;
+        const lvl = cert.level || (methodLabel + ' Level II');
+        const certNo = cert.certNo || cert.authority || '—';
+        const cls = expired
+          ? 'background:rgba(242,92,92,.15);color:#991b1b'
+          : 'background:rgba(62,207,142,.15);color:#16a34a';
+        const lbl = expired ? '⚠ EXPIRED' : '✓ VALID';
+        return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+          <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
+          <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(insp)} · ${escapeHtml(methodLabel)} ${escapeHtml(lvl)}</div><div style="font-size:8px;color:#666">${escapeHtml(certNo)}${expiry?' · expires '+expiry.toLocaleDateString('en-GB'):''}</div></div>
+        </div>`;
+      }
+      // Inspector exists but holds no cert for this method.
       return `<div style="display:flex;align-items:center;gap:6px;height:100%">
-        <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
-        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(insp)} · ${escapeHtml(lvl)}</div><div style="font-size:8px;color:#666">${escapeHtml(cert)}${expiry?' · expires '+expiry.toLocaleDateString('en-GB'):''}</div></div>
+        <span style="background:rgba(245,166,35,.18);color:#92400e;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">⚠ NOT CERTIFIED</span>
+        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(insp)}</div><div style="font-size:8px;color:#666">No ${escapeHtml(reportMethod||'method')} certification on file</div></div>
       </div>`;
     }
     return `<div style="display:flex;align-items:center;gap:6px;height:100%">

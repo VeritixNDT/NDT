@@ -1283,40 +1283,17 @@
                   <div class="fld"><label data-i18n="insp.lbl.name">Full name *</label><input id="if-name" placeholder="e.g. Jan de Vries" data-i18n-placeholder="insp.ph.name" autocomplete="off"/></div>
                   <div class="fld"><label data-i18n="insp.lbl.email">Email</label><input id="if-email" type="email" placeholder="jan@company.com" data-i18n-placeholder="insp.ph.email"/></div>
                 </div>
-                <div class="fg form-row">
-                  <div class="fld"><label data-i18n="lbl.cert_authority">Certification authority</label><input id="if-certauth" placeholder="PCN, CSWIP, ISO 9712…" data-i18n-placeholder="insp.ph.cert_auth"/></div>
-                  <div class="fld"><label data-i18n="lbl.cert_number">Certification number</label><input id="if-certnum" placeholder="PCN/UT/2/12345" data-i18n-placeholder="insp.ph.cert_num"/></div>
-                </div>
-                <div class="fg form-row">
-                  <div class="fld">
-                    <label data-i18n="lbl.cert_expiry">Certification expiry</label>
-                    <input id="if-expiry" type="date"/>
-                  </div>
-                  <div class="fld">
-                    <label data-i18n="insp.lbl.level">Level</label>
-                    <div style="display:flex;gap:6px;align-items:stretch">
-                      <select id="if-level" style="flex:1">
-                        <option value="" data-i18n="insp.opt.select">— Select —</option>
-                        <option data-i18n="insp.opt.level_1">Level I</option>
-                        <option data-i18n="insp.opt.level_2">Level II</option>
-                        <option data-i18n="insp.opt.level_3">Level III</option>
-                      </select>
-                      <button type="button" class="sel-add-btn" data-action="selAddOption" data-args="'if-level'" title="Add option">+</button>
-                      <button type="button" class="sel-del-btn" data-action="selDelOption" data-args="'if-level'" title="Remove selected option">−</button>
-                    </div>
-                  </div>
-                </div>
                 <div class="fld form-row">
-                  <label data-i18n="insp.lbl.methods">Authorised NDT methods</label>
-                  <div id="if-methods-grid" style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:2px"></div>
+                  <label>Method certifications</label>
+                  <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Tick each NDT method this inspector is certified for, then fill in that method's certificate number, level, authority and expiry date.</div>
+                  <div id="if-method-certs" style="display:flex;flex-direction:column;gap:8px"></div>
                   <!-- Custom method add -->
-                  <div class="method-add-row">
+                  <div class="method-add-row" style="margin-top:8px">
                     <input id="if-custom-method-inp" placeholder="e.g. ACFM" data-i18n-placeholder="insp.ph.custom_method" maxlength="8"
                       data-on-keydown="_wKbInspAddCustomMethod" data-pass-event="1"
                       data-on-input="_wUppercaseInput" data-pass-el="1"/>
                     <button type="button" class="btn btn-sm btn-ghost" data-action="inspAddCustomMethod" data-i18n="insp.btn.add_method">+ Add method</button>
                   </div>
-                  <div id="if-custom-methods-wrap" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
                 </div>
                 <div class="fld form-row">
                     <label data-i18n="insp.lbl.signature">Signature</label>

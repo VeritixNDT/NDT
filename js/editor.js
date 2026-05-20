@@ -94,6 +94,9 @@ var CV_FIELD_DEFS = {
   'qc-sig':       {label:'QC signature',                  ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
   'cert-auth-sig':{label:'Cert. Authority / NoBo signature', ph:'',                           get:r=>'',                           w:200,h:60,sig:true},
   'insp-date':    {label:'Inspector date',                ph:'____/____/________',            get:r=>'',                           w:145,h:38},
+  // Plain unbound "Date" card — label only, never carries report data.
+  // For PDFs where a date is written in by hand on the printed sheet.
+  'date-blank':   {label:'Date',                          ph:'____/____/________',            get:r=>'',                           w:145,h:38},
 
   // ── COMPUTED / SMART FIELDS ─────────────────────────────────────
   'defect-count':    {label:'Defect count',          ph:'3',         get:r=>(r.defects||[]).length, w:100,h:38, computed:true, mapTo:'computed'},
@@ -247,7 +250,7 @@ var CV_PALETTE_GROUPS = [
   {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
-  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date']},
+  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
   {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},

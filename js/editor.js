@@ -3118,7 +3118,15 @@ function cvRenderProps(id){
   const colorPick = (prop, val) =>
     `<div style="display:flex;gap:6px;align-items:center"><input type="color" value="${val||'#000000'}" style="width:30px;height:24px;border-radius:3px;border:1px solid var(--border);padding:1px;cursor:pointer" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','${prop}'"/><span style="font-size:9px;font-family:var(--mono);color:var(--t3)">${val||'#000'}</span></div>`;
   const numRow = (prop, val) =>
-    `<input type="number" value="${val||0}" data-prop="${prop}" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px;box-sizing:border-box" data-on-change="_wCvUpdateBlockNumber" data-pass-el="1" data-args="'${id}','${prop}'"/>`;
+    `<div style="display:flex;align-items:stretch">
+      <input type="number" step="1" value="${val||0}" data-prop="${prop}" class="cv-num"
+        style="flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;color:var(--t1);font-size:11px;padding:4px 6px;box-sizing:border-box"
+        data-on-change="_wCvUpdateBlockNumber" data-on-input="_wCvUpdateBlockNumber" data-pass-el="1" data-args="'${id}','${prop}'"/>
+      <div style="display:flex;flex-direction:column;width:22px;flex-shrink:0">
+        <button type="button" class="cv-step" title="Increase" data-action="cvStepBlockNum" data-args="'${id}','${prop}',1"  style="border-radius:0 4px 0 0;border-bottom:none">▲</button>
+        <button type="button" class="cv-step" title="Decrease" data-action="cvStepBlockNum" data-args="'${id}','${prop}',-1" style="border-radius:0 0 4px 0">▼</button>
+      </div>
+    </div>`;
 
   // Field mapping info
   const mapInfo = def && def.mapTo ? `<div style="margin-bottom:9px;padding:5px 7px;background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:4px;font-size:10px;color:var(--blue)">📎 Maps to: <span style="font-family:var(--mono)">${def.mapTo}</span></div>` : '';
@@ -3244,7 +3252,7 @@ function cvRenderProps(id){
       </select>`;
     })()) : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px">
-      ${['x','y','w','h'].map(p=>`<div><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);margin-bottom:2px;text-transform:uppercase">${p.toUpperCase()}</div>${numRow(p,block[p])}</div>`).join('')}
+      ${['x','y','w','h'].map(p=>`<div style="min-width:0"><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);margin-bottom:2px;text-transform:uppercase">${p.toUpperCase()}</div>${numRow(p,block[p])}</div>`).join('')}
     </div>
     ${row('Font',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontFamily'">
       <option value="" ${!block.fontFamily?'selected':''}>Default (Arial)</option>
@@ -3658,22 +3666,37 @@ function _wOvNewReportFromActiveMethod(){
   ovNewReport(methodId);
 }
 
+// Custom X/Y/W/H stepper — the Properties panel's ▲/▼ buttons. Steps the
+// block property by delta, then writes the new value back into the number
+// input (cvUpdateBlock skips the panel re-render for geometry props, so
+// the field has to be refreshed here).
+function cvStepBlockNum(id, prop, delta){
+  const b = cvBlocks.find(x => x.id === id);
+  if(!b) return;
+  cvUpdateBlock(id, prop, (+b[prop] || 0) + (+delta || 0));
+  const inp = document.querySelector('#cv-props-body [data-prop="' + prop + '"]');
+  if(inp) inp.value = b[prop];
+}
 function cvUpdateBlock(id, prop, value){
   const block = cvBlocks.find(b=>b.id===id);
   if(!block) return;
   // FIX: push undo for property edits (debounced — only on first change per interaction)
   if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; setTimeout(()=>{ cvDragUndoPushed=false; }, 800); }
-  if(['x','y','w','h'].includes(prop)) value = cvSnap(Math.max(prop==='x'||prop==='y'?0:16, +value));
+  // X/Y/W/H typed in the Properties panel are honoured exactly (only
+  // floored to a sane minimum) — NOT grid-snapped. Snapping a precisely
+  // typed value back to the grid is what made the number fields feel
+  // broken, and it cancelled out the spinner's ±1 steps. Drag-move still
+  // grid-snaps via cvMouseMove.
+  const _geom = ['x','y','w','h'].indexOf(prop) >= 0;
+  if(_geom) value = Math.max(prop==='x'||prop==='y'?0:16, +value || 0);
   block[prop] = value;
   cvRenderCanvas();
   // Properties panel needs to reflect the new value so e.g. alignment
   // buttons highlight the active option, lock checkbox flips, etc. Skip
-  // text inputs while typing — the input keeps focus naturally and we
-  // don't want to re-render the field underneath the caret.
-  // Skip re-rendering the panel for live-typed text and any prop
-  // starting with 'c' (color picker, colWidths) so the input under the
-  // user's caret doesn't get replaced mid-edit.
-  if(prop !== 'text' && !prop.startsWith('c')) {
+  // text inputs while typing, props starting with 'c' (color picker,
+  // colWidths), and the X/Y/W/H fields — re-rendering the panel would
+  // replace the <input> under the user's caret and break the spinner.
+  if(prop !== 'text' && !prop.startsWith('c') && !_geom) {
     cvRenderProps(id);
   }
   cvSaveLayout();

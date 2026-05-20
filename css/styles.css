@@ -1164,6 +1164,28 @@
 }
 .cv-pal-group-hdr:hover { background: var(--panel2); }
 
+/* PDF editor — Properties X/Y/W/H number fields. The tiny native spinner
+   is hidden in favour of the larger custom .cv-step up/down buttons. */
+.cv-num::-webkit-inner-spin-button,
+.cv-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.cv-num { -moz-appearance: textfield; appearance: textfield; }
+.cv-step {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--t2);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.cv-step:hover  { background: var(--panel2); color: var(--t1); }
+.cv-step:active { background: var(--blue);   color: #fff; }
+
 .vx-mode-pill[data-state="trial"]   { color: var(--violet); border-color: rgba(167,139,250,.30); }
 .vx-mode-pill[data-state="synced"]  { color: var(--green);  border-color: rgba(62,207,142,.30); }
 .vx-mode-pill[data-state="syncing"] { color: var(--cyan);   border-color: rgba(0,212,255,.30); }

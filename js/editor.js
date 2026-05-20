@@ -2739,9 +2739,17 @@ function cvRenderBlockContent(block, report, preview){
       const value = def.get(report) || '—';
       return `<div style="height:100%;padding:4px 7px;box-sizing:border-box;display:flex;align-items:center;justify-content:${jc};white-space:pre-wrap;line-height:1.35;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al}">${escapeHtml(value)}</div>`;
     }
-    // Existing non-company smart-link fallback (procedure / cert / calib / accept)
-    const inner = preview && report
-      ? cvResolveSmartLink(block, report)
+    // Non-company smart-link fields. procedure-link and accept-eval need
+    // report-specific data (a procedure number, defect measurements), so
+    // they keep the "resolves at preview/export" placeholder until a real
+    // report is in preview. cert-status and calib-status read live from
+    // Settings → Inspectors / Equipment, which is always on hand — so they
+    // resolve in design mode too, against the sample (or preview-selected)
+    // report, the way the company smart fields do.
+    const liveSmart = def.smartLink === 'cert' || def.smartLink === 'calib';
+    const smartReport = report || (liveSmart ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects) : null);
+    const inner = smartReport
+      ? cvResolveSmartLink(block, smartReport)
       : `<div style="display:flex;align-items:center;gap:6px;height:100%">
           <span style="background:rgba(167,139,250,.15);color:#6d28d9;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">⚡ SMART</span>
           <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(def.label)}</div><div style="font-size:8px;color:#666">Resolves at preview/export</div></div>

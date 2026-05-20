@@ -56,7 +56,7 @@ var CV_FIELD_DEFS = {
   'order-no':     {label:'Order no.',                     ph:'PO-98271',                      get:r=>r.orderNo||'—',               w:120,h:38, mapTo:'orderNo'},
   'req-no':       {label:'Request no.',                   ph:'REQ-2023-045',                  get:r=>r.requestNo||'—',             w:150,h:38, mapTo:'requestNo'},
   'ref-client':   {label:'Client reference',              ph:'OSB-2023-PR-012',               get:r=>r.clientRef||'—',             w:150,h:38, mapTo:'clientRef'},
-  'subject':      {label:'Subject / component',           ph:'Main leg splice weld — Node L4',get:r=>r.subject||'—',               w:260,h:38, mapTo:'subject'},
+  'subject':      {label:'Weld / object',                 ph:'Main leg splice weld — Node L4',get:r=>r.subject||'—',               w:260,h:38, mapTo:'subject'},
   'drawing-no':   {label:'Drawing no.',                   ph:'OSB-DWG-4420-B',                get:r=>r.drawing||'—',               w:150,h:38, mapTo:'drawing'},
   'subject-no':   {label:'Subject no.',                   ph:'L4-SP-007',                     get:r=>r.subjectNo||'—',             w:130,h:38, mapTo:'subjectNo'},
   'welders':      {label:'Welder(s)',                     ph:'J. Bakker, M. de Vries',        get:r=>r.welders||'—',               w:175,h:38, mapTo:'welders'},
@@ -237,12 +237,13 @@ var CV_LAYOUT_ITEMS = [
   {key:'photo-page',     label:'Photo page (6 slots)',       w:754,h:980},
   {key:'additional-page',label:'Additional page',            w:754,h:980},
   {key:'defect-table',   label:'Defect / indication table',  w:754,h:90},
+  {key:'items-table',    label:'Examination details',        w:754,h:90},
+  {key:'revision-history',label:'Revision history',           w:260,h:64},
   {key:'method-block',   label:'Method-specific data block', w:754,h:90},
   {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
 ];
 
 var CV_PALETTE_GROUPS = [
-  {id:'custom',    label:'✦ Custom / Blank',  fields:['blank-field','blank-multiline','blank-row-2','blank-row-3','blank-row-4']},
   {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block','co-footer-smart','co-confidstmt-smart']},
   {id:'template',  label:'📋 Report template', fields:['tpl-number']},
   {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','method']},
@@ -1225,7 +1226,7 @@ function cvInitCanvas(){
 function cvGetLayoutIcon(k){
   if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
-    'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','method-block':'⚙',
+    'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
     'accent-bar':'█'}[k]||'□';
 }
 
@@ -2311,6 +2312,202 @@ function cvRenderBlockContent(block, report, preview){
       }
       case 'additional-page':
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5;font-size:9px;font-weight:600;color:#333;text-align:${al}">${_h(block.text||'Additional information')}</div><div style="flex:1;padding:12px 8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;border:1px dashed #ddd;margin:8px;border-radius:3px">Place blocks inside for custom content</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
+      case 'items-table':{
+        // Examination-details table — mirrors RPT_FORM.items columns onto a
+        // table that fills the block. table-layout:fixed + percentage col
+        // widths (derived from each column's RPT_FORM.items.width) means
+        // the table scales horizontally to whatever width the user has
+        // dragged the block to; height is filled by row content, with
+        // overflow clipped if the block isn't tall enough.
+        const cols = (typeof RPT_FORM !== 'undefined' && RPT_FORM.items) ? RPT_FORM.items : [];
+        if(!cols.length){
+          return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:9px">No item columns defined</div>`;
+        }
+        // Per-block column widths win over the RPT_FORM.items defaults so
+        // users can drag columns to whatever proportions suit their layout
+        // (edited from the Properties panel). The array length must match
+        // cols — if it doesn't (e.g. RPT_FORM.items grew after the block
+        // was saved), fall back to defaults rather than render incorrectly.
+        const widthsArr = (Array.isArray(block.colWidths) && block.colWidths.length === cols.length)
+          ? block.colWidths.map(w => (typeof w === 'number' && w > 0) ? w : 130)
+          : cols.map(c => c.width || 130);
+        const totalW = widthsArr.reduce((s, w) => s + w, 0);
+        // Compute column percentages so they sum to *exactly* 100. Naive
+        // toFixed(2) on each column rounds independently and can leave a
+        // 0.05–0.5px gap on one side that reads as a misalignment against
+        // cards stacked above the table. Assigning the remainder to the
+        // last column closes that gap to zero.
+        const pcts = widthsArr.map(w => +((w / totalW) * 100).toFixed(4));
+        const sumExceptLast = pcts.slice(0, -1).reduce((s, p) => s + p, 0);
+        pcts[pcts.length - 1] = +(100 - sumExceptLast).toFixed(4);
+        const colgroup = `<colgroup>${pcts.map(p => `<col style="width:${p}%"/>`).join('')}</colgroup>`;
+        // Three independent font sizes:
+        //   titleFs  — the EXAMINATION DETAILS heading (block.titleFontSize
+        //              override → fixed 11px default)
+        //   colFs    — the column-name row (fixed 7.5px small-caps)
+        //   cellFs   — the row cells (block.fontSize from the Properties
+        //              panel, default 8.5px) so users can tune the table
+        //              text independently from the heading
+        const titleFs = _safeFs(block.titleFontSize, '11px');
+        const colFs   = '7.5px';
+        const cellFs  = fs; // already _safeFs(block.fontSize, '8.5px') above
+        const headCells = cols.map(c => `<th scope="col" style="padding:3px 5px;text-align:left;font-size:${colFs};font-weight:600;color:#fff;letter-spacing:.02em">${_h(c.label)}</th>`).join('');
+        // Source the items array in order of preference:
+        //   1. the active `report` (preview mode + a selected report)
+        //   2. live `_ovItems` — the user typing into the new-report form
+        //      right now, even before they've clicked Save (this fed
+        //      directly from dashboard.js's working copy)
+        //   3. the most recent saved report carrying items[] (design mode
+        //      or sample-data preview)
+        //   4. an empty placeholder row
+        let liveItems = null;
+        if(report && Array.isArray(report.items) && report.items.length){
+          liveItems = report.items;
+        }
+        if(!liveItems && typeof _ovItems !== 'undefined' && Array.isArray(_ovItems)){
+          const live = _ovItems
+            .map(r => {
+              const o = {}; if(!r) return o;
+              Object.keys(r).forEach(k => { if(r[k] && String(r[k]).trim()) o[k] = String(r[k]).trim(); });
+              return o;
+            })
+            .filter(r => Object.keys(r).length);
+          if(live.length) liveItems = live;
+        }
+        if(!liveItems){
+          try {
+            if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
+              const reports = ls(KEYS.reports, []) || [];
+              for(let i = reports.length - 1; i >= 0; i--){
+                if(reports[i] && Array.isArray(reports[i].items) && reports[i].items.length){
+                  liveItems = reports[i].items;
+                  break;
+                }
+              }
+            }
+          } catch(e){}
+        }
+        const items = liveItems
+          ? liveItems
+          : (preview ? [{}] : [{ subject:'[Weld / object]', drawing:'[Drawing]', dimensions:'[Dimensions]', material:'[Material]', weldType:'[Prep]', weldProcess:'[Process]', welders:'[Welder]', examDate:'—', verdict:'—' }]);
+        // Verdict cell colour swatches — same palette as the result place
+        // card (rcolor / rbg above) plus a blue variant for "For
+        // information" so all four states the form offers are covered.
+        const vColors = {
+          'Acceptable':     {fg:'#065f46', bg:'#d1fae5'},
+          'Pass':           {fg:'#065f46', bg:'#d1fae5'},
+          'Not acceptable': {fg:'#991b1b', bg:'#fee2e2'},
+          'Fail':           {fg:'#991b1b', bg:'#fee2e2'},
+          'Monitor':        {fg:'#92400e', bg:'#fef3c7'},
+          'Inconclusive':   {fg:'#92400e', bg:'#fef3c7'},
+          'For information':{fg:'#1e40af', bg:'#dbeafe'},
+        };
+        const lastCol = cols.length - 1;
+        const rows = items.map((it, ri) => {
+          const isLastRow = ri === items.length - 1;
+          const cells = cols.map((c, ci) => {
+            const v = (it && it[c.id] != null && it[c.id] !== '') ? String(it[c.id]) : '—';
+            // Verdict gets a chip — colour-coded swatch contained inside the
+            // cell. Inline-block + padding bounds the colour to the chip,
+            // so neighbouring cell borders can't bleed colour into it.
+            const inner = (c.id === 'verdict' && vColors[v])
+              ? `<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:${vColors[v].bg};color:${vColors[v].fg};font-weight:600">${_h(v)}</span>`
+              : _h(v);
+            // Internal grid lines — last column drops its right border so
+            // it can't extend past the wrapper, but every row keeps its
+            // bottom border (including the final row) so each data row
+            // has a visible line underneath even when the block is taller
+            // than the content.
+            const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
+            const borderBottom = 'border-bottom:0.5px solid #ddd;';
+            return `<td style="padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:top;word-break:break-word;overflow:hidden">${inner}</td>`;
+          }).join('');
+          return `<tr>${cells}</tr>`;
+        }).join('');
+        // Title strip — now lives inside the table as a colspan row so the
+        // bar's left/right edges line up exactly with the table's column
+        // edges instead of drifting by a few pixels (which is what happens
+        // when a separate <div> sits above the table). Bar colour is
+        // independent of block.bgColor so the card body's fill can change
+        // without making the bar disappear.
+        const tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
+        const barColor = _safeColor(block.barColor, tplSectionColor);
+        const title = _h((block.text || 'Examination details')).toUpperCase();
+        // Examination remarks — sourced same way as items (preview report
+        // → live _ovItems form value → latest saved report). Renders into
+        // the wrapper's flex:1 zone below the table, filling whatever
+        // empty space the block has under the rows.
+        let liveRemarks = (report && report.examRemarks) ? String(report.examRemarks) : '';
+        if(!liveRemarks){
+          try {
+            const liveTa = document.getElementById('ov-exam-remarks');
+            if(liveTa && liveTa.value && liveTa.value.trim()) liveRemarks = liveTa.value.trim();
+          } catch(e){}
+        }
+        if(!liveRemarks){
+          try {
+            if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
+              const reports = ls(KEYS.reports, []) || [];
+              for(let i = reports.length - 1; i >= 0; i--){
+                if(reports[i] && reports[i].examRemarks){ liveRemarks = String(reports[i].examRemarks); break; }
+              }
+            }
+          } catch(e){}
+        }
+        const remarksFs = _safeFs(block.fontSize, '8.5px');
+        const remarksHtml = liveRemarks
+          ? `<div style="flex:1;padding:6px 8px;font-size:${remarksFs};line-height:1.4;color:#000;white-space:pre-wrap;word-break:break-word;overflow:hidden;border-top:0.5px solid #ddd">${_h(liveRemarks)}</div>`
+          : `<div style="flex:1;padding:6px 8px;font-size:${remarksFs};line-height:1.4;color:#bbb;font-style:italic;overflow:hidden;border-top:0.5px solid #ddd">${preview?'':'Inspector remarks / comments…'}</div>`;
+        // Wrapper owns the outer border — keeps the card's outer rectangle
+        // pixel-aligned with cards stacked above the table. Without this,
+        // border-collapse on the cells would shift the edge by a half-pixel
+        // and the table would visibly mismatch one side.
+        return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
+          <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;flex-shrink:0">
+            ${colgroup}
+            <thead>
+              <tr><th colspan="${cols.length}" style="padding:4px 8px;background:${barColor};color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};text-align:center;letter-spacing:.06em;border-bottom:0.5px solid rgba(255,255,255,.18)">${title}</th></tr>
+              <tr style="background:${barColor}">${headCells}</tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          ${remarksHtml}
+        </div>`;
+      }
+      case 'revision-history':{
+        // Standard place-card style — small label at the top, stacked
+        // value lines below (matching how per-item fields render when a
+        // report has multiple inspected items). No coloured bar, no
+        // table chrome — just the data, formatted to read at a glance.
+        const lblTxt = _h(block.text || 'Revision history');
+        // Same fallback as the items-table card — prefer the active
+        // report's revisions, then the latest saved report carrying any
+        // revisions, else show "no revisions logged".
+        let revs = (report && Array.isArray(report.revisions)) ? report.revisions : null;
+        if(!revs || !revs.length){
+          try {
+            if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
+              const reports = ls(KEYS.reports, []) || [];
+              for(let i = reports.length - 1; i >= 0; i--){
+                if(reports[i] && Array.isArray(reports[i].revisions) && reports[i].revisions.length){
+                  revs = reports[i].revisions;
+                  break;
+                }
+              }
+            }
+          } catch(e){}
+        }
+        revs = revs || [];
+        const body = revs.length
+          ? revs.map((rv, i) => `<div style="${i ? 'border-top:0.5px solid #e5e7eb;padding-top:2px;margin-top:2px;' : ''}font-size:${fs};line-height:1.35;color:${preview?'#000':'#bbb'};white-space:normal;word-break:break-word">
+              <span style="font-family:var(--mono);font-weight:600;margin-right:6px">${_h(rv.rev||'—')}</span>${_h(rv.reason||'—')}
+            </div>`).join('')
+          : `<div style="font-size:${fs};color:${preview?'#999':'#bbb'};font-style:italic">No revisions logged</div>`;
+        return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:${revs.length>1?'flex-start':'center'};box-sizing:border-box;text-align:${al}">
+          <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblTxt}</div>
+          ${body}
+        </div>`;
+      }
       case 'defect-table':{
         if(preview && report && report.defects && report.defects.length){
           const rows = report.defects.map(d=>`<tr><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.type||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd;font-weight:bold;color:${d.sev==='High'?'#991b1b':'#065f46'}">${_h(d.sev||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.loc||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.depth||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.len||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.disp||'—')}</td></tr>`).join('');
@@ -2490,6 +2687,24 @@ function cvRenderBlockContent(block, report, preview){
 
   let value = preview && report ? (() => { try{ return def.get(report); }catch(e){ return '—'; } })() : def.ph||'';
 
+  // Items-table support — if this card maps to a per-item column (subject,
+  // drawing, welders, …) and the report carries more than one inspected
+  // item, expand the value column into a stack of N values, one per item.
+  // Each value is resolved by calling def.get against a shallow merge of
+  // the report with the item row, so card-specific formatters keep
+  // working. Single-item reports fall through to the existing single-value
+  // path and render exactly as before.
+  let itemValues = null;
+  if(preview && report && Array.isArray(report.items) && report.items.length > 1
+     && def.mapTo && typeof RPT_ITEM_FIELD_IDS !== 'undefined'
+     && RPT_ITEM_FIELD_IDS.indexOf(def.mapTo) >= 0
+     && !def.sig && !def.multi){
+    itemValues = report.items.map(it => {
+      try { return def.get(Object.assign({}, report, it)) || '—'; }
+      catch(e) { return '—'; }
+    });
+  }
+
   // V3: Apply format string if set
   if(block.format && value !== '' && value !== '—'){
     value = cvFormatValue(value, block.format);
@@ -2522,11 +2737,28 @@ function cvRenderBlockContent(block, report, preview){
   if(def.result){
     const rcolor = {Pass:'#065f46',Fail:'#991b1b',Monitor:'#92400e',Acceptable:'#065f46','Not acceptable':'#991b1b',Inconclusive:'#92400e'};
     const rbg    = {Pass:'#d1fae5',Fail:'#fee2e2',Monitor:'#fef3c7',Acceptable:'#d1fae5','Not acceptable':'#fee2e2',Inconclusive:'#fef3c7'};
-    const rk = preview ? (report.result||report.verdict||'') : '';
-    const rc = rcolor[rk]||'#555'; const rb = rbg[rk]||'#f9f9f9';
+    // Pill renders one row. `rawKey` is the unmodified verdict string (used
+    // for the colour swatch lookup); `displayText` is what the user reads
+    // (matches the all-caps transform def.get applies to single-row).
+    const pill = (rawKey, displayText) => {
+      const rc = rcolor[rawKey]||'#555'; const rb = rbg[rawKey]||'#f9f9f9';
+      return `<div style="padding:3px 10px;border:1.5px solid ${rc};color:${rc};background:${rb};font-weight:bold;font-style:${fi};font-size:${fs};display:inline-block">${_h(displayText||rawKey||'—')}</div>`;
+    };
+    let body;
+    if(itemValues){
+      body = `<div style="display:flex;flex-direction:column;gap:3px">${
+        report.items.map((it, i) => pill(it.verdict || '', itemValues[i])).join('')
+      }</div>`;
+    } else {
+      const rk = preview ? (report.result||report.verdict||'') : '';
+      // `value` (pre-escape) is what def.get returned — typically the
+      // uppercased display text. Falls back to the raw key if def.get
+      // produced nothing useful.
+      body = pill(rk, value || rk);
+    }
     return `<div style="height:100%;padding:4px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
       <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:3px">${lblEsc}</div>
-      <div style="padding:3px 10px;border:1.5px solid ${rc};color:${rc};background:${rb};font-weight:bold;font-style:${fi};font-size:${fs};display:inline-block">${vEsc}</div>
+      ${body}
     </div>`;
   }
   if(def.sig){
@@ -2552,14 +2784,25 @@ function cvRenderBlockContent(block, report, preview){
   const blockTextRaw = block.text && String(block.text).trim();
   const isDefaultLabel = blockTextRaw && blockTextRaw === String(def.label || '').trim();
   const skipLabel = def.noLabel && (!blockTextRaw || isDefaultLabel);
+  // Multi-row items rendering — stack one value per inspected item. Each
+  // row is a div so the editor's existing word-break / wrap rules apply
+  // per cell; a 0.5px divider between rows hints at the table structure
+  // without needing extra borders on every place card.
+  const valueRows = itemValues
+    ? itemValues.map((v, i) => `<div style="${i ? 'border-top:0.5px solid #e5e7eb;padding-top:2px;margin-top:2px;' : ''}font-size:${fs};font-weight:${fw};font-style:${fi};color:${preview?'#000':'#bbb'};line-height:1.35;white-space:normal;word-break:break-word">${_h(v)}</div>`).join('')
+    : null;
   if(skipLabel){
-    return `<div style="height:100%;padding:3px 7px;display:flex;align-items:center;justify-content:${jc};text-align:${al}">
-      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};color:${preview?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden;width:100%">${vEsc}</div>
-    </div>`;
+    const inner = valueRows
+      ? `<div style="display:flex;flex-direction:column;width:100%">${valueRows}</div>`
+      : `<div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};color:${preview?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden;width:100%">${vEsc}</div>`;
+    return `<div style="height:100%;padding:3px 7px;display:flex;align-items:${valueRows?'flex-start':'center'};justify-content:${jc};text-align:${al}">${inner}</div>`;
   }
-  return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
+  const valueBlock = valueRows
+    ? `<div style="display:flex;flex-direction:column">${valueRows}</div>`
+    : `<div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};min-height:11px;color:${preview?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${vEsc}</div>`;
+  return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:${valueRows?'flex-start':'center'};text-align:${al}">
     <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
-    <div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};min-height:11px;color:${preview?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${vEsc}</div>
+    ${valueBlock}
   </div>`;
 }
 
@@ -2804,27 +3047,29 @@ function cvRenderProps(id){
     ${qrUI}
     ${xrefUI}
     ${scanUI}
-    ${block.key && block.key.startsWith('blank-row-') ? (() => {
-      const cols = parseInt(block.key.replace('blank-row-','')) || 2;
-      return Array.from({length:cols}, (_,i) => `
-        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:7px 8px;margin-bottom:7px">
-          <div style="font-size:8.5px;font-family:var(--mono);color:var(--blue);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Column ${i+1}</div>
-          ${row('Label', input('c'+(i+1)+'l', block['c'+(i+1)+'l']||''))}
-          ${row('Value', input('c'+(i+1)+'v', block['c'+(i+1)+'v']||''))}
-        </div>`).join('');
-    })() : (block.key === 'blank-field' || block.key === 'blank-multiline') ? `
-      ${row('Label', input('text', block.text||''))}
-      ${row('Value text', block.key === 'blank-multiline'
-        ? `<textarea style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px;font-family:var(--font);box-sizing:border-box;resize:vertical;min-height:52px" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','customValue'">${escapeHtml(block.customValue||'')}</textarea>`
-        : input('customValue', block.customValue||'')
-      )}` : row('Label / text', input('text', block.text))
-    }
+    ${row('Label / text', input('text', block.text))}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px">
       ${['x','y','w','h'].map(p=>`<div><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);margin-bottom:2px;text-transform:uppercase">${p.toUpperCase()}</div>${numRow(p,block[p])}</div>`).join('')}
     </div>
-    ${row('Font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontSize'">
+    ${row(block.key === 'items-table' ? 'Table font size' : 'Font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontSize'">
       ${['6px','7px','7.5px','8px','8.5px','9px','10px','11px','12px','14px','16px','20px'].map(s=>`<option value="${s}" ${block.fontSize===s?'selected':''}>${s}</option>`).join('')}
     </select>`)}
+    ${block.key === 'items-table' ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
+      ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
+    </select>`) : ''}
+    ${block.key === 'items-table' && typeof RPT_FORM !== 'undefined' && Array.isArray(RPT_FORM.items) ? (() => {
+      const itemCols = RPT_FORM.items;
+      const widths = (Array.isArray(block.colWidths) && block.colWidths.length === itemCols.length)
+        ? block.colWidths
+        : itemCols.map(c => c.width || 130);
+      return row('Column widths (relative)', `<div style="display:flex;flex-direction:column;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
+        ${itemCols.map((c, i) => `<div style="display:flex;align-items:center;gap:6px">
+          <span style="flex:1;font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.label)}</span>
+          <input type="number" min="20" max="500" step="5" value="${widths[i]}" data-on-change="_wCvSetItemsColWidth" data-on-input="_wCvSetItemsColWidth" data-pass-el="1" data-args="'${id}',${i}" style="width:60px;background:var(--panel);border:1px solid var(--border);border-radius:3px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono)"/>
+        </div>`).join('')}
+        <button data-action="_wCvResetItemsColWidths" data-args="'${id}'" style="margin-top:4px;background:none;border:1px dashed var(--border);color:var(--t3);font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer">Reset to defaults</button>
+      </div>`);
+    })() : ''}
     ${check('bold',block.bold,'Bold')}
     ${check('italic',block.italic,'Italic')}
     ${check('showBorder',block.showBorder,'Show border')}
@@ -3148,6 +3393,28 @@ function _wCvUpdateBlockChecked(id, prop, el) { cvUpdateBlock(id, prop, el.check
 function _wCvUpdateBlockValue  (id, prop, el) { cvUpdateBlock(id, prop, el.value);   }
 function _wCvUpdateBlockNumber (id, prop, el) { cvUpdateBlock(id, prop, +el.value);  }
 function _wCvSetShowWhenValue  (id, key,  el) { cvSetShowWhen(id, key, el.value);    }
+
+// Update a single column width on an items-table block. Lazily creates
+// block.colWidths from the RPT_FORM.items defaults so the first edit
+// only mutates the column the user touched, leaving the others intact.
+function _wCvSetItemsColWidth(id, colIdx, el) {
+  const block = cvBlocks.find(b => b.id === id);
+  if(!block || typeof RPT_FORM === 'undefined' || !Array.isArray(RPT_FORM.items)) return;
+  const cols = RPT_FORM.items;
+  const widths = (Array.isArray(block.colWidths) && block.colWidths.length === cols.length)
+    ? block.colWidths.slice()
+    : cols.map(c => c.width || 130);
+  const v = +el.value;
+  widths[colIdx] = (Number.isFinite(v) && v >= 20) ? v : (cols[colIdx]?.width || 130);
+  cvUpdateBlock(id, 'colWidths', widths);
+}
+// Reset back to RPT_FORM.items defaults. Forces a props-panel re-render
+// because cvUpdateBlock skips that for props starting with 'c' (intended
+// for active text-typing — colWidths inherits the skip incorrectly).
+function _wCvResetItemsColWidths(id) {
+  cvUpdateBlock(id, 'colWidths', null);
+  cvRenderProps(id);
+}
 
 // Same dispatcher-args-parser issue applied to three other handlers.
 // cvExecCmd is wired to font-name / font-size selects in the rich-text

@@ -2,6 +2,14 @@
 // OVERVIEW PAGE
 // ══════════════════════════════════════════════
 var _ovMethod = null;
+// Working copy of the inspected-items table while the new-report form is
+// open. Held outside the DOM so + Add row / − Remove row can re-render the
+// section without losing typed-but-unsaved values from sibling rows.
+var _ovItems = [{}];
+// Snapshot of the revision number when the new-report form opened. Used
+// to detect whether the user has bumped the revision so the save handler
+// can demand a reason (required) and append a row to report.revisions.
+var _ovRevisionOriginal = '';
 
 function ovInit() {
   // Build new report method buttons
@@ -1013,17 +1021,33 @@ function ovNewReport(methodId, btn) {
   merged.reportNo = parts.filter(Boolean).join(sep);
   if(!merged.revision) merged.revision = '00';
 
+  // Items table — seed row 0 from any top-level values the template /
+  // saved-form may have pre-filled, so the user doesn't lose data when the
+  // items table takes over those fields from the single-instance sections.
+  _ovItems = (Array.isArray(merged.items) && merged.items.length) ? merged.items.slice() : [{}];
+  RPT_ITEM_FIELD_IDS.forEach(fid => {
+    if(_ovItems[0][fid] === undefined && merged[fid]) _ovItems[0][fid] = merged[fid];
+  });
+
   // Build form
   const body = el('ov-nr-body'); if(!body) return;
   let html = '';
 
+  // Per-item fields belong in the items table — strip them from the
+  // single-instance sections so the user enters each value in one place.
+  const omit = new Set(RPT_ITEM_FIELD_IDS);
+  const clientShared  = RPT_FORM.client.filter(f => !omit.has(f.id));
+  const subjectShared = RPT_FORM.subject.filter(f => !omit.has(f.id));
+
   // Section 1: Report revision & Client
-  html += ovFormSection('Report revision & client information', RPT_FORM.client, methodId, merged, m);
-  // Section 2: Subject
-  html += ovFormSection('Subject information', RPT_FORM.subject, methodId, merged, m);
-  // Section 3: Exam criteria
+  html += ovFormSection('Report revision & client information', clientShared, methodId, merged, m);
+  // Section 2: Examination details (expandable table + remarks)
+  html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
+  // Section 3: Subject (shared across all items)
+  html += ovFormSection('Subject information', subjectShared, methodId, merged, m);
+  // Section 4: Exam criteria
   html += ovFormSection('Examination criteria', RPT_FORM.exam, methodId, merged, m);
-  // Section 4: Method-specific equipment (from template defaults + method fields)
+  // Section 5: Method-specific equipment (from template defaults + method fields)
   const specific = (TPL_FIELDS[methodId] || []).map(f => {
     const field = {...f, id:'eq_'+f.id, label:f.label.replace('Default ','')};
     // Pre-fill from template defaults
@@ -1031,7 +1055,7 @@ function ovNewReport(methodId, btn) {
     return field;
   });
   if(specific.length) html += ovFormSection(`${m.id} — Equipment & parameters`, specific, methodId, merged, m);
-  // Section 5: Result
+  // Section 6: Result
   html += ovFormSection('Result & sign-off', RPT_FORM.result, methodId, merged, m);
 
   body.innerHTML = html;
@@ -1039,6 +1063,17 @@ function ovNewReport(methodId, btn) {
   if(typeof autofillBindClientField === 'function'){
     setTimeout(() => autofillBindClientField(methodId), 30);
   }
+  // Capture the revision baseline and attach the bump-detector. The
+  // listener fires the reason-required UI as soon as the user changes
+  // the value away from the baseline (and hides it again if they revert).
+  _ovRevisionOriginal = (merged.revision || '').trim();
+  setTimeout(() => {
+    const rev = document.getElementById(`rf-${methodId}-revision`);
+    if(rev) {
+      rev.addEventListener('input',  ovRevisionMaybePromptReason);
+      rev.addEventListener('change', ovRevisionMaybePromptReason);
+    }
+  }, 30);
 }
 
 function ovFormSection(title, fields, methodId, data, m) {
@@ -1054,6 +1089,266 @@ function ovFormSection(title, fields, methodId, data, m) {
   return html;
 }
 
+// Inspected-items table. One row per weld/object inspected under the same
+// report cover. Each <input>/<select> id is `it-<row>-<fieldId>` so
+// ovItemsCollect can read them back without touching the DOM render order.
+function ovRenderItemsTable(methodId, items, remarks) {
+  const cols = RPT_FORM.items;
+  // Percentage colgroup — derived from each column's relative width so
+  // the table scales down to whatever width the surrounding card has,
+  // instead of forcing a 1250+px min-width that pushes the rightmost
+  // (verdict) cell past the card edge. The trailing remove-button
+  // column is a small fixed slice; the data columns share what's left.
+  const dataTotal = cols.reduce((s, c) => s + (c.width || 130), 0);
+  const rmShare = 4;
+  const dataShare = 100 - rmShare;
+  const dataPcts = cols.map(c => +(((c.width || 130) / dataTotal) * dataShare).toFixed(4));
+  const sumExceptLast = dataPcts.slice(0, -1).reduce((s, p) => s + p, 0);
+  dataPcts[dataPcts.length - 1] = +(dataShare - sumExceptLast).toFixed(4);
+  const colgroup = `<colgroup>${dataPcts.map(p => `<col style="width:${p}%"/>`).join('')}<col style="width:${rmShare}%"/></colgroup>`;
+  // Column headers match the .fld label style used by the surrounding
+  // section's field labels — same font, same size (--fs-xs), same colour
+  // (--t2), no uppercase / mono so the table reads as part of the form
+  // rather than a tagged data grid.
+  const head = cols.map(c => `<th style="padding:6px 8px;font-family:var(--font);font-size:var(--fs-xs);color:var(--t2);text-align:left;font-weight:500;letter-spacing:0;text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.label)}</th>`).join('');
+  const rows = items.map((row, ri) => {
+    const cells = cols.map(c => `<td style="padding:4px 6px;vertical-align:top">${ovItemFieldHtml(ri, c, row)}</td>`).join('');
+    const rm = `<td style="padding:4px 4px;vertical-align:middle;text-align:center">${items.length > 1 ? `<button class="btn btn-sm btn-danger" data-action="ovItemsRemoveRow" data-args="${ri}" title="Remove row" style="padding:4px 8px;font-size:11px">−</button>` : ''}</td>`;
+    return `<tr>${cells}${rm}</tr>`;
+  }).join('');
+  return `<div class="sc" style="margin:0 14px 14px"><div class="sc-head" style="display:flex;align-items:center;justify-content:space-between">
+      <span class="sc-title">Examination details</span>
+      <button class="btn btn-sm" data-action="ovItemsAddRow" style="font-size:11px;padding:4px 10px">+ Add row</button>
+    </div>
+    <div class="sc-body" style="padding:8px 10px 12px">
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+        ${colgroup}
+        <thead><tr style="border-bottom:1px solid var(--border)">${head}<th></th></tr></thead>
+        <tbody id="ov-items-tbody">${rows}</tbody>
+      </table>
+      <div class="fld" style="margin-top:12px">
+        <label style="font-size:11px;color:var(--t2);font-weight:500">Remarks / comments
+          <span style="font-weight:400;color:var(--t3);margin-left:6px">printed in the empty space below the table on the report</span>
+        </label>
+        <textarea id="ov-exam-remarks" rows="3" placeholder="Any extra notes about these examinations…" style="width:100%;font-family:var(--font);font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box;resize:vertical">${escapeHtml(remarks || '')}</textarea>
+      </div>
+    </div></div>`;
+}
+
+// Build a single <tr> for the items table. Used both by the initial render
+// (via the inline map in ovRenderItemsTable) and by ovItemsAppendBlankRow
+// when auto-growing the table so the per-cell HTML is identical.
+function ovItemsRowHtml(rowIdx, row, totalRowCount) {
+  const cols = RPT_FORM.items;
+  const cells = cols.map(c => `<td style="padding:4px 6px;vertical-align:top">${ovItemFieldHtml(rowIdx, c, row)}</td>`).join('');
+  const rm = `<td style="padding:4px 4px;vertical-align:middle">${totalRowCount > 1 ? `<button class="btn btn-sm btn-danger" data-action="ovItemsRemoveRow" data-args="${rowIdx}" title="Remove row" style="padding:4px 8px;font-size:11px">−</button>` : ''}</td>`;
+  return `<tr>${cells}${rm}</tr>`;
+}
+
+// Verdict palette — same swatches as the items-table place card so the form
+// reads the same as the printed page. Kept in one place so a future tweak
+// (e.g. another verdict value, a new colour) updates both views together.
+var OV_VERDICT_COLORS = {
+  'Acceptable':     {fg:'#065f46', bg:'#d1fae5'},
+  'Pass':           {fg:'#065f46', bg:'#d1fae5'},
+  'Not acceptable': {fg:'#991b1b', bg:'#fee2e2'},
+  'Fail':           {fg:'#991b1b', bg:'#fee2e2'},
+  'Monitor':        {fg:'#92400e', bg:'#fef3c7'},
+  'Inconclusive':   {fg:'#92400e', bg:'#fef3c7'},
+  'For information':{fg:'#1e40af', bg:'#dbeafe'},
+};
+function ovVerdictStyle(val) {
+  const c = OV_VERDICT_COLORS[val];
+  return c ? `background:${c.bg};color:${c.fg};font-weight:600;` : '';
+}
+
+function ovItemFieldHtml(rowIdx, col, row) {
+  const fid = `it-${rowIdx}-${col.id}`;
+  const val = row[col.id] || '';
+  const onInput = ` data-on-input="ovItemsCapture" data-args="${rowIdx},'${col.id}'" data-pass-el="1"`;
+  const onChange = ` data-on-change="ovItemsCapture" data-args="${rowIdx},'${col.id}'" data-pass-el="1"`;
+  // Auto-formatter on blur. Dimensions / thickness → Ø…mm so users can
+  // type the bare "219.1 × 8.2" and it normalises on tab-out. Shares the
+  // existing data-args so the handler receives (rowIdx, fieldId, target).
+  const onBlur  = (col.id === 'dimensions') ? ` data-on-blur="ovItemsFormatDimensions"` : '';
+  // Shared cell-control style — explicit height + border so <input> and
+  // <select> render at the same dimensions (without this, appearance:none
+  // selects compute a shorter intrinsic height than text inputs and the
+  // dropdown cells look smaller than their neighbours).
+  const ctrlStyle = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font)';
+  // Any column that carries an `options` array — material, weldType,
+  // weldProcess, verdict — renders as a strict <select> so the user can
+  // only pick a defined value (no free-text input). A legacy value not
+  // in the current option list is preserved as a one-off selected
+  // entry so historical reports still display correctly; switching off
+  // it drops the value permanently.
+  if(col.type === 'select' || (col.options && col.options.length)) {
+    const opts = col.options || [];
+    const hasBlank = opts.includes('');
+    const valInOptions = opts.includes(val);
+    let html = '';
+    if(!hasBlank) html += `<option value=""${val===''?' selected':''}></option>`;
+    if(val && !valInOptions) html += `<option value="${escapeHtml(val)}" selected>${escapeHtml(val)}</option>`;
+    html += opts.map(o => `<option${o===val?' selected':''}>${escapeHtml(o)}</option>`).join('');
+    // Verdict gets a colour-coded background that tracks the selected
+    // value. ovItemsCapture restyles the element on change.
+    const extra = (col.id === 'verdict') ? ovVerdictStyle(val) : '';
+    return `<select id="${fid}" style="${ctrlStyle};${extra}"${onChange}>${html}</select>`;
+  }
+  const type = col.type || 'text';
+  return `<input id="${fid}" type="${type}" value="${escapeHtml(val)}" placeholder="${escapeHtml(col.placeholder||'')}" style="${ctrlStyle}"${onInput}${onBlur}/>`;
+}
+
+// Normalise a dimensions / thickness value to the canonical Ø…mm form.
+// Idempotent — re-formatting a value that already carries the prefix /
+// suffix leaves it untouched, so the save-side pass and the blur handler
+// don't compound the markers if both run.
+function ovFormatDimensions(raw) {
+  let v = (raw || '').toString().trim();
+  if(!v) return '';
+  if(!v.startsWith('Ø')) v = 'Ø' + v;
+  if(!/mm$/i.test(v))    v = v + 'mm';
+  return v;
+}
+
+// Blur handler — runs when the user tabs / clicks out of the dimensions
+// cell. Mirrors the formatted value back into _ovItems so the working
+// copy stays in sync with the displayed input.
+function ovItemsFormatDimensions(rowIdx, fieldId, target) {
+  if(fieldId !== 'dimensions') return;
+  const formatted = ovFormatDimensions(target.value);
+  if(formatted !== target.value) target.value = formatted;
+  if(!_ovItems[rowIdx]) _ovItems[rowIdx] = {};
+  _ovItems[rowIdx].dimensions = formatted;
+}
+
+// Capture a single cell into _ovItems on every keystroke / change so the
+// state survives + Add row / − Remove row re-renders without round-tripping
+// through the DOM.
+function ovItemsCapture(rowIdx, fieldId, target) {
+  if(!_ovItems[rowIdx]) _ovItems[rowIdx] = {};
+  _ovItems[rowIdx][fieldId] = target.value;
+  // Verdict swatch follows the selected value live — without this the
+  // background freezes at whatever colour the cell rendered with. Uses
+  // the same base ctrlStyle as the initial render so the cell keeps its
+  // explicit height / border / radius after the swatch is reapplied.
+  if(fieldId === 'verdict') {
+    const ctrlStyle = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font)';
+    target.style.cssText = `${ctrlStyle};${ovVerdictStyle(target.value)}`;
+  }
+  // Auto-grow — as soon as the user puts a value into the last row, add
+  // a fresh empty row underneath so they can keep filling out items
+  // without clicking + Add row. Caps at 50 rows as a sanity stop.
+  const isLastRow = rowIdx === _ovItems.length - 1;
+  const hasValue  = target.value && String(target.value).trim();
+  if(isLastRow && hasValue && _ovItems.length < 50) {
+    ovItemsAppendBlankRow();
+  }
+}
+
+// Append one empty row to the items table in-place (no full re-render, so
+// the user's caret stays where it is). Also reveals the "−" button on the
+// previously-only row, which is hidden when the table has just one row.
+function ovItemsAppendBlankRow() {
+  _ovItems.push({});
+  const tbody = document.getElementById('ov-items-tbody');
+  if(!tbody) { ovItemsRerender(); return; }
+  const newIdx = _ovItems.length - 1;
+  const tmp = document.createElement('tbody');
+  tmp.innerHTML = ovItemsRowHtml(newIdx, {}, _ovItems.length);
+  const newTr = tmp.firstElementChild;
+  if(newTr) tbody.appendChild(newTr);
+  // First row's remove cell was rendered empty (only one row existed at
+  // the time) — inject the "−" button now that there are two rows.
+  if(_ovItems.length === 2) {
+    const firstRow = tbody.firstElementChild;
+    const lastCell = firstRow && firstRow.lastElementChild;
+    if(lastCell && !lastCell.querySelector('button')) {
+      lastCell.innerHTML = `<button class="btn btn-sm btn-danger" data-action="ovItemsRemoveRow" data-args="0" title="Remove row" style="padding:4px 8px;font-size:11px">−</button>`;
+    }
+  }
+}
+
+// Read the current DOM values back into _ovItems. Used before re-rendering
+// the items section so untyped-since-last-capture chars aren't lost (e.g.
+// if Add row is clicked while a field still has focus and no input event
+// has fired for the most recent char).
+function ovItemsSync() {
+  _ovItems.forEach((row, ri) => {
+    RPT_ITEM_FIELD_IDS.forEach(fid => {
+      const inp = el(`it-${ri}-${fid}`);
+      if(inp) row[fid] = inp.value;
+    });
+  });
+}
+
+function ovItemsAddRow() {
+  ovItemsSync();
+  _ovItems.push({});
+  ovItemsRerender();
+}
+
+function ovItemsRemoveRow(idx) {
+  ovItemsSync();
+  if(_ovItems.length <= 1) return;
+  _ovItems.splice(idx, 1);
+  ovItemsRerender();
+}
+
+// Show / hide the "Reason for revision" textarea. Triggered by edits to
+// the revision input — when the value differs from _ovRevisionOriginal,
+// the amber reason block appears (and ovSaveReport blocks the save if
+// it's left empty). Reverting to the original value hides the block.
+function ovRevisionMaybePromptReason() {
+  const rev = document.getElementById(`rf-${_ovMethod}-revision`);
+  if(!rev) return;
+  const changed = (rev.value || '').trim() !== _ovRevisionOriginal;
+  let wrap = document.getElementById('ov-revision-reason-wrap');
+  if(changed) {
+    if(!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'ov-revision-reason-wrap';
+      wrap.style.cssText = 'margin:6px 0 10px;padding:10px 12px;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.32);border-radius:6px';
+      wrap.innerHTML = `
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--amber);margin-bottom:5px">
+          Reason for revision <span style="color:var(--red)">*</span>
+          <span style="font-weight:400;color:var(--t3);margin-left:6px">required when the revision number changes</span>
+        </label>
+        <textarea id="ov-revision-reason" rows="2" placeholder="What changed in this revision?" style="width:100%;font-family:var(--font);font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box"></textarea>`;
+      // Anchor the block to the revision field's surrounding .fld so it
+      // sits right under the input the user just edited, regardless of
+      // which column layout the section uses.
+      const fld = rev.closest('.fld') || rev.parentElement;
+      const sectionBody = fld && fld.closest('.sc-body');
+      if(sectionBody) sectionBody.appendChild(wrap); else if(fld && fld.parentElement) fld.parentElement.appendChild(wrap);
+    }
+    wrap.style.display = '';
+  } else if(wrap) {
+    wrap.style.display = 'none';
+  }
+}
+
+function ovItemsRerender() {
+  // Replace just the items-table section in place. The section is the only
+  // .sc whose header contains the title "Examination details". Preserves
+  // the remarks textarea content across re-renders by snapshotting it
+  // before replacement — without this, +Add row / −Remove row would wipe
+  // any remarks the user had already typed.
+  const sections = document.querySelectorAll('#ov-nr-body .sc');
+  for(const sec of sections) {
+    const title = sec.querySelector('.sc-title');
+    if(title && title.textContent.trim() === 'Examination details') {
+      const remarksEl = document.getElementById('ov-exam-remarks');
+      const remarks = remarksEl ? remarksEl.value : '';
+      const tmp = document.createElement('div');
+      tmp.innerHTML = ovRenderItemsTable(_ovMethod, _ovItems, remarks);
+      const fresh = tmp.firstElementChild;
+      if(fresh) sec.replaceWith(fresh);
+      return;
+    }
+  }
+}
+
 function ovSaveReport() {
   if(!_ovMethod) { toast(t('toast.no_method', 'No method selected.'), 'error'); return; }
   const m = NDT_METHODS.find(x => x.id === _ovMethod); if(!m) return;
@@ -1065,6 +1360,90 @@ function ovSaveReport() {
     const inp = el(`rf-${_ovMethod}-${f.id}`);
     if(inp) report[f.id] = (f.type === 'select') ? inp.value : inp.value.trim();
   });
+  // Equipment-register snapshot — if any field was rendered via the
+  // equipment dropdown (useEquipmentRegister:true on the TPL_FIELDS
+  // entry), the stored value is an equipment id. Resolve it against
+  // the live register and freeze the equipment's name / svId / last
+  // cal date onto the report so the historical record is stable even
+  // if the equipment record is later edited or deleted. Also keeps
+  // r.eq_id around for traceability / live-lookup place cards.
+  try {
+    const eqList = (typeof eqLoad === 'function') ? eqLoad() : [];
+    all.forEach(f => {
+      if(!f.useEquipmentRegister) return;
+      const pickedId = report[f.id];
+      if(!pickedId) return;
+      const rec = eqList.find(r => r.id === pickedId);
+      if(rec) {
+        report.eq_id = rec.id;
+        report[f.id] = rec.name || '';
+        if(rec.svId)      report.eq_svid    = rec.svId;
+        if(rec.calLastAt) report.eq_caldate = rec.calLastAt;
+      } else {
+        // Picked id no longer exists (equipment was deleted between
+        // render and save). Don't carry a dead reference forward.
+        report[f.id] = '';
+      }
+    });
+  } catch(e) { console.warn('equipment snapshot failed', e); }
+  // Inspected-items table — capture every row, then mirror row 0 to the
+  // top-level report fields so existing PDF place cards, list filters, and
+  // CSV exports keep reading r.subject / r.drawing / r.welders / … as
+  // before. Trailing empty rows are dropped so a single-item report still
+  // saves with items: [{…}] only.
+  ovItemsSync();
+  const items = _ovItems
+    .map(row => {
+      const clean = {};
+      RPT_ITEM_FIELD_IDS.forEach(fid => {
+        let v = (row[fid] || '').toString().trim();
+        // Normalise dimensions on save in case the blur handler didn't
+        // run (e.g. user clicked Save while the dimensions cell still
+        // had focus). ovFormatDimensions is idempotent — safe to call
+        // on values that already carry the prefix / suffix.
+        if(fid === 'dimensions' && v) v = ovFormatDimensions(v);
+        if(v) clean[fid] = v;
+      });
+      return clean;
+    })
+    .filter(row => Object.keys(row).length > 0);
+  if(items.length) {
+    report.items = items;
+    // Skip `verdict` in the mirror — the Result section keeps a top-level
+    // Overall verdict that the user signs off on, independent of any
+    // per-row disposition the items table may carry.
+    RPT_ITEM_FIELD_IDS.forEach(fid => {
+      if(fid === 'verdict') return;
+      if(items[0][fid] !== undefined) report[fid] = items[0][fid];
+    });
+  }
+  // Examination remarks — free-text notes printed in the empty space
+  // below the items table on the place card. Saved alongside the items
+  // so the PDF render can pull them on the next preview.
+  const remarksEl = document.getElementById('ov-exam-remarks');
+  const examRemarks = remarksEl ? remarksEl.value.trim() : '';
+  if(examRemarks) report.examRemarks = examRemarks;
+  // Revision-change guardrail — if the user bumped the revision number,
+  // require a non-empty reason and log it. Without a reason the save is
+  // blocked and the textarea is focused so the inspector can supply one.
+  const newRev = (report.revision || '').trim();
+  if(newRev !== _ovRevisionOriginal) {
+    const reasonEl = document.getElementById('ov-revision-reason');
+    const reason = reasonEl ? reasonEl.value.trim() : '';
+    if(!reason) {
+      toast(t('toast.revision_reason_required', 'A reason is required when the revision number changes.'), 'error');
+      if(reasonEl) reasonEl.focus();
+      return;
+    }
+    if(!Array.isArray(report.revisions)) report.revisions = [];
+    report.revisions.push({
+      rev: newRev,
+      fromRev: _ovRevisionOriginal,
+      date: new Date().toISOString(),
+      reason,
+      author: CURRENT_USER ? (CURRENT_USER.name || CURRENT_USER.email || '') : '',
+    });
+  }
   // V6: ensure new report has stage + audit log
   report.stage = 'Draft';
   report.auditLog = [];

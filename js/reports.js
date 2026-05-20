@@ -92,7 +92,7 @@ var RPT_FORM = {
     { id:'examDate',   label:'Examination date',    placeholder:'dd/mm/yyyy', type:'date' },
   ],
   subject: [
-    { id:'subject',    label:'Subject / component', placeholder:'Pipe, vessel, structure…' },
+    { id:'subject',    label:'Weld / object',       placeholder:'Pipe, vessel, structure…' },
     { id:'material',   label:'Material',             placeholder:'e.g. Carbon steel, SS316', options:['Carbon steel','Stainless steel 304','Stainless steel 316','Duplex 2205','Super duplex 2507','Inconel 625','CuNi 90/10','Chrome-moly','Aluminium'] },
     { id:'dimensions', label:'Dimensions / thickness',placeholder:'e.g. Ø219.1 × 8.2mm' },
     { id:'weldType',   label:'Weld type / prep',     placeholder:'e.g. Butt weld, Fillet', options:['V-prep','K-prep','½V-prep','Single bevel','Double V','J-prep','Fillet','Square butt','No prep'] },
@@ -116,7 +116,26 @@ var RPT_FORM = {
     { id:'witness',    label:'Witness / 3rd party',  placeholder:'Witness name' },
     { id:'signDate',   label:'Date signed',          placeholder:'dd/mm/yyyy', type:'date' },
   ],
+  // Per-item columns for the inspected-items table. Each row is one weld /
+  // object inspected under the same report cover. Row 0 mirrors to the
+  // top-level report fields (subject, drawing, …) on save so legacy place
+  // cards, filters, and CSV exports keep working unchanged.
+  items: [
+    { id:'subject',     label:'Weld / object',          placeholder:'Pipe, vessel, structure…', width:200 },
+    { id:'drawing',     label:'Drawing no.',             placeholder:'OSB-DWG-4420-B',           width:130 },
+    { id:'dimensions',  label:'Dimensions / thickness', placeholder:'Ø219.1 × 8.2mm',           width:130 },
+    { id:'material',    label:'Material',                placeholder:'e.g. Carbon steel', width:130, options:['Carbon steel','Stainless steel 304','Stainless steel 316','Duplex 2205','Super duplex 2507','Inconel 625','CuNi 90/10','Chrome-moly','Aluminium'] },
+    { id:'weldType',    label:'Weld type / prep',        placeholder:'e.g. V-prep',        width:110, options:['V-prep','K-prep','½V-prep','Single bevel','Double V','J-prep','Fillet','Square butt','No prep'] },
+    { id:'weldProcess', label:'Welding process',         placeholder:'e.g. SMAW',          width:110, options:['SMAW','GTAW','GMAW','FCAW','SAW','SMAW/GTAW','PAW','ESW','OFW'] },
+    { id:'welders',     label:'Welder(s)',               placeholder:'J. Bakker, M. de Vries',  width:150 },
+    { id:'examDate',    label:'Examination date',        placeholder:'dd/mm/yyyy', type:'date',  width:120 },
+    { id:'verdict',     label:'Result',                  type:'select', width:140, options:['','Acceptable','Not acceptable','For information','Inconclusive'] },
+  ],
 };
+// Field ids that the items table owns. The new-report form filters these
+// out of the standalone subject / client sections so the user types each
+// value in exactly one place.
+var RPT_ITEM_FIELD_IDS = (RPT_FORM.items || []).map(f => f.id);
 
 function tplBuildTabs() {
   const tabs = el('tpl-method-tabs'); if(!tabs) return;

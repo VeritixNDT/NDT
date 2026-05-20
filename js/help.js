@@ -224,7 +224,7 @@ reports: {
 <ol>
   <li>Click <kbd>Home</kbd> in the topbar.</li>
   <li>In the left sidebar under "New report", pick the method (UT, MT, PT, RT, VT, ET, etc.). The form opens with all method-specific fields already laid out.</li>
-  <li>Fill in the four standard sections: <strong>Client</strong>, <strong>Subject / component</strong>, <strong>Examination</strong>, <strong>Result</strong>. The method-specific block (e.g. UT calibration block, RT exposure block) sits at the end.</li>
+  <li>Fill in the four standard sections: <strong>Client</strong>, <strong>Weld / object</strong>, <strong>Examination</strong>, <strong>Result</strong>. The method-specific block (e.g. UT calibration block, RT exposure block) sits at the end.</li>
   <li>Set a verdict: <em>Acceptable</em>, <em>Not acceptable</em>, <em>For information</em>, or <em>Inconclusive</em>. Leave blank if you're saving as a draft.</li>
   <li>Click <strong>Save report</strong>. You're returned to the dashboard.</li>
 </ol>

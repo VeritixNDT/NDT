@@ -1095,6 +1095,16 @@
   #cv-editor-frame { min-height: 380px !important; }
 }
 
+/* PDF editor — hover affordance on place cards. Edit mode only
+   (#cv-canvas gets .cv-preview in preview mode). outline-offset:-1px
+   draws the hint just inside the card so it never shifts layout or
+   collides with a neighbour; the box-shadow selection ring still wins
+   visually on the selected card. */
+#cv-canvas:not(.cv-preview) .cv-block:hover {
+  outline: 1px solid rgba(79,142,247,.45);
+  outline-offset: -1px;
+}
+
 .vx-mode-pill[data-state="trial"]   { color: var(--violet); border-color: rgba(167,139,250,.30); }
 .vx-mode-pill[data-state="synced"]  { color: var(--green);  border-color: rgba(62,207,142,.30); }
 .vx-mode-pill[data-state="syncing"] { color: var(--cyan);   border-color: rgba(0,212,255,.30); }

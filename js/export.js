@@ -47,20 +47,44 @@ function cvBuildPrintHTML(report){
   const _pSafeColor = (v, fb) => (typeof v === 'string' && /^(?:#[0-9a-fA-F]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(?:0|1|0?\.\d+)\s*\)|transparent)$/.test(v.trim())) ? v.trim() : fb;
   const _pSafeFs    = (v, fb) => (typeof v === 'string' && /^\d+(?:\.\d+)?(?:px|pt|em|rem|%)$/.test(v.trim())) ? v.trim() : fb;
   const _pSafeAlign = (v) => (v === 'center' || v === 'right' || v === 'left' || v === 'justify') ? v : 'left';
-  const renderBlock = (block) => {
+  // Border-collapse for print — mirrors editor.js _cvBorderCollapse so
+  // the printed PDF matches the canvas: a bordered block flush against
+  // a neighbour drops its top/left border, leaving a single shared
+  // hairline instead of two stacked into 1px. `siblings` is the block
+  // list it can touch (same page body, or the header/footer set).
+  const _pBorderCollapse = (block, siblings) => {
+    const TOL = 1.5;
+    const bx = +block.x||0, by = +block.y||0, bw = +block.w||0, bh = +block.h||0;
+    let supTop = false, supLeft = false;
+    for(let i = 0; i < siblings.length; i++){
+      const o = siblings[i];
+      if(!o || o.id === block.id || o.showBorder === false) continue;
+      const ox = +o.x||0, oy = +o.y||0, ow = +o.w||0, oh = +o.h||0;
+      const vOv = Math.min(by+bh, oy+oh) - Math.max(by, oy);
+      const hOv = Math.min(bx+bw, ox+ow) - Math.max(bx, ox);
+      if(!supLeft && vOv > 2 && Math.abs((ox+ow) - bx) <= TOL) supLeft = true;
+      if(!supTop  && hOv > 2 && Math.abs((oy+oh) - by) <= TOL) supTop  = true;
+      if(supTop && supLeft) break;
+    }
+    return { top: supTop, left: supLeft };
+  };
+  const renderBlock = (block, siblings) => {
     if(!cvEvalShowWhen(block, report)) return '';
+    let borderCss = '';
+    if(block.showBorder){
+      // Real CSS border (box-shadow is dropped by print engines). The
+      // collapse drops top/left where a neighbour is flush, so touching
+      // cards print a single hairline, matching the editor.
+      const w = `0.5px solid ${_pSafeColor(block.borderColor,'#ccc')}`;
+      const col = _pBorderCollapse(block, siblings || []);
+      borderCss = `border-top:${col.top?'none':w};border-right:${w};border-bottom:${w};border-left:${col.left?'none':w}`;
+    }
     const styles = [
       `position:absolute`,
       `left:${+block.x||0}px`, `top:${+block.y||0}px`,
       `width:${+block.w||0}px`, `height:${+block.h||0}px`,
       block.bgColor ? `background:${_pSafeColor(block.bgColor,'transparent')}` : '',
-      // Print uses a real CSS `border` rather than the editor's
-      // box-shadow. Chrome (and most print engines) silently drop
-      // box-shadow in print output even with print-color-adjust:exact,
-      // which would make the cell borders disappear in the exported PDF.
-      // With proper edge-snapping (so neighbours actually touch),
-      // collapsed 0.5px borders read as one shared line in print.
-      block.showBorder ? `border:0.5px solid ${_pSafeColor(block.borderColor,'#ccc')}` : '',
+      borderCss,
       `font-size:${_pSafeFs(block.fontSize,'8.5px')}`,
       `font-weight:${block.bold?'bold':'normal'}`,
       `font-style:${block.italic?'italic':'normal'}`,
@@ -97,8 +121,8 @@ function cvBuildPrintHTML(report){
   const ftrEnabled  = cvTplCfg.footer && cvTplCfg.footer.enabled;
   const hdrHasContent = headerBlocks.length > 0;
   const ftrHasContent = footerBlocks.length > 0;
-  const hdrFragment = (hdrEnabled || hdrHasContent) ? headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
-  const ftrFragment = (ftrEnabled || ftrHasContent) ? footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(renderBlock).join('') : '';
+  const hdrFragment = (hdrEnabled || hdrHasContent) ? headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(b=>renderBlock(b, headerBlocks)).join('') : '';
+  const ftrFragment = (ftrEnabled || ftrHasContent) ? footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(b=>renderBlock(b, footerBlocks)).join('') : '';
 
   // Chrome layer for each zone — background fill, accent strip, single-edge
   // divider border. Sits behind the zone blocks at z-index 0 so user content
@@ -138,10 +162,10 @@ function cvBuildPrintHTML(report){
     // then mutate safely (filter always returns a fresh array, so no spread
     // needed to avoid mutating page.blocks).
     let bodyHtml = '';
-    page.blocks
+    const bodyBlocks = page.blocks
       .filter(b => b.zone !== 'header' && b.zone !== 'footer')
-      .sort((a,b) => (a.zIndex||0) - (b.zIndex||0))
-      .forEach(block => { bodyHtml += renderBlock(block); });
+      .sort((a,b) => (a.zIndex||0) - (b.zIndex||0));
+    bodyBlocks.forEach(block => { bodyHtml += renderBlock(block, bodyBlocks); });
     // Chrome first (z-index 0), then zone blocks + body blocks on top.
     pagesHtml += `<div class="vx-print-page" data-page-num="${pageIdx + 1}">
       ${hdrChromeFragment}

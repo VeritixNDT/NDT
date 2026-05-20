@@ -1687,10 +1687,13 @@ function cvDrawSnapLines(lines){
   lines.forEach(ln => {
     const el = document.createElement('div');
     el.className = 'cv-snap-line';
+    // Crisp 1px solid guide — a fully-opaque brand-blue line reads as a
+    // precise alignment guide; the old translucent line looked smudgy
+    // against the faint grid.
     if(ln.axis==='v'){
-      el.style.cssText = `position:absolute;left:${ln.pos}px;top:${ln.from}px;width:1px;height:${ln.to-ln.from}px;background:rgba(79,142,247,0.6);z-index:9999;pointer-events:none`;
+      el.style.cssText = `position:absolute;left:${ln.pos}px;top:${ln.from}px;width:1px;height:${ln.to-ln.from}px;background:#3b82f6;z-index:9999;pointer-events:none`;
     } else {
-      el.style.cssText = `position:absolute;left:${ln.from}px;top:${ln.pos}px;width:${ln.to-ln.from}px;height:1px;background:rgba(79,142,247,0.6);z-index:9999;pointer-events:none`;
+      el.style.cssText = `position:absolute;left:${ln.from}px;top:${ln.pos}px;width:${ln.to-ln.from}px;height:1px;background:#3b82f6;z-index:9999;pointer-events:none`;
     }
     canvas.appendChild(el);
   });
@@ -1923,6 +1926,9 @@ function _cvUpsertZoneBand(zone, canvas){
 function cvRenderCanvas(){
   const canvas = document.getElementById('cv-canvas');
   if(!canvas) return;
+  // Marker class so the CSS card-hover affordance applies only in edit
+  // mode — in preview the canvas should read like the printed page.
+  canvas.classList.toggle('cv-preview', !!cvPreview);
 
   // ── Grid overlay management (preserve across renders) ──
   let grid = document.getElementById('cv-grid-overlay');
@@ -1930,7 +1936,16 @@ function cvRenderCanvas(){
     if(!grid){
       grid = document.createElement('div');
       grid.id = 'cv-grid-overlay';
-      grid.style.cssText='position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(100,100,200,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(100,100,200,.06) 1px,transparent 1px);background-size:8px 8px;z-index:0';
+      // Two-tier graph paper: a faint fine grid at the actual snap
+      // resolution (CV_GRID) so it's truthful, plus a slightly stronger
+      // line every 8 cells for orientation without visual noise.
+      const fine = CV_GRID, major = CV_GRID * 8;
+      grid.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:0;background-image:' +
+        'linear-gradient(rgba(99,102,241,.045) 1px,transparent 1px),' +
+        'linear-gradient(90deg,rgba(99,102,241,.045) 1px,transparent 1px),' +
+        'linear-gradient(rgba(99,102,241,.085) 1px,transparent 1px),' +
+        'linear-gradient(90deg,rgba(99,102,241,.085) 1px,transparent 1px);' +
+        `background-size:${fine}px ${fine}px,${fine}px ${fine}px,${major}px ${major}px,${major}px ${major}px`;
       canvas.insertBefore(grid, canvas.firstChild);
     }
   } else if(grid){
@@ -1997,7 +2012,12 @@ function cvRenderCanvas(){
     }
     const isSel = !cvPreview && (cvSelectedId === block.id || cvSelectedIds.includes(block.id));
     // Signature: anything that changes what _cvBuildBlockElement produces.
-    const sig = JSON.stringify(block) + '|s:' + isSel + '|h:' + (!passesShowWhen) + previewSuffix;
+    // Border-collapse depends on neighbour positions, so fold it in —
+    // otherwise a card's collapsed border wouldn't refresh when a
+    // *neighbour* moved (the card's own JSON is unchanged).
+    const _col = block.showBorder ? _cvBorderCollapse(block) : null;
+    const sig = JSON.stringify(block) + '|s:' + isSel + '|h:' + (!passesShowWhen)
+      + (_col ? '|bc' + (_col.top?1:0) + (_col.left?1:0) : '') + previewSuffix;
 
     const cached = _cvBlockElCache.get(block.id);
     if(cached && cached.sig === sig){
@@ -2029,9 +2049,10 @@ function cvRenderCanvas(){
     if(!emptyHint){
       emptyHint = document.createElement('div');
       emptyHint.id = 'cv-empty-hint';
-      emptyHint.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none;color:#ccc';
-      emptyHint.innerHTML=`<svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="4" stroke="#ddd" stroke-width="2" stroke-dasharray="6 3"/><path d="M24 16v16M16 24h16" stroke="#ddd" stroke-width="2" stroke-linecap="round"/></svg>
-        <div style="font-size:13px;font-family:Arial">Drag fields from the palette, or click <strong>Default layout</strong></div>`;
+      emptyHint.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;pointer-events:none;font-family:Arial,Helvetica,sans-serif;text-align:center;padding:0 32px';
+      emptyHint.innerHTML=`<svg width="44" height="44" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="5" stroke="#d2d6dd" stroke-width="2" stroke-dasharray="6 4"/><path d="M24 16v16M16 24h16" stroke="#c2c7cf" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <div style="font-size:14px;font-weight:600;color:#9aa0aa">This page is empty</div>
+        <div style="font-size:12px;color:#b4b9c2;line-height:1.5;max-width:300px">Drag fields from the palette on the left, or load a starting point with <strong style="color:#8a909b">Default layout</strong>.</div>`;
       canvas.appendChild(emptyHint);
     }
   } else if(emptyHint){
@@ -2065,12 +2086,37 @@ function cvRenderCanvas(){
   }
 }
 
+// Border-collapse detection. Returns { top, left } — true means that
+// side's border should be SUPPRESSED because a bordered block sits
+// flush against it. The rule (always draw right/bottom, drop top/left
+// when a neighbour is flush) means exactly one of any two touching
+// blocks draws the shared edge — a single hairline, not a doubled one.
+// O(n) per block; n is small (a page's blocks).
+function _cvBorderCollapse(block){
+  const TOL = 1.5;                       // px slack for "flush"
+  const bx = +block.x||0, by = +block.y||0, bw = +block.w||0, bh = +block.h||0;
+  let supTop = false, supLeft = false;
+  for(let i = 0; i < cvBlocks.length; i++){
+    const o = cvBlocks[i];
+    if(!o || o.id === block.id || o.showBorder === false) continue;
+    const ox = +o.x||0, oy = +o.y||0, ow = +o.w||0, oh = +o.h||0;
+    // Need a real overlap along the *other* axis to count as flush.
+    const vOv = Math.min(by+bh, oy+oh) - Math.max(by, oy);
+    const hOv = Math.min(bx+bw, ox+ow) - Math.max(bx, ox);
+    if(!supLeft && vOv > 2 && Math.abs((ox+ow) - bx) <= TOL) supLeft = true;
+    if(!supTop  && hOv > 2 && Math.abs((oy+oh) - by) <= TOL) supTop  = true;
+    if(supTop && supLeft) break;
+  }
+  return { top: supTop, left: supLeft };
+}
+
 // V25 — Build a single block's DOM element. Extracted from cvRenderCanvas so
 // reconciliation can call it on demand. All side effects (event listener
 // attachments, badge/FAB appends) are scoped to the returned element.
 function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
   const elDiv = document.createElement('div');
   elDiv.id = 'cblk-'+block.id;
+  elDiv.className = 'cv-block';
   elDiv.dataset.blockId = block.id;
   const isLocked = _cvIsBlockLocked(block);
   const isHidden = !cvPreview && !passesShowWhen;
@@ -2108,23 +2154,30 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
   const _ta = _safeCssAlign(block.align);
   const _zi = Number.isFinite(+block.zIndex) ? +block.zIndex : 1;
 
-  // Border uses the real `border` property — `box-shadow:0 0 0 0.5px`
-  // is too faintly anti-aliased to be visible at 100% zoom, so toggling
-  // Show border appeared to do nothing. With the snap-to-edge fix
-  // (CV_SNAP_THRESHOLD bumped and edge-snap on resize) neighbours sit
-  // pixel-flush, so adjacent borders stack into a clean 1px hairline
-  // at shared edges — close enough to the Excel look without losing
-  // visibility.
-  //
-  // Selection / hidden-state still use box-shadow rings (no border
-  // collision) — composed into one declaration since CSS overrides any
-  // earlier box-shadow when the property repeats.
+  // Border uses the real `border` property (visible at 100% zoom,
+  // survives print). Collapsed seams: a bordered card flush against a
+  // neighbour drops its TOP/LEFT border so only the neighbour's
+  // BOTTOM/RIGHT border draws the shared edge — a single 0.5px line
+  // instead of two stacked into 1px. Free edges keep the full border.
+  let _borderCss = 'border:none';
+  if(block.showBorder){
+    const w = `0.5px solid ${_bc}`;
+    const col = (typeof _cvBorderCollapse === 'function') ? _cvBorderCollapse(block) : { top:false, left:false };
+    _borderCss = `border-top:${col.top?'none':w};border-right:${w};border-bottom:${w};border-left:${col.left?'none':w}`;
+  }
+
+  // Selection / hidden-state rings — box-shadow so they never collide
+  // with the cell border. The selection ring shows for ANY selected
+  // block, border or not: it's editor chrome (a 2px blue/amber glow),
+  // visually distinct from a 0.5px hairline print border, so it can't
+  // be mistaken for "the border is still on". Composed into one
+  // declaration since a repeated box-shadow property overrides.
   const shadows = [];
-  if(isSel && block.showBorder) {
+  if(isSel) {
     shadows.push(`0 0 0 2px ${isLocked?'#f5a623':'#4f8ef7'}`);
     shadows.push(`0 0 12px 2px ${isLocked?'rgba(245,166,35,.35)':'rgba(79,142,247,.35)'}`);
   }
-  if(isHidden && block.showBorder) {
+  if(isHidden) {
     shadows.push(`0 0 0 1.5px #a78bfa`);
   }
   const shadowDecl = shadows.length ? `box-shadow:${shadows.join(',')}` : '';
@@ -2134,7 +2187,7 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
     `left:${+block.x||0}px`, `top:${+block.y||0}px`,
     `width:${+block.w||0}px`, `height:${+block.h||0}px`,
     `background:${_bg}`,
-    `border:${block.showBorder?`0.5px solid ${_bc}`:'none'}`,
+    _borderCss,
     `font-size:${_fs}`,
     `font-weight:${block.bold?'bold':'normal'}`,
     `font-style:${block.italic?'italic':'normal'}`,
@@ -2200,6 +2253,17 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
     commentDot.title = 'Unresolved comments';
     commentDot.onclick = (ev) => { ev.stopPropagation(); cvSelectBlock(block.id); };
     elDiv.appendChild(commentDot);
+  }
+
+  // Locked-block indicator — a small amber corner badge so a locked
+  // card is unmistakable. The 0.85 opacity alone (set in the cssText
+  // above) is too subtle to read as a deliberate state.
+  if(!cvPreview && isLocked){
+    const lb = document.createElement('div');
+    lb.style.cssText = 'position:absolute;bottom:-1px;right:-1px;background:rgba(245,166,35,.95);color:#fff;font-size:8px;line-height:1;padding:2px 4px;border-radius:4px 0 0 0;z-index:401;pointer-events:none';
+    lb.textContent = '🔒';
+    lb.title = t('pe.lock.label', 'Locked — position fixed');
+    elDiv.appendChild(lb);
   }
 
   if(!cvPreview){
@@ -2748,7 +2812,7 @@ function cvRenderBlockContent(block, report, preview){
     // it again in front of every placed card was visual noise, especially
     // in tight footer rows where "∑ Page" stacked above "Page 1 of 3".
     return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al};box-sizing:border-box">
-      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
       <div style="font-size:${fs};font-weight:${fw||'600'};font-style:${fi};border-bottom:0.5px dashed ${preview?'transparent':'#a78bfa'};min-height:11px;color:${preview?'#0d9488':'#a78bfa'};padding-bottom:1px">${vEsc}</div>
     </div>`;
   }
@@ -2775,15 +2839,15 @@ function cvRenderBlockContent(block, report, preview){
       // produced nothing useful.
       body = pill(rk, value || rk);
     }
-    return `<div style="height:100%;padding:4px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
-      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:3px">${lblEsc}</div>
+    return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;text-align:${al}">
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px">${lblEsc}</div>
       ${body}
     </div>`;
   }
   if(def.sig){
     const sh = Math.max(0, block.h-26);
     return `<div style="height:100%;padding:3px 7px;text-align:${al}">
-      <div style="font-size:7px;color:#777;margin-bottom:3px">${lblEsc}</div>
+      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px">${lblEsc}</div>
       <div style="height:${sh}px;${block.showBorder?'border-bottom:0.5px solid #000;':''}"></div>
     </div>`;
   }
@@ -2820,7 +2884,7 @@ function cvRenderBlockContent(block, report, preview){
     ? `<div style="display:flex;flex-direction:column">${valueRows}</div>`
     : `<div style="font-size:${fs};font-weight:${fw};font-style:${fi};${block.showBorder?`border-bottom:0.5px solid ${preview?'transparent':'#ddd'};`:''};min-height:11px;color:${preview?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${vEsc}</div>`;
   return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:${valueRows?'flex-start':'center'};text-align:${al}">
-    <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
+    <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lblEsc}</div>
     ${valueBlock}
   </div>`;
 }
@@ -2861,10 +2925,9 @@ function cvUpdateSelectionUI(){
     }
     const isSel = (cvSelectedId === block.id) || cvSelectedIds.includes(block.id);
     const isLocked = _cvIsBlockLocked(block);
-    if(isSel && block.showBorder){
-      // Match the selection visual in _cvBuildBlockElement — box-shadow
-      // glow rather than CSS outline. Only applied when showBorder is on,
-      // so unchecking "Show border" leaves no visible frame whatsoever.
+    if(isSel){
+      // Selection visual — always shown for a selected block (matches
+      // _cvBuildBlockElement). Editor chrome, independent of showBorder.
       elB.style.boxShadow = `0 0 0 2px ${isLocked?'#f5a623':'#4f8ef7'},0 0 12px 2px ${isLocked?'rgba(245,166,35,.35)':'rgba(79,142,247,.35)'}`;
     } else {
       elB.style.boxShadow = '';
@@ -2882,7 +2945,11 @@ function cvUpdateSelectionUI(){
       const isLocked = _cvIsBlockLocked(block);
       const fab = document.createElement('div');
       fab.className = 'cblk-fab-btn';
-      fab.style.cssText = 'position:absolute;top:-24px;right:0;display:flex;gap:2px;z-index:300';
+      // FABs normally sit just above the block. For a block near the
+      // page top the row would render off-canvas / clipped — flip it to
+      // just below the block in that case.
+      const fabAbove = (+block.y || 0) >= 26;
+      fab.style.cssText = `position:absolute;${fabAbove ? 'top:-24px' : 'top:'+((+block.h||0)+2)+'px'};right:0;display:flex;gap:2px;z-index:300`;
       fab.innerHTML = `
         <button class="cblk-fab-btn" data-action="cvDuplicateBlock" data-args="'${block.id}'" title="${escapeHtml(t('pe.fab.duplicate','Duplicate (Ctrl+D)'))}" style="background:var(--panel);border:1px solid var(--border2);color:var(--t2);font-size:10px;padding:2px 6px;border-radius:3px;cursor:pointer;line-height:1">⧉</button>
         <button class="cblk-fab-btn" data-action="cvToggleLock" data-args="'${block.id}'" title="${escapeHtml(t(isLocked?'pe.fab.unlock':'pe.fab.lock', (isLocked?'Unlock':'Lock')+' position'))}" style="background:var(--panel);border:1px solid var(--border2);color:${isLocked?'var(--amber)':'var(--t2)'};font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;line-height:1">${isLocked?'🔒':'🔓'}</button>
@@ -3716,11 +3783,16 @@ function cvMouseUp(){
       if(b.zone !== newZone) b.zone = newZone;
     }
   }
-  if(cvDragging||cvResizing) cvSaveLayout();
+  const _moved = !!(cvDragging || cvResizing);
+  if(_moved) cvSaveLayout();
   cvDragging=null; cvResizing=null; cvDragUndoPushed=false;
   document.body.style.cursor=''; document.body.style.userSelect='';
   // Clear snap lines
   document.querySelectorAll('.cv-snap-line').forEach(e=>e.remove());
+  // A moved/resized block can change which edges its neighbours share,
+  // so re-render: the border-collapse signature picks up neighbours
+  // whose collapsed borders flipped.
+  if(_moved) cvRenderCanvas();
   // FIX V22: detach document-level listeners
   cvDetachDragListeners();
   // V25: persistent alignment guides may need updating — positions changed

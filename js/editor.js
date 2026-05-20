@@ -708,7 +708,6 @@ function cvResolveSmartLink(block, report){
     const insp = report?.inspector || '—';
     const list = (typeof INSPECTORS !== 'undefined') ? INSPECTORS : (typeof ls==='function' ? ls('vx-inspectors-v1',[]) : []);
     const match = list.find(i => i.name === insp);
-    const examDate = report?.examDate ? new Date(report.examDate) : new Date();
     const reportMethod = report?.method || '';
     if(match){
       // Resolve the inspector's certification FOR THIS REPORT'S METHOD.
@@ -727,7 +726,12 @@ function cvResolveSmartLink(block, report){
       }
       if(cert){
         const expiry = cert.expiry ? new Date(cert.expiry) : null;
-        const expired = expiry && examDate > expiry;
+        // Expiry is judged against TODAY — the same rule Settings →
+        // Inspectors uses (certStatus) — so an expired cert always reads
+        // as expired here, regardless of the report's examination date.
+        const expired = !!cert.expiry && (typeof certStatus === 'function'
+          ? certStatus(cert.expiry) === 'expired'
+          : (!!expiry && new Date() > expiry));
         const lvl = cert.level || (methodLabel + ' Level II');
         const certNo = cert.certNo || cert.authority || '—';
         const cls = expired
@@ -751,7 +755,9 @@ function cvResolveSmartLink(block, report){
     </div>`;
   }
   if(k === 'calib-status'){
-    const examDate = report?.examDate ? new Date(report.examDate) : new Date();
+    // Calibration validity is judged against today, matching Settings →
+    // Equipment (eqIsExpired) — not the report's examination date.
+    const now = new Date();
     const reportMethod = report?.method || '';
     const rec = _cvEqRecord(report);
     if(rec){
@@ -761,7 +767,9 @@ function cvResolveSmartLink(block, report){
       //   2. Method approval — is the report's method in the
       //      equipment's approved `methods` list?
       const calDue = rec.calDueAt ? new Date(rec.calDueAt) : null;
-      const expired = calDue && !isNaN(calDue) && examDate > calDue;
+      const expired = (typeof eqIsExpired === 'function')
+        ? eqIsExpired(rec)
+        : (calDue && !isNaN(calDue) && now > calDue);
       const approvedForMethod = !reportMethod
         || !Array.isArray(rec.methods) || !rec.methods.length
         || rec.methods.includes(reportMethod);
@@ -795,7 +803,7 @@ function cvResolveSmartLink(block, report){
       const cd = new Date(calDate);
       if(!isNaN(cd)){
         const expiry = new Date(cd); expiry.setFullYear(expiry.getFullYear()+1);
-        if(examDate > expiry){ cls='background:rgba(242,92,92,.15);color:#991b1b'; lbl='⚠ EXPIRED'; }
+        if(now > expiry){ cls='background:rgba(242,92,92,.15);color:#991b1b'; lbl='⚠ EXPIRED'; }
         else { cls='background:rgba(62,207,142,.15);color:#16a34a'; lbl='✓ VALID'; }
         detail = `cal ${cd.toLocaleDateString('en-GB')} · expires ${expiry.toLocaleDateString('en-GB')}`;
       }

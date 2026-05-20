@@ -3970,7 +3970,6 @@ function cvBgMouseDown(e){
 }
 function cvMouseMove(e){
   if(cvDragging){
-    if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; }
     const canvas = document.getElementById('cv-canvas');
     if(!canvas) return;
     const canvasRect = canvas.getBoundingClientRect();
@@ -3978,6 +3977,15 @@ function cvMouseMove(e){
     const my = (e.clientY - canvasRect.top)  / cvZoom;
     const dx = mx - cvDragging.anchorX;
     const dy = my - cvDragging.anchorY;
+    // Drag threshold — sub-3px pointer jitter counts as a click, not a
+    // drag, so simply clicking a block never nudges or grid-snaps it.
+    // (A non-grid block would otherwise jump to the nearest grid line on
+    // the first stray mousemove between mousedown and mouseup.)
+    if(!cvDragging.engaged){
+      if(Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+      cvDragging.engaged = true;
+    }
+    if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; }
     // When a container is dragged, its parented children are appended to
     // startPositions so they ride along. In that case the move must stay
     // rigid (grid snap only) — alignment-line snap would pull the

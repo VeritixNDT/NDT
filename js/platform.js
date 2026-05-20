@@ -10,6 +10,7 @@
 
 var VX_PLATFORM_KEY    = 'vx-platform-v1';      // mode + tokens + endpoint config
 var VX_SYNC_QUEUE_KEY  = 'vx-sync-queue-v1';    // pending mutations awaiting upload
+var VX_SYNC_DROPPED_KEY = 'vx-sync-dropped-v1'; // ops permanently dropped after exhausting the retry budget
 var VX_DIRTY_FLAGS_KEY = 'vx-dirty-flags-v1';   // per-key last-modified-locally timestamps
 var VX_PLAN_KEY        = 'vx-plan-v1';          // current subscription tier + limits
 
@@ -151,15 +152,45 @@ function _vxSupabase(){
         flowType: 'pkce',
         storageKey: 'vx-sb-auth-v1',
       },
-      global: {
-        headers: { 'x-vx-client': 'web/v3' },
-      },
+      // NOTE: no custom global headers. A custom request header (the old
+      // 'x-vx-client') makes every call a CORS-preflighted request and
+      // has to be echoed back in Access-Control-Allow-Headers — if the
+      // auth endpoint or a network security layer doesn't, the browser
+      // kills the request as "TypeError: Failed to fetch". Dropping it
+      // keeps the SDK's requests on the standard, well-supported path.
     });
+    // Catch the password-recovery flow. When the user clicks the link
+    // in a reset email they return here with a recovery token in the
+    // URL hash; detectSessionInUrl processes it and fires this event,
+    // at which point we prompt for the new password.
+    try {
+      _vxSupabaseClient.auth.onAuthStateChange(function(event){
+        if(event === 'PASSWORD_RECOVERY' && typeof vxPromptNewPassword === 'function'){
+          vxPromptNewPassword();
+        }
+      });
+    } catch(e){ console.warn('vx: auth listener attach failed', e); }
   } catch(e){
     console.warn('vx: supabase init failed', e);
     _vxSupabaseClient = null;
   }
   return _vxSupabaseClient;
+}
+
+// Tear down a Supabase client before discarding it. The critical step
+// is stopAutoRefresh() — without it the old client's GoTrue token-
+// refresh timer keeps running after _vxSupabaseClient is replaced, and
+// two clients racing on Supabase's *rotating* refresh tokens can
+// invalidate the session (one refresh rotates the token, the other
+// then presents a stale one and gets logged out). Also closes the
+// realtime socket / channels so they don't leak. Every step is
+// individually guarded — SDK minor versions differ on which of these
+// methods exist.
+function _vxDisposeSupabaseClient(client){
+  if(!client) return;
+  try { if(client.auth && typeof client.auth.stopAutoRefresh === 'function') client.auth.stopAutoRefresh(); } catch(e){}
+  try { if(typeof client.removeAllChannels === 'function') client.removeAllChannels(); } catch(e){}
+  try { if(client.realtime && typeof client.realtime.disconnect === 'function') client.realtime.disconnect(); } catch(e){}
 }
 
 /** True iff the Supabase SDK is loaded AND both meta tags are populated. */
@@ -219,7 +250,15 @@ async function _vxApplySupabaseSession(session){
         .order('joined_at', { ascending: true })
         .limit(1)
         .maybeSingle();
-      if(r && r.data){
+      if(r && r.error){
+        // The membership query FAILED (network drop, TLS interception,
+        // RLS error, …). This is NOT the same as "user has no org" —
+        // reconciling here would spawn a spurious duplicate org and
+        // make the user admin of the wrong (empty) workspace. Leave
+        // orgId / role untouched and let a later session-apply (on a
+        // healthy connection) resolve them correctly.
+        console.warn('vx: org membership lookup failed — skipping reconcile', r.error.message || r.error);
+      } else if(r && r.data){
         // V44.3: stash the server-trusted role into vxPlatformConfig so
         // bootApp can sync it down to CURRENT_USER (the legacy local user
         // record) after loadSession runs. Without this, a user who signed
@@ -589,17 +628,34 @@ var VX_BREAKER_FAIL_THRESHOLD = 5;
 var VX_BREAKER_COOLDOWN_MS    = 60 * 1000;
 var _vxBreakerRecentFails = 0;
 var _vxBreakerOpenUntil = 0;
+// Count of consecutive breaker trips (resets on the first successful
+// op). When the SDK client wedges into a bad state, every request fails
+// with TypeError: Failed to fetch — the breaker opens, cools down, then
+// trips again the moment retries resume. After two such trips we null
+// out the cached _vxSupabaseClient so the next call rebuilds it from
+// scratch with a fresh fetch wrapper, websocket, and auth listener.
+var _vxBreakerTripCount = 0;
+var VX_BREAKER_TRIPS_BEFORE_SDK_RESET = 2;
 
 function vxBreakerIsOpen() { return Date.now() < _vxBreakerOpenUntil; }
 function _vxBreakerRecordResult(ok) {
   if(ok) {
     _vxBreakerRecentFails = 0;
     _vxBreakerOpenUntil = 0;
+    _vxBreakerTripCount = 0;
   } else {
     _vxBreakerRecentFails++;
     if(_vxBreakerRecentFails >= VX_BREAKER_FAIL_THRESHOLD) {
       _vxBreakerOpenUntil = Date.now() + VX_BREAKER_COOLDOWN_MS;
-      console.warn('vx: sync circuit breaker open for ' + (VX_BREAKER_COOLDOWN_MS/1000) + 's');
+      _vxBreakerRecentFails = 0;   // reset so the *next* burst counts cleanly toward another trip
+      _vxBreakerTripCount++;
+      console.warn('vx: sync circuit breaker open for ' + (VX_BREAKER_COOLDOWN_MS/1000) + 's (trip ' + _vxBreakerTripCount + ')');
+      if(_vxBreakerTripCount >= VX_BREAKER_TRIPS_BEFORE_SDK_RESET) {
+        console.warn('vx: resetting Supabase SDK singleton after ' + _vxBreakerTripCount + ' consecutive breaker trips');
+        _vxDisposeSupabaseClient(_vxSupabaseClient);
+        _vxSupabaseClient = null;
+        _vxBreakerTripCount = 0;
+      }
     }
   }
 }
@@ -655,6 +711,7 @@ function vxSyncStats()  {
     pending: q.filter(o => o.status === 'pending').length,
     failed:  q.filter(o => o.status === 'failed').length,
     delivered: q.filter(o => o.status === 'delivered').length,
+    droppedPermanently: vxSyncDroppedList().length,
     breakerOpen: vxBreakerIsOpen(),
   };
 }
@@ -671,14 +728,24 @@ async function vxSyncFlush() {
   if(!pending.length) return { empty: true };
 
   let delivered = 0, failed = 0, dropped = 0;
+  const droppedThisRun = [];
   for(const op of pending) {
     if(vxBreakerIsOpen()) break;   // stop mid-flush if breaker trips
     op.tries = (op.tries || 0) + 1;
 
-    // Drop ops that have exceeded the retry budget
+    // Drop ops that have exceeded the retry budget — mark them so the
+    // compaction step at the end of this function evicts them from the
+    // queue (instead of leaving them in 'failed' state to be re-tried
+    // forever on every subsequent flush). A copy is stashed in the
+    // dropped log for UI surfacing and post-mortem.
     if(op.tries > VX_SYNC_OP_MAX_RETRIES) {
-      op.status = 'failed';
+      op.status = 'dropped';
       op.lastError = (op.lastError || '') + ' [exceeded retry budget]';
+      op.droppedAt = new Date().toISOString();
+      droppedThisRun.push({
+        id: op.id, key: op.key, op: op.op, tries: op.tries,
+        lastError: op.lastError, droppedAt: op.droppedAt,
+      });
       dropped++;
       vxReportError(new Error('Sync op dropped after ' + op.tries + ' attempts: ' + op.key), 'sync-drop');
       continue;
@@ -710,13 +777,46 @@ async function vxSyncFlush() {
       _vxBreakerRecordResult(false);
     }
   }
-  // Compact: drop delivered entries older than 24h to keep storage tidy
+  // Compact:
+  //   - 'dropped' ops are removed from the queue entirely (their record
+  //     lives in the dropped log persisted below — without this they were
+  //     left in 'failed' state and re-tried every cycle, which is how the
+  //     vx-settings-v1 op reached 134 attempts before).
+  //   - 'delivered' ops older than 24h are pruned to keep storage tidy.
   const cutoff = Date.now() - 24*60*60*1000;
-  const next = queue.filter(o => o.status !== 'delivered' || (o.deliveredAt && new Date(o.deliveredAt).getTime() > cutoff));
+  const next = queue.filter(o => {
+    if(o.status === 'dropped') return false;
+    if(o.status === 'delivered') return o.deliveredAt && new Date(o.deliveredAt).getTime() > cutoff;
+    return true;
+  });
   try { localStorage.setItem(VX_SYNC_QUEUE_KEY, JSON.stringify(next)); } catch(e){}
+  // Persist this run's dropped ops, capped to the most recent 200 so the
+  // log can't itself become a storage hog. UI consumers read this via
+  // vxSyncDroppedList() to surface a "N ops dropped permanently" badge.
+  if(droppedThisRun.length){
+    try {
+      const existing = JSON.parse(localStorage.getItem(VX_SYNC_DROPPED_KEY) || '[]');
+      const combined = existing.concat(droppedThisRun).slice(-200);
+      localStorage.setItem(VX_SYNC_DROPPED_KEY, JSON.stringify(combined));
+    } catch(e){}
+  }
   vxPlatformSet({ lastSyncAt: new Date().toISOString(), syncErrorCount: failed });
   vxSyncPokeBadge();
   return { delivered, failed, dropped, remaining: next.filter(o => o.status !== 'delivered').length };
+}
+
+// Read the persisted dropped-op log. UI / diagnostics use this to show
+// "N ops dropped permanently" without scanning the live queue.
+function vxSyncDroppedList() {
+  try { return JSON.parse(localStorage.getItem(VX_SYNC_DROPPED_KEY) || '[]'); }
+  catch { return []; }
+}
+// Clear the dropped log — useful for "I've seen the failures, hide the
+// badge" actions or for tests.
+function vxSyncDroppedClear() {
+  try { localStorage.removeItem(VX_SYNC_DROPPED_KEY); }
+  catch(e){}
+  vxSyncPokeBadge();
 }
 
 // Periodic retry sweep — every 30s when authenticated AND online AND breaker closed
@@ -1376,10 +1476,53 @@ async function vxOpenForgotPassword() {
     okLabel: t('auth.forgot.send', 'Send link'),
   });
   if(!email || !email.trim()) return;
-  vxApi.request('/auth/forgot-password', { method: 'POST', body: { email: email.trim() } }).then(r => {
-    if(r.ok) toast(t('toast.reset_link_sent','Reset link sent. Check your inbox.'), 'success');
-    else toast('Couldn\'t send reset link: ' + (r.error || 'unknown'), 'error');
+  const sb = _vxSupabase();
+  if(!sb){ toast('Supabase not configured — cannot send a reset link.', 'error'); return; }
+  try {
+    // Supabase emails a recovery link back to redirectTo. When the user
+    // clicks it they return here with a recovery token in the URL hash;
+    // the onAuthStateChange listener (registered in _vxSupabase) catches
+    // the PASSWORD_RECOVERY event and prompts for the new password.
+    // NOTE: this redirect URL must be listed under Supabase → Auth →
+    // URL Configuration → Redirect URLs, or the link falls back to the
+    // project's Site URL.
+    const r = await sb.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: location.origin + location.pathname,
+    });
+    if(r.error) toast("Couldn't send reset link: " + r.error.message, 'error');
+    else toast(t('toast.reset_link_sent','Reset link sent. Check your inbox (and spam folder).'), 'success');
+  } catch(e){
+    toast("Couldn't send reset link: " + String(e.message || e), 'error');
+  }
+}
+
+// Prompt for and apply a new password. Fired by the PASSWORD_RECOVERY
+// auth event after the user clicks the emailed recovery link — at that
+// point Supabase has placed a short-lived recovery session, so
+// updateUser({password}) is authorised.
+async function vxPromptNewPassword() {
+  const pwd = await vxPrompt({
+    title: t('auth.newpw.title', 'Set a new password'),
+    message: t('auth.newpw.prompt', 'Enter a new password for your account (at least 8 characters):'),
+    inputType: 'password',
+    placeholder: '••••••••',
+    okLabel: t('auth.newpw.save', 'Update password'),
   });
+  if(!pwd) return;
+  if(pwd.length < 8){ toast('Password must be at least 8 characters.', 'error'); return; }
+  const sb = _vxSupabase();
+  if(!sb){ toast('Supabase not configured.', 'error'); return; }
+  try {
+    const r = await sb.auth.updateUser({ password: pwd });
+    if(r.error){ toast("Couldn't update password: " + r.error.message, 'error'); return; }
+    toast('Password updated — you are now signed in.', 'success');
+    // Strip the recovery token from the URL so a refresh doesn't re-fire.
+    try { history.replaceState(null, '', location.origin + location.pathname); } catch(e){}
+    updateDeployModePill();
+    if(typeof vxRenderSubscription === 'function') vxRenderSubscription();
+  } catch(e){
+    toast("Couldn't update password: " + String(e.message || e), 'error');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2020,42 +2163,53 @@ var vxApi = {
     if(!sb){
       return { ok: false, status: 0, data: null, error: 'Supabase not configured. Paste your project URL and anon key into the meta tags in veritix-ndt-inspect-v3_44.html.' };
     }
-    try {
-      var r = await sb.auth.signInWithPassword({ email: email, password: password });
-      if(r.error){
-        // Map Supabase error codes onto HTTP-ish status so the existing
-        // caller (doLogin) can branch on r.status >= 500 vs 401.
-        var status = 401;
-        var msg = r.error.message || 'sign-in failed';
-        if(/network|fetch|timeout/i.test(msg)) status = 0;
-        return { ok: false, status: status, data: null, error: msg };
-      }
-      var session = r.data.session;
-      await _vxApplySupabaseSession(session);
-      var cfg = vxPlatformConfig();
-      return {
-        ok: true,
-        status: 200,
-        data: {
-          accessToken:  session?.access_token  || null,
-          refreshToken: session?.refresh_token || null,
-          expiresAt:    session?.expires_at ? session.expires_at * 1000 : null,
-          user: {
-            id:    session?.user?.id    || null,
-            email: session?.user?.email || email,
-            // Look up role from membership for display. _vxApplySupabaseSession
-            // already resolved orgId; the role hint is best-effort.
-            role:  null,
-            email_verified: !!session?.user?.email_confirmed_at,
-            email_verified_at: session?.user?.email_confirmed_at || null,
+    // Retry transient network failures only. The user's link to
+    // Supabase has been intermittent — a single TypeError: Failed to
+    // fetch shouldn't mean "wrong password". Three attempts with a
+    // short backoff (0ms / 600ms / 1200ms) lets a good moment through.
+    // A genuine auth error ("Invalid login credentials") is returned
+    // immediately — retrying that would never change the outcome.
+    var lastErr = 'network error';
+    for(var attempt = 0; attempt < 3; attempt++){
+      if(attempt > 0) await new Promise(function(res){ setTimeout(res, 600 * attempt); });
+      try {
+        var r = await sb.auth.signInWithPassword({ email: email, password: password });
+        if(r.error){
+          var msg = r.error.message || 'sign-in failed';
+          // Network-ish error reported by the SDK — retry.
+          if(/network|fetch|timeout|connection/i.test(msg)){ lastErr = msg; continue; }
+          // Genuine auth failure (bad credentials, unconfirmed email) —
+          // return now, no point retrying.
+          return { ok: false, status: 401, data: null, error: msg };
+        }
+        var session = r.data.session;
+        await _vxApplySupabaseSession(session);
+        var cfg = vxPlatformConfig();
+        return {
+          ok: true,
+          status: 200,
+          data: {
+            accessToken:  session?.access_token  || null,
+            refreshToken: session?.refresh_token || null,
+            expiresAt:    session?.expires_at ? session.expires_at * 1000 : null,
+            user: {
+              id:    session?.user?.id    || null,
+              email: session?.user?.email || email,
+              role:  null,
+              email_verified: !!session?.user?.email_confirmed_at,
+              email_verified_at: session?.user?.email_confirmed_at || null,
+            },
+            org: cfg.orgId ? { id: cfg.orgId } : null,
           },
-          org: cfg.orgId ? { id: cfg.orgId } : null,
-        },
-        error: null,
-      };
-    } catch(e){
-      return { ok: false, status: 0, data: null, error: String(e.message || e) };
+          error: null,
+        };
+      } catch(e){
+        // Thrown TypeError: Failed to fetch lands here — treat as
+        // transient and let the loop retry.
+        lastErr = String(e.message || e);
+      }
     }
+    return { ok: false, status: 0, data: null, error: lastErr + ' (retried 3×)' };
   },
 
   /**
@@ -2715,23 +2869,38 @@ async function vxRegisterServiceWorker() {
 
   const swCode = `
     // Veritix service worker — minimal shell + background sync placeholder
-    const CACHE = 'veritix-shell-v1';
+    // CACHE name is versioned; bump it whenever the caching strategy
+    // changes so the activate handler can purge stale caches.
+    const CACHE = 'veritix-shell-v2';
     self.addEventListener('install', (e) => {
       self.skipWaiting();
     });
     self.addEventListener('activate', (e) => {
-      e.waitUntil(self.clients.claim());
+      // Purge any cache that isn't the current version — this is what
+      // evicts the old cache-first JS bundles from veritix-shell-v1.
+      e.waitUntil(
+        caches.keys()
+          .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+          .then(() => self.clients.claim())
+      );
     });
     self.addEventListener('fetch', (e) => {
-      // Cache-first for static assets, network-first for API
       const url = new URL(e.request.url);
       if(url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('.css') || url.pathname.endsWith('.js')) {
+        // NETWORK-FIRST for the app shell. The previous cache-first
+        // strategy meant a cached editor.js / dashboard.js was served
+        // forever — code updates never reached the user without a
+        // manual cache wipe. Now the live file always wins when online;
+        // the cache is only a fallback for genuine offline use.
         e.respondWith(
-          caches.open(CACHE).then(c =>
-            c.match(e.request).then(r => r || fetch(e.request).then(res => {
-              if(res.ok && res.type === 'basic') c.put(e.request, res.clone());
-              return res;
-            }).catch(() => caches.match('/')))
+          fetch(e.request).then(res => {
+            if(res.ok && res.type === 'basic'){
+              const clone = res.clone();
+              caches.open(CACHE).then(c => c.put(e.request, clone));
+            }
+            return res;
+          }).catch(() =>
+            caches.open(CACHE).then(c => c.match(e.request).then(r => r || caches.match('/')))
           )
         );
       }

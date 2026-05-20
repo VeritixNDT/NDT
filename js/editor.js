@@ -94,11 +94,6 @@ var CV_FIELD_DEFS = {
   'qc-sig':       {label:'QC signature',                  ph:'',                              get:r=>'',                           w:185,h:60,sig:true},
   'cert-auth-sig':{label:'Cert. Authority / NoBo signature', ph:'',                           get:r=>'',                           w:200,h:60,sig:true},
   'insp-date':    {label:'Inspector date',                ph:'____/____/________',            get:r=>'',                           w:145,h:38},
-  'blank-field':     {label:'Blank field (single)',       ph:'Custom value',   get:r=>'',  blank:true,            w:200, h:38},
-  'blank-multiline': {label:'Blank field (multi-line)',   ph:'Custom text…',   get:r=>'',  blank:true, multi:true, w:380, h:64},
-  'blank-row-2':     {label:'Blank row — 2 columns',     ph:'',               get:r=>'',  blankRow:2,             w:400, h:38},
-  'blank-row-3':     {label:'Blank row — 3 columns',     ph:'',               get:r=>'',  blankRow:3,             w:560, h:38},
-  'blank-row-4':     {label:'Blank row — 4 columns',     ph:'',               get:r=>'',  blankRow:4,             w:720, h:38},
 
   // ── COMPUTED / SMART FIELDS ─────────────────────────────────────
   'defect-count':    {label:'Defect count',          ph:'3',         get:r=>(r.defects||[]).length, w:100,h:38, computed:true, mapTo:'computed'},
@@ -367,8 +362,17 @@ var cvUndoStack = [];
 var cvRedoStack = [];
 var cvClipboard = null;  // copy/paste
 var cvDragUndoPushed = false;  // prevent undo spam during drag
-var CV_GRID = 8;
-var CV_SNAP_THRESHOLD = 6;  // pixels for snap-to-edge
+// Base positioning grid. 4px (finer than the previous 8px) so block
+// widths / x-positions divide cleanly with the per-column sizes used
+// across CV_FIELD_DEFS and RPT_FORM.items (most are multiples of 4).
+// Combined with the snap-to-edge below, this gives an Excel-feel:
+// blocks always land on a predictable cadence in empty space, but the
+// edge snap overrides for pixel-perfect adjacency next to neighbours.
+var CV_GRID = 4;
+// Pixels for snap-to-edge. 12px is wide enough to feel responsive when
+// dragging a card into a neighbouring column without making it sticky
+// in empty space.
+var CV_SNAP_THRESHOLD = 12;
 // Snap-to-grid toggle — persisted across sessions. Default on so the
 // editor's existing behaviour is unchanged; flipping off lets the user
 // position pixel-perfectly without the grid rounding their drags.
@@ -1091,7 +1095,7 @@ function cvAllComments(){
 function cvFindReplace(findStr, replaceStr, replaceAll){
   if(!findStr) return 0;
   let count = 0;
-  const fields = ['text', 'customValue', 'c1l','c1v','c2l','c2v','c3l','c3v','c4l','c4v'];
+  const fields = ['text'];
   cvPages.forEach(page => {
     page.blocks.forEach(b => {
       fields.forEach(f => {
@@ -1270,15 +1274,12 @@ function _cvGroupLabel(grp){ return t(_CV_GROUP_KEY_MAP[grp.id] || ('pe.group.' 
 //   ⚡ smart link  — purple, live-bound to a settings value
 //   ∑ computed    — teal,   derived/calculated at render time
 //   ★ advanced    — amber,  QR, weld map, scan image, defect-repeat, xref
-//   ✦ blank       — green,  user-fillable placeholder (no data binding)
 //   f field       — blue,   default — pulls from the report record
 function _cvFieldBadge(def){
   if(def.smartLink)  return { badge:'⚡', badgeStyle:'background:rgba(167,139,250,.15);color:#a78bfa' };
   if(def.computed)   return { badge:'∑', badgeStyle:'background:rgba(20,184,166,.15);color:#14b8a6' };
   if(def.qr || def.weldMap || def.scanImg || def.repeat || def.xref)
                      return { badge:'★', badgeStyle:'background:rgba(245,166,35,.15);color:var(--amber)' };
-  if(def.blank || def.blankRow)
-                     return { badge:'✦', badgeStyle:'background:rgba(62,207,142,.15);color:var(--green)' };
   return                    { badge:'f', badgeStyle:'background:rgba(79,142,247,.15);color:var(--blue)' };
 }
 
@@ -1307,7 +1308,7 @@ function cvRenderPalette(filter){
           const it = allLayout.find(x => x.key === r.key);
           if(!it) return;
           const lbl = _cvLayoutLabel(it);
-          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${it.key}',true" data-action="cvAddBlockDefault" data-args="'${it.key}',true" title="${escapeHtml(lbl)}\nClick = stack below previous\nShift+Click = chain to the right" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
             <span style="font-size:13px;width:16px;text-align:center;flex-shrink:0;opacity:.65">${cvGetLayoutIcon(it.key)}</span><span>${escapeHtml(lbl)}</span>
           </div>`;
         } else {
@@ -1315,7 +1316,7 @@ function cvRenderPalette(filter){
           const lbl = _cvFieldLabel(r.key, def);
           const short = lbl.split(' / ')[0].split(' ').slice(0,4).join(' ');
           const { badge, badgeStyle } = _cvFieldBadge(def);
-          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${r.key}',false" data-action="cvAddBlockDefault" data-args="'${r.key}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
+          html += `<div class="palette-item" draggable="true" data-on-dragstart="cvPaletteDragStart" data-pass-event="1" data-args="'${r.key}',false" data-action="cvAddBlockDefault" data-args="'${r.key}',false" title="${escapeHtml(lbl)}${def.mapTo?'\nField: '+def.mapTo:''}\nClick = stack below previous\nShift+Click = chain to the right" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:grab;color:var(--t2);font-size:11px;border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--panel2)'" onmouseleave="this.style.background=''">
             <span style="font-size:8.5px;font-family:var(--mono);${badgeStyle};padding:1px 4px;border-radius:3px;flex-shrink:0">${badge}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(short)}</span>
           </div>`;
         }
@@ -1418,8 +1419,36 @@ function cvDrop(e){
   if(!canvas) return;
   const rect = canvas.getBoundingClientRect();
   // FIX: account for zoom correctly using getBoundingClientRect (already scaled)
-  const x = cvSnap(Math.max(0,(e.clientX - rect.left) / cvZoom));
-  const y = cvSnap(Math.max(0,(e.clientY - rect.top)  / cvZoom));
+  let x = cvSnap(Math.max(0,(e.clientX - rect.left) / cvZoom));
+  let y = cvSnap(Math.max(0,(e.clientY - rect.top)  / cvZoom));
+  // Edge-snap the drop position to neighbouring blocks' edges. Without
+  // this, palette drops only honour the grid — they land 1-3px off the
+  // neighbour's edge and the borders don't actually touch. Same snap
+  // mechanism the drag-move path uses, including the closest-target
+  // tie-break and Alt-bypass.
+  if(!e.altKey){
+    const def = cvPaletteDrag.isLayout
+      ? _cvAllLayoutItems().find(it => it.key === cvPaletteDrag.key)
+      : CV_FIELD_DEFS[cvPaletteDrag.key];
+    const probeW = cvSnap((def && def.w) || 200);
+    const probeH = cvSnap((def && def.h) || 38);
+    const snaps = cvCalcSnapLines(null, x, y, probeW, probeH);
+    const byDelta = (a,b) => Math.abs(a.delta) - Math.abs(b.delta);
+    const vSnap = snaps.filter(s => s.axis === 'v').sort(byDelta)[0];
+    const hSnap = snaps.filter(s => s.axis === 'h').sort(byDelta)[0];
+    if(vSnap){
+      if(vSnap.edge === 'l')       x = vSnap.pos;
+      else if(vSnap.edge === 'r')  x = vSnap.pos - probeW;
+      else if(vSnap.edge === 'cx') x = vSnap.pos - probeW / 2;
+    }
+    if(hSnap){
+      if(hSnap.edge === 't')       y = hSnap.pos;
+      else if(hSnap.edge === 'b')  y = hSnap.pos - probeH;
+      else if(hSnap.edge === 'cy') y = hSnap.pos - probeH / 2;
+    }
+    x = Math.max(0, x);
+    y = Math.max(0, y);
+  }
   // V3: handle component drops
   if(cvPaletteDrag.key && cvPaletteDrag.key.startsWith('comp:')){
     cvInsertComponent(cvPaletteDrag.key.slice(5), x, y);
@@ -1435,7 +1464,7 @@ function cvDrop(e){
 // dangle on a ghost id.
 var _cvLastPlacedId = null;
 
-function cvAddBlockDefault(key, isLayout){
+function cvAddBlockDefault(key, isLayout, event){
   // Resolve the block's default width. Layout items go through
   // _cvAllLayoutItems so dynamic items (saved-logo cards) are considered
   // too; field items use CV_FIELD_DEFS. Falls back to 200px when neither
@@ -1464,13 +1493,25 @@ function cvAddBlockDefault(key, isLayout){
   }
   if(!anchor && !isLayout) anchor = _cvFindStackAnchor();
 
+  // Shift-click chains the new card to the RIGHT of the anchor (Excel-
+  // style row build-out) instead of below it. Keeps the same width,
+  // touches the previous card's right edge exactly. Without Shift the
+  // default vertical-stack behaviour is unchanged.
+  const chainRight = !!(event && event.shiftKey && anchor);
+
   let x, w, y;
   if(anchor){
     // Snap inherited values so a legacy block with non-grid w doesn't
     // pass its misalignment forward.
-    x = cvSnap(anchor.x);
-    w = cvSnap(anchor.w);
-    y = cvSnap(anchor.y + anchor.h + 4);
+    if(chainRight){
+      x = cvSnap(anchor.x + anchor.w);
+      w = cvSnap(anchor.w);
+      y = cvSnap(anchor.y);
+    } else {
+      x = cvSnap(anchor.x);
+      w = cvSnap(anchor.w);
+      y = cvSnap(anchor.y + anchor.h + 4);
+    }
   } else {
     w = cvSnap(defaultW);
     x = cvSnap(Math.max(0, (CV_PAGE_WIDTH_PX - w) / 2));
@@ -2067,6 +2108,27 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
   const _ta = _safeCssAlign(block.align);
   const _zi = Number.isFinite(+block.zIndex) ? +block.zIndex : 1;
 
+  // Border uses the real `border` property — `box-shadow:0 0 0 0.5px`
+  // is too faintly anti-aliased to be visible at 100% zoom, so toggling
+  // Show border appeared to do nothing. With the snap-to-edge fix
+  // (CV_SNAP_THRESHOLD bumped and edge-snap on resize) neighbours sit
+  // pixel-flush, so adjacent borders stack into a clean 1px hairline
+  // at shared edges — close enough to the Excel look without losing
+  // visibility.
+  //
+  // Selection / hidden-state still use box-shadow rings (no border
+  // collision) — composed into one declaration since CSS overrides any
+  // earlier box-shadow when the property repeats.
+  const shadows = [];
+  if(isSel && block.showBorder) {
+    shadows.push(`0 0 0 2px ${isLocked?'#f5a623':'#4f8ef7'}`);
+    shadows.push(`0 0 12px 2px ${isLocked?'rgba(245,166,35,.35)':'rgba(79,142,247,.35)'}`);
+  }
+  if(isHidden && block.showBorder) {
+    shadows.push(`0 0 0 1.5px #a78bfa`);
+  }
+  const shadowDecl = shadows.length ? `box-shadow:${shadows.join(',')}` : '';
+
   elDiv.style.cssText = [
     `position:absolute`,
     `left:${+block.x||0}px`, `top:${+block.y||0}px`,
@@ -2082,17 +2144,10 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
     `cursor:${cvPreview?'default':isLocked?'not-allowed':'move'}`,
     `z-index:${_zi}`,
     `user-select:none`,
-    // Selection visual — only when showBorder is on. The previous behaviour
-    // (always showing a box-shadow ring around selected blocks) was read by
-    // users as "the border is still there" when they unchecked Show border.
-    // When showBorder is off, we rely on the FAB buttons floating above the
-    // selected block (and the properties panel content) as the only visual
-    // cue of selection. No outline, no shadow, no ring, no glow.
-    (isSel && block.showBorder) ? `box-shadow:0 0 0 2px ${isLocked?'#f5a623':'#4f8ef7'},0 0 12px 2px ${isLocked?'rgba(245,166,35,.35)':'rgba(79,142,247,.35)'};` : '',
-    isLocked && !cvPreview ? 'opacity:0.85;' : '',
-    // Hidden-block indicator also respects showBorder for the same reason.
-    (isHidden && block.showBorder) ? 'opacity:0.4;box-shadow:0 0 0 1.5px #a78bfa;' : (isHidden ? 'opacity:0.4;' : ''),
-  ].join(';');
+    shadowDecl,
+    isLocked && !cvPreview ? 'opacity:0.85' : '',
+    isHidden ? 'opacity:0.4' : '',
+  ].filter(Boolean).join(';');
 
   // AUDIT-FIX #11: tolerate per-block render errors. Previously a single
   // throwing block would crash the whole cvRenderCanvas pass, leaving the
@@ -2245,7 +2300,7 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
 function cvRenderBlockContent(block, report, preview){
   const key = block.key;
   const co = ls(KEYS.company, {});
-  // SECURITY: block.text, block.customValue, block.c[n]l/v, block.bgColor/
+  // SECURITY: block.text, block.bgColor/
   // color/borderColor/fontSize and the company name all originate from
   // free-form user input (properties panel + imported/shared template JSON +
   // company settings) and are injected via innerHTML below. Without these
@@ -2536,42 +2591,6 @@ function cvRenderBlockContent(block, report, preview){
       default:
         return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:4px 7px;color:#aaa;font-size:8.5px;text-align:${al}">${_h(block.text||key)}</div>`;
     }
-  }
-
-  // ── Blank / custom place cards ─────────────────────────────────────
-  if(key === 'blank-field'){
-    const lblRaw = block.text || 'Custom label';
-    const valRaw = block.customValue || (preview ? '' : '');
-    const lbl = _h(lblRaw);
-    const val = _h(valRaw);
-    return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;text-align:${al}">
-      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
-      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};padding-bottom:1px;line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${val}</div>
-    </div>`;
-  }
-  if(key === 'blank-multiline'){
-    const lblRaw = block.text || 'Custom label';
-    const valRaw = block.customValue || (preview ? '' : '');
-    const lbl = _h(lblRaw);
-    const val = _h(valRaw);
-    return `<div style="height:100%;padding:3px 7px;box-sizing:border-box;text-align:${al}">
-      <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px">${lbl}</div>
-      <div style="font-size:${fs};font-weight:${fw};font-style:${fi};color:${valRaw?'#000':'#bbb'};min-height:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${val}</div>
-    </div>`;
-  }
-  if(key.startsWith('blank-row-')){
-    const cols = parseInt(key.replace('blank-row-','')) || 2;
-    const cells = Array.from({length:cols}, (_,i) => {
-      const lblRaw = block['c'+(i+1)+'l'] || `Label ${i+1}`;
-      const valRaw = block['c'+(i+1)+'v'] || (preview ? '' : '');
-      const lbl = _h(lblRaw);
-      const val = _h(valRaw);
-      return `<div style="flex:1;padding:3px 6px;min-width:0;text-align:${al}">
-        <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
-        <div style="font-size:${fs};font-weight:${fw};font-style:${fi};min-height:11px;color:${valRaw?'#000':'#bbb'};line-height:1.35;white-space:normal;word-break:break-word;overflow:hidden">${val}</div>
-      </div>`;
-    });
-    return `<div style="height:100%;display:flex;align-items:stretch;box-sizing:border-box">${cells.join('')}</div>`;
   }
 
   // ── Data field blocks ──────────────────────────────────────────────
@@ -3079,7 +3098,7 @@ function cvRenderProps(id){
     </div>`)}
     ${row('Text colour', colorPick('color', block.color||'#000000'))}
     ${row('Background',  colorPick('bgColor', block.bgColor||'transparent'))}
-    ${block.showBorder ? row('Border colour', colorPick('borderColor', block.borderColor||'#cccccc')) : ''}
+    <div style="margin-bottom:9px;${block.showBorder?'':'opacity:0.45;pointer-events:none'}"><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Border colour</div>${colorPick('borderColor', block.borderColor||'#cccccc')}</div>
     ${formatUI}
     ${showWhenUI}
     ${commentsUI}
@@ -3148,7 +3167,6 @@ function cvBlockTypeIcon(b){
   if(def.xref)      return '↗';
   if(def.sig)       return '✍';
   if(def.result)    return '★';
-  if(def.blank || def.blankRow) return '✦';
   if(def.multi)     return '¶';
   return 'f';
 }
@@ -3472,7 +3490,10 @@ function cvUpdateBlock(id, prop, value){
   // buttons highlight the active option, lock checkbox flips, etc. Skip
   // text inputs while typing — the input keeps focus naturally and we
   // don't want to re-render the field underneath the caret.
-  if(prop !== 'text' && prop !== 'customValue' && !prop.startsWith('c')) {
+  // Skip re-rendering the panel for live-typed text and any prop
+  // starting with 'c' (color picker, colWidths) so the input under the
+  // user's caret doesn't get replaced mid-edit.
+  if(prop !== 'text' && !prop.startsWith('c')) {
     cvRenderProps(id);
   }
   cvSaveLayout();
@@ -3603,9 +3624,13 @@ function cvMouseMove(e){
       // intentionally. Grid snap still applies via cvSnap above.
       if(cvDragging.ids.length === 1 && !e.altKey){
         const snaps = cvCalcSnapLines(b.id, newX, newY, b.w, b.h);
-        // Apply strongest snap
-        const vSnap = snaps.find(s=>s.axis==='v');
-        const hSnap = snaps.find(s=>s.axis==='h');
+        // Pick the snap with the SMALLEST delta on each axis so the
+        // closest target wins (previously: first in iteration order,
+        // which sometimes pulled the drag toward a more distant block
+        // when a closer one was also within threshold — felt random).
+        const byDelta = (a,b) => Math.abs(a.delta) - Math.abs(b.delta);
+        const vSnap = snaps.filter(s=>s.axis==='v').sort(byDelta)[0];
+        const hSnap = snaps.filter(s=>s.axis==='h').sort(byDelta)[0];
         if(vSnap){
           if(vSnap.edge==='l') newX = vSnap.pos;
           else if(vSnap.edge==='r') newX = vSnap.pos - b.w;
@@ -3634,8 +3659,32 @@ function cvMouseMove(e){
   if(cvResizing){
     if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; }
     const b=cvBlocks.find(b=>b.id===cvResizing.id); if(!b) return;
-    b.w=cvSnap(Math.max(32, cvResizing.startW+(e.clientX-cvResizing.startX)/cvZoom));
-    b.h=cvSnap(Math.max(16, cvResizing.startH+(e.clientY-cvResizing.startY)/cvZoom));
+    let newW = cvSnap(Math.max(32, cvResizing.startW+(e.clientX-cvResizing.startX)/cvZoom));
+    let newH = cvSnap(Math.max(16, cvResizing.startH+(e.clientY-cvResizing.startY)/cvZoom));
+    // Edge-snap during resize so the right / bottom edge actually
+    // touches neighbouring blocks. Without this, only the drag-move
+    // path snapped to edges — resizing always landed on the grid
+    // (multiples of CV_GRID) which left tiny gaps next to non-grid-
+    // aligned neighbours. Alt bypasses the snap, same convention as
+    // drag-move.
+    if(!e.altKey){
+      const snaps = cvCalcSnapLines(b.id, b.x, b.y, newW, newH);
+      const byDelta = (a,b) => Math.abs(a.delta) - Math.abs(b.delta);
+      const vSnap = snaps.filter(s => s.axis === 'v' && (s.edge === 'r' || s.edge === 'cx')).sort(byDelta)[0];
+      const hSnap = snaps.filter(s => s.axis === 'h' && (s.edge === 'b' || s.edge === 'cy')).sort(byDelta)[0];
+      if(vSnap){
+        if(vSnap.edge === 'r')      newW = Math.max(32, vSnap.pos - b.x);
+        else if(vSnap.edge === 'cx') newW = Math.max(32, (vSnap.pos - b.x) * 2);
+      }
+      if(hSnap){
+        if(hSnap.edge === 'b')      newH = Math.max(16, hSnap.pos - b.y);
+        else if(hSnap.edge === 'cy') newH = Math.max(16, (hSnap.pos - b.y) * 2);
+      }
+      cvDrawSnapLines(snaps.filter(s => s === vSnap || s === hSnap));
+    } else {
+      cvDrawSnapLines([]);
+    }
+    b.w = newW; b.h = newH;
     const elB=document.getElementById('cblk-'+b.id); if(elB){elB.style.width=b.w+'px';elB.style.height=b.h+'px';}
     cvUpdatePropsPositionLive();
   }

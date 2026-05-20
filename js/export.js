@@ -54,6 +54,12 @@ function cvBuildPrintHTML(report){
       `left:${+block.x||0}px`, `top:${+block.y||0}px`,
       `width:${+block.w||0}px`, `height:${+block.h||0}px`,
       block.bgColor ? `background:${_pSafeColor(block.bgColor,'transparent')}` : '',
+      // Print uses a real CSS `border` rather than the editor's
+      // box-shadow. Chrome (and most print engines) silently drop
+      // box-shadow in print output even with print-color-adjust:exact,
+      // which would make the cell borders disappear in the exported PDF.
+      // With proper edge-snapping (so neighbours actually touch),
+      // collapsed 0.5px borders read as one shared line in print.
       block.showBorder ? `border:0.5px solid ${_pSafeColor(block.borderColor,'#ccc')}` : '',
       `font-size:${_pSafeFs(block.fontSize,'8.5px')}`,
       `font-weight:${block.bold?'bold':'normal'}`,

@@ -690,10 +690,14 @@ function cvResolveSmartLink(block, report){
   const k = block.key;
   if(k === 'procedure-link'){
     const procNo = report?.eq_proc || report?.proc || report?.procedure || '—';
-    const rev = report?.procRev || '';
+    const reportRev = report?.procRev || '';
     const procs = (typeof ls === 'function') ? ls(KEYS.procedures, []) : [];
     const match = procs.find(p => p.procNo === procNo || p.procedureNo === procNo || p.no === procNo);
     if(match){
+      // Revision is pulled from the linked procedure record on file (its
+      // authoritative current revision), falling back to the revision
+      // recorded on the report if the record carries none.
+      const rev = match.revision || match.rev || reportRev;
       return `<div style="display:flex;align-items:center;gap:6px;height:100%">
         <span style="background:rgba(62,207,142,.15);color:#16a34a;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">✓ LINKED</span>
         <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(procNo)}${rev?' Rev '+escapeHtml(rev):''}</div><div style="font-size:8px;color:#666">${escapeHtml(match.title || match.specification || 'Procedure on file')}</div></div>
@@ -701,7 +705,7 @@ function cvResolveSmartLink(block, report){
     }
     return `<div style="display:flex;align-items:center;gap:6px;height:100%">
       <span style="background:rgba(245,166,35,.18);color:#92400e;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">⚠ MISSING</span>
-      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(procNo)}</div><div style="font-size:8px;color:#666">No procedure on file matching this number</div></div>
+      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(procNo)}${reportRev?' Rev '+escapeHtml(reportRev):''}</div><div style="font-size:8px;color:#666">No procedure on file matching this number</div></div>
     </div>`;
   }
   if(k === 'cert-status'){

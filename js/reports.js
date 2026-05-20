@@ -17,7 +17,13 @@ var TPL_FIELDS = {
     { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 17638:2016','EN-ISO 17638:2017','EN-ISO 3452-1:2021','EN-ISO 16809:2019','EN-ISO 6507-1','ASME BPVC Section V Art.4 Ed.2023','ASME BPVC Section V Art.6 Ed.2023','ASME BPVC Section V Art.7 Ed.2023','ASME BPVC Section V Art.9 Ed.2023','ASME BPVC 2021: Section II'] },
     { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 level 2','EN-ISO 11666:2018 level 3','EN-ISO 23278:2016 Level 1','EN-ISO 23278:2016 Level 2','EN-ISO 23278:2016 Level 3','EN-ISO 5817:2014','AWS D1.1','ASME BPVC Section VIII div.1 Ed.2023','For client information'] },
     { id:'proc',  label:'Default procedure no.',       placeholder:'e.g. SV2023-004-NDTD-PRO-0009', options:['SV2023-004-NDTD-PRO-0009','SV2023-004-NDTD-PRO-0005','SV2023-004-NDTD-PRO-0003','SV2023-004-NDTD-PRO-0007','SV2023-004-NDTD-PRO-0013','SV2023-004-NDTD-PRO-0014'] },
-    { id:'equip', label:'Default equipment',           placeholder:'e.g. Olympus EPOCH 650', options:['SIUI Smartor','Olympus EPOCH 650','Olympus EPOCH 6LT','Sonatest Veo+','GE USM 36','Inspection kit','Universal cam gauge','Welding gauge set','X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Mic 10','Sonodur 3','Proceq Equotip 550'] },
+    // `equip` is rendered by a custom renderer (equipmentSelectHtml) in
+    // the new-report form — it sources its options from the equipment
+    // register (Settings → Equipment) and disables out-of-cal items.
+    // The options array is kept as a fallback for the template editor
+    // (Settings → Report templates) where the equipment context isn't
+    // available; for new reports the live equipment register wins.
+    { id:'equip', label:'Equipment',                    placeholder:'Pick from the equipment register…', useEquipmentRegister:true, options:['SIUI Smartor','Olympus EPOCH 650','Olympus EPOCH 6LT','Sonatest Veo+','GE USM 36','Inspection kit','Universal cam gauge','Welding gauge set','X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Mic 10','Sonodur 3','Proceq Equotip 550'] },
   ],
   UT: [
     { id:'coup',  label:'Default couplant',     placeholder:'e.g. Ultragel II', options:['Waterbased','Oil','Ultragel II','Sono 600','Sonagel W','Glycerin'] },
@@ -251,6 +257,12 @@ function tplFormSection(title, fields, methodId, data) {
 function rptFieldHtml(methodId, f, data) {
   const val = data[f.id] || '';
   const fid = `rf-${methodId}-${f.id}`;
+  // Equipment-register-backed fields render a method-filtered dropdown
+  // sourced live from Settings → Equipment. Out-of-cal items appear in
+  // the list but are disabled so the inspector can't pick gear that's
+  // out of calibration. Falls back to free text when the register is
+  // empty (so the form still works before any equipment is added).
+  if(f.useEquipmentRegister) return equipmentSelectHtml(methodId, f, val, fid);
   if(f.type==='textarea') return `<div class="fld"><label>${f.label}</label><textarea id="${fid}" rows="2" placeholder="${f.placeholder}">${val}</textarea></div>`;
   if(f.type==='select') {
     return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
@@ -268,6 +280,43 @@ function rptFieldHtml(methodId, f, data) {
     </div></div>`;
   }
   return `<div class="fld"><label>${f.label}</label><input id="${fid}" type="${f.type||'text'}" value="${val}" placeholder="${f.placeholder||''}" ${f.readonly?'readonly style="color:var(--t3);font-style:italic"':''}/></div>`;
+}
+
+// Equipment-register dropdown — used by any RPT_FORM / TPL_FIELDS field
+// that sets useEquipmentRegister:true. Filters to equipment authorised
+// for `methodId` (empty methods on a record = approved for any method),
+// shows "OUT OF CAL" + disabled for past-due items, and falls back to
+// a free-text input when the register is empty so the form still works
+// on day one.
+function equipmentSelectHtml(methodId, f, val, fid) {
+  const list = (typeof eqLoad === 'function') ? eqLoad() : [];
+  const filtered = list.filter(r => !Array.isArray(r.methods) || !r.methods.length || r.methods.includes(methodId));
+  if(!filtered.length) {
+    return `<div class="fld"><label>${escapeHtml(f.label)}</label>
+      <input id="${fid}" type="text" value="${escapeHtml(val||'')}" placeholder="No equipment in register — add via Settings → Equipment"/>
+    </div>`;
+  }
+  // Resolve which option to mark selected. `val` may be the equipment id
+  // (after a previous save through this dropdown) or the equipment name
+  // (legacy free-text reports / template defaults written before the
+  // register existed). Try id first, then name.
+  let selectedId = '';
+  const byId   = filtered.find(r => r.id === val);
+  if(byId) selectedId = byId.id;
+  else {
+    const byName = filtered.find(r => r.name === val);
+    if(byName) selectedId = byName.id;
+  }
+  const opts = filtered.map(r => {
+    const expired = (typeof eqIsExpired === 'function') && eqIsExpired(r);
+    const bits = [r.name];
+    if(r.svId) bits.push(`(${r.svId})`);
+    if(expired) bits.push('— OUT OF CAL');
+    return `<option value="${escapeHtml(r.id)}"${selectedId===r.id?' selected':''}${expired?' disabled':''}>${escapeHtml(bits.join(' '))}</option>`;
+  }).join('');
+  return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· from Settings → Equipment</span></label>
+    <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}"><option value="">— Select —</option>${opts}</select>
+  </div>`;
 }
 
 function rptFormSave(methodId) {

@@ -1739,6 +1739,7 @@ function showSS(id, btn) {
   const sni = btn || el('sni-'+id); if(sni) sni.classList.add('active');
   if(id==='users')       { try{uaRender();}catch(e){console.error(e);} }
   if(id==='inspectors')  { try{inspRender();}catch(e){console.error(e);} }
+  if(id==='equipment')   { try{eqRender();}catch(e){console.error(e);} }
   if(id==='database') { try{dbRefreshCard();}catch(e){console.error(e);} }
   if(id==='subscription') { try{vxRenderSubscription();}catch(e){console.error(e);} }
   if(id==='system')   { renderSystemInfo(); }

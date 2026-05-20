@@ -2,6 +2,24 @@
 // PDF TEMPLATE EDITOR v2 — Professional Canvas Layout Builder
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Equipment-register fallback lookup. Used by the equipment / sv-id /
+// cal-date field getters as a last resort — the normal path is the
+// snapshot fields written onto the report by ovSaveReport
+// (eq_equip / eq_svid / eq_caldate). This lookup catches reports where
+// the snapshot didn't fire but eq_id is set, so the cards don't go
+// dark unnecessarily. Returns null when there's no register or no
+// matching record.
+function _cvEqRecord(r) {
+  if(!r || !r.eq_id) return null;
+  if(typeof eqLoad !== 'function') return null;
+  try { return eqLoad().find(e => e.id === r.eq_id) || null; }
+  catch(e) { return null; }
+}
+function _cvEqLookup(r, field) {
+  const rec = _cvEqRecord(r);
+  return rec ? (rec[field] || null) : null;
+}
+
 // ── Field definitions — maps to report data ────────────────────────────
 var CV_FIELD_DEFS = {
   'report-no':    {label:'Report No.',                    ph:'SV-2023-004-NDTD-REP-023-001', get:r=>r.reportNo||r.id||'—',        w:260,h:38, mapTo:'reportNo'},
@@ -57,9 +75,9 @@ var CV_FIELD_DEFS = {
   'acc-crit':     {label:'Acceptance criteria',           ph:'EN-ISO 11666:2018 level 2',     get:r=>r.eq_acc||r.accCrit||'—',     w:200,h:38, mapTo:'eq_acc / accCrit'},
   'procedure':    {label:'Procedure no.',                 ph:'SV2023-004-NDTD-PRO-0009',      get:r=>r.eq_proc||r.proc||'—',       w:210,h:38, mapTo:'eq_proc / proc'},
   'proc-rev':     {label:'Procedure revision',            ph:'01',                            get:r=>r.procRev||'—',               w:90, h:38, mapTo:'procRev'},
-  'equipment':    {label:'Equipment',                     ph:'SIUI Smartor 16',               get:r=>r.eq_equip||r.equip||'—',     w:185,h:38, mapTo:'eq_equip / equip'},
-  'sv-id':        {label:'SV-ID No.',                     ph:'SV-UT-004',                     get:r=>r.eq_svid||r.eqSvId||'—',     w:110,h:38, mapTo:'eq_svid'},
-  'cal-date':     {label:'Calibration date',              ph:'2025-01-10',                    get:r=>r.eq_caldate||r.eqCalDate||'—',w:130,h:38, mapTo:'eq_caldate'},
+  'equipment':    {label:'Equipment',                     ph:'SIUI Smartor 16',               get:r=>r.eq_equip||r.equip||_cvEqLookup(r,'name')||'—',     w:185,h:38, mapTo:'eq_equip / equip'},
+  'sv-id':        {label:'SV-ID No.',                     ph:'SV-UT-004',                     get:r=>r.eq_svid||r.eqSvId||_cvEqLookup(r,'svId')||'—',     w:110,h:38, mapTo:'eq_svid'},
+  'cal-date':     {label:'Calibration date',              ph:'2025-01-10',                    get:r=>r.eq_caldate||r.eqCalDate||_cvEqLookup(r,'calLastAt')||'—',w:130,h:38, mapTo:'eq_caldate'},
   'stage':        {label:'Stage of examination',          ph:'Final',                         get:r=>r.stage||'—',                 w:140,h:38, mapTo:'stage'},
   'result':       {label:'Result / Verdict',              ph:'ACCEPTABLE',                    get:r=>{const v=r.verdict||r.result||'—'; return v==='Acceptable'||v==='Pass'?'ACCEPTABLE':v==='Not acceptable'||v==='Fail'?'NOT ACCEPTABLE':v==='Monitor'?'MONITOR':v;}, w:240,h:48,result:true, mapTo:'verdict'},
   'indications':  {label:'Reportable indications',        ph:'No / Nee',                      get:r=>r.indications||((r.verdict==='Not acceptable'||r.result==='Fail')?'Yes':'No'), w:155,h:38, mapTo:'indications'},
@@ -686,24 +704,58 @@ function cvResolveSmartLink(block, report){
     </div>`;
   }
   if(k === 'calib-status'){
+    const examDate = report?.examDate ? new Date(report.examDate) : new Date();
+    const reportMethod = report?.method || '';
+    const rec = _cvEqRecord(report);
+    if(rec){
+      // Live equipment record from Settings → Equipment. Two checks,
+      // mirroring the inspector cert-status card:
+      //   1. Calibration — calDueAt vs the report's exam date
+      //   2. Method approval — is the report's method in the
+      //      equipment's approved `methods` list?
+      const calDue = rec.calDueAt ? new Date(rec.calDueAt) : null;
+      const expired = calDue && !isNaN(calDue) && examDate > calDue;
+      const approvedForMethod = !reportMethod
+        || !Array.isArray(rec.methods) || !rec.methods.length
+        || rec.methods.includes(reportMethod);
+      let cls, lbl, detail;
+      if(expired){
+        cls = 'background:rgba(242,92,92,.15);color:#991b1b'; lbl = '⚠ OUT OF CAL';
+        detail = 'Calibration expired ' + calDue.toLocaleDateString('en-GB');
+      } else if(!approvedForMethod){
+        cls = 'background:rgba(245,166,35,.18);color:#92400e'; lbl = '⚠ NOT APPROVED';
+        detail = 'Not approved for ' + reportMethod + ' — approved: ' + ((rec.methods||[]).join(', ') || 'none');
+      } else {
+        cls = 'background:rgba(62,207,142,.15);color:#16a34a'; lbl = '✓ VALID';
+        detail = (calDue && !isNaN(calDue) ? 'In cal to ' + calDue.toLocaleDateString('en-GB') : 'No calibration-due date set')
+               + (reportMethod ? ' · approved for ' + reportMethod : '');
+      }
+      const name = (rec.name || '—') + (rec.svId ? ' · ' + rec.svId : '');
+      return `<div style="display:flex;align-items:center;gap:6px;height:100%">
+        <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
+        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(name)}</div><div style="font-size:8px;color:#666">${escapeHtml(detail)}</div></div>
+      </div>`;
+    }
+    // Fallback — no register record (legacy report, or equipment that
+    // predates the register). Use the snapshot fields; without a record
+    // there's no methods list, so the method check is skipped and
+    // calibration validity falls back to the "assume 1 year" heuristic.
     const equip = report?.eq_equip || report?.equip || '—';
     const calDate = report?.eq_caldate || report?.eqCalDate;
-    const examDate = report?.examDate ? new Date(report.examDate) : new Date();
     let cls='background:rgba(160,160,160,.18);color:#666', lbl='— NO DATE';
-    let detail = `${escapeHtml(equip)}`;
+    let detail = '';
     if(calDate){
       const cd = new Date(calDate);
       if(!isNaN(cd)){
-        // Assume cal valid 1 year
         const expiry = new Date(cd); expiry.setFullYear(expiry.getFullYear()+1);
         if(examDate > expiry){ cls='background:rgba(242,92,92,.15);color:#991b1b'; lbl='⚠ EXPIRED'; }
         else { cls='background:rgba(62,207,142,.15);color:#16a34a'; lbl='✓ VALID'; }
-        detail += ` · cal ${cd.toLocaleDateString('en-GB')} · expires ${expiry.toLocaleDateString('en-GB')}`;
+        detail = `cal ${cd.toLocaleDateString('en-GB')} · expires ${expiry.toLocaleDateString('en-GB')}`;
       }
     }
     return `<div style="display:flex;align-items:center;gap:6px;height:100%">
       <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
-      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(equip)}</div><div style="font-size:8px;color:#666">${detail.replace(escapeHtml(equip),'').trim().replace(/^·\s*/,'')||'Calibration record on file'}</div></div>
+      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(equip)}</div><div style="font-size:8px;color:#666">${escapeHtml(detail||'Calibration record on file')}</div></div>
     </div>`;
   }
   if(k === 'accept-eval'){

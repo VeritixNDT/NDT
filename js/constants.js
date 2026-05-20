@@ -141,6 +141,12 @@ var KEYS = {
   defects:  'vx-defects-v1',
   procedures:'vx-procedures-v1',
   inspectors:'vx-inspectors-v1',
+  // Equipment register — each entry is { id, name, svId, methods:[],
+  // calLastAt:ISO, calDueAt:ISO, notes }. Drives the equipment dropdown
+  // on the new-report form (filtered by method, out-of-cal items
+  // disabled) and feeds the equipment / sv-id / cal-date place cards
+  // via the snapshot fields ovSaveReport writes onto the report.
+  equipment:'vx-equipment-v1',
 };
 
 // Method names use the formal "Examination" suffix per ASME / EN

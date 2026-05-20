@@ -2362,3 +2362,138 @@ function renderSystemInfo() {
   if(stbody) stbody.innerHTML = sessionRows.map(([k,v])=>`<tr><td class="dim" style="width:160px">${k}</td><td class="mono">${v}</td></tr>`).join('');
 }
 
+// ══════════════════════════════════════════════════════════════════
+// EQUIPMENT REGISTER — Settings → Equipment
+// One source of truth for calibrated equipment. Each record carries
+// a name, asset id (SV-ID), authorised method list, last/next cal
+// dates, and notes. The new-report Equipment dropdown filters by
+// method and disables records whose calDueAt is in the past, so an
+// inspector physically can't pick a piece of gear that's out of
+// calibration. Records are snapshotted onto the saved report (name,
+// svId, calLastAt) so the historical report doesn't drift when the
+// equipment record changes later.
+// ══════════════════════════════════════════════════════════════════
+
+var _eqEditId = null;   // null when adding, otherwise the equipment id being edited
+
+function eqLoad()  { return ls(KEYS.equipment, []) || []; }
+function eqSaveAll(list) { lss(KEYS.equipment, list); }
+function eqIsExpired(rec) {
+  if(!rec || !rec.calDueAt) return false;
+  const due = new Date(rec.calDueAt);
+  if(isNaN(due)) return false;
+  return due.getTime() < Date.now();
+}
+function eqDaysToExpiry(rec) {
+  if(!rec || !rec.calDueAt) return null;
+  const due = new Date(rec.calDueAt);
+  if(isNaN(due)) return null;
+  return Math.floor((due.getTime() - Date.now()) / (24*60*60*1000));
+}
+
+function eqRender() {
+  // Method checkbox grid in the form — follows the user's NDT-method
+  // order from Settings → NDT methods.
+  const grid = el('eqf-methods-grid');
+  if(grid) {
+    grid.innerHTML = getActiveMethods().map(m =>
+      `<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--t2);cursor:pointer">
+        <input type="checkbox" class="eqf-method-cb" value="${escapeHtml(m.id)}" style="cursor:pointer"/>
+        <span style="color:${m.color};font-weight:600">${escapeHtml(m.id)}</span>
+      </label>`
+    ).join('');
+  }
+  // Equipment list table
+  const wrap = el('eq-list-wrap'); if(!wrap) return;
+  const list = eqLoad();
+  if(!list.length) {
+    wrap.innerHTML = `<div class="sc"><div class="sc-body" style="text-align:center;color:var(--t3);font-size:13px;padding:30px">No equipment in the register yet. Click <strong>+ Add equipment</strong> above to add the first item.</div></div>`;
+    return;
+  }
+  let html = `<div class="sc"><div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
+    <thead><tr>
+      <th scope="col">Name</th><th scope="col">SV-ID</th>
+      <th scope="col">Methods</th>
+      <th scope="col">Last cal.</th><th scope="col">Due</th>
+      <th scope="col" style="width:90px">Status</th>
+      <th scope="col" style="width:120px"></th>
+    </tr></thead><tbody>`;
+  list.forEach(rec => {
+    const days = eqDaysToExpiry(rec);
+    let status, statusBg, statusFg;
+    if(days == null)        { status = 'No date';    statusBg = 'rgba(154,170,191,.18)'; statusFg = 'var(--t3)'; }
+    else if(days < 0)       { status = 'OUT OF CAL'; statusBg = 'rgba(242,92,92,.18)';   statusFg = 'var(--red)'; }
+    else if(days <= 30)     { status = days + 'd left'; statusBg = 'rgba(245,166,35,.18)'; statusFg = 'var(--amber)'; }
+    else                    { status = 'In cal';     statusBg = 'rgba(62,207,142,.18)';  statusFg = 'var(--green)'; }
+    html += `<tr>
+      <td style="font-weight:600">${escapeHtml(rec.name||'—')}</td>
+      <td style="font-family:var(--mono);font-size:12px">${escapeHtml(rec.svId||'—')}</td>
+      <td style="font-size:12px">${(rec.methods||[]).map(m=>{
+        const md = NDT_METHODS.find(x=>x.id===m);
+        return `<span style="display:inline-block;font-family:var(--mono);font-size:10px;color:${md?md.color:'var(--t2)'};border:1px solid currentColor;border-radius:3px;padding:0 4px;margin-right:3px">${escapeHtml(m)}</span>`;
+      }).join('') || '<span style="color:var(--t3);font-style:italic">any</span>'}</td>
+      <td style="font-family:var(--mono);font-size:11px">${rec.calLastAt ? fmtDate(rec.calLastAt) : '—'}</td>
+      <td style="font-family:var(--mono);font-size:11px">${rec.calDueAt ? fmtDate(rec.calDueAt) : '—'}</td>
+      <td><span style="display:inline-block;font-size:10px;font-weight:600;background:${statusBg};color:${statusFg};padding:2px 7px;border-radius:3px">${status}</span></td>
+      <td style="text-align:right">
+        <button class="btn btn-sm" data-action="eqOpenForm" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px">Edit</button>
+        <button class="btn btn-sm btn-danger" data-action="eqDelete" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px">Del</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table></div></div>';
+  wrap.innerHTML = html;
+}
+
+function eqOpenForm(id) {
+  _eqEditId = id || null;
+  const wrap = el('eq-form-wrap'); if(!wrap) return;
+  const title = el('eq-form-title'); if(title) title.textContent = id ? 'Edit equipment' : 'Add equipment';
+  // Re-render so the methods grid is rebuilt fresh (avoids stale checked state)
+  eqRender();
+  const rec = id ? eqLoad().find(r => r.id === id) : null;
+  el('eqf-name').value    = rec ? (rec.name||'')    : '';
+  el('eqf-svid').value    = rec ? (rec.svId||'')    : '';
+  el('eqf-callast').value = rec ? (rec.calLastAt||'') : '';
+  el('eqf-caldue').value  = rec ? (rec.calDueAt||'')  : '';
+  el('eqf-notes').value   = rec ? (rec.notes||'')   : '';
+  const methods = rec ? (rec.methods||[]) : [];
+  document.querySelectorAll('.eqf-method-cb').forEach(cb => { cb.checked = methods.includes(cb.value); });
+  wrap.style.display = '';
+  el('eqf-name').focus();
+}
+
+function eqCloseForm() {
+  _eqEditId = null;
+  const wrap = el('eq-form-wrap'); if(wrap) wrap.style.display = 'none';
+}
+
+function eqSave() {
+  const name = (el('eqf-name').value || '').trim();
+  if(!name) { toast('Equipment needs a name.', 'error'); el('eqf-name').focus(); return; }
+  const rec = {
+    id: _eqEditId || ('eq-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7)),
+    name,
+    svId:      (el('eqf-svid').value    || '').trim(),
+    calLastAt: (el('eqf-callast').value || '').trim() || null,
+    calDueAt:  (el('eqf-caldue').value  || '').trim() || null,
+    notes:     (el('eqf-notes').value   || '').trim(),
+    methods:   Array.from(document.querySelectorAll('.eqf-method-cb:checked')).map(cb => cb.value),
+    updatedAt: new Date().toISOString(),
+  };
+  const list = eqLoad();
+  const i = list.findIndex(r => r.id === rec.id);
+  if(i >= 0) list[i] = { ...list[i], ...rec };
+  else       list.push(rec);
+  eqSaveAll(list);
+  toast(_eqEditId ? 'Equipment updated.' : 'Equipment added.');
+  eqCloseForm();
+  eqRender();
+}
+
+async function eqDelete(id) {
+  if(!await vxConfirm({ message: 'Delete this equipment record? Reports that referenced it keep their snapshot, but the record is removed from the dropdown.', okLabel: 'Delete', danger: true })) return;
+  eqSaveAll(eqLoad().filter(r => r.id !== id));
+  toast('Equipment deleted.');
+  eqRender();
+}

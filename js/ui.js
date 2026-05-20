@@ -756,12 +756,12 @@ function _wRemoveById(id) { const t = document.getElementById(id); if(t) t.remov
 function _wEmailModalBackdropClose(el, e) { if(e.target === el) closeEmailModal(); }
 function _wHelpBackdropClose(el, e)       { if(e.target === el) helpClose(); }
 function _wCvFgColorChange(el) {
-  cvExecCmd('foreColor', el.value);
+  cvSetBlockColor(el.value);
   const p = document.getElementById('cv-fg-preview'); if(p) p.style.borderBottomColor = el.value;
   _cvTrackRecentColor(el.value);
 }
 function _wCvBgColorChange(el) {
-  cvExecCmd('hiliteColor', el.value);
+  cvSetBlockBg(el.value);
   const p = document.getElementById('cv-bg-preview'); if(p) p.style.background = el.value;
   _cvTrackRecentColor(el.value);
 }
@@ -848,11 +848,11 @@ function _wCvOpenColourPicker(slot, _el, e){
 
 function _wCvPickColour(slot, hex){
   if(slot === 'fg'){
-    cvExecCmd('foreColor', hex);
+    cvSetBlockColor(hex);
     const p = document.getElementById('cv-fg-preview'); if(p) p.style.borderBottomColor = hex;
     const i = document.getElementById('cv-tb-fg'); if(i) i.value = hex;
   } else {
-    cvExecCmd('hiliteColor', hex);
+    cvSetBlockBg(hex);
     const p = document.getElementById('cv-bg-preview'); if(p) p.style.background = hex;
     const i = document.getElementById('cv-tb-bg'); if(i) i.value = hex;
   }

@@ -1583,42 +1583,36 @@
               <div class="rbn-grp">
                 <div class="rbn-col" style="gap:3px">
                   <div class="rbn-row" style="gap:2px">
-                    <select id="cv-tb-font" class="tb-select" style="width:100px" data-on-change="_wCvExecCmdValue" data-pass-el="1" data-args="'fontName'">
+                    <select id="cv-tb-font" class="tb-select" style="width:100px" data-on-change="cvSetBlockFont" data-pass-value="1" title="Font of the selected block(s)">
                       <option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Times New Roman</option><option>Georgia</option><option>Courier New</option><option>Verdana</option><option>Calibri</option>
                     </select>
-                    <select id="cv-tb-size" class="tb-select" style="width:48px" data-on-change="_wCvExecCmdValue" data-pass-el="1" data-args="'fontSize'">
-                      <option value="1">7</option><option value="2">9</option><option value="3" selected>11</option><option value="4">13</option><option value="5">16</option><option value="6">20</option><option value="7">28</option>
+                    <select id="cv-tb-size" class="tb-select" style="width:52px" data-on-change="cvSetBlockFontSize" data-pass-value="1" title="Font size of the selected block(s)">
+                      <option value="6px">6</option><option value="7px">7</option><option value="7.5px">7.5</option><option value="8px">8</option><option value="8.5px" selected>8.5</option><option value="9px">9</option><option value="10px">10</option><option value="11px">11</option><option value="12px">12</option><option value="14px">14</option><option value="16px">16</option><option value="20px">20</option>
                     </select>
                   </div>
                   <div class="rbn-row" style="gap:2px">
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'bold'" title="Bold"><b>B</b></button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'italic'" title="Italic"><i>I</i></button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'underline'" title="Underline"><u>U</u></button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'strikeThrough'" title="Strikethrough"><s>S</s></button>
+                    <button id="cv-tb-bold" class="tbe tbe-fmt" data-action="cvToggleBlockFmt" data-args="'bold'" title="Bold"><b>B</b></button>
+                    <button id="cv-tb-italic" class="tbe tbe-fmt" data-action="cvToggleBlockFmt" data-args="'italic'" title="Italic"><i>I</i></button>
+                    <button id="cv-tb-underline" class="tbe tbe-fmt" data-action="cvToggleBlockFmt" data-args="'underline'" title="Underline"><u>U</u></button>
+                    <button id="cv-tb-strike" class="tbe tbe-fmt" data-action="cvToggleBlockFmt" data-args="'strike'" title="Strikethrough"><s>S</s></button>
                     <!-- V25: themed colour picker with recents -->
                     <button class="tbe tbe-fmt" data-action="_wCvOpenColourPicker" data-args="'fg'" title="Text colour"><span id="cv-fg-preview" style="font-weight:bold;border-bottom:3px solid #000">A</span></button>
-                    <button class="tbe tbe-fmt" data-action="_wCvOpenColourPicker" data-args="'bg'" title="Highlight"><span id="cv-bg-preview" style="background:#ffff00;padding:0 3px">H</span></button>
-                    <!-- Hidden native inputs preserved for legacy & fallback "Custom…" path -->
+                    <button class="tbe tbe-fmt" data-action="_wCvOpenColourPicker" data-args="'bg'" title="Background colour"><span id="cv-bg-preview" style="background:#ffff00;padding:0 3px">H</span></button>
+                    <!-- Hidden native inputs preserved for the "Custom…" colour path -->
                     <input type="color" id="cv-tb-fg" value="#000000" style="position:absolute;opacity:0;width:1px;height:1px;top:-9999px;left:0" data-on-input="_wCvFgColorChange" data-pass-el="1"/>
                     <input type="color" id="cv-tb-bg" value="#ffff00" style="position:absolute;opacity:0;width:1px;height:1px;top:-9999px;left:0" data-on-input="_wCvBgColorChange" data-pass-el="1"/>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'removeFormat'" title="Clear" style="font-size:10px;padding:2px 4px">✕</button>
+                    <button class="tbe tbe-fmt" data-action="cvClearBlockFmt" title="Clear formatting" style="font-size:10px;padding:2px 4px">✕</button>
                   </div>
                 </div>
                 <div class="rbn-lbl" data-i18n="pe.grp.font">Font</div>
               </div>
               <div class="rbn-grp">
-                <div class="rbn-col" style="gap:3px">
+                <div class="rbn-col" style="gap:3px;justify-content:center">
                   <div class="rbn-row" style="gap:2px">
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'justifyLeft'" title="Left" style="font-size:12px">⬅</button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'justifyCenter'" title="Center" style="font-size:12px">↔</button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'justifyRight'" title="Right" style="font-size:12px">➡</button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'justifyFull'" title="Justify" style="font-size:12px">☰</button>
-                  </div>
-                  <div class="rbn-row" style="gap:2px">
-                    <button class="tbe" data-action="cvExecCmd" data-args="'insertUnorderedList'" style="font-size:11px">• List</button>
-                    <button class="tbe" data-action="cvExecCmd" data-args="'insertOrderedList'" style="font-size:11px">1. List</button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'outdent'">⇤</button>
-                    <button class="tbe tbe-fmt" data-action="cvExecCmd" data-args="'indent'">⇥</button>
+                    <button id="cv-tb-align-left" class="tbe tbe-fmt" data-action="cvSetBlockAlign" data-args="'left'" title="Align left" style="font-size:12px">⬅</button>
+                    <button id="cv-tb-align-center" class="tbe tbe-fmt" data-action="cvSetBlockAlign" data-args="'center'" title="Align center" style="font-size:12px">↔</button>
+                    <button id="cv-tb-align-right" class="tbe tbe-fmt" data-action="cvSetBlockAlign" data-args="'right'" title="Align right" style="font-size:12px">➡</button>
+                    <button id="cv-tb-align-justify" class="tbe tbe-fmt" data-action="cvSetBlockAlign" data-args="'justify'" title="Justify" style="font-size:12px">☰</button>
                   </div>
                 </div>
                 <div class="rbn-lbl" data-i18n="pe.grp.paragraph">Paragraph</div>

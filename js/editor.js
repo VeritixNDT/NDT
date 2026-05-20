@@ -300,6 +300,23 @@ function _cvCloneBlock(b){
 var CV_TPL_KEY = 'vx-tpl-config-v1';
 var CV_METHOD_TPL_PREFIX = 'vx-method-tpl-';
 
+// PDF editor font catalogue. block.fontFamily stores a KEY from this map;
+// the rendered CSS value is the full fallback stack. Both the ribbon and
+// the Properties-panel dropdowns list these keys. A block with no
+// fontFamily (or an unknown one) inherits the canvas font, so existing
+// templates are unaffected.
+var CV_FONTS = {
+  'Arial':           "Arial, Helvetica, sans-serif",
+  'Helvetica':       "Helvetica, Arial, sans-serif",
+  'Segoe UI':        "'Segoe UI', Tahoma, Geneva, sans-serif",
+  'Times New Roman': "'Times New Roman', Times, serif",
+  'Georgia':         "Georgia, 'Times New Roman', serif",
+  'Courier New':     "'Courier New', Courier, monospace",
+  'Verdana':         "Verdana, Geneva, sans-serif",
+  'Calibri':         "Calibri, 'Segoe UI', sans-serif"
+};
+var CV_FONT_LIST = Object.keys(CV_FONTS);
+
 var cvPages = [{label:'Page 1', blocks:[]}];
 var cvCurrentPage = 0;
 var cvBlocks = cvPages[0].blocks;
@@ -2151,6 +2168,8 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
   const _bc = _safeCssColor(block.borderColor, '#ccc');
   const _fc = _safeCssColor(block.color, '#000');
   const _fs = _safeCssFs(block.fontSize, '8.5px');
+  const _ff = (block.fontFamily && CV_FONTS[block.fontFamily]) ? CV_FONTS[block.fontFamily] : '';
+  const _td = [block.underline?'underline':'', block.strike?'line-through':''].filter(Boolean).join(' ');
   const _ta = _safeCssAlign(block.align);
   const _zi = Number.isFinite(+block.zIndex) ? +block.zIndex : 1;
 
@@ -2189,8 +2208,10 @@ function _cvBuildBlockElement(block, report, isSel, passesShowWhen){
     `background:${_bg}`,
     _borderCss,
     `font-size:${_fs}`,
+    _ff ? `font-family:${_ff}` : '',
     `font-weight:${block.bold?'bold':'normal'}`,
     `font-style:${block.italic?'italic':'normal'}`,
+    _td ? `text-decoration:${_td}` : '',
     `color:${_fc}`,
     `text-align:${_ta}`,
     `box-sizing:border-box`, `overflow:hidden`,
@@ -2997,6 +3018,7 @@ function cvRenderProps(id){
 
   const block = cvBlocks.find(b=>b.id===id);
   if(!block){ panel.innerHTML=''; return; }
+  _cvSyncRibbon(block);
   const def = !block.isLayout ? CV_FIELD_DEFS[block.key] : null;
   const title = def ? def.label.split('/')[0].trim() : block.key.replace(/-/g,' ');
 
@@ -3144,6 +3166,10 @@ function cvRenderProps(id){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px">
       ${['x','y','w','h'].map(p=>`<div><div style="font-size:8.5px;font-family:var(--mono);color:var(--t3);margin-bottom:2px;text-transform:uppercase">${p.toUpperCase()}</div>${numRow(p,block[p])}</div>`).join('')}
     </div>
+    ${row('Font',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontFamily'">
+      <option value="" ${!block.fontFamily?'selected':''}>Default (Arial)</option>
+      ${CV_FONT_LIST.map(f=>`<option value="${f}" ${block.fontFamily===f?'selected':''}>${f}</option>`).join('')}
+    </select>`)}
     ${row(block.key === 'items-table' ? 'Table font size' : 'Font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontSize'">
       ${['6px','7px','7.5px','8px','8.5px','9px','10px','11px','12px','14px','16px','20px'].map(s=>`<option value="${s}" ${block.fontSize===s?'selected':''}>${s}</option>`).join('')}
     </select>`)}
@@ -3165,10 +3191,12 @@ function cvRenderProps(id){
     })() : ''}
     ${check('bold',block.bold,'Bold')}
     ${check('italic',block.italic,'Italic')}
+    ${check('underline',block.underline,'Underline')}
+    ${check('strike',block.strike,'Strikethrough')}
     ${check('showBorder',block.showBorder,'Show border')}
     ${check('locked',block.locked,'Lock position 🔒')}
     ${row('Alignment',`<div style="display:flex;gap:3px">
-      ${['left','center','right'].map(a=>`<button data-action="cvUpdateBlock" data-args="'${id}','align','${a}'" style="flex:1;padding:4px 2px;font-size:11px;border-radius:3px;border:1px solid var(--border);cursor:pointer;background:${block.align===a?'var(--blue)':'var(--bg2)'};color:${block.align===a?'#fff':'var(--t2)'}">${a==='left'?'⬅':a==='center'?'↔':'➡'}</button>`).join('')}
+      ${['left','center','right','justify'].map(a=>`<button data-action="cvUpdateBlock" data-args="'${id}','align','${a}'" style="flex:1;padding:4px 2px;font-size:11px;border-radius:3px;border:1px solid var(--border);cursor:pointer;background:${block.align===a?'var(--blue)':'var(--bg2)'};color:${block.align===a?'#fff':'var(--t2)'}">${a==='left'?'⬅':a==='center'?'↔':a==='right'?'➡':'☰'}</button>`).join('')}
     </div>`)}
     ${row('Text colour', colorPick('color', block.color||'#000000'))}
     ${row('Background',  colorPick('bgColor', block.bgColor||'transparent'))}
@@ -3508,14 +3536,12 @@ function _wCvResetItemsColWidths(id) {
   cvRenderProps(id);
 }
 
-// Same dispatcher-args-parser issue applied to three other handlers.
-// cvExecCmd is wired to font-name / font-size selects in the rich-text
-// toolbar. apSetSeverity is wired to the four severity colour pickers in
-// Appearance settings. captureWizardSetVal is wired to every field in the
-// capture wizard modal. Without these wrappers each handler was receiving
-// the DOM element where a string was expected, causing silent failure of
-// the font picker, severity colours, and capture-wizard input persistence.
-function _wCvExecCmdValue       (cmd,    el) { cvExecCmd(cmd, el.value);             }
+// Same dispatcher-args-parser issue applied to two other handlers.
+// apSetSeverity is wired to the four severity colour pickers in Appearance
+// settings. captureWizardSetVal is wired to every field in the capture
+// wizard modal. Without these wrappers each handler was receiving the DOM
+// element where a string was expected, causing silent failure of the
+// severity colours and capture-wizard input persistence.
 function _wApSetSeverityValue   (level,  el) { apSetSeverity(level, el.value);       }
 function _wCaptureWizardSetValue(target, el) { captureWizardSetVal(target, el.value);}
 
@@ -3571,6 +3597,101 @@ function cvUpdateBlock(id, prop, value){
     cvRenderProps(id);
   }
   cvSaveLayout();
+}
+// ── Ribbon Font / Paragraph commands ────────────────────────────────────
+// The whole ribbon used to route through document.execCommand, which only
+// affects a contenteditable selection. The place cards aren't edited
+// inline, so every one of these controls silently did nothing. They now
+// mutate real block properties on the current selection instead.
+
+// Apply `mutate` to every selected, unlocked block (one undo step, one
+// re-render). Toasts and returns 0 when there's nothing to act on.
+function _cvApplyToSelection(mutate){
+  if(!cvSelectedIds.length){
+    toast(t('toast.select_blocks_first','Select one or more blocks first.'), 'warn');
+    return 0;
+  }
+  cvPushUndo();
+  let n = 0;
+  cvSelectedIds.forEach(id => {
+    const b = cvBlocks.find(bb => bb.id === id);
+    if(!b || _cvIsBlockLocked(b)) return;
+    mutate(b); n++;
+  });
+  if(n){ cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout(); }
+  else toast(t('pe.toast.block_locked','That block is locked.'), 'warn');
+  return n;
+}
+
+// Font family — empty value clears the override (falls back to canvas font).
+function cvSetBlockFont(font){
+  if(font && !CV_FONTS[font]) return;
+  _cvApplyToSelection(b => { if(font) b.fontFamily = font; else delete b.fontFamily; });
+}
+
+// Font size — value is a CSS px string e.g. '8.5px'.
+function cvSetBlockFontSize(size){
+  if(!/^\d+(?:\.\d+)?px$/.test(String(size||''))) return;
+  _cvApplyToSelection(b => { b.fontSize = size; });
+}
+
+// Bold / italic / underline / strike — decide the new state from the first
+// selected block, then apply it uniformly so a mixed selection converges.
+function cvToggleBlockFmt(prop){
+  if(['bold','italic','underline','strike'].indexOf(prop) < 0) return;
+  if(!cvSelectedIds.length){
+    toast(t('toast.select_blocks_first','Select one or more blocks first.'), 'warn');
+    return;
+  }
+  const first = cvBlocks.find(b => b.id === cvSelectedIds[0]);
+  const next = !(first && first[prop]);
+  _cvApplyToSelection(b => { b[prop] = next; });
+}
+
+// Text alignment.
+function cvSetBlockAlign(align){
+  if(['left','center','right','justify'].indexOf(align) < 0) return;
+  _cvApplyToSelection(b => { b.align = align; });
+}
+
+// Text / background colour — called by the ribbon colour picker (ui.js).
+function cvSetBlockColor(hex){
+  if(!/^#[0-9a-fA-F]{3,8}$/.test(String(hex||''))) return;
+  _cvApplyToSelection(b => { b.color = hex; });
+}
+function cvSetBlockBg(hex){
+  if(!/^(?:#[0-9a-fA-F]{3,8}|transparent)$/.test(String(hex||''))) return;
+  _cvApplyToSelection(b => { b.bgColor = hex; });
+}
+
+// Clear character formatting — mirrors execCommand('removeFormat'): resets
+// weight/style/decoration/font/colour but leaves geometry, border and
+// background alone.
+function cvClearBlockFmt(){
+  _cvApplyToSelection(b => {
+    b.bold = false; b.italic = false; b.underline = false; b.strike = false;
+    delete b.fontFamily;
+    b.color = '#000000';
+  });
+}
+
+// Sync the ribbon Font/Paragraph controls to the selected block's state so
+// the dropdowns show the right value and the toggle buttons highlight.
+function _cvSyncRibbon(block){
+  if(!block) return;
+  const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+  const act = (id, on)  => { const el = document.getElementById(id); if(el) el.classList.toggle('active', !!on); };
+  set('cv-tb-font', (block.fontFamily && CV_FONTS[block.fontFamily]) ? block.fontFamily : 'Arial');
+  set('cv-tb-size', /^\d+(?:\.\d+)?px$/.test(block.fontSize||'') ? block.fontSize : '8.5px');
+  act('cv-tb-bold',      block.bold);
+  act('cv-tb-italic',    block.italic);
+  act('cv-tb-underline', block.underline);
+  act('cv-tb-strike',    block.strike);
+  ['left','center','right','justify'].forEach(a => act('cv-tb-align-'+a, (block.align||'left') === a));
+  const fgP = document.getElementById('cv-fg-preview');
+  if(fgP && /^#[0-9a-fA-F]{3,8}$/.test(block.color||'')) fgP.style.borderBottomColor = block.color;
+  const bgP = document.getElementById('cv-bg-preview');
+  if(bgP && /^#[0-9a-fA-F]{3,8}$/.test(block.bgColor||'')) bgP.style.background = block.bgColor;
 }
 function cvDeleteBlock(id){ cvPushUndo(); cvPages[cvCurrentPage].blocks=cvPages[cvCurrentPage].blocks.filter(b=>b.id!==id); cvSync(); if(cvSelectedId===id){cvSelectedId=null;cvSelectedIds=cvSelectedIds.filter(x=>x!==id);} if(_cvLastPlacedId === id) _cvLastPlacedId = null; cvRenderCanvas(); cvRenderProps(cvSelectedId); cvSaveLayout(); }
 function cvDeleteSelected(){
@@ -4707,37 +4828,6 @@ function cvSetSectionColor(c){
 function cvInsertTable(){ cvAddBlockDefault('text-block',true); toast(t('toast.table_edit_hint', 'Table: edit the text block content in Properties')); }
 function cvInsertHRule(){ cvAddBlockDefault('h-line',true); }
 function cvInsertPageBreak(){ cvAddPage(); }
-
-// V24: cvExecCmd — text-formatting commands for the contenteditable text-block.
-//
-// document.execCommand is officially deprecated but still works in every
-// current browser. We wrap it in a small abstraction so the eventual Range-API
-// migration is a one-function change. Console warnings let us monitor if a
-// browser drops support before we've migrated.
-//
-// Migration plan (when execCommand stops working):
-//   1. For bold/italic/underline/strikeThrough: wrap selection in <span> with
-//      the corresponding CSS via Range.surroundContents().
-//   2. For justifyLeft/Center/Right/Full: walk to nearest block ancestor and
-//      set textAlign style.
-//   3. For insertUnordered/OrderedList: convert selection into <ul>/<ol> via
-//      Range API + DOM manipulation.
-//   4. For outdent/indent: adjust margin-left or list nesting depth.
-//   5. For removeFormat: strip all formatting spans within the selection.
-// Reference implementations: rich-text editor libraries like Tiptap, Slate,
-// and Lexical all handle these via Range API. If we ever pull one in, this
-// wrapper becomes a no-op pass-through.
-function cvExecCmd(cmd, val){
-  try {
-    const ok = document.execCommand(cmd, false, val || null);
-    if(!ok && typeof console !== 'undefined'){
-      console.warn('[cvExecCmd] command "' + cmd + '" returned false — may be unsupported.');
-    }
-  } catch(e){
-    console.error('[cvExecCmd] threw for "' + cmd + '":', e);
-    // Future: route to Range-API fallback once implemented.
-  }
-}
 
 // ── Full-page overlay mode ───────────────────────────────────────────
 function cvOpenFullPage(){

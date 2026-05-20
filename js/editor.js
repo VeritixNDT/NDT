@@ -3829,6 +3829,14 @@ function _cvClampToParent(cell, parent){
   const snapT = (typeof CV_SNAP_THRESHOLD === 'number') ? CV_SNAP_THRESHOLD : 12;
   if(cell.y - innerY <= snapT) cell.y = innerY;
 }
+// Resize variant — caps a cell's size so it stays inside its container
+// WITHOUT moving its x/y. Used after a cell is resized: dragging the
+// right / bottom edge must never shift the opposite (x/y) edge.
+function _cvClampSizeToParent(cell, parent){
+  if(!cell || !parent) return;
+  cell.w = Math.min(cell.w, Math.max(16, parent.x + parent.w - cell.x));
+  cell.h = Math.min(cell.h, Math.max(16, parent.y + parent.h - cell.y));
+}
 // Hit-test a cell's centre against every container and (re)assign its
 // parentId: inside a container → parent to it, lift above it, clamp
 // inside; inside none → un-parent. Lets the user drag a cell out of a
@@ -4111,7 +4119,7 @@ function cvMouseUp(){
         _cvContainerChildren(b.id).forEach(ch => { _cvClampToParent(ch, b); _cvBlockElCache.delete(ch.id); });
       } else if(_resized && b.key === 'method-cell' && b.parentId){
         const p = cvBlocks.find(x => x.id === b.parentId);
-        if(p) _cvClampToParent(b, p);
+        if(p) _cvClampSizeToParent(b, p);
       }
     }
   }

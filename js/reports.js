@@ -112,7 +112,7 @@ var RPT_FORM = {
   result: [
     { id:'verdict',    label:'Overall verdict',     placeholder:'', type:'select', options:['— Select —','Acceptable','Not acceptable','For information','Inconclusive'] },
     { id:'remarks',    label:'Remarks / observations',placeholder:'Closing remarks…', type:'textarea' },
-    { id:'inspector',  label:'Inspector name',      placeholder:'Name of inspector' },
+    { id:'inspector',  label:'Inspector name',      placeholder:'Name of inspector', useInspectorRegister:true },
     { id:'witness',    label:'Witness / 3rd party',  placeholder:'Witness name' },
     { id:'signDate',   label:'Date signed',          placeholder:'dd/mm/yyyy', type:'date' },
   ],
@@ -282,6 +282,11 @@ function rptFieldHtml(methodId, f, data) {
   // out of calibration. Falls back to free text when the register is
   // empty (so the form still works before any equipment is added).
   if(f.useEquipmentRegister) return equipmentSelectHtml(methodId, f, val, fid);
+  // Inspector-register-backed fields render a dropdown from Settings →
+  // Inspectors. An inspector with no certification for the report's
+  // method, or an expired one, appears disabled — they can't be
+  // selected to sign the report.
+  if(f.useInspectorRegister) return inspectorSelectHtml(methodId, f, val, fid);
   if(f.type==='textarea') return `<div class="fld"><label>${f.label}</label><textarea id="${fid}" rows="2" placeholder="${f.placeholder}">${val}</textarea></div>`;
   if(f.type==='select') {
     return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
@@ -335,6 +340,56 @@ function equipmentSelectHtml(methodId, f, val, fid) {
   }).join('');
   return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· from Settings → Equipment</span></label>
     <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}"><option value="">— Select —</option>${opts}</select>
+  </div>`;
+}
+
+// Inspector-register dropdown — used by any field with
+// useInspectorRegister:true. Lists inspectors from Settings →
+// Inspectors; each option is disabled unless the inspector holds a
+// non-expired certification for the report's method, so an inspector
+// who isn't validly certified can't be selected to sign. Falls back to
+// free text when the directory is empty.
+function inspectorSelectHtml(methodId, f, val, fid) {
+  // The full inspector dropdown is admin-only — an admin records who
+  // performed/signed the inspection. A non-admin signs as themselves:
+  // their own name is shown locked, and ovNewReport / ovSaveReport
+  // enforce that their certification for this method is valid.
+  const isAdmin = (typeof vxIsAdmin === 'function') ? vxIsAdmin() : true;
+  if(!isAdmin) {
+    let myName = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER)
+      ? (CURRENT_USER.name || CURRENT_USER.email || '') : '';
+    if(typeof _ovCurrentUserInspector === 'function') {
+      const rec = _ovCurrentUserInspector();
+      if(rec && rec.name) myName = rec.name;
+    }
+    return `<div class="fld"><label>${escapeHtml(f.label)}</label>
+      <input id="${fid}" type="text" value="${escapeHtml(myName || val || '')}" readonly style="color:var(--t3);font-style:italic" title="You sign reports as yourself"/>
+    </div>`;
+  }
+  const list = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS) && INSPECTORS.length)
+    ? INSPECTORS
+    : ((typeof ls === 'function') ? ls('vx-inspectors-v1', []) : []);
+  if(!list.length) {
+    return `<div class="fld"><label>${escapeHtml(f.label)}</label>
+      <input id="${fid}" type="text" value="${escapeHtml(val||'')}" placeholder="No inspectors in directory — add via Settings → Inspectors"/>
+    </div>`;
+  }
+  const opts = list.map(ins => {
+    const certs = (typeof _inspMethodCerts === 'function') ? _inspMethodCerts(ins) : (ins.methodCerts || {});
+    const cert = methodId ? certs[methodId] : null;
+    let disabled = false, suffix = '';
+    if(methodId && !cert) {
+      disabled = true; suffix = ' — not certified for ' + methodId;
+    } else if(cert) {
+      const d = (typeof daysUntil === 'function') ? daysUntil(cert.expiry) : null;
+      if(d !== null && d < 0) { disabled = true; suffix = ' — ' + methodId + ' cert EXPIRED'; }
+    }
+    // A previously-saved value that's now disabled is still shown
+    // selected so the form doesn't silently lose it.
+    return `<option value="${escapeHtml(ins.name)}"${ins.name===val?' selected':''}${disabled && ins.name!==val?' disabled':''}>${escapeHtml((ins.name||'—') + suffix)}</option>`;
+  }).join('');
+  return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· must hold a valid ${escapeHtml(methodId||'')} certification</span></label>
+    <select id="${fid}" class="rf-inspector" data-method="${escapeHtml(methodId)}"><option value="">— Select —</option>${opts}</select>
   </div>`;
 }
 

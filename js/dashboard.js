@@ -10,6 +10,25 @@ var _ovItems = [{}];
 // to detect whether the user has bumped the revision so the save handler
 // can demand a reason (required) and append a row to report.revisions.
 var _ovRevisionOriginal = '';
+// Set when a non-admin opens a new report for a method their
+// certification doesn't cover (missing / expired). Holds the reason
+// string; ovSaveReport refuses to save while it's set.
+var _ovSignBlockReason = null;
+
+// Resolve the logged-in user to their inspector-directory record, by
+// email first (reliable) then name. Returns null when there's no
+// match — used to check the signer's per-method certification.
+function _ovCurrentUserInspector() {
+  if(typeof CURRENT_USER === 'undefined' || !CURRENT_USER) return null;
+  const list = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS) && INSPECTORS.length)
+    ? INSPECTORS
+    : ((typeof ls === 'function') ? ls('vx-inspectors-v1', []) : []);
+  const email = (CURRENT_USER.email || '').toLowerCase().trim();
+  const name  = (CURRENT_USER.name  || '').toLowerCase().trim();
+  return list.find(i => email && (i.email || '').toLowerCase().trim() === email)
+      || list.find(i => name  && (i.name  || '').toLowerCase().trim() === name)
+      || null;
+}
 
 function ovInit() {
   // Build new report method buttons
@@ -1047,8 +1066,11 @@ function ovNewReport(methodId, btn) {
   html += ovFormSection('Subject information', subjectShared, methodId, merged, m);
   // Section 4: Exam criteria
   html += ovFormSection('Examination criteria', RPT_FORM.exam, methodId, merged, m);
-  // Section 5: Method-specific equipment (from template defaults + method fields)
-  const specific = (TPL_FIELDS[methodId] || []).map(f => {
+  // Section 5: Equipment & parameters. Includes TPL_FIELDS._common
+  // (specification, acceptance criteria, procedure, equipment) AND the
+  // per-method fields. _common was previously template-editor-only, so
+  // the equipment dropdown never rendered on the new-report form.
+  const specific = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[methodId] || [])].map(f => {
     const field = {...f, id:'eq_'+f.id, label:f.label.replace('Default ','')};
     // Pre-fill from template defaults
     if(!merged['eq_'+f.id] && tpl[f.id]) merged['eq_'+f.id] = tpl[f.id];
@@ -1062,6 +1084,27 @@ function ovNewReport(methodId, btn) {
   // V9: bind auto-fill suggestion to client field
   if(typeof autofillBindClientField === 'function'){
     setTimeout(() => autofillBindClientField(methodId), 30);
+  }
+  // Non-admin inspectors sign their own reports. Verify the logged-in
+  // user holds a valid certification for this report's method — if not,
+  // pop up a notice and block the save (admins are exempt; they pick a
+  // cert-validated inspector from the dropdown instead).
+  _ovSignBlockReason = null;
+  if(typeof vxIsAdmin === 'function' && !vxIsAdmin()){
+    const meRec = _ovCurrentUserInspector();
+    const certs = (meRec && typeof _inspMethodCerts === 'function') ? _inspMethodCerts(meRec) : {};
+    const cert  = certs[methodId];
+    const expFmt = c => (typeof fmtDate === 'function' && c && c.expiry) ? fmtDate(c.expiry) : (c && c.expiry) || '';
+    if(!meRec){
+      _ovSignBlockReason = 'Your account is not linked to an inspector record, so you cannot sign this report. Please contact an administrator.';
+    } else if(!cert){
+      _ovSignBlockReason = `You hold no ${methodId} certification, so you are unable to sign this ${methodId} report.`;
+    } else if(typeof daysUntil === 'function' && cert.expiry && daysUntil(cert.expiry) < 0){
+      _ovSignBlockReason = `Your ${methodId} certification expired on ${expFmt(cert)} — you are unable to sign this report. Please contact an administrator to renew it.`;
+    }
+    if(_ovSignBlockReason && typeof vxConfirm === 'function'){
+      vxConfirm({ title: 'Certification check', message: _ovSignBlockReason, okLabel: 'OK', cancelLabel: 'OK' });
+    }
   }
   // Capture the revision baseline and attach the bump-detector. The
   // listener fires the reason-required UI as soon as the user changes
@@ -1352,8 +1395,19 @@ function ovItemsRerender() {
 function ovSaveReport() {
   if(!_ovMethod) { toast(t('toast.no_method', 'No method selected.'), 'error'); return; }
   const m = NDT_METHODS.find(x => x.id === _ovMethod); if(!m) return;
+  // A non-admin without a valid certification for this method can't
+  // sign the report — refuse the save (the reason was already shown in
+  // a popup when the form opened).
+  if(_ovSignBlockReason){
+    if(typeof vxConfirm === 'function'){
+      vxConfirm({ title: 'Cannot sign report', message: _ovSignBlockReason, okLabel: 'OK', cancelLabel: 'OK' });
+    } else {
+      toast(_ovSignBlockReason, 'error');
+    }
+    return;
+  }
   const allFields = [...RPT_FORM.client, ...RPT_FORM.subject, ...RPT_FORM.exam, ...RPT_FORM.result];
-  const specific = (TPL_FIELDS[_ovMethod] || []).map(f => ({...f, id:'eq_'+f.id}));
+  const specific = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])].map(f => ({...f, id:'eq_'+f.id}));
   const all = [...allFields, ...specific];
   const report = { method: _ovMethod, createdAt: new Date().toISOString() };
   all.forEach(f => {

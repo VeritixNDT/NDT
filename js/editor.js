@@ -788,23 +788,41 @@ function cvResolveSmartLink(block, report){
   if(!block || !block.key) return '';
   const k = block.key;
   if(k === 'procedure-link'){
-    const procNo = report?.eq_proc || report?.proc || report?.procedure || '—';
-    const reportRev = report?.procRev || '';
     const procs = (typeof ls === 'function') ? ls(KEYS.procedures, []) : [];
-    const match = procs.find(p => p.procNo === procNo || p.procedureNo === procNo || p.no === procNo);
+    const spec       = (report?.eq_spec || report?.spec || report?.specification || '').trim();
+    const procNo     = (report?.eq_proc || report?.proc || report?.procedure || '').trim();
+    const reportRev  = report?.procRev || '';
+    const reportMeth = report?.method || '';
+    // Resolve against Settings → Procedures. Primary link: the report's
+    // specification → a procedure's `standard` field (narrowed to the
+    // report's method when several procedures share that standard). Falls
+    // back to a direct procedure-number match for older reports that
+    // carry an explicit number.
+    const norm = s => String(s || '').trim().toLowerCase();
+    let match = null;
+    if(spec){
+      const bySpec = procs.filter(p => p.standard && norm(p.standard) === norm(spec));
+      match = bySpec.find(p => p.method === reportMeth) || bySpec[0] || null;
+    }
+    if(!match && procNo && procNo !== '—'){
+      match = procs.find(p => p.procNo === procNo || p.procedureNo === procNo || p.no === procNo);
+    }
     if(match){
       // Revision is pulled from the linked procedure record on file (its
       // authoritative current revision), falling back to the revision
       // recorded on the report if the record carries none.
       const rev = match.revision || match.rev || reportRev;
+      const shownNo = match.procNo || match.procedureNo || match.no || procNo || '—';
       return `<div style="display:flex;align-items:center;gap:6px;height:100%">
         <span style="background:rgba(62,207,142,.15);color:#16a34a;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">✓ LINKED</span>
-        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(procNo)}${rev?' Rev '+escapeHtml(rev):''}</div><div style="font-size:8px;color:#666">${escapeHtml(match.title || match.specification || 'Procedure on file')}</div></div>
+        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(shownNo)}${rev?' Rev '+escapeHtml(rev):''}</div><div style="font-size:8px;color:#666">${escapeHtml(match.title || match.standard || match.specification || 'Procedure on file')}</div></div>
       </div>`;
     }
+    const missDesc = spec ? 'No procedure on file for this specification'
+                          : 'No procedure on file matching this number';
     return `<div style="display:flex;align-items:center;gap:6px;height:100%">
       <span style="background:rgba(245,166,35,.18);color:#92400e;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">⚠ MISSING</span>
-      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(procNo)}${reportRev?' Rev '+escapeHtml(reportRev):''}</div><div style="font-size:8px;color:#666">No procedure on file matching this number</div></div>
+      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(spec || procNo || '—')}${reportRev?' Rev '+escapeHtml(reportRev):''}</div><div style="font-size:8px;color:#666">${escapeHtml(missDesc)}</div></div>
     </div>`;
   }
   if(k === 'cert-status'){

@@ -20,9 +20,7 @@ function loadSettings() {
   if(el('co-color'))     el('co-color').value     = color;
   if(el('co-color-hex')) el('co-color-hex').value = color;
   const s = ls(KEYS.settings, {});
-  if(el('ap-compact'))  el('ap-compact').checked  = !!s.compact;
   if(el('ap-signal'))   el('ap-signal').checked   = s.signal!==false;
-  if(el('ap-anim'))     el('ap-anim').checked     = s.anim!==false;
   if(el('num-prefix'))  el('num-prefix').value    = s.numPrefix||'INS';
   if(el('num-sep'))     el('num-sep').value       = s.numSep!==undefined?s.numSep:'-';
   if(el('num-year'))    el('num-year').value      = s.numYear||'4';

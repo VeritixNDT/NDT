@@ -401,7 +401,7 @@ function cvShowDesktopOnly(){
       </div>
     </div>
   `;
-  try { if(typeof applyTranslations === 'function') applyTranslations(pdfSec); } catch(e){}
+  try { if(typeof i18nApply === 'function') i18nApply(pdfSec); } catch(e){}
 }
 
 // Apply device gating to the sidebar. On non-desktop devices, dim the
@@ -524,7 +524,7 @@ function vxShowAdminRequired(sectionId){
       </div>
     </div>
   `;
-  try { if(typeof applyTranslations === 'function') applyTranslations(sec); } catch(e){}
+  try { if(typeof i18nApply === 'function') i18nApply(sec); } catch(e){}
 }
 
 // Apply role-based gating to the sidebar nav. Hides every admin-only

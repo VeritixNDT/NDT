@@ -116,6 +116,13 @@ var CV_FIELD_DEFS = {
   'procedure-link':  {label:'Procedure (linked)',    ph:'SV-PRO-009 Rev 02',  get:r=>'',w:280,h:46, smartLink:'procedure'},
   'cert-status':     {label:'Inspector cert status', ph:'Level II UT · valid', get:r=>'',w:240,h:46, smartLink:'cert'},
   'calib-status':    {label:'Equipment calibration', ph:'Cal valid until Q3 2025', get:r=>'',w:240,h:46, smartLink:'calib'},
+  // Light-equipment calibration cards — same shape and status logic as
+  // calib-status. They resolve a register record (Settings → Equipment)
+  // by name/notes keyword: white-light meters for the light card, UV-A
+  // lamps for the UV card. Name the gear so the keyword matches, e.g.
+  // "Lux meter" or "UV-A Lamp Labino".
+  'light-status':    {label:'White-light equipment', ph:'White light · in cal', get:r=>'',w:240,h:46, smartLink:'light'},
+  'uv-light-status': {label:'UV-A light equipment',  ph:'UV-A 365 nm · in cal', get:r=>'',w:240,h:46, smartLink:'uvlight'},
   'accept-eval':     {label:'Acceptance evaluation', ph:'7 mm vs ≤ 8 mm (ISO 11666 L2) — ACCEPTABLE', get:r=>'',w:380,h:46, smartLink:'accept'},
 
   // ── ADVANCED OUTPUT ─────────────────────────────────────────────
@@ -255,7 +262,7 @@ var CV_PALETTE_GROUPS = [
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
-  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','accept-eval']},
+  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','light-status','uv-light-status','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},
   {id:'components',label:'⬢ My components', isComponents:true},
@@ -709,6 +716,58 @@ function _cvSmartCardHtml(cls, lbl, ...lines){
     <div style="flex:1;min-width:0;line-height:1.3">${body}</div>
   </div>`;
 }
+
+// ── Light / UV-light equipment smart cards ─────────────────────────────
+// White-light meters and UV-A lamps are calibrated gear like any other,
+// so these cards reuse the calib-status status logic. They resolve a
+// register record (Settings → Equipment) by name/notes keyword.
+var _CV_UV_RE    = /\buv\b|uv-?a|black\s*-?light|wood'?s\s*lamp|365\s*nm/i;
+var _CV_LIGHT_RE = /lux|light\s*meter|white\s*-?light|illuminat|photometer|lumen/i;
+
+// Pick a register record passing matchFn, preferring one approved for the
+// report's method — mirrors the calib-status fallback resolution.
+function _cvResolveEqByKind(matchFn, reportMethod){
+  if(typeof eqLoad !== 'function') return null;
+  let all;
+  try { all = eqLoad() || []; } catch(e){ return null; }
+  const pool = all.filter(matchFn);
+  if(!pool.length) return null;
+  return (reportMethod && pool.find(e => Array.isArray(e.methods) && e.methods.includes(reportMethod)))
+    || pool[0];
+}
+
+// Build a calibration status card from a register record. Identical
+// checks and styling to the calib-status branch of cvResolveSmartLink:
+//   1. Calibration — calDueAt vs today (eqIsExpired)
+//   2. Method approval — report's method in the record's `methods` list
+function _cvEqKindStatusCard(rec, reportMethod, emptyLbl){
+  if(!rec){
+    return _cvSmartCardHtml('background:rgba(160,160,160,.18);color:#666', emptyLbl,
+      ['No matching equipment'], ['Add it to Settings → Equipment']);
+  }
+  const calDue = rec.calDueAt ? new Date(rec.calDueAt) : null;
+  const expired = (typeof eqIsExpired === 'function')
+    ? eqIsExpired(rec)
+    : (calDue && !isNaN(calDue) && new Date() > calDue);
+  const approvedForMethod = !reportMethod
+    || !Array.isArray(rec.methods) || !rec.methods.length
+    || rec.methods.includes(reportMethod);
+  let cls, lbl, detail;
+  if(expired){
+    cls = 'background:rgba(242,92,92,.15);color:#991b1b'; lbl = '⚠ OUT OF CAL';
+    detail = ['Calibration expired ' + calDue.toLocaleDateString('en-GB')];
+  } else if(!approvedForMethod){
+    cls = 'background:rgba(245,166,35,.18);color:#92400e'; lbl = '⚠ NOT APPROVED';
+    detail = ['Not approved for ' + reportMethod, 'approved: ' + ((rec.methods||[]).join(', ') || 'none')];
+  } else {
+    cls = 'background:rgba(62,207,142,.15);color:#16a34a'; lbl = '✓ VALID';
+    detail = [
+      (calDue && !isNaN(calDue)) ? 'In cal to ' + calDue.toLocaleDateString('en-GB') : 'No calibration-due date set',
+      reportMethod ? 'approved for ' + reportMethod : '',
+    ];
+  }
+  return _cvSmartCardHtml(cls, lbl, [rec.name || '—', rec.svId || ''], detail);
+}
 function cvResolveSmartLink(block, report){
   if(!block || !block.key) return '';
   const k = block.key;
@@ -849,6 +908,18 @@ function cvResolveSmartLink(block, report){
       }
     }
     return _cvSmartCardHtml(cls, lbl, [equip], detail);
+  }
+  if(k === 'light-status' || k === 'uv-light-status'){
+    // White-light / UV-A light equipment calibration card. Resolves a
+    // register record by name keyword; UV matches are kept out of the
+    // white-light pool so a "UV light" record can't resolve as both.
+    const reportMethod = report?.method || '';
+    const isUv = k === 'uv-light-status';
+    const rec = _cvResolveEqByKind(e => {
+      const s = (e.name || '') + ' ' + (e.notes || '');
+      return isUv ? _CV_UV_RE.test(s) : (_CV_LIGHT_RE.test(s) && !_CV_UV_RE.test(s));
+    }, reportMethod);
+    return _cvEqKindStatusCard(rec, reportMethod, isUv ? '— NO UV LAMP' : '— NO LIGHT METER');
   }
   if(k === 'accept-eval'){
     // If block has measurement+criterion props, evaluate
@@ -2837,7 +2908,8 @@ function cvRenderBlockContent(block, report, preview){
     // Settings → Inspectors / Equipment, which is always on hand — so they
     // resolve in design mode too, against the sample (or preview-selected)
     // report, the way the company smart fields do.
-    const liveSmart = def.smartLink === 'cert' || def.smartLink === 'calib';
+    const liveSmart = def.smartLink === 'cert' || def.smartLink === 'calib'
+      || def.smartLink === 'light' || def.smartLink === 'uvlight';
     const smartReport = report || (liveSmart ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects) : null);
     const inner = smartReport
       ? cvResolveSmartLink(block, smartReport)

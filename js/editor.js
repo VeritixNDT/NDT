@@ -868,11 +868,16 @@ function cvResolveSmartLink(block, report){
       const rev = match.revision || match.rev || reportRev;
       const shownNo = match.procNo || match.procedureNo || match.no || procNo || '—';
       // Review date carried on the linked procedure record (Settings →
-      // NDT procedures) — shown as a third line when set.
+      // NDT procedures). A procedure past its review date flags the card
+      // into the not-valid (red) state — the same treatment the cert /
+      // calib cards give an expired certificate.
       const reviewDate = match.reviewDate ? new Date(match.reviewDate) : null;
-      const reviewLine = (reviewDate && !isNaN(reviewDate))
-        ? ['Review: ' + reviewDate.toLocaleDateString('en-GB')] : [];
-      return _cvSmartCardHtml('✓ LINKED',
+      const reviewOk   = reviewDate && !isNaN(reviewDate);
+      const overdue    = reviewOk && reviewDate < new Date(new Date().toDateString());
+      const reviewLine = reviewOk
+        ? [(overdue ? 'Review overdue — ' : 'Review: ') + reviewDate.toLocaleDateString('en-GB')]
+        : [];
+      return _cvSmartCardHtml(overdue ? '⚠ REVIEW DUE' : '✓ LINKED',
         [shownNo + (rev ? ' Rev ' + rev : '')],
         [match.title || match.standard || match.specification || 'Procedure on file'],
         reviewLine);

@@ -3422,7 +3422,15 @@ function cvRenderProps(id){
       return row('Column widths (relative)', `<div style="display:flex;flex-direction:column;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
         ${itemCols.map((c, i) => `<div style="display:flex;align-items:center;gap:6px">
           <span style="flex:1;font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.label)}</span>
-          <input type="number" min="20" max="500" step="5" value="${widths[i]}" data-on-change="_wCvSetItemsColWidth" data-on-input="_wCvSetItemsColWidth" data-pass-el="1" data-args="'${id}',${i}" style="width:60px;background:var(--panel);border:1px solid var(--border);border-radius:3px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono)"/>
+          <div style="display:flex;align-items:stretch;width:80px;flex-shrink:0">
+            <input type="number" min="20" max="500" step="5" value="${widths[i]}" data-colw="${i}" class="cv-num"
+              data-on-change="_wCvSetItemsColWidth" data-on-input="_wCvSetItemsColWidth" data-pass-el="1" data-args="'${id}',${i}"
+              style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono)"/>
+            <div style="display:flex;flex-direction:column;width:22px;flex-shrink:0">
+              <button type="button" class="cv-step" data-action="cvStepColWidth" data-args="'${id}',${i},1"  style="border-radius:0 4px 0 0;border-bottom:none">▲</button>
+              <button type="button" class="cv-step" data-action="cvStepColWidth" data-args="'${id}',${i},-1" style="border-radius:0 0 4px 0">▼</button>
+            </div>
+          </div>
         </div>`).join('')}
         <button data-action="_wCvResetItemsColWidths" data-args="'${id}'" style="margin-top:4px;background:none;border:1px dashed var(--border);color:var(--t3);font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer">Reset to defaults</button>
       </div>`);
@@ -3765,6 +3773,24 @@ function _wCvSetItemsColWidth(id, colIdx, el) {
   const v = +el.value;
   widths[colIdx] = (Number.isFinite(v) && v >= 20) ? v : (cols[colIdx]?.width || 130);
   cvUpdateBlock(id, 'colWidths', widths);
+}
+// Step a single items-table column width by ±5 — the ▲/▼ buttons beside
+// each width field, styled identically (.cv-num + .cv-step) to the
+// X/Y/W/H geometry steppers.
+function cvStepColWidth(id, colIdx, delta){
+  const block = cvBlocks.find(b => b.id === id);
+  if(!block || typeof RPT_FORM === 'undefined' || !Array.isArray(RPT_FORM.items)) return;
+  const cols = RPT_FORM.items;
+  const widths = (Array.isArray(block.colWidths) && block.colWidths.length === cols.length)
+    ? block.colWidths.slice()
+    : cols.map(c => c.width || 130);
+  const cur = (+widths[colIdx]) || (cols[colIdx]?.width || 130);
+  widths[colIdx] = Math.min(500, Math.max(20, cur + (+delta || 0) * 5));
+  cvUpdateBlock(id, 'colWidths', widths);
+  // cvUpdateBlock skips the props re-render for 'c…' props, so push the
+  // new value straight into the width field.
+  const inp = document.querySelector('#cv-props-body [data-colw="' + colIdx + '"]');
+  if(inp) inp.value = widths[colIdx];
 }
 // Reset back to RPT_FORM.items defaults. Forces a props-panel re-render
 // because cvUpdateBlock skips that for props starting with 'c' (intended

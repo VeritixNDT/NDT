@@ -44,6 +44,11 @@ var TPL_FIELDS = {
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black','Visible red','Dry powder black','Dry powder red'] },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
+    // Light / UV examination conditions. White-light for visible MT,
+    // UV-A irradiance + low background light for fluorescent MT.
+    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'] },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'] },
+    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'] },
   ],
   VT: [
     { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 350', options:['350','500','1000'] },
@@ -57,6 +62,11 @@ var TPL_FIELDS = {
     { id:'ddwell', label:'Developer dwell time', placeholder:'e.g. 10 mins', options:['7 mins','10 mins','10-20 mins','15 mins','20 mins','30 mins'] },
     { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
+    // Light / UV examination conditions. White-light for visible (colour
+    // contrast) PT, UV-A irradiance + low background light for fluorescent PT.
+    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'] },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'] },
+    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'] },
   ],
   PMI:[
     { id:'ctrl',label:'System control',placeholder:'e.g. 316L Reference block',options:['316L Reference block','304 Reference block','Duplex reference block','Carbon steel reference block']},

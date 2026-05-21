@@ -118,9 +118,8 @@ var CV_FIELD_DEFS = {
   'calib-status':    {label:'Equipment calibration', ph:'Cal valid until Q3 2025', get:r=>'',w:240,h:46, smartLink:'calib'},
   // Light-equipment calibration cards — same shape and status logic as
   // calib-status. They resolve a register record (Settings → Equipment)
-  // by name/notes keyword: white-light meters for the light card, UV-A
-  // lamps for the UV card. Name the gear so the keyword matches, e.g.
-  // "Lux meter" or "UV-A Lamp Labino".
+  // by its Type field — White-light meter for the light card, UV-A lamp
+  // for the UV card — falling back to a name keyword for untyped records.
   'light-status':    {label:'White-light equipment', ph:'White light · in cal', get:r=>'',w:240,h:46, smartLink:'light'},
   'uv-light-status': {label:'UV-A light equipment',  ph:'UV-A 365 nm · in cal', get:r=>'',w:240,h:46, smartLink:'uvlight'},
   'accept-eval':     {label:'Acceptance evaluation', ph:'7 mm vs ≤ 8 mm (ISO 11666 L2) — ACCEPTABLE', get:r=>'',w:380,h:46, smartLink:'accept'},
@@ -719,8 +718,9 @@ function _cvSmartCardHtml(cls, lbl, ...lines){
 
 // ── Light / UV-light equipment smart cards ─────────────────────────────
 // White-light meters and UV-A lamps are calibrated gear like any other,
-// so these cards reuse the calib-status status logic. They resolve a
-// register record (Settings → Equipment) by name/notes keyword.
+// so these cards reuse the calib-status status logic. Resolution is by
+// the equipment record's Type field, with a name/notes keyword fallback
+// for records saved before the Type field existed.
 var _CV_UV_RE    = /\buv\b|uv-?a|black\s*-?light|wood'?s\s*lamp|365\s*nm/i;
 var _CV_LIGHT_RE = /lux|light\s*meter|white\s*-?light|illuminat|photometer|lumen/i;
 
@@ -911,11 +911,17 @@ function cvResolveSmartLink(block, report){
   }
   if(k === 'light-status' || k === 'uv-light-status'){
     // White-light / UV-A light equipment calibration card. Resolves a
-    // register record by name keyword; UV matches are kept out of the
+    // register record (Settings → Equipment) by its Type field. Records
+    // with no Type set (saved before the field existed) fall back to a
+    // name/notes keyword match; UV matches are kept out of the
     // white-light pool so a "UV light" record can't resolve as both.
     const reportMethod = report?.method || '';
     const isUv = k === 'uv-light-status';
     const rec = _cvResolveEqByKind(e => {
+      if(e.type === 'uv-light')    return isUv;
+      if(e.type === 'white-light') return !isUv;
+      if(e.type === 'general')     return false;
+      // Untyped legacy record — fall back to the name/notes keyword.
       const s = (e.name || '') + ' ' + (e.notes || '');
       return isUv ? _CV_UV_RE.test(s) : (_CV_LIGHT_RE.test(s) && !_CV_UV_RE.test(s));
     }, reportMethod);

@@ -2484,6 +2484,14 @@ function eqDaysToExpiry(rec) {
   if(isNaN(due)) return null;
   return Math.floor((due.getTime() - Date.now()) / (24*60*60*1000));
 }
+// Equipment type — distinguishes white-light meters / UV-A lamps from
+// general NDT instruments. Drives the white-light / UV-light smart cards
+// in the PDF editor. Records with no type set read as 'General'.
+function eqTypeLabel(type) {
+  return type === 'white-light' ? 'White-light meter'
+       : type === 'uv-light'    ? 'UV-A lamp'
+       : 'General';
+}
 
 function eqRender() {
   // Method checkbox grid in the form — follows the user's NDT-method
@@ -2506,7 +2514,7 @@ function eqRender() {
   }
   let html = `<div class="sc"><div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
     <thead><tr>
-      <th scope="col">Name</th><th scope="col">SV-ID</th>
+      <th scope="col">Name</th><th scope="col">SV-ID</th><th scope="col">Type</th>
       <th scope="col">Methods</th>
       <th scope="col">Last cal.</th><th scope="col">Due</th>
       <th scope="col" style="width:90px">Status</th>
@@ -2522,6 +2530,7 @@ function eqRender() {
     html += `<tr>
       <td style="font-weight:600">${escapeHtml(rec.name||'—')}</td>
       <td style="font-family:var(--mono);font-size:12px">${escapeHtml(rec.svId||'—')}</td>
+      <td style="font-size:12px;color:var(--t2)">${escapeHtml(eqTypeLabel(rec.type))}</td>
       <td style="font-size:12px">${(rec.methods||[]).map(m=>{
         const md = NDT_METHODS.find(x=>x.id===m);
         return `<span style="display:inline-block;font-family:var(--mono);font-size:10px;color:${md?md.color:'var(--t2)'};border:1px solid currentColor;border-radius:3px;padding:0 4px;margin-right:3px">${escapeHtml(m)}</span>`;
@@ -2551,6 +2560,7 @@ function eqOpenForm(id) {
   el('eqf-callast').value = rec ? (rec.calLastAt||'') : '';
   el('eqf-caldue').value  = rec ? (rec.calDueAt||'')  : '';
   el('eqf-notes').value   = rec ? (rec.notes||'')   : '';
+  if(el('eqf-type')) el('eqf-type').value = (rec && rec.type) || 'general';
   const methods = rec ? (rec.methods||[]) : [];
   document.querySelectorAll('.eqf-method-cb').forEach(cb => { cb.checked = methods.includes(cb.value); });
   wrap.style.display = '';
@@ -2569,6 +2579,7 @@ function eqSave() {
     id: _eqEditId || ('eq-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7)),
     name,
     svId:      (el('eqf-svid').value    || '').trim(),
+    type:      el('eqf-type') ? el('eqf-type').value : 'general',
     calLastAt: (el('eqf-callast').value || '').trim() || null,
     calDueAt:  (el('eqf-caldue').value  || '').trim() || null,
     notes:     (el('eqf-notes').value   || '').trim(),

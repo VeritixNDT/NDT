@@ -220,7 +220,17 @@ function cvBuildPrintHTML(report){
     break-after: auto;
   }
   @media print {
-    .vx-print-page { width: 210mm; height: 297mm; }
+    .vx-print-page {
+      width: 210mm; height: 297mm;
+      /* The design canvas is full-bleed A4 (794px = 210mm), so the
+         outermost blocks — full-width accent bars, edge section headers —
+         sit hard against the sheet edge. Physical printers cannot print a
+         ~5-6mm band at each edge, so that content was being clipped.
+         Scale the page inward, centred, to keep everything inside a ~7mm
+         safe margin. PDF exports gain the same tidy margin. */
+      transform: scale(0.93);
+      transform-origin: center center;
+    }
   }
   @media screen {
     body { background: #444; padding: 20px; }

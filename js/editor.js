@@ -2862,12 +2862,18 @@ function cvRenderBlockContent(block, report, preview){
         // pixel-aligned with cards stacked above the table. Without this,
         // border-collapse on the cells would shift the edge by a half-pixel
         // and the table would visibly mismatch one side.
+        // The heading colour is set on <thead> — one fill behind BOTH
+        // header rows — so the title bar and the column-header row share a
+        // single rectangle and align exactly. Backgrounding the title
+        // colspan cell and the column-header row separately let the two
+        // drift by a sub-pixel at some zooms / column widths (the colspan
+        // cell rounds once, the N column cells round independently).
         return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
           <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;flex-shrink:0">
             ${colgroup}
-            <thead>
-              <tr><th colspan="${cols.length}" style="padding:4px 8px;background:${barColor};color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};text-align:center;letter-spacing:.06em;border-bottom:0.5px solid rgba(255,255,255,.18)">${title}</th></tr>
-              <tr style="background:${barColor}">${headCells}</tr>
+            <thead style="background:${barColor}">
+              <tr><th colspan="${cols.length}" style="padding:4px 8px;color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};text-align:center;letter-spacing:.06em;border-bottom:0.5px solid rgba(255,255,255,.18)">${title}</th></tr>
+              <tr>${headCells}</tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>

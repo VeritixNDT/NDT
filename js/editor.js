@@ -557,6 +557,15 @@ var CV_SAMPLE = {
   defects: [
     { type:'Linear indication', sev:'High', loc:'250mm from datum', depth:'3.2', len:'12', disp:'Repair required' },
     { type:'Surface porosity', sev:'Low',  loc:'680mm from datum', depth:'—', len:'4', disp:'Accept as-is' },
+  ],
+  // Sample examination-details rows — shown in the items-table block when
+  // the editor is in Preview mode and no real report / form data is on
+  // hand, so the layout designer can judge column spacing against
+  // realistic content instead of an empty row.
+  items: [
+    { subject:'Main leg splice weld — Node L4', drawing:'OSB-DWG-4420-B', dimensions:'Ø323.9 × 32mm', material:'S355J2G3', weldType:'V-prep',  weldProcess:'FCAW', welders:'J. Bakker',   examDate:'2025-03-15', extent:'100% Weld and HAZ',        verdict:'Acceptable' },
+    { subject:'Brace-to-chord weld — Node K2', drawing:'OSB-DWG-4418-A', dimensions:'Ø219.1 × 20mm', material:'S355J2G3', weldType:'½V-prep', weldProcess:'SMAW', welders:'M. de Vries', examDate:'2025-03-15', extent:'100% of the given weld',   verdict:'Not acceptable' },
+    { subject:'Stiffener fillet weld — Bay 3', drawing:'OSB-DWG-4421-C', dimensions:'12mm fillet',    material:'S355J2G3', weldType:'Fillet',  weldProcess:'SAW',  welders:'J. Bakker',   examDate:'2025-03-16', extent:'100% Surface examination', verdict:'Acceptable' },
   ]
 };
 
@@ -2712,7 +2721,9 @@ function cvRenderBlockContent(block, report, preview){
         }
         const items = liveItems
           ? liveItems
-          : (preview ? [{}] : [{ subject:'[Weld / object]', drawing:'[Drawing]', dimensions:'[Dimensions]', material:'[Material]', weldType:'[Prep]', weldProcess:'[Process]', welders:'[Welder]', examDate:'—', verdict:'—' }]);
+          : (preview
+              ? ((typeof CV_SAMPLE !== 'undefined' && Array.isArray(CV_SAMPLE.items) && CV_SAMPLE.items.length) ? CV_SAMPLE.items : [{}])
+              : [{ subject:'[Weld / object]', drawing:'[Drawing]', dimensions:'[Dimensions]', material:'[Material]', weldType:'[Prep]', weldProcess:'[Process]', welders:'[Welder]', examDate:'—', extent:'[Extent]', verdict:'—' }]);
         // Verdict cell colour swatches — same palette as the result place
         // card (rcolor / rbg above) plus a blue variant for "For
         // information" so all four states the form offers are covered.

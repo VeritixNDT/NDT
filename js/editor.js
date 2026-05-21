@@ -3333,8 +3333,23 @@ function cvRenderProps(id){
     `<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;margin-bottom:5px">
       <input type="checkbox" ${val?'checked':''} data-on-change="_wCvUpdateBlockChecked" data-pass-el="1" data-args="'${id}','${prop}'"/> ${lbl}
     </label>`;
+  // <input type="color"> only accepts a full #rrggbb value. A 3-digit hex
+  // (#000 — what the default layout stores), "transparent" (an unset
+  // background), an rgb()/rgba() string or a named colour makes the
+  // browser log a format warning and silently fall back. Normalise to
+  // #rrggbb for the swatch; the span still shows the block's real value.
+  const _toHex6 = (v) => {
+    const s = (typeof v === 'string' ? v : '').trim().toLowerCase();
+    let m = s.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/);
+    if(m) return '#' + m[1]+m[1] + m[2]+m[2] + m[3]+m[3];
+    m = s.match(/^#([0-9a-f]{6})(?:[0-9a-f]{2})?$/);
+    if(m) return '#' + m[1];
+    m = s.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/);
+    if(m){ const h = n => Math.max(0,Math.min(255,+n)).toString(16).padStart(2,'0'); return '#' + h(m[1]) + h(m[2]) + h(m[3]); }
+    return '#000000';
+  };
   const colorPick = (prop, val) =>
-    `<div style="display:flex;gap:6px;align-items:center"><input type="color" value="${val||'#000000'}" style="width:30px;height:24px;border-radius:3px;border:1px solid var(--border);padding:1px;cursor:pointer" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','${prop}'"/><span style="font-size:9px;font-family:var(--mono);color:var(--t3)">${val||'#000'}</span></div>`;
+    `<div style="display:flex;gap:6px;align-items:center"><input type="color" value="${_toHex6(val)}" style="width:30px;height:24px;border-radius:3px;border:1px solid var(--border);padding:1px;cursor:pointer" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','${prop}'"/><span style="font-size:9px;font-family:var(--mono);color:var(--t3)">${val||'#000'}</span></div>`;
   const numRow = (prop, val) => {
     // X/Y/W/H are disabled while the block is locked — a locked block's
     // geometry is frozen, so the panel must not offer a way to change it.

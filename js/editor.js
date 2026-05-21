@@ -4715,6 +4715,20 @@ async function cvSaveAsMethodTpl(){
   if(await vxConfirm({ message: `Save the current layout as the ${method} template?`, okLabel: t('vxc.save','Save') })) cvSaveMethodTpl(method);
 }
 
+// The ribbon's 💾 Save (and Ctrl+S) commit the canvas straight to the
+// current method's template — the vx-method-tpl-<method> slot that
+// reports read from — with no confirm dialog. cvSaveAsMethodTpl stays as
+// the explicit, confirmed variant. The working draft (vx-canvas-layout-v1)
+// autosaves on every edit, so it is already current; this is what makes
+// the 💾 Save button actually persist a method template.
+function cvSaveLayoutToMethod(){
+  const allBlocks = cvPages.reduce((a,p)=>a.concat(p.blocks),[]);
+  if(!allBlocks.length){ toast(t('toast.design_template_first','Design a template first.')); return; }
+  const sel = document.getElementById('cv-method-select');
+  const method = (sel && sel.value) || cvPpvMethod || 'UT';
+  cvSaveMethodTpl(method);
+}
+
 // V25: copy current layout to another method's template slot. Opens a small
 // modal with a method picker so the user can target a specific destination
 // (vs the "Save for method" button which always uses the visible dropdown).
@@ -5391,10 +5405,10 @@ document.addEventListener('keydown', e => {
 
   const mod = e.ctrlKey || e.metaKey;
 
-  // ── Save: Ctrl/Cmd + S ──
+  // ── Save: Ctrl/Cmd + S — commit to the current method's template ──
   if(mod && e.key === 's' && !e.shiftKey && !e.altKey){
     e.preventDefault();
-    try { cvSaveLayout(); toast(t('pe.toast.layout_saved','Layout saved.')); } catch(err){ console.error(err); }
+    try { cvSaveLayoutToMethod(); } catch(err){ console.error(err); }
     return;
   }
 

@@ -211,7 +211,6 @@ function _wPullAll() {
     vxRenderSubscription();
   });
 }
-function _wSaveLayoutWithToast()    { cvSaveLayout(); toast(t('pe.toast.layout_saved','Layout saved.')); }
 function _wResetProcFileQueue()     { _procFileQueue = []; procRenderQueue(); }
 function _wRemoveCertPill(i)        { _certPills.splice(i, 1); renderCertPills(); }
 function _wApLockResume() {

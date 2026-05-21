@@ -940,15 +940,21 @@ function cvResolveSmartLink(block, report){
     const wl = report?.eq_whitelight || report?.whitelight || report?.eq_lux || report?.lux || '';
     const uv = report?.eq_uvirr || report?.uvirr || '';
     const bg = report?.eq_bgwhite || report?.bgwhite || '';
+    // Flag a UV-A reading below the 1000 µW/cm² fluorescent-inspection
+    // minimum — the badge turns red and the line notes the shortfall.
+    const uvNum = parseFloat(uv);
+    const uvLow = uv !== '' && !isNaN(uvNum) && uvNum < 1000;
     const lines = [];
     if(wl) lines.push(['White light', wl + ' lux']);
-    if(uv) lines.push(['UV-A', uv + ' µW/cm²']);
+    if(uv) lines.push(['UV-A', uv + ' µW/cm²' + (uvLow ? ' — below 1000 min' : '')]);
     if(bg) lines.push(['Background', bg + ' lux']);
     if(!lines.length){
       return _cvSmartCardHtml('background:rgba(160,160,160,.18);color:#666', '💡 LIGHT / UV',
         ['No light/UV readings'], ['Recorded on VT / MT / PT reports']);
     }
-    return _cvSmartCardHtml('background:rgba(234,179,8,.16);color:#a16207', '💡 LIGHT / UV', ...lines);
+    const condCls = uvLow ? 'background:rgba(242,92,92,.15);color:#991b1b'
+                          : 'background:rgba(234,179,8,.16);color:#a16207';
+    return _cvSmartCardHtml(condCls, uvLow ? '⚠ UV-A LOW' : '💡 LIGHT / UV', ...lines);
   }
   if(k === 'accept-eval'){
     // If block has measurement+criterion props, evaluate

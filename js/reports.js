@@ -47,7 +47,7 @@ var TPL_FIELDS = {
     // Light / UV examination conditions. White-light for visible MT,
     // UV-A irradiance + low background light for fluorescent MT.
     { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true, numeric:true },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum' },
     { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
   ],
   VT: [
@@ -65,7 +65,7 @@ var TPL_FIELDS = {
     // Light / UV examination conditions. White-light for visible (colour
     // contrast) PT, UV-A irradiance + low background light for fluorescent PT.
     { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true, numeric:true },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum' },
     { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
   ],
   PMI:[
@@ -312,9 +312,20 @@ function rptFieldHtml(methodId, f, data) {
     // Numeric fields (UV-A, white-light) restrict input to numbers and
     // raise a decimal keypad on tablets; non-numeric fields stay free text.
     const numAttrs = f.numeric ? ' type="number" min="0" step="any" inputmode="decimal"' : ' type="text"';
+    // Range flag — fields with a minWarn threshold show an amber warning
+    // when the entered reading falls below it (e.g. UV-A < 1000 µW/cm²).
+    // _rptRangeCheck keeps it live as the inspector types.
+    const numVal = parseFloat(val);
+    const low = f.minWarn != null && val !== '' && !isNaN(numVal) && numVal < f.minWarn;
+    const warnAttrs = f.minWarn != null
+      ? ` data-on-input="_rptRangeCheck" data-on-change="_rptRangeCheck" data-pass-el="1" data-minwarn="${f.minWarn}"`
+      : '';
+    const warnHtml = f.minWarn != null
+      ? `<div class="rpt-range-warn" style="display:${low?'':'none'};font-size:11px;color:var(--amber);margin-top:3px">⚠ ${escapeHtml(f.minWarnMsg || ('Below the recommended minimum of ' + f.minWarn))}</div>`
+      : '';
     return `<div class="fld"><label>${f.label}</label>
-      <input id="${fid}" list="${dl}"${numAttrs} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
-      <datalist id="${dl}">${opts}</datalist></div>`;
+      <input id="${fid}" list="${dl}"${numAttrs}${warnAttrs} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"${low?' style="border-color:var(--amber)"':''}/>
+      <datalist id="${dl}">${opts}</datalist>${warnHtml}</div>`;
   }
   if(f.type==='select') {
     return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
@@ -332,6 +343,21 @@ function rptFieldHtml(methodId, f, data) {
     </div></div>`;
   }
   return `<div class="fld"><label>${f.label}</label><input id="${fid}" type="${f.type||'text'}" value="${val}" placeholder="${f.placeholder||''}" ${f.readonly?'readonly style="color:var(--t3);font-style:italic"':''}/></div>`;
+}
+
+// Range flag for editable reading fields. Toggles the amber warning shown
+// under a field (and its border colour) when the entered value drops
+// below the field's data-minwarn threshold. Wired via data-on-input /
+// data-on-change on the input by rptFieldHtml.
+function _rptRangeCheck(inp){
+  if(!inp) return;
+  const min = parseFloat(inp.dataset.minwarn);
+  if(isNaN(min)) return;
+  const warn = inp.parentElement ? inp.parentElement.querySelector('.rpt-range-warn') : null;
+  const v = parseFloat(inp.value);
+  const low = inp.value.trim() !== '' && !isNaN(v) && v < min;
+  if(warn) warn.style.display = low ? '' : 'none';
+  inp.style.borderColor = low ? 'var(--amber)' : '';
 }
 
 // Equipment-register dropdown — used by any RPT_FORM / TPL_FIELDS field

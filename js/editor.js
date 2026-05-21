@@ -4317,6 +4317,22 @@ function cvMouseMove(e){
         cvDrawSnapLines([]);
       }
 
+      // A method-cell that belongs to a method block is confined to that
+      // container's inner area — it cannot be dragged out of it. When the
+      // method block itself is dragged its children ride along via their
+      // own startPositions entry, so this clamp is a no-op there and only
+      // bites when a cell is dragged on its own.
+      if(b.key === 'method-cell' && b.parentId){
+        const parent = cvBlocks.find(p => p.id === b.parentId);
+        if(parent){
+          const barH = _cvMethodBarHeight(parent);
+          const minX = parent.x, maxX = parent.x + parent.w - b.w;
+          const minY = parent.y + barH, maxY = parent.y + parent.h - b.h;
+          newX = Math.min(Math.max(newX, minX), Math.max(minX, maxX));
+          newY = Math.min(Math.max(newY, minY), Math.max(minY, maxY));
+        }
+      }
+
       b.x = newX; b.y = newY;
       const elB = document.getElementById('cblk-'+b.id);
       if(elB){ elB.style.left=b.x+'px'; elB.style.top=b.y+'px'; }
@@ -4380,7 +4396,15 @@ function cvMouseUp(){
         // leaves x/y untouched and must not snap the cell anywhere.
         if(b.key === 'method-cell'){
           const sp = cvDragging.startPositions.find(s => s.id === id);
-          if(sp && (sp.x !== b.x || sp.y !== b.y)) _cvReparentCell(b);
+          if(sp && (sp.x !== b.x || sp.y !== b.y)){
+            // A cell already inside a method block stays inside it: clamp
+            // it back into its container rather than hit-testing for
+            // detachment. Only an unparented free cell runs the hit-test
+            // that can attach it to a container it was dropped into.
+            const parent = b.parentId ? cvBlocks.find(p => p.id === b.parentId) : null;
+            if(parent) _cvClampToParent(b, parent);
+            else _cvReparentCell(b);
+          }
         }
       }
     });

@@ -867,9 +867,15 @@ function cvResolveSmartLink(block, report){
       // recorded on the report if the record carries none.
       const rev = match.revision || match.rev || reportRev;
       const shownNo = match.procNo || match.procedureNo || match.no || procNo || '—';
+      // Review date carried on the linked procedure record (Settings →
+      // NDT procedures) — shown as a third line when set.
+      const reviewDate = match.reviewDate ? new Date(match.reviewDate) : null;
+      const reviewLine = (reviewDate && !isNaN(reviewDate))
+        ? ['Review: ' + reviewDate.toLocaleDateString('en-GB')] : [];
       return _cvSmartCardHtml('✓ LINKED',
         [shownNo + (rev ? ' Rev ' + rev : '')],
-        [match.title || match.standard || match.specification || 'Procedure on file']);
+        [match.title || match.standard || match.specification || 'Procedure on file'],
+        reviewLine);
     }
     const missDesc = spec ? 'No procedure on file for this specification'
                           : 'No procedure on file matching this number';

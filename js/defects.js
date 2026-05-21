@@ -410,6 +410,7 @@ function procRenderView(){
         <td style="font-size:11px">${p.standard||'—'}</td>
         <td style="font-size:11px">${p.acceptance||'—'}</td>
         <td><span class="badge badge-${stColor}" style="font-size:10px">${p.status||'—'}</span></td>
+        <td style="font-size:11px;white-space:nowrap">${p.reviewDate ? new Date(p.reviewDate).toLocaleDateString('en-GB') : '—'}</td>
         <td>
           ${hasFile
             ?`<div style="display:flex;align-items:center;gap:6px;cursor:pointer" data-action="procViewFileView" data-args="${idx}" title="Click to view">
@@ -424,14 +425,14 @@ function procRenderView(){
     }).join('');
     wrap.innerHTML = `<div class="sc"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%;font-size:12px"><thead><tr>
-        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Document</th>
+        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Review</th><th scope="col">Document</th>
       </tr></thead><tbody>${rows}</tbody></table></div></div>`;
   } else {
     wrap.innerHTML = `<div class="sc"><div class="sc-body np">
       <table class="tbl" style="width:100%"><thead><tr>
-        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Document</th>
+        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Review</th><th scope="col">Document</th>
       </tr></thead><tbody>
-        <tr><td colspan="8" style="text-align:center;padding:36px;color:var(--t3)">No procedures found. Add procedures via <strong>Settings → NDT procedures</strong>.</td></tr>
+        <tr><td colspan="9" style="text-align:center;padding:36px;color:var(--t3)">No procedures found. Add procedures via <strong>Settings → NDT procedures</strong>.</td></tr>
       </tbody></table></div></div>`;
   }
 }
@@ -522,6 +523,7 @@ function procRender(){
         <td style="font-size:11px">${p.standard||'—'}</td>
         <td style="font-size:11px">${p.acceptance||'—'}</td>
         <td><span class="badge badge-${stColor}" style="font-size:10px">${p.status||'—'}</span></td>
+        <td style="font-size:11px;white-space:nowrap">${p.reviewDate ? new Date(p.reviewDate).toLocaleDateString('en-GB') : '—'}</td>
         <td>
           ${hasFile
             ?`<div style="display:flex;align-items:center;gap:6px;cursor:pointer" data-action="procViewFile" data-args="${idx}" title="Click to view">
@@ -542,14 +544,14 @@ function procRender(){
     }).join('');
     wrap.innerHTML = `<div class="sc"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%;font-size:12px"><thead><tr>
-        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Document</th><th scope="col" style="width:90px">Actions</th>
+        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Review</th><th scope="col">Document</th><th scope="col" style="width:90px">Actions</th>
       </tr></thead><tbody>${rows}</tbody></table></div></div>`;
   } else {
     wrap.innerHTML = `<div class="sc"><div class="sc-body np">
       <table class="tbl" style="width:100%"><thead><tr>
-        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Document</th><th scope="col">Actions</th>
+        <th scope="col">Procedure No.</th><th scope="col">Title</th><th scope="col">Rev</th><th scope="col">Method</th><th scope="col">Specification</th><th scope="col">Acceptance</th><th scope="col">Status</th><th scope="col">Review</th><th scope="col">Document</th><th scope="col">Actions</th>
       </tr></thead><tbody>
-        <tr><td colspan="9" style="text-align:center;padding:36px;color:var(--t3)">No procedures found. Click <strong>+ Upload procedure</strong> to add one.</td></tr>
+        <tr><td colspan="10" style="text-align:center;padding:36px;color:var(--t3)">No procedures found. Click <strong>+ Upload procedure</strong> to add one.</td></tr>
       </tbody></table></div></div>`;
   }
 }
@@ -592,6 +594,7 @@ function procShowUpload(editIdx){
     el('proc-no').value = p.procNo||'';
     el('proc-title').value = p.title||'';
     el('proc-rev').value = p.revision||'';
+    el('proc-review').value = p.reviewDate||'';
     el('proc-status').value = p.status||'Active';
     if(mSel) mSel.value = p.method||'UT';
     el('proc-standard').value = p.standard||'';
@@ -603,7 +606,7 @@ function procShowUpload(editIdx){
   } else {
     if(titleEl) titleEl.textContent = 'Upload procedure';
     if(saveBtn) saveBtn.textContent = 'Save procedure';
-    ['proc-no','proc-title','proc-rev','proc-standard','proc-acceptance'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
+    ['proc-no','proc-title','proc-rev','proc-review','proc-standard','proc-acceptance'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
     el('proc-status').value = 'Active';
     if(mSel) mSel.selectedIndex = 0;
     if(queueEl) queueEl.innerHTML = '';
@@ -908,6 +911,7 @@ async function procSave(){
   const method = el('proc-method')?.value||'UT';
   const standard = el('proc-standard')?.value?.trim()||'';
   const acceptance = el('proc-acceptance')?.value?.trim()||'';
+  const reviewDate = el('proc-review')?.value||'';
 
   if(!procNo){ toast(t('toast.procedure_no_required', 'Procedure number is required'),'error'); return; }
 
@@ -920,7 +924,7 @@ async function procSave(){
   if(_procEditIdx >= 0 && _procEditIdx < all.length){
     const p = all[_procEditIdx];
     if(hasNewFile && p.procNo && p.procNo !== procNo) procDeleteFile(p.procNo);
-    Object.assign(p, {procNo, title, revision, status, method, standard, acceptance, updatedAt:new Date().toISOString()});
+    Object.assign(p, {procNo, title, revision, status, method, standard, acceptance, reviewDate, updatedAt:new Date().toISOString()});
     if(hasNewFile){
       p.fileName = fileName; p.fileType = fileType; p.fileSize = fileSize; p.hasFile = true;
       if(!procSaveFile(procNo, _procFileQueue[0].dataUrl)){
@@ -934,7 +938,7 @@ async function procSave(){
       if(!await vxConfirm({ message: `A procedure named "${procNo}" already exists. Are you sure you want to add it anyway?`, okLabel: t('vxc.add','Add') })) return;
     }
     const proc = {
-      procNo, title, revision, status, method, standard, acceptance,
+      procNo, title, revision, status, method, standard, acceptance, reviewDate,
       fileName: fileName||null, fileType: fileType||null, fileSize: fileSize||null,
       hasFile: hasNewFile,
       createdAt: new Date().toISOString(),

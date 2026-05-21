@@ -44,11 +44,11 @@ var TPL_FIELDS = {
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black','Visible red','Dry powder black','Dry powder red'] },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
-    // Light / UV examination conditions. White-light for visible MT,
-    // UV-A irradiance + low background light for fluorescent MT.
-    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true, numeric:true },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum' },
-    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
+    // Light / UV examination conditions. White light gates the UV-A
+    // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
+    // above 20 lux it is a visible white-light inspection (UV-A N/A).
+    { id:'whitelight', label:'White light (lux)',         placeholder:'e.g. 500',  options:['5','10','15','20','50','350','500','1000','1500','2000'], editable:true, numeric:true, gates:'uvirr' },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   VT: [
     { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 350', options:['350','500','1000'] },
@@ -62,11 +62,11 @@ var TPL_FIELDS = {
     { id:'ddwell', label:'Developer dwell time', placeholder:'e.g. 10 mins', options:['7 mins','10 mins','10-20 mins','15 mins','20 mins','30 mins'] },
     { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
-    // Light / UV examination conditions. White-light for visible (colour
-    // contrast) PT, UV-A irradiance + low background light for fluorescent PT.
-    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true, numeric:true },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum' },
-    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
+    // Light / UV examination conditions. White light gates the UV-A
+    // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
+    // above 20 lux it is a visible white-light inspection (UV-A N/A).
+    { id:'whitelight', label:'White light (lux)',         placeholder:'e.g. 500',  options:['5','10','15','20','50','350','500','1000','1500','2000'], editable:true, numeric:true, gates:'uvirr' },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   PMI:[
     { id:'ctrl',label:'System control',placeholder:'e.g. 316L Reference block',options:['316L Reference block','304 Reference block','Duplex reference block','Carbon steel reference block']},
@@ -312,20 +312,35 @@ function rptFieldHtml(methodId, f, data) {
     // Numeric fields (UV-A, white-light) restrict input to numbers and
     // raise a decimal keypad on tablets; non-numeric fields stay free text.
     const numAttrs = f.numeric ? ' type="number" min="0" step="any" inputmode="decimal"' : ' type="text"';
+    // Gate target — a field that reads "Not applicable" until its gating
+    // field qualifies it (UV-A applies only when white light ≤ gateMax).
+    const gateMax = f.gateMax != null ? f.gateMax : 20;
+    let gateApplies = true;
+    if(f.gatedBy) {
+      const gv = parseFloat((data['eq_'+f.gatedBy] != null ? data['eq_'+f.gatedBy] : data[f.gatedBy]) || '');
+      gateApplies = !isNaN(gv) && gv <= gateMax;
+    }
+    // Gate source — drives a target field's applicability (white light
+    // gates UV-A). _rptLightGate keeps the target live as the user types.
+    const gateAttrs = f.gates ? ' data-on-input="_rptLightGate" data-on-change="_rptLightGate" data-pass-el="1"' : '';
+    const gateData  = f.gatedBy ? ` data-gatemax="${gateMax}"` : '';
     // Range flag — fields with a minWarn threshold show an amber warning
     // when the entered reading falls below it (e.g. UV-A < 1000 µW/cm²).
-    // _rptRangeCheck keeps it live as the inspector types.
     const numVal = parseFloat(val);
     const low = f.minWarn != null && val !== '' && !isNaN(numVal) && numVal < f.minWarn;
     const warnAttrs = f.minWarn != null
       ? ` data-on-input="_rptRangeCheck" data-on-change="_rptRangeCheck" data-pass-el="1" data-minwarn="${f.minWarn}"`
       : '';
     const warnHtml = f.minWarn != null
-      ? `<div class="rpt-range-warn" style="display:${low?'':'none'};font-size:11px;color:var(--amber);margin-top:3px">⚠ ${escapeHtml(f.minWarnMsg || ('Below the recommended minimum of ' + f.minWarn))}</div>`
+      ? `<div class="rpt-range-warn" style="display:${low&&gateApplies?'':'none'};font-size:11px;color:var(--amber);margin-top:3px">⚠ ${escapeHtml(f.minWarnMsg || ('Below the recommended minimum of ' + f.minWarn))}</div>`
       : '';
+    const naHtml = f.gatedBy
+      ? `<div class="rpt-na" style="display:${gateApplies?'none':'block'};font-size:13px;color:var(--t3);font-style:italic;padding:7px 2px">Not applicable — fluorescent inspection only (≤${gateMax} lux)</div>`
+      : '';
+    const inpStyle = (low?'border-color:var(--amber);':'') + (f.gatedBy && !gateApplies ? 'display:none' : '');
     return `<div class="fld"><label>${f.label}</label>
-      <input id="${fid}" list="${dl}"${numAttrs}${warnAttrs} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"${low?' style="border-color:var(--amber)"':''}/>
-      <datalist id="${dl}">${opts}</datalist>${warnHtml}</div>`;
+      <input id="${fid}" list="${dl}"${numAttrs}${warnAttrs}${gateAttrs}${gateData} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"${inpStyle?` style="${inpStyle}"`:''}/>
+      <datalist id="${dl}">${opts}</datalist>${warnHtml}${naHtml}</div>`;
   }
   if(f.type==='select') {
     return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
@@ -358,6 +373,34 @@ function _rptRangeCheck(inp){
   const low = inp.value.trim() !== '' && !isNaN(v) && v < min;
   if(warn) warn.style.display = low ? '' : 'none';
   inp.style.borderColor = low ? 'var(--amber)' : '';
+}
+
+// Light-mode gate. White light above the threshold (20 lux) means a
+// visible white-light inspection, so the UV-A field doesn't apply; at or
+// below it the exam is fluorescent and UV-A is captured. Shows the UV-A
+// input or its "Not applicable" readout live as the white-light field is
+// edited, and clears the UV-A value while N/A so a visible inspection
+// never carries a stray UV reading. Wired via data-on-input on the
+// white-light field by rptFieldHtml.
+function _rptLightGate(wlInput){
+  if(!wlInput) return;
+  const uvInput = document.getElementById(wlInput.id.replace('whitelight','uvirr'));
+  if(!uvInput) return;
+  const fld = uvInput.closest('.fld'); if(!fld) return;
+  const na   = fld.querySelector('.rpt-na');
+  const warn = fld.querySelector('.rpt-range-warn');
+  const max  = parseFloat(uvInput.dataset.gatemax);
+  const lim  = isNaN(max) ? 20 : max;
+  const wl   = parseFloat(wlInput.value);
+  const applies = wlInput.value.trim() !== '' && !isNaN(wl) && wl <= lim;
+  uvInput.style.display = applies ? '' : 'none';
+  if(na) na.style.display = applies ? 'none' : 'block';
+  if(applies){
+    if(typeof _rptRangeCheck === 'function') _rptRangeCheck(uvInput);
+  } else {
+    uvInput.value = '';
+    if(warn) warn.style.display = 'none';
+  }
 }
 
 // Equipment-register dropdown — used by any RPT_FORM / TPL_FIELDS field

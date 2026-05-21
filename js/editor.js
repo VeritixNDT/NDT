@@ -122,11 +122,12 @@ var CV_FIELD_DEFS = {
   // for the UV card — falling back to a name keyword for untyped records.
   'light-status':    {label:'White-light equipment', ph:'White light · in cal', get:r=>'',w:240,h:46, smartLink:'light'},
   'uv-light-status': {label:'UV-A light equipment',  ph:'UV-A 365 nm · in cal', get:r=>'',w:240,h:46, smartLink:'uvlight'},
-  // Combined examination light & UV conditions — renders the white-light,
-  // UV-A and background-light readings the inspector captured on a
-  // VT / MT / PT report (eq_whitelight / eq_uvirr / eq_bgwhite; VT's
-  // white light is eq_lux).
-  'light-conditions':{label:'Light & UV conditions', ph:'White light · UV-A · background', get:r=>'',w:240,h:46, smartLink:'lightcond'},
+  // Combined examination light & UV conditions — renders the white-light
+  // and UV-A readings captured on a VT / MT / PT report. White light gates
+  // UV-A: ≤20 lux is fluorescent (UV-A shown), above 20 lux is a visible
+  // inspection (UV-A "Not applicable"). MT / PT use eq_whitelight /
+  // eq_uvirr; VT's white light is eq_lux.
+  'light-conditions':{label:'Light & UV conditions', ph:'White light · UV-A', get:r=>'',w:240,h:46, smartLink:'lightcond'},
   'accept-eval':     {label:'Acceptance evaluation', ph:'7 mm vs ≤ 8 mm (ISO 11666 L2) — ACCEPTABLE', get:r=>'',w:380,h:46, smartLink:'accept'},
 
   // ── ADVANCED OUTPUT ─────────────────────────────────────────────
@@ -537,7 +538,7 @@ var CV_SAMPLE = {
     spec:'EN-ISO 17640:2018', accCrit:'EN-ISO 11666:2018 level 2',
     proc:'SV2023-004-NDTD-PRO-0009', procRev:'01', stage:'Final',
     equip:'SIUI Smartor 16', eqSvId:'SV-UT-004', eqCalDate:'2025-01-10',
-    whitelight:'500', uvirr:'1200', bgwhite:'≤20',
+    whitelight:'15', uvirr:'1200',
     inspector:'Carl Cope', level:'UT Level II',
     certAuth:'PCN:319222', indications:'No / Nee', witness:'Client representative',
     repDate:'2025-03-15', signDate:'2025-03-15',
@@ -545,9 +546,9 @@ var CV_SAMPLE = {
   },
   methodData: {
     UT:  {coup:'Waterbased', freq:'5 MHz', range:'0-100mm', probe:'Single crystal angle beam 70°', sens:'DAC + Transfer + 6dB', refblk:'K1 IIW 1', calblk:'EN-ISO 17640 32mm'},
-    MT:  {tech:'Yoke (AC)', mtmethod:'Wet fluorescent', syscontrol:'> 4,5 kg + ASTM Pie', demag:'Yes', curint:'2-3 Ampere', cur:'AC', susp:'Magnaflux 7HF', susptype:'Fluorescent water-based', contrast:'Not used', whitelight:'500', uvirr:'1200', bgwhite:'≤20'},
+    MT:  {tech:'Yoke (AC)', mtmethod:'Wet fluorescent', syscontrol:'> 4,5 kg + ASTM Pie', demag:'Yes', curint:'2-3 Ampere', cur:'AC', susp:'Magnaflux 7HF', susptype:'Fluorescent water-based', contrast:'Not used', whitelight:'15', uvirr:'1200'},
     VT:  {lux:'500', magn:'×2', dist:'600 mm max', vtequip:'Welding gauge set'},
-    PT:  {pen:'Magnaflux ZL4C', pdwell:'15 mins', ddwell:'10-20 mins', clean:'Magnaflux SKC-S', dev:'Magnaflux SKD-S2', whitelight:'500', uvirr:'1200', bgwhite:'≤20'},
+    PT:  {pen:'Magnaflux ZL4C', pdwell:'15 mins', ddwell:'10-20 mins', clean:'Magnaflux SKC-S', dev:'Magnaflux SKD-S2', whitelight:'15', uvirr:'1200'},
     PMI: {ctrl:'316L Reference block', mode:'Alloy ID', pmiequip:'X-MET 8000 Expert'},
     HT:  {scale:'HV10', method:'UCI', htequip:'Mic 10'},
     RT:  {source:'Ir-192', film:'D7 / Kodak AA400', iqitype:'Wire type EN 462-1', sfd:'700 mm'},
@@ -939,15 +940,22 @@ function cvResolveSmartLink(block, report){
     // VT records white light as eq_lux; MT / PT as eq_whitelight.
     const wl = report?.eq_whitelight || report?.whitelight || report?.eq_lux || report?.lux || '';
     const uv = report?.eq_uvirr || report?.uvirr || '';
-    const bg = report?.eq_bgwhite || report?.bgwhite || '';
-    // Flag a UV-A reading below the 1000 µW/cm² fluorescent-inspection
-    // minimum — the badge turns red and the line notes the shortfall.
+    // White light gates UV-A: at or below 20 lux the exam is fluorescent
+    // (UV-A applies); above 20 lux it is a visible white-light inspection,
+    // so UV-A reads "Not applicable".
+    const wlNum = parseFloat(wl);
+    const fluorescent = wl !== '' && !isNaN(wlNum) && wlNum <= 20;
+    // Flag an applicable UV-A reading below the 1000 µW/cm² minimum — the
+    // badge turns red and the line notes the shortfall.
     const uvNum = parseFloat(uv);
-    const uvLow = uv !== '' && !isNaN(uvNum) && uvNum < 1000;
+    const uvLow = fluorescent && uv !== '' && !isNaN(uvNum) && uvNum < 1000;
     const lines = [];
     if(wl) lines.push(['White light', wl + ' lux']);
-    if(uv) lines.push(['UV-A', uv + ' µW/cm²' + (uvLow ? ' — below 1000 min' : '')]);
-    if(bg) lines.push(['Background', bg + ' lux']);
+    if(fluorescent){
+      lines.push(['UV-A', uv !== '' ? (uv + ' µW/cm²' + (uvLow ? ' — below 1000 min' : '')) : 'not recorded']);
+    } else if(wl){
+      lines.push(['UV-A', 'Not applicable']);
+    }
     if(!lines.length){
       return _cvSmartCardHtml('background:rgba(160,160,160,.18);color:#666', '💡 LIGHT / UV',
         ['No light/UV readings'], ['Recorded on VT / MT / PT reports']);

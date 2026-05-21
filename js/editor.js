@@ -122,6 +122,11 @@ var CV_FIELD_DEFS = {
   // for the UV card — falling back to a name keyword for untyped records.
   'light-status':    {label:'White-light equipment', ph:'White light · in cal', get:r=>'',w:240,h:46, smartLink:'light'},
   'uv-light-status': {label:'UV-A light equipment',  ph:'UV-A 365 nm · in cal', get:r=>'',w:240,h:46, smartLink:'uvlight'},
+  // Combined examination light & UV conditions — renders the white-light,
+  // UV-A and background-light readings the inspector captured on a
+  // VT / MT / PT report (eq_whitelight / eq_uvirr / eq_bgwhite; VT's
+  // white light is eq_lux).
+  'light-conditions':{label:'Light & UV conditions', ph:'White light · UV-A · background', get:r=>'',w:240,h:46, smartLink:'lightcond'},
   'accept-eval':     {label:'Acceptance evaluation', ph:'7 mm vs ≤ 8 mm (ISO 11666 L2) — ACCEPTABLE', get:r=>'',w:380,h:46, smartLink:'accept'},
 
   // ── ADVANCED OUTPUT ─────────────────────────────────────────────
@@ -261,7 +266,7 @@ var CV_PALETTE_GROUPS = [
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
-  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','light-status','uv-light-status','accept-eval']},
+  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','light-status','uv-light-status','light-conditions','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},
   {id:'components',label:'⬢ My components', isComponents:true},
@@ -532,6 +537,7 @@ var CV_SAMPLE = {
     spec:'EN-ISO 17640:2018', accCrit:'EN-ISO 11666:2018 level 2',
     proc:'SV2023-004-NDTD-PRO-0009', procRev:'01', stage:'Final',
     equip:'SIUI Smartor 16', eqSvId:'SV-UT-004', eqCalDate:'2025-01-10',
+    whitelight:'500', uvirr:'1200', bgwhite:'≤20',
     inspector:'Carl Cope', level:'UT Level II',
     certAuth:'PCN:319222', indications:'No / Nee', witness:'Client representative',
     repDate:'2025-03-15', signDate:'2025-03-15',
@@ -539,9 +545,9 @@ var CV_SAMPLE = {
   },
   methodData: {
     UT:  {coup:'Waterbased', freq:'5 MHz', range:'0-100mm', probe:'Single crystal angle beam 70°', sens:'DAC + Transfer + 6dB', refblk:'K1 IIW 1', calblk:'EN-ISO 17640 32mm'},
-    MT:  {tech:'Yoke (AC)', mtmethod:'Wet fluorescent', syscontrol:'> 4,5 kg + ASTM Pie', demag:'Yes', curint:'2-3 Ampere', cur:'AC', susp:'Magnaflux 7HF', susptype:'Fluorescent water-based', contrast:'Not used'},
+    MT:  {tech:'Yoke (AC)', mtmethod:'Wet fluorescent', syscontrol:'> 4,5 kg + ASTM Pie', demag:'Yes', curint:'2-3 Ampere', cur:'AC', susp:'Magnaflux 7HF', susptype:'Fluorescent water-based', contrast:'Not used', whitelight:'500', uvirr:'1200', bgwhite:'≤20'},
     VT:  {lux:'500', magn:'×2', dist:'600 mm max', vtequip:'Welding gauge set'},
-    PT:  {pen:'Magnaflux ZL4C', pdwell:'15 mins', ddwell:'10-20 mins', clean:'Magnaflux SKC-S', dev:'Magnaflux SKD-S2'},
+    PT:  {pen:'Magnaflux ZL4C', pdwell:'15 mins', ddwell:'10-20 mins', clean:'Magnaflux SKC-S', dev:'Magnaflux SKD-S2', whitelight:'500', uvirr:'1200', bgwhite:'≤20'},
     PMI: {ctrl:'316L Reference block', mode:'Alloy ID', pmiequip:'X-MET 8000 Expert'},
     HT:  {scale:'HV10', method:'UCI', htequip:'Mic 10'},
     RT:  {source:'Ir-192', film:'D7 / Kodak AA400', iqitype:'Wire type EN 462-1', sfd:'700 mm'},
@@ -926,6 +932,23 @@ function cvResolveSmartLink(block, report){
       return isUv ? _CV_UV_RE.test(s) : (_CV_LIGHT_RE.test(s) && !_CV_UV_RE.test(s));
     }, reportMethod);
     return _cvEqKindStatusCard(rec, reportMethod, isUv ? '— NO UV LAMP' : '— NO LIGHT METER');
+  }
+  if(k === 'light-conditions'){
+    // Combined examination light & UV conditions — the white-light, UV-A
+    // and background-light readings captured on a VT / MT / PT report.
+    // VT records white light as eq_lux; MT / PT as eq_whitelight.
+    const wl = report?.eq_whitelight || report?.whitelight || report?.eq_lux || report?.lux || '';
+    const uv = report?.eq_uvirr || report?.uvirr || '';
+    const bg = report?.eq_bgwhite || report?.bgwhite || '';
+    const lines = [];
+    if(wl) lines.push(['White light', wl + ' lux']);
+    if(uv) lines.push(['UV-A', uv + ' µW/cm²']);
+    if(bg) lines.push(['Background', bg + ' lux']);
+    if(!lines.length){
+      return _cvSmartCardHtml('background:rgba(160,160,160,.18);color:#666', '💡 LIGHT / UV',
+        ['No light/UV readings'], ['Recorded on VT / MT / PT reports']);
+    }
+    return _cvSmartCardHtml('background:rgba(234,179,8,.16);color:#a16207', '💡 LIGHT / UV', ...lines);
   }
   if(k === 'accept-eval'){
     // If block has measurement+criterion props, evaluate
@@ -2915,7 +2938,8 @@ function cvRenderBlockContent(block, report, preview){
     // resolve in design mode too, against the sample (or preview-selected)
     // report, the way the company smart fields do.
     const liveSmart = def.smartLink === 'cert' || def.smartLink === 'calib'
-      || def.smartLink === 'light' || def.smartLink === 'uvlight';
+      || def.smartLink === 'light' || def.smartLink === 'uvlight'
+      || def.smartLink === 'lightcond';
     const smartReport = report || (liveSmart ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects) : null);
     const inner = smartReport
       ? cvResolveSmartLink(block, smartReport)

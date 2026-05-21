@@ -2816,7 +2816,11 @@ function cvRenderBlockContent(block, report, preview){
             // than the content.
             const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
             const borderBottom = 'border-bottom:0.5px solid #ddd;';
-            return `<td style="padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:top;word-break:break-word;overflow:hidden">${inner}</td>`;
+            // Each data row renders 36px deep so the table's row rhythm
+            // matches the standard place-card height used everywhere else
+            // on the report. height on a <td> acts as a minimum, so a cell
+            // with unusually long content can still grow past it.
+            return `<td style="height:36px;padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:top;word-break:break-word;overflow:hidden">${inner}</td>`;
           }).join('');
           return `<tr>${cells}</tr>`;
         }).join('');

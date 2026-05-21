@@ -561,7 +561,7 @@ function cvBuildReport(method, result, showDefects){
       b.id = b.reportNo || real.reportNo;
       // Defects from store, filtered to this report
       const allDef = ls(KEYS.defects, []);
-      b.defects = allDef.filter(d => d.reportNo === b.reportNo || d.reportId === real.id) || [];
+      b.defects = allDef.filter(d => d.reportNo === b.reportNo || d.reportId === real.id);
       if(!b.defects.length && showDefects) b.defects = CV_SAMPLE.defects.slice(0, 1); // give designer at least one row
       // Method-specific
       b.methodData = CV_SAMPLE.methodData[b.method] || {};

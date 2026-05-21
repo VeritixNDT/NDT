@@ -784,6 +784,25 @@ function _cvEqKindStatusCard(rec, reportMethod, emptyLbl){
   }
   return _cvSmartCardHtml(cls, lbl, [rec.name || '—', rec.svId || ''], detail);
 }
+// Normalise a specification / standard string to a comparison key, so the
+// procedure smart card links a report's specification to a registered
+// procedure even when the two were typed in different forms. By agreed
+// rule the key ignores letter case, all whitespace and punctuation, the
+// edition year (":2016", "Ed.2023", a trailing year) and a leading "EN"
+// adoption prefix — so "ISO 17638: 2016", "EN-ISO 17638:2018" and
+// "EN ISO 17638" all collapse to the same key, "iso17638".
+function _cvSpecKey(s){
+  let x = String(s || '').toLowerCase().trim();
+  if(!x) return '';
+  // Drop the edition year where it is anchored to a separator or "Ed.".
+  x = x.replace(/[:\-]\s*(?:ed(?:ition)?\.?\s*)?(?:19|20)\d{2}/g, ' ');
+  x = x.replace(/\bed(?:ition)?\.?\s*(?:19|20)\d{2}/g, ' ');
+  x = x.replace(/\s+(?:19|20)\d{2}\s*$/g, ' ');
+  // Reduce to bare alphanumerics, then drop a leading "en" adoption
+  // marker so "eniso17638" matches a plain "iso17638".
+  x = x.replace(/[^a-z0-9]+/g, '').replace(/^en(?=iso)/, '');
+  return x;
+}
 function cvResolveSmartLink(block, report){
   if(!block || !block.key) return '';
   const k = block.key;
@@ -793,16 +812,23 @@ function cvResolveSmartLink(block, report){
     const procNo     = (report?.eq_proc || report?.proc || report?.procedure || '').trim();
     const reportRev  = report?.procRev || '';
     const reportMeth = report?.method || '';
-    // Resolve against Settings → Procedures. Primary link: the report's
-    // specification → a procedure's `standard` field (narrowed to the
-    // report's method when several procedures share that standard). Falls
-    // back to a direct procedure-number match for older reports that
-    // carry an explicit number.
-    const norm = s => String(s || '').trim().toLowerCase();
+    // Resolve against Settings → NDT procedures. Primary link: the
+    // report's specification → a procedure's `standard` field, compared on
+    // the year-/prefix-agnostic key (see _cvSpecKey). When several
+    // procedures share a standard, prefer the report's own method and an
+    // Active revision. Falls back to a direct procedure-number match for
+    // older reports that carry an explicit number.
     let match = null;
     if(spec){
-      const bySpec = procs.filter(p => p.standard && norm(p.standard) === norm(spec));
-      match = bySpec.find(p => p.method === reportMeth) || bySpec[0] || null;
+      const specKey = _cvSpecKey(spec);
+      if(specKey){
+        const bySpec   = procs.filter(p => _cvSpecKey(p.standard) === specKey);
+        const isActive = p => /^active$/i.test(String(p.status || '').trim());
+        match = bySpec.find(p => p.method === reportMeth && isActive(p))
+             || bySpec.find(p => p.method === reportMeth)
+             || bySpec.find(isActive)
+             || bySpec[0] || null;
+      }
     }
     if(!match && procNo && procNo !== '—'){
       match = procs.find(p => p.procNo === procNo || p.procedureNo === procNo || p.no === procNo);
@@ -2973,16 +2999,16 @@ function cvRenderBlockContent(block, report, preview){
       const value = def.get(report) || '—';
       return `<div style="height:100%;padding:4px 7px;box-sizing:border-box;display:flex;align-items:center;justify-content:${jc};white-space:pre-wrap;line-height:1.35;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al}">${escapeHtml(value)}</div>`;
     }
-    // Non-company smart-link fields. procedure-link and accept-eval need
-    // report-specific data (a procedure number, defect measurements), so
-    // they keep the "resolves at preview/export" placeholder until a real
-    // report is in preview. cert-status and calib-status read live from
-    // Settings → Inspectors / Equipment, which is always on hand — so they
-    // resolve in design mode too, against the sample (or preview-selected)
-    // report, the way the company smart fields do.
+    // Non-company smart-link fields. accept-eval still needs report-
+    // specific defect measurements, so it keeps the "resolves at preview/
+    // export" placeholder until a real report is in preview. The rest —
+    // cert / calib / light status and procedure-link — resolve live in
+    // design mode too: they read from Settings (Inspectors / Equipment /
+    // NDT procedures) against the sample or preview-selected report, the
+    // way the company smart fields do.
     const liveSmart = def.smartLink === 'cert' || def.smartLink === 'calib'
       || def.smartLink === 'light' || def.smartLink === 'uvlight'
-      || def.smartLink === 'lightcond';
+      || def.smartLink === 'lightcond' || def.smartLink === 'procedure';
     const smartReport = report || (liveSmart ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects) : null);
     const inner = smartReport
       ? cvResolveSmartLink(block, smartReport)

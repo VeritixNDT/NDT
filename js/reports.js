@@ -46,9 +46,9 @@ var TPL_FIELDS = {
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     // Light / UV examination conditions. White-light for visible MT,
     // UV-A irradiance + low background light for fluorescent MT.
-    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'] },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'] },
-    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'] },
+    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true },
+    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
   ],
   VT: [
     { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 350', options:['350','500','1000'] },
@@ -64,9 +64,9 @@ var TPL_FIELDS = {
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
     // Light / UV examination conditions. White-light for visible (colour
     // contrast) PT, UV-A irradiance + low background light for fluorescent PT.
-    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'] },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'] },
-    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'] },
+    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true },
+    { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
   ],
   PMI:[
     { id:'ctrl',label:'System control',placeholder:'e.g. 316L Reference block',options:['316L Reference block','304 Reference block','Duplex reference block','Carbon steel reference block']},
@@ -303,6 +303,16 @@ function rptFieldHtml(methodId, f, data) {
   // selected to sign the report.
   if(f.useInspectorRegister) return inspectorSelectHtml(methodId, f, val, fid);
   if(f.type==='textarea') return `<div class="fld"><label>${f.label}</label><textarea id="${fid}" rows="2" placeholder="${f.placeholder}">${val}</textarea></div>`;
+  // Editable combo — free-typed value with the presets offered as datalist
+  // suggestions, so an inspector can enter an exact reading (e.g. 1187)
+  // and still pick a common value in one click.
+  if(f.editable && f.options && f.options.length) {
+    const dl = fid + '-dl';
+    const opts = f.options.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+    return `<div class="fld"><label>${f.label}</label>
+      <input id="${fid}" list="${dl}" type="text" value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
+      <datalist id="${dl}">${opts}</datalist></div>`;
+  }
   if(f.type==='select') {
     return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
       <select id="${fid}" style="flex:1">${(f.options||[]).map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>
@@ -441,6 +451,15 @@ async function rptFormClear(methodId) {
 function tplFieldHtml(methodId, f, tpl) {
   const val = tpl[f.id]||'';
   const fid = `tpl-${methodId}-${f.id}`;
+  // Editable combo — same as the new-report form: free text with the
+  // presets as datalist suggestions (see rptFieldHtml).
+  if(f.editable && f.options && f.options.length) {
+    const dl = fid + '-dl';
+    const opts = f.options.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+    return `<div class="fld"><label>${f.label}</label>
+      <input id="${fid}" list="${dl}" type="text" value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
+      <datalist id="${dl}">${opts}</datalist></div>`;
+  }
   if(f.options && f.options.length) {
     const opts = f.options.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
     return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">

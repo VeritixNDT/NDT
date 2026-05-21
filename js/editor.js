@@ -711,12 +711,28 @@ function cvEvalShowWhen(block, report){
 }
 
 // Resolve smart-link content for procedure/cert/calib/accept-eval
-// Smart-card body — a status badge plus one or more text lines. The
-// first line is the name (bold); the rest are detail. Each line is a
-// set of pieces that sit inline when the card is wide and wrap onto
-// their own line when it is narrow (flex-wrap), so the cert / calib
-// cards stay readable at any card width.
-function _cvSmartCardHtml(cls, lbl, ...lines){
+// The Veritix shield, drawn inline. Inline fill/stroke (no dependency on
+// the .vx-shield stylesheet) so it renders identically in the editor and
+// in printed / exported PDFs. `mark` picks the interior glyph: a tick for
+// a valid state, a cross for an invalid one, a dash for neutral.
+function _cvShieldSvg(lineColor, bodyFill, mark){
+  const inner = mark === 'cross'
+    ? `<path d="M19 25 L33 39 M33 25 L19 39" fill="none" stroke="${lineColor}" stroke-width="5" stroke-linecap="round"/>`
+    : mark === 'dash'
+    ? `<path d="M18 31 L34 31" fill="none" stroke="${lineColor}" stroke-width="5" stroke-linecap="round"/>`
+    : `<path d="M17 30 L24 38 L36 22" fill="none" stroke="${lineColor}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return `<svg width="21" height="24" viewBox="0 0 52 60" style="display:block">`
+    + `<path d="M26 2 L50 14 L50 36 Q50 52 26 58 Q2 52 2 36 L2 14 Z" fill="${bodyFill}" stroke="${lineColor}" stroke-width="2.5"/>`
+    + inner + `</svg>`;
+}
+// Smart-card body — a Veritix-shield status indicator plus one or more
+// text lines. The status is read from the lbl's leading glyph: ✓ → valid
+// (green shield + tick, "valid" caption), ⚠ / ✕ → not valid (red shield +
+// cross, "not valid" caption), anything else → neutral (grey shield). The
+// descriptive reason for a failure lives in the detail lines. The first
+// line is the name (bold); the rest are detail. Each line's pieces sit
+// inline when the card is wide and wrap when it is narrow (flex-wrap).
+function _cvSmartCardHtml(lbl, ...lines){
   const row = (pieces, style) => {
     const spans = (pieces || [])
       .filter(p => p != null && String(p).trim() !== '')
@@ -726,8 +742,20 @@ function _cvSmartCardHtml(cls, lbl, ...lines){
   const body = lines.map((ln, i) =>
     row(ln, i === 0 ? 'font-weight:600;font-size:9px' : 'font-size:8px;color:#666')
   ).join('');
-  return `<div style="display:flex;align-items:center;gap:6px;height:100%">
-    <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600;flex-shrink:0;white-space:nowrap">${lbl}</span>
+  let lc, fill, mark, caption;
+  if(/^✓/.test(lbl)){
+    lc = '#16a34a'; fill = 'rgba(62,207,142,.18)'; mark = 'check'; caption = 'valid';
+  } else if(/^[⚠✕✗]/.test(lbl)){
+    lc = '#b91c1c'; fill = 'rgba(242,92,92,.16)'; mark = 'cross'; caption = 'not valid';
+  } else {
+    lc = '#8a8f98'; fill = 'rgba(160,160,160,.16)'; mark = 'dash';
+    caption = String(lbl || '').replace(/^\W+/u, '').toLowerCase() || '—';
+  }
+  return `<div style="display:flex;align-items:center;gap:8px;height:100%">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;width:48px">
+      ${_cvShieldSvg(lc, fill, mark)}
+      <span style="font-size:7px;font-weight:700;letter-spacing:.2px;color:${lc};text-align:center;line-height:1.1">${escapeHtml(caption)}</span>
+    </div>
     <div style="flex:1;min-width:0;line-height:1.3">${body}</div>
   </div>`;
 }
@@ -758,7 +786,7 @@ function _cvResolveEqByKind(matchFn, reportMethod){
 //   2. Method approval — report's method in the record's `methods` list
 function _cvEqKindStatusCard(rec, reportMethod, emptyLbl){
   if(!rec){
-    return _cvSmartCardHtml('background:rgba(160,160,160,.18);color:#666', emptyLbl,
+    return _cvSmartCardHtml(emptyLbl,
       ['No matching equipment'], ['Add it to Settings → Equipment']);
   }
   const calDue = rec.calDueAt ? new Date(rec.calDueAt) : null;
@@ -768,21 +796,21 @@ function _cvEqKindStatusCard(rec, reportMethod, emptyLbl){
   const approvedForMethod = !reportMethod
     || !Array.isArray(rec.methods) || !rec.methods.length
     || rec.methods.includes(reportMethod);
-  let cls, lbl, detail;
+  let lbl, detail;
   if(expired){
-    cls = 'background:rgba(242,92,92,.15);color:#991b1b'; lbl = '⚠ OUT OF CAL';
+    lbl = '⚠ OUT OF CAL';
     detail = ['Calibration expired ' + calDue.toLocaleDateString('en-GB')];
   } else if(!approvedForMethod){
-    cls = 'background:rgba(245,166,35,.18);color:#92400e'; lbl = '⚠ NOT APPROVED';
+    lbl = '⚠ NOT APPROVED';
     detail = ['Not approved for ' + reportMethod, 'approved: ' + ((rec.methods||[]).join(', ') || 'none')];
   } else {
-    cls = 'background:rgba(62,207,142,.15);color:#16a34a'; lbl = '✓ VALID';
+    lbl = '✓ VALID';
     detail = [
       (calDue && !isNaN(calDue)) ? 'In cal to ' + calDue.toLocaleDateString('en-GB') : 'No calibration-due date set',
       reportMethod ? 'approved for ' + reportMethod : '',
     ];
   }
-  return _cvSmartCardHtml(cls, lbl, [rec.name || '—', rec.svId || ''], detail);
+  return _cvSmartCardHtml(lbl, [rec.name || '—', rec.svId || ''], detail);
 }
 // Normalise a specification / standard string to a comparison key, so the
 // procedure smart card links a report's specification to a registered
@@ -839,17 +867,15 @@ function cvResolveSmartLink(block, report){
       // recorded on the report if the record carries none.
       const rev = match.revision || match.rev || reportRev;
       const shownNo = match.procNo || match.procedureNo || match.no || procNo || '—';
-      return `<div style="display:flex;align-items:center;gap:6px;height:100%">
-        <span style="background:rgba(62,207,142,.15);color:#16a34a;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">✓ LINKED</span>
-        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(shownNo)}${rev?' Rev '+escapeHtml(rev):''}</div><div style="font-size:8px;color:#666">${escapeHtml(match.title || match.standard || match.specification || 'Procedure on file')}</div></div>
-      </div>`;
+      return _cvSmartCardHtml('✓ LINKED',
+        [shownNo + (rev ? ' Rev ' + rev : '')],
+        [match.title || match.standard || match.specification || 'Procedure on file']);
     }
     const missDesc = spec ? 'No procedure on file for this specification'
                           : 'No procedure on file matching this number';
-    return `<div style="display:flex;align-items:center;gap:6px;height:100%">
-      <span style="background:rgba(245,166,35,.18);color:#92400e;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">⚠ MISSING</span>
-      <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${escapeHtml(spec || procNo || '—')}${reportRev?' Rev '+escapeHtml(reportRev):''}</div><div style="font-size:8px;color:#666">${escapeHtml(missDesc)}</div></div>
-    </div>`;
+    return _cvSmartCardHtml('⚠ MISSING',
+      [(spec || procNo || '—') + (reportRev ? ' Rev ' + reportRev : '')],
+      [missDesc]);
   }
   if(k === 'cert-status'){
     const insp = report?.inspector || '—';
@@ -881,22 +907,19 @@ function cvResolveSmartLink(block, report){
           : (!!expiry && new Date() > expiry));
         const lvl = cert.level || (methodLabel + ' Level II');
         const certNo = cert.certNo || cert.authority || '—';
-        const cls = expired
-          ? 'background:rgba(242,92,92,.15);color:#991b1b'
-          : 'background:rgba(62,207,142,.15);color:#16a34a';
         const lbl = expired ? '⚠ EXPIRED' : '✓ VALID';
         // Inspector name on its own line, the cert method/level under
         // it, then the cert no. + expiry (which wrap apart when narrow).
-        return _cvSmartCardHtml(cls, lbl,
+        return _cvSmartCardHtml(lbl,
           [insp],
           [(methodLabel + ' ' + lvl).trim()],
           ['Cert no. ' + certNo, expiry ? 'expires ' + expiry.toLocaleDateString('en-GB') : '']);
       }
       // Inspector exists but holds no cert for this method.
-      return _cvSmartCardHtml('background:rgba(245,166,35,.18);color:#92400e', '⚠ NOT CERTIFIED',
+      return _cvSmartCardHtml('⚠ NOT CERTIFIED',
         [insp], ['No ' + (reportMethod || 'method') + ' certification on file']);
     }
-    return _cvSmartCardHtml('background:rgba(160,160,160,.18);color:#666', '— UNKNOWN',
+    return _cvSmartCardHtml('— UNKNOWN',
       [insp], ['Inspector not found in directory']);
   }
   if(k === 'calib-status'){
@@ -931,15 +954,15 @@ function cvResolveSmartLink(block, report){
       const approvedForMethod = !reportMethod
         || !Array.isArray(rec.methods) || !rec.methods.length
         || rec.methods.includes(reportMethod);
-      let cls, lbl, detail;
+      let lbl, detail;
       if(expired){
-        cls = 'background:rgba(242,92,92,.15);color:#991b1b'; lbl = '⚠ OUT OF CAL';
+        lbl = '⚠ OUT OF CAL';
         detail = ['Calibration expired ' + calDue.toLocaleDateString('en-GB')];
       } else if(!approvedForMethod){
-        cls = 'background:rgba(245,166,35,.18);color:#92400e'; lbl = '⚠ NOT APPROVED';
+        lbl = '⚠ NOT APPROVED';
         detail = ['Not approved for ' + reportMethod, 'approved: ' + ((rec.methods||[]).join(', ') || 'none')];
       } else {
-        cls = 'background:rgba(62,207,142,.15);color:#16a34a'; lbl = '✓ VALID';
+        lbl = '✓ VALID';
         detail = [
           (calDue && !isNaN(calDue)) ? 'In cal to ' + calDue.toLocaleDateString('en-GB') : 'No calibration-due date set',
           reportMethod ? 'approved for ' + reportMethod : '',
@@ -948,7 +971,7 @@ function cvResolveSmartLink(block, report){
       // Equipment name and SV-ID as separate pieces so the SV-ID drops
       // onto its own line, and the "approved" piece below the "in cal"
       // piece, when the card is narrow.
-      return _cvSmartCardHtml(cls, lbl, [rec.name || '—', rec.svId || ''], detail);
+      return _cvSmartCardHtml(lbl, [rec.name || '—', rec.svId || ''], detail);
     }
     // Fallback — no register record (legacy report, or equipment that
     // predates the register). Use the snapshot fields; without a record
@@ -956,18 +979,17 @@ function cvResolveSmartLink(block, report){
     // calibration validity falls back to the "assume 1 year" heuristic.
     const equip = report?.eq_equip || report?.equip || '—';
     const calDate = report?.eq_caldate || report?.eqCalDate;
-    let cls='background:rgba(160,160,160,.18);color:#666', lbl='— NO DATE';
+    let lbl='— NO DATE';
     let detail = ['Calibration record on file'];
     if(calDate){
       const cd = new Date(calDate);
       if(!isNaN(cd)){
         const expiry = new Date(cd); expiry.setFullYear(expiry.getFullYear()+1);
-        if(now > expiry){ cls='background:rgba(242,92,92,.15);color:#991b1b'; lbl='⚠ EXPIRED'; }
-        else { cls='background:rgba(62,207,142,.15);color:#16a34a'; lbl='✓ VALID'; }
+        lbl = now > expiry ? '⚠ EXPIRED' : '✓ VALID';
         detail = ['cal ' + cd.toLocaleDateString('en-GB'), 'expires ' + expiry.toLocaleDateString('en-GB')];
       }
     }
-    return _cvSmartCardHtml(cls, lbl, [equip], detail);
+    return _cvSmartCardHtml(lbl, [equip], detail);
   }
   if(k === 'light-status' || k === 'uv-light-status'){
     // White-light / UV-A light equipment calibration card. Resolves a
@@ -1010,12 +1032,10 @@ function cvResolveSmartLink(block, report){
       lines.push(['UV-A', 'Not applicable']);
     }
     if(!lines.length){
-      return _cvSmartCardHtml('background:rgba(160,160,160,.18);color:#666', '💡 LIGHT / UV',
+      return _cvSmartCardHtml('💡 LIGHT / UV',
         ['No light/UV readings'], ['Recorded on VT / MT / PT reports']);
     }
-    const condCls = uvLow ? 'background:rgba(242,92,92,.15);color:#991b1b'
-                          : 'background:rgba(234,179,8,.16);color:#a16207';
-    return _cvSmartCardHtml(condCls, uvLow ? '⚠ UV-A LOW' : '💡 LIGHT / UV', ...lines);
+    return _cvSmartCardHtml(uvLow ? '⚠ UV-A LOW' : '💡 LIGHT / UV', ...lines);
   }
   if(k === 'accept-eval'){
     // If block has measurement+criterion props, evaluate
@@ -1031,12 +1051,10 @@ function cvResolveSmartLink(block, report){
       else if(op === '>=') pass = meas >= crit;
       else if(op === '>') pass = meas > crit;
       else pass = meas <= crit;
-      const cls = pass ? 'background:rgba(62,207,142,.15);color:#16a34a' : 'background:rgba(242,92,92,.15);color:#991b1b';
       const lbl = pass ? '✓ ACCEPTABLE' : '✕ EXCEEDS LIMIT';
-      return `<div style="display:flex;align-items:center;gap:6px;height:100%">
-        <span style="${cls};border-radius:3px;padding:1px 5px;font-size:9px;font-weight:600">${lbl}</span>
-        <div style="flex:1;min-width:0;line-height:1.25"><div style="font-weight:600;font-size:9px">${meas} ${escapeHtml(unit)} ${op} ${crit} ${escapeHtml(unit)}</div><div style="font-size:8px;color:#666">${escapeHtml(std)}</div></div>
-      </div>`;
+      return _cvSmartCardHtml(lbl,
+        [meas + ' ' + unit + ' ' + op + ' ' + crit + ' ' + unit],
+        [std]);
     }
     return `<div style="display:flex;align-items:center;gap:6px;height:100%;color:#999;font-size:9px;font-style:italic">Set measurement & criterion in block properties</div>`;
   }

@@ -357,7 +357,12 @@ function procInitView(){
 }
 
 function procRenderView(){
-  let list = procGetAll();
+  // See procRender — procGetAll() returns a fresh parse each call, so each
+  // procedure's stored-array index must be captured while `list` still
+  // holds these object instances (indexOf against a second call fails).
+  const stored = procGetAll();
+  const idxOf  = new Map(stored.map((p, i) => [p, i]));
+  let list = stored.slice();
   const search = (el('proc-view-search')?.value||'').toLowerCase().trim();
   const fMethod = el('proc-view-f-method')?.value||'';
   const fStatus = el('proc-view-f-status')?.value||'';
@@ -371,7 +376,7 @@ function procRenderView(){
   list.sort((a,b)=>(a.procNo||'').localeCompare(b.procNo||''));
 
   // Metrics
-  const all = procGetAll();
+  const all = stored;
   const metricsEl = el('proc-view-metrics');
   if(metricsEl){
     const active = all.filter(p=>p.status==='Active').length;
@@ -388,11 +393,10 @@ function procRenderView(){
 
   // Table (view-only — no edit/delete buttons)
   const wrap = el('proc-view-table-wrap'); if(!wrap) return;
-  const allProcs = procGetAll();
 
   if(list.length){
     const rows = list.map(p=>{
-      const idx = allProcs.indexOf(p);
+      const idx = idxOf.get(p);
       const md = NDT_METHODS.find(m=>m.id===p.method);
       const stColor = {Active:'green',Draft:'blue',Superseded:'amber',Withdrawn:'red'}[p.status]||'muted';
       const hasFile = !!(p.hasFile || p.fileName);
@@ -476,7 +480,16 @@ function procCloseViewViewer(){
 }
 
 function procRender(){
-  let list = procGetAll();
+  // procGetAll() parses fresh JSON on every call, so objects from one call
+  // are never reference-equal to another's. Capture each procedure's
+  // stored-array index up front, while `list` still holds these exact
+  // instances. The old allProcs.indexOf(p) compared against a SECOND
+  // procGetAll() and always returned -1 — every row's Edit/Del button
+  // carried data-args="-1", so Edit opened a blank upload form, Delete
+  // removed the last procedure, and View reported "not found".
+  const stored = procGetAll();
+  const idxOf  = new Map(stored.map((p, i) => [p, i]));
+  let list = stored.slice();
   const search = (el('proc-search')?.value||'').toLowerCase().trim();
   const fMethod = el('proc-f-method')?.value||'';
   const fStatus = el('proc-f-status')?.value||'';
@@ -492,11 +505,10 @@ function procRender(){
   procRenderMetrics(list);
 
   const wrap = el('proc-table-wrap'); if(!wrap) return;
-  const allProcs = procGetAll();
 
   if(list.length){
     const rows = list.map(p=>{
-      const idx = allProcs.indexOf(p);
+      const idx = idxOf.get(p);
       const md = NDT_METHODS.find(m=>m.id===p.method);
       const stColor = {Active:'green',Draft:'blue',Superseded:'amber',Withdrawn:'red'}[p.status]||'muted';
       const hasFile = !!(p.hasFile || p.fileName);

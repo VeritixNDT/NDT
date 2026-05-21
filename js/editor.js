@@ -391,7 +391,7 @@ var cvPreview = false;
 var cvNextId = 1;
 var cvPaletteDrag = null;
 var cvPaletteCollapsed = {};
-var cvPpvMethod = 'UT';
+var cvPpvMethod = 'MT';
 var cvPpvResult = 'Pass';
 var cvPpvShowDefects = false;
 var cvUndoStack = [];
@@ -535,11 +535,11 @@ var CV_SAMPLE = {
     surfTemp:'18°C', weldPos:'PA',
     partExam:'100% of weld seam incl. HAZ — 1200mm total length',
     examType:'Weld surface examination', extent:'100% Weld and HAZ',
-    spec:'EN-ISO 17640:2018', accCrit:'EN-ISO 11666:2018 level 2',
+    spec:'EN-ISO 17638:2016', accCrit:'EN-ISO 23278:2016 Level 2',
     proc:'SV2023-004-NDTD-PRO-0009', procRev:'01', stage:'Final',
-    equip:'SIUI Smartor 16', eqSvId:'SV-UT-004', eqCalDate:'2025-01-10',
+    equip:'Magnaflux Y-7 AC Yoke', eqSvId:'SV-MT-002', eqCalDate:'2025-01-10',
     whitelight:'15', uvirr:'1200',
-    inspector:'Carl Cope', level:'UT Level II',
+    inspector:'Carl Cope', level:'MT Level II',
     certAuth:'PCN:319222', indications:'No / Nee', witness:'Client representative',
     repDate:'2025-03-15', signDate:'2025-03-15',
     remarks:'Examination performed in accordance with the approved procedure. No recordable indications were detected. The weld is accepted.',

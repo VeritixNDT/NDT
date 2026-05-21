@@ -784,6 +784,17 @@ async function vxSyncFlush() {
   //     left in 'failed' state and re-tried every cycle, which is how the
   //     vx-settings-v1 op reached 134 attempts before).
   //   - 'delivered' ops older than 24h are pruned to keep storage tidy.
+  // A key whose queued writes have ALL been delivered this run is no longer
+  // ahead of the server — clear its dirty flag so a later pullAll may
+  // refresh it again. Keys with ops still pending/failed stay dirty so
+  // pullAll keeps skipping them until the queue fully drains — that is what
+  // protects an in-flight save from being clobbered by a concurrent pull.
+  const _stillQueued = new Set(
+    queue.filter(o => o.status === 'pending' || o.status === 'failed').map(o => o.key)
+  );
+  pending.forEach(o => {
+    if(o.status === 'delivered' && o.key && !_stillQueued.has(o.key)) _vxClearDirty(o.key);
+  });
   const cutoff = Date.now() - 24*60*60*1000;
   const next = queue.filter(o => {
     if(o.status === 'dropped') return false;
@@ -2657,23 +2668,31 @@ function lss(k, v) {
 var vxStore = {
   get: ls,
   set: lss,
-  /** Force a re-pull from server, replacing local state for this key */
+  /** Re-pull from server, replacing local state for this key — UNLESS the
+   *  key has unpushed local edits. The server copy is stale precisely
+   *  because our queued write hasn't landed yet; pulling it would silently
+   *  roll the local change back. Keep local; the sync queue pushes it up. */
   async pull(k) {
     if(!vxIsAuthenticated()) return null;
+    if(vxStore.isDirty(k)) return ls(k, null);
     const remote = await vxApi.hydrate(k);
     if(remote != null) { _vxRawLss(k, remote); _vxClearDirty(k); }
     return remote;
   },
-  /** Pull every entity key on demand (e.g. after login or manual refresh) */
+  /** Pull every entity key on demand (e.g. after login or manual refresh).
+   *  Keys with unpushed local changes are skipped — overwriting them with
+   *  the (stale) server copy is what made a freshly-saved PDF template
+   *  revert to its old layout on the next refresh. */
   async pullAll() {
     if(!vxIsAuthenticated()) return { skipped: true };
-    let count = 0;
+    let count = 0, kept = 0;
     for(const k of VX_ENTITY_KEYS) {
+      if(vxStore.isDirty(k)) { kept++; continue; }
       const r = await vxApi.hydrate(k);
       if(r != null) { _vxRawLss(k, r); _vxClearDirty(k); count++; }
     }
     vxPlatformSet({ lastSyncAt: new Date().toISOString() });
-    return { count };
+    return { count, kept };
   },
   isDirty(k) { try { return !!(JSON.parse(localStorage.getItem(VX_DIRTY_FLAGS_KEY) || '{}')[k]); } catch { return false; } },
   dirtyKeys() { try { return Object.keys(JSON.parse(localStorage.getItem(VX_DIRTY_FLAGS_KEY) || '{}')); } catch { return []; } },

@@ -4460,7 +4460,13 @@ function cvLoadLayout(){
   try {
     const d = ls(CV_KEY, null);
     if(d){
-      if(d.pages){ cvPages = d.pages; cvCurrentPage = d.currentPage || 0; }
+      if(Array.isArray(d.pages) && d.pages.length){
+        cvPages = d.pages;
+        // Clamp the saved page index into range. A stale or corrupt
+        // layout whose currentPage points past the last page would crash
+        // cvSync() — it does an unguarded cvPages[cvCurrentPage].blocks.
+        cvCurrentPage = Math.min(Math.max(0, d.currentPage || 0), cvPages.length - 1);
+      }
       else if(d.blocks){ cvPages = [{ label: 'Page 1', blocks: d.blocks }]; cvCurrentPage = 0; }
       cvNextId = d.nextId || (cvPages.reduce((s,p)=>s+p.blocks.length, 0) + 1);
     }

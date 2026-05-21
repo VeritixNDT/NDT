@@ -3262,16 +3262,21 @@ function cvRenderProps(id){
     </label>`;
   const colorPick = (prop, val) =>
     `<div style="display:flex;gap:6px;align-items:center"><input type="color" value="${val||'#000000'}" style="width:30px;height:24px;border-radius:3px;border:1px solid var(--border);padding:1px;cursor:pointer" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','${prop}'"/><span style="font-size:9px;font-family:var(--mono);color:var(--t3)">${val||'#000'}</span></div>`;
-  const numRow = (prop, val) =>
-    `<div style="display:flex;align-items:stretch">
-      <input type="number" step="1" value="${val||0}" data-prop="${prop}" class="cv-num"
-        style="flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;color:var(--t1);font-size:11px;padding:4px 6px;box-sizing:border-box"
+  const numRow = (prop, val) => {
+    // X/Y/W/H are disabled while the block is locked — a locked block's
+    // geometry is frozen, so the panel must not offer a way to change it.
+    const lk  = _cvIsBlockLocked(block);
+    const off = lk ? ';opacity:.5;cursor:not-allowed' : '';
+    return `<div style="display:flex;align-items:stretch">
+      <input type="number" step="1" value="${val||0}" data-prop="${prop}" class="cv-num"${lk?' disabled':''}
+        style="flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;color:var(--t1);font-size:11px;padding:4px 6px;box-sizing:border-box${off}"
         data-on-change="_wCvUpdateBlockNumber" data-on-input="_wCvUpdateBlockNumber" data-pass-el="1" data-args="'${id}','${prop}'"/>
       <div style="display:flex;flex-direction:column;width:22px;flex-shrink:0">
-        <button type="button" class="cv-step" title="Increase" data-action="cvStepBlockNum" data-args="'${id}','${prop}',1"  style="border-radius:0 4px 0 0;border-bottom:none">▲</button>
-        <button type="button" class="cv-step" title="Decrease" data-action="cvStepBlockNum" data-args="'${id}','${prop}',-1" style="border-radius:0 0 4px 0">▼</button>
+        <button type="button" class="cv-step"${lk?' disabled':''} title="Increase" data-action="cvStepBlockNum" data-args="'${id}','${prop}',1"  style="border-radius:0 4px 0 0;border-bottom:none${off}">▲</button>
+        <button type="button" class="cv-step"${lk?' disabled':''} title="Decrease" data-action="cvStepBlockNum" data-args="'${id}','${prop}',-1" style="border-radius:0 0 4px 0${off}">▼</button>
       </div>
     </div>`;
+  };
 
   // Field mapping info
   const mapInfo = def && def.mapTo ? `<div style="margin-bottom:9px;padding:5px 7px;background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:4px;font-size:10px;color:var(--blue)">📎 Maps to: <span style="font-family:var(--mono)">${def.mapTo}</span></div>` : '';
@@ -3825,6 +3830,16 @@ function cvStepBlockNum(id, prop, delta){
 function cvUpdateBlock(id, prop, value){
   const block = cvBlocks.find(b=>b.id===id);
   if(!block) return;
+  const _geom = ['x','y','w','h'].indexOf(prop) >= 0;
+  // A locked block's position and size are frozen. Reject X/Y/W/H edits
+  // from the Properties panel — typed values and steppers alike — so the
+  // lock can't be bypassed there. (The inputs also render disabled while
+  // locked; this is the defence-in-depth guard.)
+  if(_geom && _cvIsBlockLocked(block)){
+    toast(t('pe.toast.locked_geom','Block is locked — unlock it to move or resize.'), 'warn');
+    cvRenderProps(id);
+    return;
+  }
   // FIX: push undo for property edits (debounced — only on first change per interaction)
   if(!cvDragUndoPushed){ cvPushUndo(); cvDragUndoPushed = true; setTimeout(()=>{ cvDragUndoPushed=false; }, 800); }
   // X/Y/W/H typed in the Properties panel are honoured exactly (only
@@ -3832,7 +3847,6 @@ function cvUpdateBlock(id, prop, value){
   // typed value back to the grid is what made the number fields feel
   // broken, and it cancelled out the spinner's ±1 steps. Drag-move still
   // grid-snaps via cvMouseMove.
-  const _geom = ['x','y','w','h'].indexOf(prop) >= 0;
   if(_geom) value = Math.max(prop==='x'||prop==='y'?0:16, +value || 0);
   block[prop] = value;
   cvRenderCanvas();
@@ -3959,7 +3973,7 @@ function _cvMethodBarHeight(block){
 // Keep a cell inside its container's INNER area — below the title bar and
 // within the borders. A cell that lands near the bar snaps flush against
 // it, so place cards sit tight under the header instead of floating.
-function _cvClampToParent(cell, parent){
+function _cvClampToParent(cell, parent, doSnap){
   if(!cell || !parent) return;
   const barH   = _cvMethodBarHeight(parent);
   const innerX = parent.x;
@@ -3970,9 +3984,12 @@ function _cvClampToParent(cell, parent){
   cell.h = Math.min(cell.h, innerH);
   cell.x = Math.min(Math.max(cell.x, innerX), innerX + innerW - cell.w);
   cell.y = Math.min(Math.max(cell.y, innerY), innerY + innerH - cell.h);
-  // Snap flush to the header bar when the cell lands near the top.
+  // Snap flush to the header bar when the cell lands near the top — but
+  // ONLY on an explicit drag / drop / resize. On layout load this snap
+  // would silently pull validly-placed cells up to the bar on every
+  // return to the editor, so the load path passes doSnap === false.
   const snapT = (typeof CV_SNAP_THRESHOLD === 'number') ? CV_SNAP_THRESHOLD : 12;
-  if(cell.y - innerY <= snapT) cell.y = innerY;
+  if(doSnap !== false && cell.y - innerY <= snapT) cell.y = innerY;
 }
 // Resize variant — caps a cell's size so it stays inside its container
 // WITHOUT moving its x/y. Used after a cell is resized: dragging the
@@ -4593,9 +4610,14 @@ function cvLoadLayout(){
   try {
     cvPages.forEach(pg => {
       (pg.blocks || []).forEach(b => {
-        if(b && b.key === 'method-cell' && b.parentId){
+        // Skip locked cells — a locked cell's position is frozen, so the
+        // re-clamp must never move it. Unlocked cells are clamped back
+        // into bounds but NOT snapped (snap is drag-only — see
+        // _cvClampToParent), so a return to the editor leaves a validly
+        // placed cell exactly where the inspector left it.
+        if(b && b.key === 'method-cell' && b.parentId && !_cvIsBlockLocked(b)){
           const parent = (pg.blocks || []).find(x => x.id === b.parentId);
-          if(parent) _cvClampToParent(b, parent);
+          if(parent) _cvClampToParent(b, parent, false);
         }
       });
     });

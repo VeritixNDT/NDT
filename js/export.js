@@ -170,11 +170,13 @@ function cvBuildPrintHTML(report){
     bodyBlocks.forEach(block => { bodyHtml += renderBlock(block, bodyBlocks); });
     // Chrome first (z-index 0), then zone blocks + body blocks on top.
     pagesHtml += `<div class="vx-print-page" data-page-num="${pageIdx + 1}">
-      ${hdrChromeFragment}
-      ${ftrChromeFragment}
-      ${hdrFragment}
-      ${bodyHtml}
-      ${ftrFragment}
+      <div class="vx-print-inner">
+        ${hdrChromeFragment}
+        ${ftrChromeFragment}
+        ${hdrFragment}
+        ${bodyHtml}
+        ${ftrFragment}
+      </div>
     </div>`;
   });
 
@@ -219,16 +221,25 @@ function cvBuildPrintHTML(report){
     page-break-after: auto;
     break-after: auto;
   }
+  /* Every page's content lives in this inner layer. The print-time scale
+     (below) is applied HERE, never on .vx-print-page itself: transforming
+     the page-break element makes Chrome emit a trailing blank page and
+     shift content vertically in Save-as-PDF — which is what made the PDF
+     margins differ from a physical print. The blocks inside are
+     position:absolute and this layer is inset:0, so their coordinates and
+     the printed result stay identical between print and PDF. */
+  .vx-print-inner { position: absolute; inset: 0; }
   @media print {
-    .vx-print-page {
-      width: 210mm; height: 297mm;
-      /* The design canvas is full-bleed A4 (794px = 210mm), so the
-         outermost blocks — full-width accent bars, edge section headers —
-         sit hard against the sheet edge. Physical printers cannot print a
-         ~5-6mm band at each edge, so that content was being clipped.
-         Scale the page inward, centred, to keep everything inside a ~7mm
-         safe margin. PDF exports gain the same tidy margin. */
-      transform: scale(0.93);
+    .vx-print-page { width: 210mm; height: 297mm; }
+    /* The design canvas is full-bleed A4 (794px = 210mm). Physical
+       printers cannot print a ~5-6mm band at each edge. A light 3% inward
+       scale (centred) pulls real content — text, boxes, borders, which
+       carry the design's own ~5mm margin — clear of that dead zone while
+       keeping the report essentially full size. Purely decorative
+       full-bleed elements may still lose a few mm at the very edge, which
+       is unavoidable on a non-borderless printer. */
+    .vx-print-inner {
+      transform: scale(0.97);
       transform-origin: center center;
     }
   }

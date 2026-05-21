@@ -119,7 +119,6 @@ var RPT_FORM = {
   ],
   exam: [
     { id:'examType',   label:'Examination type',    placeholder:'e.g. Initial', options:['Weld surface examination','Surface examination','Crack examination','Forging examination','Casting examination','Positive Material Identification','Hardness test','Wall thickness measurements','Lamination examination','Ultrasonic examination'] },
-    { id:'extent',     label:'Extent',               placeholder:'e.g. 100%', options:['100% Weld and HAZ','100% of the given weld','100% Surface examination','100% of the given surface','As requested by the client'] },
     { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
     { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
     { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
@@ -144,6 +143,7 @@ var RPT_FORM = {
     { id:'weldProcess', label:'Welding process',         placeholder:'e.g. SMAW',          width:110, options:['SMAW','GTAW','GMAW','FCAW','SAW','SMAW/GTAW','PAW','ESW','OFW'] },
     { id:'welders',     label:'Welder(s)',               placeholder:'J. Bakker, M. de Vries',  width:150 },
     { id:'examDate',    label:'Examination date',        placeholder:'dd/mm/yyyy', type:'date',  width:120 },
+    { id:'extent',      label:'Extent',                  placeholder:'e.g. 100%', width:150, options:['100% Weld and HAZ','100% of the given weld','100% Surface examination','100% of the given surface','As requested by the client'] },
     { id:'verdict',     label:'Result',                  type:'select', width:140, options:['','Acceptable','Not acceptable','For information','Inconclusive'] },
   ],
 };

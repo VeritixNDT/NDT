@@ -46,8 +46,8 @@ var TPL_FIELDS = {
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     // Light / UV examination conditions. White-light for visible MT,
     // UV-A irradiance + low background light for fluorescent MT.
-    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true },
+    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true, numeric:true },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true },
     { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
   ],
   VT: [
@@ -64,8 +64,8 @@ var TPL_FIELDS = {
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
     // Light / UV examination conditions. White-light for visible (colour
     // contrast) PT, UV-A irradiance + low background light for fluorescent PT.
-    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true },
-    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true },
+    { id:'whitelight', label:'White-light intensity (lux)', placeholder:'e.g. 500',  options:['350','500','750','1000','1500','2000'], editable:true, numeric:true },
+    { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',    placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true },
     { id:'bgwhite',    label:'Background white light (lux)',placeholder:'e.g. ≤20',  options:['≤2','≤5','≤10','≤20','≤50'], editable:true },
   ],
   PMI:[
@@ -309,8 +309,11 @@ function rptFieldHtml(methodId, f, data) {
   if(f.editable && f.options && f.options.length) {
     const dl = fid + '-dl';
     const opts = f.options.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+    // Numeric fields (UV-A, white-light) restrict input to numbers and
+    // raise a decimal keypad on tablets; non-numeric fields stay free text.
+    const numAttrs = f.numeric ? ' type="number" min="0" step="any" inputmode="decimal"' : ' type="text"';
     return `<div class="fld"><label>${f.label}</label>
-      <input id="${fid}" list="${dl}" type="text" value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
+      <input id="${fid}" list="${dl}"${numAttrs} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
       <datalist id="${dl}">${opts}</datalist></div>`;
   }
   if(f.type==='select') {
@@ -456,8 +459,11 @@ function tplFieldHtml(methodId, f, tpl) {
   if(f.editable && f.options && f.options.length) {
     const dl = fid + '-dl';
     const opts = f.options.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+    // Numeric fields (UV-A, white-light) restrict input to numbers and
+    // raise a decimal keypad on tablets; non-numeric fields stay free text.
+    const numAttrs = f.numeric ? ' type="number" min="0" step="any" inputmode="decimal"' : ' type="text"';
     return `<div class="fld"><label>${f.label}</label>
-      <input id="${fid}" list="${dl}" type="text" value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
+      <input id="${fid}" list="${dl}"${numAttrs} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
       <datalist id="${dl}">${opts}</datalist></div>`;
   }
   if(f.options && f.options.length) {

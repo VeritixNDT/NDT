@@ -1684,9 +1684,27 @@ var vxEntityStore = {
           }
           continue;
         }
-        // IDB has a value. Mirror it into localStorage (overwriting whatever
-        // was there — IDB is canonical). If localStorage refuses (quota), fall
-        // back to the memory cache.
+        // IDB has a value — but it is NOT unconditionally newer than
+        // localStorage. Every lss() writes localStorage synchronously while
+        // the IDB write is debounced (50ms) and fire-and-forget, so on this
+        // device localStorage is never STALER than IDB. A refresh shortly
+        // after an edit can interrupt the pending IDB write, leaving IDB
+        // behind. Blindly mirroring IDB → localStorage here would then
+        // silently roll the edit back — e.g. PDF-editor blocks jumping to
+        // their old positions on reload. So keep localStorage when it
+        // already holds a value, and re-schedule an IDB write so the
+        // canonical store catches up. Only pull IDB → localStorage when
+        // localStorage has nothing: the genuine recovery case (localStorage
+        // cleared or lost, IDB survived). Cloud-sync pulls go through
+        // _vxRawLss, which writes localStorage too, so this never hides a
+        // remote update.
+        let lsExisting = null;
+        try { lsExisting = localStorage.getItem(key); } catch(e){}
+        if(lsExisting != null) {
+          try { _vxEntityScheduleWrite(key, JSON.parse(lsExisting)); } catch(e){}
+          hydrated++;
+          continue;
+        }
         try {
           const serialized = typeof idbValue === 'string' ? idbValue : JSON.stringify(idbValue);
           localStorage.setItem(key, serialized);

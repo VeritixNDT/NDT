@@ -36,7 +36,7 @@ var CV_FIELD_DEFS = {
     } catch(e){ return '—'; }
   }, w:150, h:38, mapTo:'templateNo', noLabel:true},
   'revision':     {label:'Revision',                      ph:'00',                            get:r=>r.revision||'00',             w:90, h:38, mapTo:'revision'},
-  'exam-date':    {label:'Examination date',              ph:'2025-03-15',                    get:r=>r.examDate||'—',              w:130,h:38, mapTo:'examDate'},
+  'exam-date':    {label:'Examination date',              ph:'15 Mar 2025',                   get:r=>fmtDate(r.examDate),          w:130,h:38, mapTo:'examDate'},
   // Method — renders the full method name (e.g.
   // "MAGNETIC PARTICLE EXAMINATION REPORT") from NDT_METHODS rather than
   // just the code "MT". Uppercased on render so the card reads as a
@@ -110,7 +110,7 @@ var CV_FIELD_DEFS = {
   // Report / sign date (auto) — formerly "Today (auto)". Renders today's
   // date as the live report / sign date. Keys / palette group unchanged
   // so existing canvases with a today-date block keep working.
-  'today-date':      {label:'Report / sign (auto)',  ph:'15-Mar-2025', get:r=>{const d=new Date();return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}, w:140,h:38, computed:true},
+  'today-date':      {label:'Report / sign (auto)',  ph:'15 Mar 2025', get:r=>fmtDate(new Date()), w:140,h:38, computed:true},
   'page-num':        {label:'Page X of Y',           ph:'Page 1 of 3', get:r=>'Page '+((typeof _cvPrintPageNum!=='undefined'&&_cvPrintPageNum)||(typeof cvCurrentPage!=='undefined'?cvCurrentPage+1:1))+' of '+(typeof cvPages!=='undefined'?cvPages.length:1), w:130,h:32, computed:true},
 
   // ── PROCEDURE / CERT / CALIBRATION STATUS ───────────────────────
@@ -804,14 +804,14 @@ function _cvEqKindStatusCard(rec, reportMethod, emptyLbl){
   let lbl, detail;
   if(expired){
     lbl = '⚠ OUT OF CAL';
-    detail = ['Calibration expired ' + calDue.toLocaleDateString('en-GB')];
+    detail = ['Calibration expired ' + fmtDate(calDue)];
   } else if(!approvedForMethod){
     lbl = '⚠ NOT APPROVED';
     detail = ['Not approved for ' + reportMethod, 'approved: ' + ((rec.methods||[]).join(', ') || 'none')];
   } else {
     lbl = '✓ VALID';
     detail = [
-      (calDue && !isNaN(calDue)) ? 'In cal to ' + calDue.toLocaleDateString('en-GB') : 'No calibration-due date set',
+      (calDue && !isNaN(calDue)) ? 'In cal to ' + fmtDate(calDue) : 'No calibration-due date set',
       reportMethod ? 'approved for ' + reportMethod : '',
     ];
   }
@@ -880,7 +880,7 @@ function cvResolveSmartLink(block, report){
       const reviewOk   = reviewDate && !isNaN(reviewDate);
       const overdue    = reviewOk && reviewDate < new Date(new Date().toDateString());
       const reviewLine = reviewOk
-        ? [(overdue ? 'Review overdue — ' : 'Review: ') + reviewDate.toLocaleDateString('en-GB')]
+        ? [(overdue ? 'Review overdue — ' : 'Review: ') + fmtDate(reviewDate)]
         : [];
       return _cvSmartCardHtml(overdue ? '⚠ REVIEW DUE' : '✓ LINKED',
         [shownNo + (rev ? ' Rev ' + rev : '')],
@@ -929,7 +929,7 @@ function cvResolveSmartLink(block, report){
         return _cvSmartCardHtml(lbl,
           [insp],
           [(methodLabel + ' ' + lvl).trim()],
-          ['Cert no. ' + certNo, expiry ? 'expires ' + expiry.toLocaleDateString('en-GB') : '']);
+          ['Cert no. ' + certNo, expiry ? 'expires ' + fmtDate(expiry) : '']);
       }
       // Inspector exists but holds no cert for this method.
       return _cvSmartCardHtml('⚠ NOT CERTIFIED',
@@ -973,14 +973,14 @@ function cvResolveSmartLink(block, report){
       let lbl, detail;
       if(expired){
         lbl = '⚠ OUT OF CAL';
-        detail = ['Calibration expired ' + calDue.toLocaleDateString('en-GB')];
+        detail = ['Calibration expired ' + fmtDate(calDue)];
       } else if(!approvedForMethod){
         lbl = '⚠ NOT APPROVED';
         detail = ['Not approved for ' + reportMethod, 'approved: ' + ((rec.methods||[]).join(', ') || 'none')];
       } else {
         lbl = '✓ VALID';
         detail = [
-          (calDue && !isNaN(calDue)) ? 'In cal to ' + calDue.toLocaleDateString('en-GB') : 'No calibration-due date set',
+          (calDue && !isNaN(calDue)) ? 'In cal to ' + fmtDate(calDue) : 'No calibration-due date set',
           reportMethod ? 'approved for ' + reportMethod : '',
         ];
       }
@@ -1002,7 +1002,7 @@ function cvResolveSmartLink(block, report){
       if(!isNaN(cd)){
         const expiry = new Date(cd); expiry.setFullYear(expiry.getFullYear()+1);
         lbl = now > expiry ? '⚠ EXPIRED' : '✓ VALID';
-        detail = ['cal ' + cd.toLocaleDateString('en-GB'), 'expires ' + expiry.toLocaleDateString('en-GB')];
+        detail = ['cal ' + fmtDate(cd), 'expires ' + fmtDate(expiry)];
       }
     }
     return _cvSmartCardHtml(lbl, [equip], detail);
@@ -2823,7 +2823,10 @@ function cvRenderBlockContent(block, report, preview){
         const rows = items.map((it, ri) => {
           const isLastRow = ri === items.length - 1;
           const cells = cols.map((c, ci) => {
-            const v = (it && it[c.id] != null && it[c.id] !== '') ? String(it[c.id]) : '—';
+            let v = (it && it[c.id] != null && it[c.id] !== '') ? String(it[c.id]) : '—';
+            // Date columns render through the shared formatter so the table
+            // matches the rest of the report's date style.
+            if(c.type === 'date' && v !== '—') v = fmtDate(v);
             // Verdict gets a chip — colour-coded swatch contained inside the
             // cell. Inline-block + padding bounds the colour to the chip,
             // so neighbouring cell borders can't bleed colour into it.

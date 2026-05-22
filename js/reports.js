@@ -683,6 +683,7 @@ function rptInit() {
 
 // V6: View state + selection + saved filters
 var _rptView = 'table';            // 'table' | 'kanban'
+var _rptStatusFilter = '';         // '' | 'review' | 'approved' — status-tile filter
 var _rptSelectedIdx = new Set();   // indices into the full reports array
 var _rptActiveSavedView = null;    // id of currently active saved view (or null)
 
@@ -702,30 +703,18 @@ function rptSetView(view){
 
 function rptCollectFilters(){
   return {
-    method:    el('rpt-fm')?.value || '',
-    result:    el('rpt-fr')?.value || '',
-    stage:     el('rpt-fstage')?.value || '',
-    repNo:     el('rpt-f-repno')?.value || '',
-    client:    el('rpt-f-client')?.value || '',
-    project:   el('rpt-f-project')?.value || '',
-    drawing:   el('rpt-f-drawing')?.value || '',
-    weldNo:    el('rpt-f-weldno')?.value || '',
-    inspector: el('rpt-f-insp')?.value || '',
-    dateFrom:  el('rpt-f-datefrom')?.value || '',
-    dateTo:    el('rpt-f-dateto')?.value || '',
+    search:   el('rpt-search')?.value || '',
+    method:   el('rpt-fm')?.value || '',
+    status:   _rptStatusFilter || '',
+    dateFrom: el('rpt-f-datefrom')?.value || '',
+    dateTo:   el('rpt-f-dateto')?.value || '',
   };
 }
 
 function rptApplyFilters(filters){
+  if(el('rpt-search'))     el('rpt-search').value     = filters.search    || '';
   if(el('rpt-fm'))         el('rpt-fm').value         = filters.method    || '';
-  if(el('rpt-fr'))         el('rpt-fr').value         = filters.result    || '';
-  if(el('rpt-fstage'))     el('rpt-fstage').value     = filters.stage     || '';
-  if(el('rpt-f-repno'))    el('rpt-f-repno').value    = filters.repNo     || '';
-  if(el('rpt-f-client'))   el('rpt-f-client').value   = filters.client    || '';
-  if(el('rpt-f-project'))  el('rpt-f-project').value  = filters.project   || '';
-  if(el('rpt-f-drawing'))  el('rpt-f-drawing').value  = filters.drawing   || '';
-  if(el('rpt-f-weldno'))   el('rpt-f-weldno').value   = filters.weldNo    || '';
-  if(el('rpt-f-insp'))     el('rpt-f-insp').value     = filters.inspector || '';
+  _rptStatusFilter = filters.status || '';
   if(el('rpt-f-datefrom')) el('rpt-f-datefrom').value = filters.dateFrom  || '';
   if(el('rpt-f-dateto'))   el('rpt-f-dateto').value   = filters.dateTo    || '';
 }
@@ -856,39 +845,27 @@ function rptBulkExportCsv(){
 function rptRender() {
   let list = ls(KEYS.reports, []);
   const allReports = list.slice(); // keep original index reference for selection
+  const search = (el('rpt-search')?.value || '').toLowerCase().trim();
   const fm = el('rpt-fm')?.value || '';
-  const fr = el('rpt-fr')?.value || '';
-  const fStage = el('rpt-fstage')?.value || '';
-  const fRepNo   = (el('rpt-f-repno')?.value   || '').toLowerCase().trim();
-  const fClient  = (el('rpt-f-client')?.value  || '').toLowerCase().trim();
-  const fProject = (el('rpt-f-project')?.value || '').toLowerCase().trim();
-  const fDrawing = (el('rpt-f-drawing')?.value || '').toLowerCase().trim();
-  const fWeldNo  = (el('rpt-f-weldno')?.value  || '').toLowerCase().trim();
-  const fInsp    = (el('rpt-f-insp')?.value    || '').toLowerCase().trim();
   const fDateFrom = el('rpt-f-datefrom')?.value || '';
   const fDateTo = el('rpt-f-dateto')?.value || '';
 
   // Build filtered list while preserving the original index in `_origIdx`
   list = list.map((r, i) => ({ r, _origIdx: i })).filter(({r}) => {
     if(fm && r.method !== fm) return false;
-    if(fr) {
-      if(fr === 'Draft') { if(r.verdict && r.verdict !== '— Select —') return false; }
-      else if(r.verdict !== fr) return false;
+    // Status tiles — 'review' = Submitted stage, 'approved' = Approved.
+    if(_rptStatusFilter === 'review'   && getReportStage(r) !== 'Submitted') return false;
+    if(_rptStatusFilter === 'approved' && getReportStage(r) !== 'Approved')  return false;
+    if(search) {
+      const hay = [r.reportNo, r.client, r.project, r.drawing, r.weldNo, r.inspector].map(v => (v||'').toLowerCase()).join(' ');
+      if(!hay.includes(search)) return false;
     }
-    if(fStage && getReportStage(r) !== fStage) return false;
-    // Per-field search boxes — each its own filter.
-    if(fRepNo   && !(r.reportNo  ||'').toLowerCase().includes(fRepNo))   return false;
-    if(fClient  && !(r.client    ||'').toLowerCase().includes(fClient))  return false;
-    if(fProject && !(r.project   ||'').toLowerCase().includes(fProject)) return false;
-    if(fDrawing && !(r.drawing   ||'').toLowerCase().includes(fDrawing)) return false;
-    if(fWeldNo  && !(r.weldNo    ||'').toLowerCase().includes(fWeldNo))  return false;
-    if(fInsp    && !(r.inspector ||'').toLowerCase().includes(fInsp))    return false;
     if(fDateFrom){ const d = (r.createdAt||'').split('T')[0]; if(d < fDateFrom) return false; }
     if(fDateTo)  { const d = (r.createdAt||'').split('T')[0]; if(d > fDateTo)   return false; }
     return true;
   });
 
-  const activeFilters = [fm, fr, fStage, fRepNo, fClient, fProject, fDrawing, fWeldNo, fInsp, fDateFrom, fDateTo].filter(Boolean).length;
+  const activeFilters = [fm, search, _rptStatusFilter, fDateFrom, fDateTo].filter(Boolean).length;
   // V31: translated subtitle. Plural-aware report count + "N filter(s) active"
   // when filters are in play. The {n} interpolation handles localization of
   // grammatical number for English / Dutch / German / French / Spanish.
@@ -901,9 +878,34 @@ function rptRender() {
   set('rpt-sub', reportLbl + filterLbl);
 
   rptRenderSavedViews();
-
-  if(_rptView === 'kanban') return rptRenderKanban(list, allReports);
+  rptRenderTiles(allReports);
   return rptRenderTable(list, allReports);
+}
+
+// Status tiles — counts of every report by workflow status, doubling as
+// click-to-filter controls. '' = All, 'review' = Submitted, 'approved'.
+function rptRenderTiles(allReports){
+  const wrap = el('rpt-tiles'); if(!wrap) return;
+  const total    = allReports.length;
+  const forRev   = allReports.filter(r => getReportStage(r) === 'Submitted').length;
+  const approved = allReports.filter(r => getReportStage(r) === 'Approved').length;
+  const tile = (key, label, n, accent) => {
+    const on = _rptStatusFilter === key;
+    return `<button data-action="rptSetStatusFilter" data-args="'${key}'" style="flex:0 0 auto;min-width:132px;text-align:left;padding:9px 15px;border-radius:8px;cursor:pointer;font-family:var(--font);border:1px solid ${on?accent:'var(--border)'};background:${on?accent+'22':'var(--bg2)'}">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">${label}</div>
+      <div style="font-size:21px;font-weight:700;color:${accent}">${n}</div>
+    </button>`;
+  };
+  wrap.innerHTML =
+      tile('',         'All reports', total,    '#7f8caa')
+    + tile('review',   'For review',  forRev,   '#00d4ff')
+    + tile('approved', 'Approved',    approved, '#3ecf8e');
+}
+
+function rptSetStatusFilter(key){
+  key = key || '';
+  _rptStatusFilter = (_rptStatusFilter === key) ? '' : key;
+  rptRender();
 }
 
 function rptRenderTable(list, allReports){
@@ -931,7 +933,7 @@ function rptRenderTable(list, allReports){
     wrap.innerHTML = `<div class="sc" style="margin-top:14px"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%"><thead><tr>
         <th scope="col" style="width:34px;padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select all visible reports" title="Select all visible"></th>
-        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="width:70px" data-i18n="col.actions">Actions</th>
+        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="width:180px" data-i18n="col.actions">Actions</th>
       </tr></thead><tbody></tbody></table></div></div>`;
     table = wrap.querySelector('table.tbl');
     tbody = table.querySelector('tbody');
@@ -1030,7 +1032,7 @@ function _rptRowInner(r, _origIdx) {
     <td>${escapeHtml(r.inspector||'—')}</td>
     <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(r.createdAt)}</td>
     <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>
-    <td><button class="btn btn-sm btn-danger" data-action="rptDelete" data-args="${_origIdx}" aria-label="Delete report ${escapeHtml(r.reportNo||'')}">Del</button></td>`;
+    <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovOpenReport" data-args="${_origIdx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="ovPrintReport" data-args="${_origIdx}" style="margin-right:4px">PDF</button><button class="btn btn-sm btn-danger" data-action="rptDelete" data-args="${_origIdx}" aria-label="Delete report ${escapeHtml(r.reportNo||'')}">Del</button></td>`;
 }
 
 function rptRenderKanban(list, allReports){
@@ -1204,10 +1206,9 @@ function rptDelete(idx) {
 }
 
 function rptClearFilters() {
-  ['rpt-f-repno','rpt-f-client','rpt-f-project','rpt-f-drawing','rpt-f-weldno','rpt-f-insp','rpt-f-datefrom','rpt-f-dateto'].forEach(id => { const e=el(id); if(e) e.value=''; });
+  ['rpt-search','rpt-f-datefrom','rpt-f-dateto'].forEach(id => { const e=el(id); if(e) e.value=''; });
   const fm = el('rpt-fm'); if(fm) fm.value = '';
-  const fr = el('rpt-fr'); if(fr) fr.value = '';
-  const fStage = el('rpt-fstage'); if(fStage) fStage.value = '';
+  _rptStatusFilter = '';
   rptRender();
 }
 

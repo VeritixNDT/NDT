@@ -1598,7 +1598,14 @@ function ovRenderRecentList() {
     wrap.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:13px;padding:20px">No reports saved yet.</div>';
     return;
   }
-  let html = `<table class="tbl" style="width:100%"><thead><tr>
+  // TEST TOOL — bulk-clear button for wiping test data during local
+  // testing. Remove this block and ovClearAllReports() before release.
+  let html = `<div style="margin-bottom:10px;padding:6px 10px;border:1px dashed var(--amber);border-radius:6px;display:flex;align-items:center;gap:10px;background:rgba(245,166,35,.06);flex-wrap:wrap">
+    <span style="font-size:10px;font-family:var(--mono);color:var(--amber);text-transform:uppercase;letter-spacing:.05em">⚠ Test tool</span>
+    <button class="btn btn-sm btn-danger" data-action="ovClearAllReports" style="font-size:11px">Delete all reports</button>
+    <span style="font-size:10px;color:var(--t3)">Temporary — clears test data; remove before the cloud release.</span>
+  </div>`;
+  html += `<table class="tbl" style="width:100%"><thead><tr>
     <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:168px"></th>
   </tr></thead><tbody>`;
   reports.slice().reverse().forEach((r, i) => {
@@ -1626,6 +1633,19 @@ function ovOpenReport(idx){
   const r = reports[idx];
   if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
   ovNewReport(r.method, null, r);
+}
+
+// TEST TOOL — wipes every saved report in one click, for resetting test
+// data during local testing. Remove this function and the button in
+// ovRenderRecentList before the cloud release.
+async function ovClearAllReports(){
+  const reports = ls(KEYS.reports, []);
+  if(!reports.length){ toast(t('toast.no_reports','No reports to delete.')); return; }
+  if(!await vxConfirm({ message: 'Delete ALL ' + reports.length + ' saved report(s)? This testing tool cannot be undone.', okLabel: t('vxc.delete','Delete all'), danger: true })) return;
+  lss(KEYS.reports, []);
+  updateReportCount();
+  ovRenderRecentList();
+  toast(t('toast.all_reports_deleted','All test reports deleted.'));
 }
 
 async function ovDeleteReport(idx) {

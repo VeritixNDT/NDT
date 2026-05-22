@@ -1432,6 +1432,25 @@ function cvAddPage(){
   cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
   toast(tf('toast.added_label','Added {label}', {label}));
 }
+// Duplicate the current page — an easy way to base an extra page (e.g. a
+// table-continuation page) on page 1. Blocks are deep-copied with fresh
+// ids so the copy and the original never share a block id.
+function cvDuplicatePage(){
+  const src = cvPages[cvCurrentPage];
+  if(!src) return;
+  cvPushUndo();
+  const blocks = (src.blocks || []).map(b => {
+    const c = JSON.parse(JSON.stringify(b));
+    c.id = _cvBlockId();
+    return c;
+  });
+  const label = 'Page ' + (cvPages.length + 1);
+  cvPages.splice(cvCurrentPage + 1, 0, { label: label, blocks: blocks });
+  cvCurrentPage = cvCurrentPage + 1;
+  cvSync(); cvSelectedId = null; cvSelectedIds = [];
+  cvRenderPageTabs(); cvRenderCanvas(); cvRenderProps(null); cvSaveLayout();
+  toast('Page duplicated as ' + label + ' — use ✎ on the tab to rename it.');
+}
 function cvSwitchPage(idx){
   if(idx<0||idx>=cvPages.length) return;
   cvCurrentPage=idx; cvSync(); cvSelectedId=null; cvSelectedIds=[];
@@ -1458,9 +1477,12 @@ function cvRenderPageTabs(){
   if(!bar) return;
   bar.innerHTML = cvPages.map((p,i)=>{
     const active=i===cvCurrentPage?'active':'';
+    const rename=`<span class="pg-close" data-action="cvRenamePage" data-args="${i}" data-stop-prop="1" title="Rename page">✎</span>`;
     const close=cvPages.length>1?`<span class="pg-close" data-action="cvDeletePage" data-args="${i}" data-stop-prop="1" title="Delete page">✕</span>`:'';
-    return `<button class="canvas-page-tab ${active}" data-action="cvSwitchPage" data-args="${i}" data-on-dblclick="_wCvRenamePageStopProp" data-pass-event="1" data-args="${i}" title="Double-click to rename">${p.label}${close}</button>`;
-  }).join('') + `<button class="canvas-page-add" data-action="cvAddPage" title="Add page">+</button>`;
+    return `<button class="canvas-page-tab ${active}" data-action="cvSwitchPage" data-args="${i}" title="${_h(p.label)}">${_h(p.label)}${rename}${close}</button>`;
+  }).join('')
+    + `<button class="canvas-page-add" data-action="cvDuplicatePage" title="Duplicate current page">⧉</button>`
+    + `<button class="canvas-page-add" data-action="cvAddPage" title="Add blank page">+</button>`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
@@ -2335,7 +2357,7 @@ function cvRenderCanvas(){
       emptyHint.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;pointer-events:none;font-family:Arial,Helvetica,sans-serif;text-align:center;padding:0 32px';
       emptyHint.innerHTML=`<svg width="44" height="44" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="5" stroke="#d2d6dd" stroke-width="2" stroke-dasharray="6 4"/><path d="M24 16v16M16 24h16" stroke="#c2c7cf" stroke-width="2.5" stroke-linecap="round"/></svg>
         <div style="font-size:14px;font-weight:600;color:#9aa0aa">This page is empty</div>
-        <div style="font-size:12px;color:#b4b9c2;line-height:1.5;max-width:300px">Drag fields from the palette on the left, or load a starting point with <strong style="color:#8a909b">Default layout</strong>.</div>`;
+        <div style="font-size:12px;color:#b4b9c2;line-height:1.5;max-width:300px">Drag fields from the palette on the left to build the report, or duplicate an existing page with the ⧉ button.</div>`;
       canvas.appendChild(emptyHint);
     }
   } else if(emptyHint){

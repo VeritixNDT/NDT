@@ -684,6 +684,9 @@ function rptInit() {
 // V6: View state + selection + saved filters
 var _rptView = 'table';            // 'table' | 'kanban'
 var _rptStatusFilter = '';         // '' | 'review' | 'approved' — status-tile filter
+// reportNo -> highest revision number seen. A report below its reportNo's
+// max is superseded (locked). Recomputed at the start of each table render.
+var _rptMaxRev = {};
 var _rptSelectedIdx = new Set();   // indices into the full reports array
 var _rptActiveSavedView = null;    // id of currently active saved view (or null)
 
@@ -910,6 +913,13 @@ function rptSetStatusFilter(key){
 
 function rptRenderTable(list, allReports){
   const wrap = el('rpt-table-wrap'); if(!wrap) return;
+  // Highest revision per report number — drives the superseded/locked flag.
+  _rptMaxRev = {};
+  allReports.forEach(o => {
+    const rn = o.reportNo; if(!rn) return;
+    const rv = parseInt(o.revision, 10) || 0;
+    if(_rptMaxRev[rn] == null || rv > _rptMaxRev[rn]) _rptMaxRev[rn] = rv;
+  });
   // V12: if previous render was kanban, the board needs to go before we
   // can build the table shell. The shell-creation branch handles this when
   // table.tbl is missing — but if both exist (theoretically possible after
@@ -1005,10 +1015,19 @@ var visibleIdxListLatest = [];
 
 // Hash-like signature of a report's rendered fields. If this changes, the
 // row gets re-rendered. Cheap concat; no actual hashing needed.
+// A report is superseded (locked) once a higher revision of the same
+// report number exists. Superseded reports are read-only — PDF / email
+// only, no Open. Reads _rptMaxRev, filled by rptRenderTable.
+function _rptIsSuperseded(r){
+  if(!r || !r.reportNo) return false;
+  return (parseInt(r.revision, 10) || 0) < (_rptMaxRev[r.reportNo] || 0);
+}
+
 function _rptRowSig(r, idx) {
   return [
     r.reportNo, r.method, getReportStage(r), r.verdict, r.client, r.subject,
     r.drawing, r.inspector, r.createdAt, r.stageUpdatedAt,
+    _rptIsSuperseded(r) ? 'S' : '',
     _rptSelectedIdx.has(idx) ? '1' : '0',
   ].join('|');
 }
@@ -1016,6 +1035,7 @@ function _rptRowSig(r, idx) {
 // Build the inner HTML of one row. Stable enough to compare via the signature.
 function _rptRowInner(r, _origIdx) {
   const md = NDT_METHODS.find(x => x.id === r.method);
+  const sup = _rptIsSuperseded(r);
   const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : 'Draft';
   const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':verdict==='Various'?'amber':'blue';
   const stage = getReportStage(r);
@@ -1023,7 +1043,7 @@ function _rptRowInner(r, _origIdx) {
   const isSelected = _rptSelectedIdx.has(_origIdx);
   const health = stageHealthy(r);
   return `<td style="padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select report ${escapeHtml(r.reportNo||'')}" ${isSelected?'checked':''} data-action="rptToggleSelect" data-pass-event="1" data-args="${_origIdx}"></td>
-    <td style="font-family:var(--mono);font-size:12px">${escapeHtml(r.reportNo||'—')} <span style="color:var(--t3);font-weight:400">Rev ${escapeHtml(r.revision||'00')}</span></td>
+    <td style="font-family:var(--mono);font-size:12px">${escapeHtml(r.reportNo||'—')} <span style="color:var(--t3);font-weight:400">Rev ${escapeHtml(r.revision||'00')}</span>${sup?' <span title="Superseded by a later revision — locked" style="color:var(--t3)">🔒</span>':''}</td>
     <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${escapeHtml(r.method||'—')}</span></td>
     <td><span class="badge" data-no-glyph style="background:${sc.bg};color:${sc.fg};box-shadow:inset 0 0 0 1px ${sc.accent}33;font-size:10px">${tStage(stage)}</span>${health!=='fresh'?` <span title="${fmtDuration(timeOnStage(r))} on this stage" style="font-size:10px;color:${health==='critical'?'var(--red)':'var(--amber)'};font-family:var(--mono)">·${fmtDuration(timeOnStage(r))}</span>`:''}</td>
     <td>${escapeHtml(r.client||'—')}</td>
@@ -1032,7 +1052,7 @@ function _rptRowInner(r, _origIdx) {
     <td>${escapeHtml(r.inspector||'—')}</td>
     <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(r.createdAt)}</td>
     <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>
-    <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovOpenReport" data-args="${_origIdx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="ovPrintReport" data-args="${_origIdx}">PDF</button></td>`;
+    <td style="white-space:nowrap">${sup?'':`<button class="btn btn-sm" data-action="ovOpenReport" data-args="${_origIdx}" style="margin-right:4px">Open</button>`}<button class="btn btn-sm" data-action="ovPrintReport" data-args="${_origIdx}">PDF</button></td>`;
 }
 
 function rptRenderKanban(list, allReports){

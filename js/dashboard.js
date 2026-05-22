@@ -1702,6 +1702,13 @@ function ovOpenReport(idx){
   const reports = ls(KEYS.reports, []);
   const r = reports[idx];
   if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
+  // A superseded revision is locked — once a higher revision of the same
+  // report number exists, only the current revision can be opened.
+  const _rev = parseInt(r.revision, 10) || 0;
+  if(reports.some(o => o.reportNo && o.reportNo === r.reportNo && (parseInt(o.revision, 10) || 0) > _rev)){
+    toast(t('toast.report_superseded','This revision is superseded — open the current revision to make changes.'), 'error');
+    return;
+  }
   // Came from the Reports page — switch to the Overview page first, since
   // ovNewReport only activates the new-report SECTION within it. Without
   // this the form is built on a page that isn't on screen.

@@ -802,6 +802,22 @@ function rptUpdateBulkBar(){
   bar.style.display = 'flex';
   set('rpt-bulk-count', tf('rpt.bulk.selected', '{n} selected', { n }));
 }
+// Bulk PDF — browser printing is one report at a time, so each selected
+// report opens its own print/PDF view in turn.
+function rptBulkPdf(){
+  const idxs = Array.from(_rptSelectedIdx);
+  if(!idxs.length){ toast(t('toast.select_reports','Select one or more reports first.'), 'warn'); return; }
+  idxs.forEach(i => { if(typeof ovPrintReport === 'function') ovPrintReport(i); });
+}
+
+// Bulk Open — opening loads a report into the form, so exactly one must
+// be selected. ovOpenReport itself blocks superseded revisions.
+function rptBulkOpen(){
+  const idxs = Array.from(_rptSelectedIdx);
+  if(idxs.length !== 1){ toast(t('toast.open_one','Select a single report to open.'), 'warn'); return; }
+  if(typeof ovOpenReport === 'function') ovOpenReport(idxs[0]);
+}
+
 function rptBulkSetStage(stage){
   const idxs = Array.from(_rptSelectedIdx);
   const count = setReportStageBulk(idxs, stage);
@@ -943,7 +959,7 @@ function rptRenderTable(list, allReports){
     wrap.innerHTML = `<div class="sc" style="margin-top:14px"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%"><thead><tr>
         <th scope="col" style="width:34px;padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select all visible reports" title="Select all visible"></th>
-        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="width:120px" data-i18n="col.actions">Actions</th>
+        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th>
       </tr></thead><tbody></tbody></table></div></div>`;
     table = wrap.querySelector('table.tbl');
     tbody = table.querySelector('tbody');
@@ -958,7 +974,7 @@ function rptRenderTable(list, allReports){
 
   // Empty state
   if(!list.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--t3)">No reports match these filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--t3)">No reports match these filters.</td></tr>';
     visibleIdxListLatest = [];
     return;
   }
@@ -1051,8 +1067,7 @@ function _rptRowInner(r, _origIdx) {
     <td style="font-size:12px;color:var(--t2)">${escapeHtml(r.drawing||'—')}</td>
     <td>${escapeHtml(r.inspector||'—')}</td>
     <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(r.createdAt)}</td>
-    <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>
-    <td style="white-space:nowrap">${sup?'':`<button class="btn btn-sm" data-action="ovOpenReport" data-args="${_origIdx}" style="margin-right:4px">Open</button>`}<button class="btn btn-sm" data-action="ovPrintReport" data-args="${_origIdx}">PDF</button></td>`;
+    <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>`;
 }
 
 function rptRenderKanban(list, allReports){

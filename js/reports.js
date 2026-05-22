@@ -259,9 +259,9 @@ function tplRenderForm(methodId, m) {
 
   // Section 1: Report revision & Client info
   html += tplFormSection('Report revision & client information', RPT_FORM.client, methodId, f);
-  // Section 2: Subject
-  html += tplFormSection('Subject information', RPT_FORM.subject, methodId, f);
-  // Section 3: Examination criteria (common + method-specific from defaults)
+  // Examination criteria (common + method-specific from defaults). The
+  // standalone Subject section was dropped to match the new-report form —
+  // its fields are item-table columns / live in Examination criteria.
   const examFields = [...RPT_FORM.exam];
   // Add method defaults as pre-filled context
   html += tplFormSection('Examination criteria', examFields, methodId, f);

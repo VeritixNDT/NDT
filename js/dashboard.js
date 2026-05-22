@@ -1102,10 +1102,10 @@ function ovNewReport(methodId, btn, sourceReport) {
 
   // Section 1: Report revision & Client
   html += ovFormSection('Report revision & client information', clientShared, methodId, merged, m);
-  // Section 2: Examination details (expandable table + remarks)
-  html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
-  // Section 3: Subject (shared across all items)
+  // Section 2: Subject (shared across all items)
   html += ovFormSection('Subject information', subjectShared, methodId, merged, m);
+  // Section 3: Examination details (expandable table + remarks)
+  html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
   // Section 4: Exam criteria
   html += ovFormSection('Examination criteria', RPT_FORM.exam, methodId, merged, m);
   // Section 5: Equipment & parameters. Includes TPL_FIELDS._common

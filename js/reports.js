@@ -119,9 +119,9 @@ var RPT_FORM = {
   ],
   exam: [
     { id:'examType',   label:'Examination type',    placeholder:'e.g. Initial', options:['Weld surface examination','Surface examination','Crack examination','Forging examination','Casting examination','Positive Material Identification','Hardness test','Wall thickness measurements','Lamination examination','Ultrasonic examination'] },
-    { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
     { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
     { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
+    { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
   ],
   result: [
     { id:'verdict',    label:'Overall verdict',     placeholder:'', type:'select', options:['— Select —','Acceptable','Not acceptable','For information','Inconclusive'] },

@@ -25,6 +25,9 @@ function _ovBumpRevision(rev){
 function _ovOverallVerdict(items){
   const vs = (items || []).map(it => ((it && it.verdict) || '').trim()).filter(Boolean);
   if(!vs.length) return '';
+  // A mix of accepted and rejected items isn't a single pass/fail
+  // outcome — report it as "Various" (shown amber in the lists).
+  if(vs.includes('Acceptable') && vs.includes('Not acceptable')) return 'Various';
   if(vs.includes('Not acceptable'))  return 'Not acceptable';
   if(vs.includes('Inconclusive'))    return 'Inconclusive';
   if(vs.includes('For information')) return 'For information';
@@ -738,7 +741,7 @@ function ovOpenDrilldown(title, list){
       list.map(r => {
         const md = NDT_METHODS.find(x => x.id === r.method);
         const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : 'Draft';
-        const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':'blue';
+        const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':verdict==='Various'?'amber':'blue';
         return `<tr>
           <td style="font-family:var(--mono);font-size:12px;color:var(--cyan)">${escapeHtml(r.reportNo||'—')}</td>
           <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${r.method||'—'}</span></td>
@@ -1684,7 +1687,7 @@ function ovRenderRecentList() {
       <td style="font-family:var(--mono);font-size:12px">${r.revision||'00'}</td>
       <td>${escapeHtml(r.client||'—')}</td>
       <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
-      <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
+      <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':r.verdict==='Various'?'amber':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
       <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
     </tr>`;
   });

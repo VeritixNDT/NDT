@@ -1017,13 +1017,13 @@ function _rptRowSig(r, idx) {
 function _rptRowInner(r, _origIdx) {
   const md = NDT_METHODS.find(x => x.id === r.method);
   const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : 'Draft';
-  const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':'blue';
+  const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':verdict==='Various'?'amber':'blue';
   const stage = getReportStage(r);
   const sc = RPT_STAGE_COLORS[stage] || RPT_STAGE_COLORS.Draft;
   const isSelected = _rptSelectedIdx.has(_origIdx);
   const health = stageHealthy(r);
   return `<td style="padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select report ${escapeHtml(r.reportNo||'')}" ${isSelected?'checked':''} data-action="rptToggleSelect" data-pass-event="1" data-args="${_origIdx}"></td>
-    <td style="font-family:var(--mono);font-size:12px">${escapeHtml(r.reportNo||'—')}</td>
+    <td style="font-family:var(--mono);font-size:12px">${escapeHtml(r.reportNo||'—')} <span style="color:var(--t3);font-weight:400">Rev ${escapeHtml(r.revision||'00')}</span></td>
     <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${escapeHtml(r.method||'—')}</span></td>
     <td><span class="badge" data-no-glyph style="background:${sc.bg};color:${sc.fg};box-shadow:inset 0 0 0 1px ${sc.accent}33;font-size:10px">${tStage(stage)}</span>${health!=='fresh'?` <span title="${fmtDuration(timeOnStage(r))} on this stage" style="font-size:10px;color:${health==='critical'?'var(--red)':'var(--amber)'};font-family:var(--mono)">·${fmtDuration(timeOnStage(r))}</span>`:''}</td>
     <td>${escapeHtml(r.client||'—')}</td>
@@ -1126,7 +1126,7 @@ function rptRenderKanban(list, allReports){
 function rptRenderKanbanCard(r, idx){
   const md = NDT_METHODS.find(x => x.id === r.method);
   const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : '—';
-  const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':null;
+  const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':verdict==='Various'?'amber':null;
   const isSelected = _rptSelectedIdx.has(idx);
   const health = stageHealthy(r);
   const healthClass = health === 'fresh' ? '' : 'health-' + health;

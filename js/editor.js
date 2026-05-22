@@ -111,7 +111,7 @@ var CV_FIELD_DEFS = {
   // date as the live report / sign date. Keys / palette group unchanged
   // so existing canvases with a today-date block keep working.
   'today-date':      {label:'Report / sign (auto)',  ph:'15 Mar 2025', get:r=>fmtDate(new Date()), w:140,h:38, computed:true},
-  'page-num':        {label:'Page X of Y',           ph:'Page 1 of 3', get:r=>'Page '+((typeof _cvPrintPageNum!=='undefined'&&_cvPrintPageNum)||(typeof cvCurrentPage!=='undefined'?cvCurrentPage+1:1))+' of '+(typeof cvPages!=='undefined'?cvPages.length:1), w:130,h:32, computed:true},
+  'page-num':        {label:'Page X of Y',           ph:'Page 1 of 3', get:r=>'Page '+((typeof _cvPrintPageNum!=='undefined'&&_cvPrintPageNum)||(typeof cvCurrentPage!=='undefined'?cvCurrentPage+1:1))+' of '+((typeof _cvPrintPageNum!=='undefined'&&_cvPrintPageNum&&typeof _cvPrintTotal!=='undefined'&&_cvPrintTotal)?_cvPrintTotal:(typeof cvPages!=='undefined'?cvPages.length:1)), w:130,h:32, computed:true},
 
   // ── PROCEDURE / CERT / CALIBRATION STATUS ───────────────────────
   'procedure-link':  {label:'Procedure (linked)',    ph:'SV-PRO-009 Rev 02',  get:r=>'',w:280,h:46, smartLink:'procedure'},
@@ -398,6 +398,11 @@ var cvPpvResult = 'Pass';
 // each sheet); 0 at all other times. Lets the page-num field resolve to
 // the real page on every printed sheet instead of a static "Page 1".
 var _cvPrintPageNum = 0;
+// Total printed sheets after table pagination (the "of N" page-num shows),
+// and the row slice the items-table renders on the current sheet
+// (null = every row).
+var _cvPrintTotal = 0;
+var _cvItemsSlice = null;
 var cvPpvShowDefects = false;
 var cvUndoStack = [];
 var cvRedoStack = [];
@@ -2832,11 +2837,17 @@ function cvRenderBlockContent(block, report, preview){
             }
           } catch(e){}
         }
-        const items = liveItems
+        let items = liveItems
           ? liveItems
           : (preview
               ? ((typeof CV_SAMPLE !== 'undefined' && Array.isArray(CV_SAMPLE.items) && CV_SAMPLE.items.length) ? CV_SAMPLE.items : [{}])
               : [{ subject:'[Weld / object]', drawing:'[Drawing]', dimensions:'[Dimensions]', material:'[Material]', weldType:'[Prep]', weldProcess:'[Process]', welders:'[Welder]', examDate:'—', extent:'[Extent]', verdict:'—' }]);
+        // Pagination — during a print build the engine sets _cvItemsSlice
+        // so page 1 shows the rows that fit and each continuation page
+        // shows its overflow batch.
+        if(_cvItemsSlice && Array.isArray(items)){
+          items = items.slice(_cvItemsSlice.start, _cvItemsSlice.start + _cvItemsSlice.count);
+        }
         // Verdict cell colour swatches — same palette as the result place
         // card (rcolor / rbg above) plus a blue variant for "For
         // information" so all four states the form offers are covered.

@@ -159,14 +159,50 @@ function cvBuildPrintHTML(report){
   const hdrChromeFragment = renderChrome('header');
   const ftrChromeFragment = renderChrome('footer');
 
+  // ── Table pagination ────────────────────────────────────────────────
+  // Page 1's examination-details table fills to capacity; overflow rows
+  // flow onto copies of the continuation page — a later template page
+  // that also carries an items-table block. No overflow → the
+  // continuation page is not printed at all. (≈40px allows for the
+  // items-table's title strip + column-header row above the 36px rows.)
+  const _itemsCap = b => Math.max(1, Math.floor((((typeof b.h === 'number' && b.h > 0) ? b.h : 90) - 40) / 36));
+  const _mainTbl = (cvPages[0] && cvPages[0].blocks) ? cvPages[0].blocks.find(b => b.key === 'items-table') : null;
+  let _contIdx = -1;
+  for(let i = 1; i < cvPages.length; i++){
+    if((cvPages[i].blocks || []).some(b => b.key === 'items-table')){ _contIdx = i; break; }
+  }
+  const _contTbl  = (_contIdx >= 0) ? cvPages[_contIdx].blocks.find(b => b.key === 'items-table') : null;
+  const _nItems   = (report && Array.isArray(report.items)) ? report.items.length : 0;
+  const _cap0     = _mainTbl ? _itemsCap(_mainTbl) : 0;
+  const _capC     = _contTbl ? _itemsCap(_contTbl) : 0;
+  const _overflow = !!(_mainTbl && _contTbl && _capC > 0 && _nItems > _cap0);
+
+  // Sheet plan — one entry per printed sheet: { page, slice }.
+  const _plan = [];
+  if(_overflow){
+    _plan.push({ page: cvPages[0], slice: { start: 0, count: _cap0 } });
+    let _placed = _cap0;
+    while(_placed < _nItems && _plan.length < 200){
+      _plan.push({ page: cvPages[_contIdx], slice: { start: _placed, count: _capC } });
+      _placed += _capC;
+    }
+    cvPages.forEach((p, i) => { if(i !== 0 && i !== _contIdx) _plan.push({ page: p, slice: null }); });
+  } else {
+    // No overflow — print every page once, skipping the continuation
+    // page (it exists only to receive overflow rows).
+    cvPages.forEach((p, i) => { if(i !== _contIdx) _plan.push({ page: p, slice: null }); });
+  }
+  _cvPrintTotal = _plan.length;
+
   let pagesHtml = '';
-  cvPages.forEach((page, pageIdx) => {
-    // Expose the 1-based page number so the page-num field resolves per
-    // page — the header / footer fragments are re-rendered for each sheet.
-    _cvPrintPageNum = pageIdx + 1;
-    // Body blocks only — exclude zone-tagged blocks, those are in the
-    // header/footer fragments. Filter before sort so sort mutates only
-    // the fresh filtered array, never page.blocks.
+  _plan.forEach((entry, sheetIdx) => {
+    // 1-based sheet number for the page-num field; the items-table row
+    // slice for this sheet (null when the table isn't paginated).
+    _cvPrintPageNum = sheetIdx + 1;
+    _cvItemsSlice   = entry.slice;
+    const page = entry.page;
+    // Body blocks only — zone-tagged blocks are in the header/footer
+    // fragments. Filter before sort so sort never mutates page.blocks.
     let bodyHtml = '';
     const bodyBlocks = page.blocks
       .filter(b => b.zone !== 'header' && b.zone !== 'footer')
@@ -174,8 +210,7 @@ function cvBuildPrintHTML(report){
     bodyBlocks.forEach(block => { bodyHtml += renderBlock(block, bodyBlocks); });
     const hdrFragment = _hdrShow ? headerBlocks.map(b => renderBlock(b, headerBlocks)).join('') : '';
     const ftrFragment = _ftrShow ? footerBlocks.map(b => renderBlock(b, footerBlocks)).join('') : '';
-    // Chrome first (z-index 0), then zone blocks + body blocks on top.
-    pagesHtml += `<div class="vx-print-page" data-page-num="${pageIdx + 1}">
+    pagesHtml += `<div class="vx-print-page" data-page-num="${sheetIdx + 1}">
       <div class="vx-print-inner">
         ${hdrChromeFragment}
         ${ftrChromeFragment}
@@ -185,6 +220,7 @@ function cvBuildPrintHTML(report){
       </div>
     </div>`;
   });
+  _cvItemsSlice   = null;
   _cvPrintPageNum = 0;
 
   // Filename surfaced to the browser's print-to-PDF dialog via <title>.

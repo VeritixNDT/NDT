@@ -111,7 +111,7 @@ var CV_FIELD_DEFS = {
   // date as the live report / sign date. Keys / palette group unchanged
   // so existing canvases with a today-date block keep working.
   'today-date':      {label:'Report / sign (auto)',  ph:'15-Mar-2025', get:r=>{const d=new Date();return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}, w:140,h:38, computed:true},
-  'page-num':        {label:'Page X of Y',           ph:'Page 1 of 3', get:r=>'Page 1 of '+(typeof cvPages!=='undefined'?cvPages.length:1), w:130,h:32, computed:true},
+  'page-num':        {label:'Page X of Y',           ph:'Page 1 of 3', get:r=>'Page '+((typeof _cvPrintPageNum!=='undefined'&&_cvPrintPageNum)||(typeof cvCurrentPage!=='undefined'?cvCurrentPage+1:1))+' of '+(typeof cvPages!=='undefined'?cvPages.length:1), w:130,h:32, computed:true},
 
   // ── PROCEDURE / CERT / CALIBRATION STATUS ───────────────────────
   'procedure-link':  {label:'Procedure (linked)',    ph:'SV-PRO-009 Rev 02',  get:r=>'',w:280,h:46, smartLink:'procedure'},
@@ -394,6 +394,10 @@ var cvPaletteDrag = null;
 var cvPaletteCollapsed = {};
 var cvPpvMethod = 'MT';
 var cvPpvResult = 'Pass';
+// 1-based page number during a print build (set by cvBuildPrintHTML for
+// each sheet); 0 at all other times. Lets the page-num field resolve to
+// the real page on every printed sheet instead of a static "Page 1".
+var _cvPrintPageNum = 0;
 var cvPpvShowDefects = false;
 var cvUndoStack = [];
 var cvRedoStack = [];

@@ -123,8 +123,13 @@ function cvBuildPrintHTML(report){
   const ftrEnabled  = cvTplCfg.footer && cvTplCfg.footer.enabled;
   const hdrHasContent = headerBlocks.length > 0;
   const ftrHasContent = footerBlocks.length > 0;
-  const hdrFragment = (hdrEnabled || hdrHasContent) ? headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(b=>renderBlock(b, headerBlocks)).join('') : '';
-  const ftrFragment = (ftrEnabled || ftrHasContent) ? footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(b=>renderBlock(b, footerBlocks)).join('') : '';
+  // Header / footer blocks sorted once; the fragments are re-rendered
+  // per page inside the loop below so the page-num field resolves to the
+  // correct page on every sheet.
+  if(hdrEnabled || hdrHasContent) headerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0));
+  if(ftrEnabled || ftrHasContent) footerBlocks.sort((a,b)=>(a.zIndex||0)-(b.zIndex||0));
+  const _hdrShow = hdrEnabled || hdrHasContent;
+  const _ftrShow = ftrEnabled || ftrHasContent;
 
   // Chrome layer for each zone — background fill, accent strip, single-edge
   // divider border. Sits behind the zone blocks at z-index 0 so user content
@@ -156,18 +161,19 @@ function cvBuildPrintHTML(report){
 
   let pagesHtml = '';
   cvPages.forEach((page, pageIdx) => {
-    // Body blocks only — exclude zone-tagged blocks, those are already in the
-    // header/footer fragments. AUDIT-FIX #10: filter before sort. Previously
-    // we spread-and-sorted the entire blocks array then filtered out zone
-    // blocks during iteration, which sorted blocks that were about to be
-    // discarded. Filtering first creates a smaller array, which sort can
-    // then mutate safely (filter always returns a fresh array, so no spread
-    // needed to avoid mutating page.blocks).
+    // Expose the 1-based page number so the page-num field resolves per
+    // page — the header / footer fragments are re-rendered for each sheet.
+    _cvPrintPageNum = pageIdx + 1;
+    // Body blocks only — exclude zone-tagged blocks, those are in the
+    // header/footer fragments. Filter before sort so sort mutates only
+    // the fresh filtered array, never page.blocks.
     let bodyHtml = '';
     const bodyBlocks = page.blocks
       .filter(b => b.zone !== 'header' && b.zone !== 'footer')
       .sort((a,b) => (a.zIndex||0) - (b.zIndex||0));
     bodyBlocks.forEach(block => { bodyHtml += renderBlock(block, bodyBlocks); });
+    const hdrFragment = _hdrShow ? headerBlocks.map(b => renderBlock(b, headerBlocks)).join('') : '';
+    const ftrFragment = _ftrShow ? footerBlocks.map(b => renderBlock(b, footerBlocks)).join('') : '';
     // Chrome first (z-index 0), then zone blocks + body blocks on top.
     pagesHtml += `<div class="vx-print-page" data-page-num="${pageIdx + 1}">
       <div class="vx-print-inner">
@@ -179,6 +185,7 @@ function cvBuildPrintHTML(report){
       </div>
     </div>`;
   });
+  _cvPrintPageNum = 0;
 
   // Filename surfaced to the browser's print-to-PDF dialog via <title>.
   // Format: "<ReportNo> — <TemplateNo>" so the inspector can tell at a glance

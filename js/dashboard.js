@@ -1144,6 +1144,14 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Section 6: Result
   html += ovFormSection('Result & sign-off', RPT_FORM.result.filter(f => !omit.has(f.id)), methodId, merged, m);
 
+  // Save bar — at the foot of the form. "Save" stores the report as a
+  // Draft; "For review" stores it at the Submitted stage so it lands in
+  // the reviewers' Inbox.
+  html += `<div style="display:flex;justify-content:flex-end;gap:10px;margin:20px 14px 12px;padding-top:16px;border-top:1px solid var(--border)">
+    <button class="btn" data-action="ovSaveReport" data-args="'review'">For review</button>
+    <button class="btn btn-primary" data-action="ovSaveReport">Save</button>
+  </div>`;
+
   body.innerHTML = html;
   // V9: bind auto-fill suggestion to client field
   if(typeof autofillBindClientField === 'function'){
@@ -1466,7 +1474,7 @@ function ovItemsRerender() {
   }
 }
 
-function ovSaveReport() {
+function ovSaveReport(mode) {
   if(!_ovMethod) { toast(t('toast.no_method', 'No method selected.'), 'error'); return; }
   const m = NDT_METHODS.find(x => x.id === _ovMethod); if(!m) return;
   // A non-admin without a valid certification for this method can't
@@ -1610,11 +1618,15 @@ function ovSaveReport() {
       author: CURRENT_USER ? (CURRENT_USER.name || CURRENT_USER.email || '') : '',
     });
   }
-  // V6: ensure new report has stage + audit log
-  report.stage = 'Draft';
+  // V6: ensure new report has stage + audit log. "For review" saves the
+  // report straight to the Submitted stage so it appears in the
+  // reviewers' Inbox; a plain Save keeps it as the inspector's Draft.
+  const forReview = (mode === 'review');
+  report.stage = forReview ? 'Submitted' : 'Draft';
   report.auditLog = [];
   if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
   addReportAudit(report, 'created', _ovReviseSource ? ('Revision ' + (report.revision||'') + ' created') : 'Report created');
+  if(forReview) addReportAudit(report, 'submitted', 'Submitted for review');
   // Stage 2 — freeze the fully rendered report so reprints are identical
   // regardless of any later template / register change. Stored as a
   // self-contained HTML document on the record.
@@ -1634,7 +1646,7 @@ function ovSaveReport() {
   }
   updateReportCount();
   if(typeof updateInboxBadge === 'function') updateInboxBadge();
-  toast(`${m.id} report saved.`);
+  toast(forReview ? `${m.id} report submitted for review.` : `${m.id} report saved.`);
   ovShowSection('dashboard', el('ovi-dashboard'));
 }
 

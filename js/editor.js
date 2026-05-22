@@ -2674,7 +2674,12 @@ function cvRenderBlockContent(block, report, preview){
   const al = _safeAlign(block.align);
   const jc = al==='center'?'center':al==='right'?'flex-end':'flex-start';  // justify-content
   const fs = _safeFs(block.fontSize, '8.5px');
-  const fc = _safeColor(block.color, '#000');
+  // Page number and the auto report/sign date render in the brand green
+  // (the valid-shield colour) as a deliberate accent — applied in both
+  // the editor preview and the printed PDF (this render path feeds both).
+  const fc = (block.key === 'page-num' || block.key === 'today-date')
+    ? '#16a34a'
+    : _safeColor(block.color, '#000');
   const bg = _safeColor(block.bgColor, 'transparent');
   const bc = _safeColor(block.borderColor, '#ccc');
   const fw = block.bold ? 'bold' : 'normal';

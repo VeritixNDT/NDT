@@ -1015,7 +1015,15 @@ function cvResolveSmartLink(block, report){
     // white-light pool so a "UV light" record can't resolve as both.
     const reportMethod = report?.method || '';
     const isUv = k === 'uv-light-status';
-    const rec = _cvResolveEqByKind(e => {
+    // Prefer the light meter the inspector explicitly picked on the
+    // report (eq_uvmeter / eq_lightmeter hold the register id); fall back
+    // to resolving one by register Type when nothing was picked.
+    let rec = null;
+    const pickedId = report && (isUv ? report.eq_uvmeter : report.eq_lightmeter);
+    if(pickedId && typeof eqLoad === 'function'){
+      try { rec = (eqLoad() || []).find(e => e.id === pickedId) || null; } catch(e){}
+    }
+    if(!rec) rec = _cvResolveEqByKind(e => {
       if(e.type === 'uv-light')    return isUv;
       if(e.type === 'white-light') return !isUv;
       if(e.type === 'general')     return false;
@@ -1023,7 +1031,7 @@ function cvResolveSmartLink(block, report){
       const s = (e.name || '') + ' ' + (e.notes || '');
       return isUv ? _CV_UV_RE.test(s) : (_CV_LIGHT_RE.test(s) && !_CV_UV_RE.test(s));
     }, reportMethod);
-    return _cvEqKindStatusCard(rec, reportMethod, isUv ? '— NO UV LAMP' : '— NO LIGHT METER');
+    return _cvEqKindStatusCard(rec, reportMethod, isUv ? '— NO UV METER' : '— NO LIGHT METER');
   }
   if(k === 'light-conditions'){
     // Combined examination light & UV conditions — the white-light, UV-A

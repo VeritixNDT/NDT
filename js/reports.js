@@ -27,7 +27,7 @@ var TPL_FIELDS = {
     // The options array is kept as a fallback for the template editor
     // (Settings → Report templates) where the equipment context isn't
     // available; for new reports the live equipment register wins.
-    { id:'equip', label:'Equipment',                    placeholder:'Pick from the equipment register…', useEquipmentRegister:true, options:['SIUI Smartor','Olympus EPOCH 650','Olympus EPOCH 6LT','Sonatest Veo+','GE USM 36','Inspection kit','Universal cam gauge','Welding gauge set','X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Mic 10','Sonodur 3','Proceq Equotip 550'] },
+    { id:'equip', label:'NDT equipment',                placeholder:'Pick from the equipment register…', useEquipmentRegister:true, options:['SIUI Smartor','Olympus EPOCH 650','Olympus EPOCH 6LT','Sonatest Veo+','GE USM 36','Inspection kit','Universal cam gauge','Welding gauge set','X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Mic 10','Sonodur 3','Proceq Equotip 550'] },
   ],
   UT: [
     { id:'coup',  label:'Default couplant',     placeholder:'e.g. Ultragel II', options:['Waterbased','Oil','Ultragel II','Sono 600','Sonagel W','Glycerin'] },
@@ -51,6 +51,8 @@ var TPL_FIELDS = {
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
+    { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light' },
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light' },
     // Light / UV examination conditions. White light gates the UV-A
     // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
     // above 20 lux it is a visible white-light inspection (UV-A N/A).
@@ -71,6 +73,8 @@ var TPL_FIELDS = {
     { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
     { id:'lightsource',label:'Light source',     placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
+    { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light' },
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light' },
     // Light / UV examination conditions. White light gates the UV-A
     // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
     // above 20 lux it is a visible white-light inspection (UV-A N/A).
@@ -424,17 +428,20 @@ function _rptLightGate(wlInput){
 // on day one.
 function equipmentSelectHtml(methodId, f, val, fid) {
   const list = (typeof eqLoad === 'function') ? eqLoad() : [];
-  // Light meters / UV-A lamps live in the register too, but they belong
-  // to the lighting smart cards (which resolve by Type), not the main
-  // examination-equipment field — so exclude them here.
-  const exam = list.filter(r => r.type !== 'white-light' && r.type !== 'uv-light');
-  let filtered = exam.filter(r => !Array.isArray(r.methods) || !r.methods.length || r.methods.includes(methodId));
-  // Nothing is tagged for this method but the register has equipment —
-  // show the whole (examination) register rather than dropping to a
-  // free-text box, so the inspector can still pick their gear. (Method
-  // tags are a filter convenience, not a hard gate; tag the item with
-  // this method in Settings → Equipment to have it shown method-filtered.)
-  if(!filtered.length && exam.length) filtered = exam.slice();
+  // A typed field (f.eqType — the UV-A / white-light meter pickers)
+  // lists only that register Type. The main NDT-equipment field lists
+  // everything EXCEPT the light / UV gear (which belongs to the light
+  // meter pickers and their smart cards).
+  const pool = f.eqType
+    ? list.filter(r => r.type === f.eqType)
+    : list.filter(r => r.type !== 'white-light' && r.type !== 'uv-light');
+  let filtered = pool.filter(r => !Array.isArray(r.methods) || !r.methods.length || r.methods.includes(methodId));
+  // Nothing is tagged for this method but the pool has equipment — show
+  // the whole pool rather than dropping to a free-text box, so the
+  // inspector can still pick their gear. (Method tags are a filter
+  // convenience, not a hard gate; tag the item with this method in
+  // Settings → Equipment to have it shown method-filtered.)
+  if(!filtered.length && pool.length) filtered = pool.slice();
   if(!filtered.length) {
     return `<div class="fld"><label>${escapeHtml(f.label)}</label>
       <input id="${fid}" type="text" value="${escapeHtml(val||'')}" placeholder="No equipment in register — add via Settings → Equipment"/>

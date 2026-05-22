@@ -1507,7 +1507,13 @@ function ovSaveReport() {
       const pickedId = report[f.id];
       if(!pickedId) return;
       const rec = eqList.find(r => r.id === pickedId);
-      if(rec) {
+      if(f.eqType) {
+        // Light meter picker (UV-A / white-light) — keep the register id
+        // on the field so the light/UV smart card resolves it; never
+        // claim the primary eq_id / eq_svid / eq_caldate snapshot, which
+        // belongs to the main NDT equipment.
+        if(!rec) report[f.id] = '';
+      } else if(rec) {
         report.eq_id = rec.id;
         report[f.id] = rec.name || '';
         if(rec.svId)      report.eq_svid    = rec.svId;

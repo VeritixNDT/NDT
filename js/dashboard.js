@@ -20,6 +20,17 @@ var _ovReviseSource = null;
 function _ovBumpRevision(rev){
   return String((parseInt(rev, 10) || 0) + 1).padStart(2, '0');
 }
+// Overall report verdict rolled up from the inspected-items results —
+// worst case wins. '' when no row carries a result yet.
+function _ovOverallVerdict(items){
+  const vs = (items || []).map(it => ((it && it.verdict) || '').trim()).filter(Boolean);
+  if(!vs.length) return '';
+  if(vs.includes('Not acceptable'))  return 'Not acceptable';
+  if(vs.includes('Inconclusive'))    return 'Inconclusive';
+  if(vs.includes('For information')) return 'For information';
+  if(vs.every(v => v === 'Acceptable')) return 'Acceptable';
+  return vs[0];
+}
 // True when the form-built report differs in any editable content from
 // its revision source. Metadata (revision, dates, audit, history,
 // derived equipment-snapshot ids) is ignored, so reopening and re-saving
@@ -27,7 +38,8 @@ function _ovBumpRevision(rev){
 function _ovReportChanged(next, src){
   if(!src) return true;
   const skip = new Set(['revision','revisions','revisedFrom','createdAt','createdBy',
-    'updatedAt','auditLog','stage','id','eq_id','eq_svid','eq_caldate','frozenHtml']);
+    'updatedAt','auditLog','stage','id','eq_id','eq_svid','eq_caldate','frozenHtml',
+    'witness','procRev']);
   const norm = v => JSON.stringify(v == null ? '' : v);
   const keys = new Set([...Object.keys(next || {}), ...Object.keys(src || {})]);
   for(const k of keys){
@@ -1094,12 +1106,25 @@ function ovNewReport(methodId, btn, sourceReport) {
   const body = el('ov-nr-body'); if(!body) return;
   let html = '';
 
-  // Per-item fields belong in the items table — strip them from the
-  // single-instance sections so the user enters each value in one place.
-  const omit = new Set(RPT_ITEM_FIELD_IDS);
+  // Fields kept off the new-report form: item-table columns (entered in
+  // the items table) plus four that are now system-derived rather than
+  // typed — report revision (assigned by the revision workflow), overall
+  // verdict (rolled up from the item results on save), procedure revision
+  // (read from the linked procedure), and witness / 3rd party.
+  const omit = new Set([...RPT_ITEM_FIELD_IDS, 'revision','verdict','procRev','witness']);
   const clientShared  = RPT_FORM.client.filter(f => !omit.has(f.id));
   const subjectShared = RPT_FORM.subject.filter(f => !omit.has(f.id));
+  const examShared    = RPT_FORM.exam.filter(f => !omit.has(f.id));
 
+  // Revision mode opens with a mandatory reason box at the top — the
+  // revision number itself is system-assigned, so there is no field for
+  // it; this textarea feeds ovSaveReport's revision guardrail.
+  if(sourceReport){
+    html += `<div style="margin:0 14px 14px;padding:11px 13px;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.32);border-radius:6px">
+      <label style="display:block;font-size:11px;font-weight:600;color:var(--amber);margin-bottom:5px">Reason for revision <span style="color:var(--red)">*</span></label>
+      <textarea id="ov-revision-reason" rows="2" placeholder="What changed in this revision?" style="width:100%;font-family:var(--font);font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box"></textarea>
+    </div>`;
+  }
   // Section 1: Report revision & Client
   html += ovFormSection('Report revision & client information', clientShared, methodId, merged, m);
   // Section 2: Subject (shared across all items)
@@ -1107,7 +1132,7 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Section 3: Examination details (expandable table + remarks)
   html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
   // Section 4: Exam criteria
-  html += ovFormSection('Examination criteria', RPT_FORM.exam, methodId, merged, m);
+  html += ovFormSection('Examination criteria', examShared, methodId, merged, m);
   // Section 5: Equipment & parameters. Includes TPL_FIELDS._common
   // (specification, acceptance criteria, procedure, equipment) AND the
   // per-method fields. _common was previously template-editor-only, so
@@ -1120,7 +1145,7 @@ function ovNewReport(methodId, btn, sourceReport) {
   });
   if(specific.length) html += ovFormSection(`${m.id} — Equipment & parameters`, specific, methodId, merged, m);
   // Section 6: Result
-  html += ovFormSection('Result & sign-off', RPT_FORM.result, methodId, merged, m);
+  html += ovFormSection('Result & sign-off', RPT_FORM.result.filter(f => !omit.has(f.id)), methodId, merged, m);
 
   body.innerHTML = html;
   // V9: bind auto-fill suggestion to client field
@@ -1148,26 +1173,11 @@ function ovNewReport(methodId, btn, sourceReport) {
       vxConfirm({ title: 'Certification check', message: _ovSignBlockReason, okLabel: 'OK', cancelLabel: 'OK' });
     }
   }
-  // Capture the revision baseline and attach the bump-detector. The
-  // listener fires the reason-required UI as soon as the user changes
-  // the value away from the baseline (and hides it again if they revert).
-  // Baseline = the source's own revision when revising (merged.revision
-  // already holds the bumped value, so the guardrail sees the change),
-  // else the new report's current revision.
-  _ovRevisionOriginal = (sourceReport ? (sourceReport.revision || '00') : (merged.revision || '')).trim();
-  setTimeout(() => {
-    const rev = document.getElementById(`rf-${methodId}-revision`);
-    if(rev) {
-      rev.addEventListener('input',  ovRevisionMaybePromptReason);
-      rev.addEventListener('change', ovRevisionMaybePromptReason);
-      // In revision mode the revision number is system-assigned — lock
-      // the field and surface the reason box from the start.
-      if(sourceReport){
-        rev.readOnly = true;
-        ovRevisionMaybePromptReason();
-      }
-    }
-  }, 30);
+  // Baseline revision for ovSaveReport's reason guardrail. The revision
+  // number is no longer a form field — it is system-assigned on save
+  // (00 for a new report, the next number for a revision) — and in
+  // revision mode the reason box is rendered into the form above.
+  _ovRevisionOriginal = (sourceReport ? (sourceReport.revision || '00') : '00').trim();
 }
 
 function ovFormSection(title, fields, methodId, data, m) {
@@ -1389,39 +1399,6 @@ function ovItemsRemoveRow(idx) {
   ovItemsRerender();
 }
 
-// Show / hide the "Reason for revision" textarea. Triggered by edits to
-// the revision input — when the value differs from _ovRevisionOriginal,
-// the amber reason block appears (and ovSaveReport blocks the save if
-// it's left empty). Reverting to the original value hides the block.
-function ovRevisionMaybePromptReason() {
-  const rev = document.getElementById(`rf-${_ovMethod}-revision`);
-  if(!rev) return;
-  const changed = (rev.value || '').trim() !== _ovRevisionOriginal;
-  let wrap = document.getElementById('ov-revision-reason-wrap');
-  if(changed) {
-    if(!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'ov-revision-reason-wrap';
-      wrap.style.cssText = 'margin:6px 0 10px;padding:10px 12px;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.32);border-radius:6px';
-      wrap.innerHTML = `
-        <label style="display:block;font-size:11px;font-weight:600;color:var(--amber);margin-bottom:5px">
-          Reason for revision <span style="color:var(--red)">*</span>
-          <span style="font-weight:400;color:var(--t3);margin-left:6px">required when the revision number changes</span>
-        </label>
-        <textarea id="ov-revision-reason" rows="2" placeholder="What changed in this revision?" style="width:100%;font-family:var(--font);font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box"></textarea>`;
-      // Anchor the block to the revision field's surrounding .fld so it
-      // sits right under the input the user just edited, regardless of
-      // which column layout the section uses.
-      const fld = rev.closest('.fld') || rev.parentElement;
-      const sectionBody = fld && fld.closest('.sc-body');
-      if(sectionBody) sectionBody.appendChild(wrap); else if(fld && fld.parentElement) fld.parentElement.appendChild(wrap);
-    }
-    wrap.style.display = '';
-  } else if(wrap) {
-    wrap.style.display = 'none';
-  }
-}
-
 function ovItemsRerender() {
   // Replace just the items-table section in place. The section is the only
   // .sc whose header contains the title "Examination details". Preserves
@@ -1465,6 +1442,11 @@ function ovSaveReport() {
     const inp = el(`rf-${_ovMethod}-${f.id}`);
     if(inp) report[f.id] = (f.type === 'select') ? inp.value : inp.value.trim();
   });
+  // Report revision is system-assigned, not a typed field: 00 for a new
+  // report, the next number when revising an existing one.
+  report.revision = _ovReviseSource
+    ? _ovBumpRevision((_ovReviseSource.revision || '00').trim())
+    : '00';
   // Equipment-register snapshot — if any field was rendered via the
   // equipment dropdown (useEquipmentRegister:true on the TPL_FIELDS
   // entry), the stored value is an equipment id. Resolve it against
@@ -1514,14 +1496,17 @@ function ovSaveReport() {
     .filter(row => Object.keys(row).length > 0);
   if(items.length) {
     report.items = items;
-    // Skip `verdict` in the mirror — the Result section keeps a top-level
-    // Overall verdict that the user signs off on, independent of any
-    // per-row disposition the items table may carry.
+    // Mirror row 0's values to the top-level report fields (legacy place
+    // cards / filters / CSV). `verdict` is excluded — the overall verdict
+    // is rolled up from every row's result below, not taken from row 0.
     RPT_ITEM_FIELD_IDS.forEach(fid => {
       if(fid === 'verdict') return;
       if(items[0][fid] !== undefined) report[fid] = items[0][fid];
     });
   }
+  // Overall verdict is derived from the inspected-items results — worst
+  // case wins — rather than entered as a separate sign-off field.
+  report.verdict = _ovOverallVerdict(items);
   // Examination remarks — free-text notes printed in the empty space
   // below the items table on the place card. Saved alongside the items
   // so the PDF render can pull them on the next preview.

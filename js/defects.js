@@ -572,6 +572,20 @@ function procRenderMetrics(filtered){
     <div class="stat-tile violet"><div class="stat-label">Methods covered</div><div class="stat-val">${methods}</div><div class="stat-sub">of ${NDT_METHODS.length} configured</div></div>`;
 }
 
+// Fill a procedure-form <select> with the canonical options, keeping a
+// non-canonical saved value selectable so editing a legacy procedure
+// never silently loses its specification / acceptance.
+function _procFillSelect(id, options, value){
+  const sel = el(id);
+  if(!sel) return;
+  const v = String(value || '');
+  const opts = (options || []).slice();
+  if(v && opts.indexOf(v) === -1) opts.unshift(v);
+  sel.innerHTML = '<option value=""></option>'
+    + opts.map(o => `<option${o === v ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
+  sel.value = v;
+}
+
 // ── Upload form ──────────────────────────────────────────────────────
 function procShowUpload(editIdx){
   _procEditIdx = typeof editIdx === 'number' ? editIdx : -1;
@@ -585,6 +599,12 @@ function procShowUpload(editIdx){
   const mSel = el('proc-method');
   if(mSel) mSel.innerHTML = getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
   if(extractBanner) extractBanner.style.display = 'none';
+  // Specification / Acceptance dropdowns share the report form's
+  // canonical lists (TPL_FIELDS._common) so a procedure's values always
+  // match a report's exactly.
+  const _tc = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS._common) || [];
+  const specOpts = (_tc.find(f => f.id === 'spec') || {}).options || [];
+  const accOpts  = (_tc.find(f => f.id === 'acc')  || {}).options || [];
 
   if(_procEditIdx >= 0){
     const all = procGetAll();
@@ -597,8 +617,8 @@ function procShowUpload(editIdx){
     el('proc-review').value = p.reviewDate||'';
     el('proc-status').value = p.status||'Active';
     if(mSel) mSel.value = p.method||'UT';
-    el('proc-standard').value = p.standard||'';
-    el('proc-acceptance').value = p.acceptance||'';
+    _procFillSelect('proc-standard', specOpts, p.standard);
+    _procFillSelect('proc-acceptance', accOpts, p.acceptance);
     if(p.fileName && queueEl){
       const fIcon = p.fileType?(p.fileType.includes('pdf')?'📕':p.fileType.includes('image')?'🖼':'📘'):'📄';
       queueEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel2);border-radius:6px;font-size:12px;color:var(--t2)">${fIcon} ${escapeHtml(p.fileName)} <span style="color:var(--t3);font-size:10px">(current file — upload new to replace)</span></div>`;
@@ -606,7 +626,9 @@ function procShowUpload(editIdx){
   } else {
     if(titleEl) titleEl.textContent = 'Upload procedure';
     if(saveBtn) saveBtn.textContent = 'Save procedure';
-    ['proc-no','proc-title','proc-rev','proc-review','proc-standard','proc-acceptance'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
+    ['proc-no','proc-title','proc-rev','proc-review'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
+    _procFillSelect('proc-standard', specOpts, '');
+    _procFillSelect('proc-acceptance', accOpts, '');
     el('proc-status').value = 'Active';
     if(mSel) mSel.selectedIndex = 0;
     if(queueEl) queueEl.innerHTML = '';

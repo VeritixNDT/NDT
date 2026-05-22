@@ -1506,6 +1506,17 @@ function ovSaveReport() {
   // Overall verdict is derived from the inspected-items results — worst
   // case wins — rather than entered as a separate sign-off field.
   report.verdict = _ovOverallVerdict(items);
+  // Required-field guard — a saved report must carry the essentials.
+  // Without this a report could be saved with no client, inspector or
+  // examined items at all.
+  const _missing = [];
+  if(!String(report.client || '').trim())    _missing.push('Client');
+  if(!String(report.inspector || '').trim()) _missing.push('Inspector');
+  if(!items.length)                          _missing.push('at least one examination item');
+  if(_missing.length){
+    toast(t('toast.report_missing','Cannot save — please complete') + ': ' + _missing.join(', ') + '.', 'error');
+    return;
+  }
   // Examination remarks — free-text notes printed in the empty space
   // below the items table on the place card. Saved alongside the items
   // so the PDF render can pull them on the next preview.

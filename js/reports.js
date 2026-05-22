@@ -51,12 +51,14 @@ var TPL_FIELDS = {
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
-    { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light' },
-    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light' },
-    // Light / UV examination conditions. White light gates the UV-A
-    // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
-    // above 20 lux it is a visible white-light inspection (UV-A N/A).
+    // Light / UV examination conditions. The white-light lux reading is
+    // entered first and gates the meter pickers and the UV-A reading:
+    // ≤ 20 lux is a fluorescent inspection (UV-A meter / reading apply);
+    // ≥ 50 lux is a visible white-light inspection (white-light meter
+    // applies). The non-applicable picker / reading is greyed out.
     { id:'whitelight', label:'White light (lux)',         placeholder:'e.g. 500',  options:['5','10','15','20','50','350','500','1000','1500','2000'], editable:true, numeric:true, gates:'uvirr' },
+    { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light',    gatedBy:'whitelight', gateMax:20 },
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:50 },
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   VT: [
@@ -73,12 +75,14 @@ var TPL_FIELDS = {
     { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
     { id:'lightsource',label:'Light source',     placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
-    { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light' },
-    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light' },
-    // Light / UV examination conditions. White light gates the UV-A
-    // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
-    // above 20 lux it is a visible white-light inspection (UV-A N/A).
+    // Light / UV examination conditions. The white-light lux reading is
+    // entered first and gates the meter pickers and the UV-A reading:
+    // ≤ 20 lux is a fluorescent inspection (UV-A meter / reading apply);
+    // ≥ 50 lux is a visible white-light inspection (white-light meter
+    // applies). The non-applicable picker / reading is greyed out.
     { id:'whitelight', label:'White light (lux)',         placeholder:'e.g. 500',  options:['5','10','15','20','50','350','500','1000','1500','2000'], editable:true, numeric:true, gates:'uvirr' },
+    { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light',    gatedBy:'whitelight', gateMax:20 },
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:50 },
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   PMI:[
@@ -313,7 +317,7 @@ function rptFieldHtml(methodId, f, data) {
   // the list but are disabled so the inspector can't pick gear that's
   // out of calibration. Falls back to free text when the register is
   // empty (so the form still works before any equipment is added).
-  if(f.useEquipmentRegister) return equipmentSelectHtml(methodId, f, val, fid);
+  if(f.useEquipmentRegister) return equipmentSelectHtml(methodId, f, val, fid, data);
   // Inspector-register-backed fields render a dropdown from Settings →
   // Inspectors. An inspector with no certification for the report's
   // method, or an expired one, appears disabled — they can't be
@@ -401,23 +405,49 @@ function _rptRangeCheck(inp){
 // white-light field by rptFieldHtml.
 function _rptLightGate(wlInput){
   if(!wlInput) return;
+  const wlRaw = (wlInput.value || '').trim();
+  const wl    = parseFloat(wlRaw);
+  const wlNum = (wlRaw !== '' && !isNaN(wl)) ? wl : null;
+  // UV-A irradiance reading — shown only for a fluorescent inspection.
   const uvInput = document.getElementById(wlInput.id.replace('whitelight','uvirr'));
-  if(!uvInput) return;
-  const fld = uvInput.closest('.fld'); if(!fld) return;
-  const na   = fld.querySelector('.rpt-na');
-  const warn = fld.querySelector('.rpt-range-warn');
-  const max  = parseFloat(uvInput.dataset.gatemax);
-  const lim  = isNaN(max) ? 20 : max;
-  const wl   = parseFloat(wlInput.value);
-  const applies = wlInput.value.trim() !== '' && !isNaN(wl) && wl <= lim;
-  uvInput.style.display = applies ? '' : 'none';
-  if(na) na.style.display = applies ? 'none' : 'block';
-  if(applies){
-    if(typeof _rptRangeCheck === 'function') _rptRangeCheck(uvInput);
-  } else {
-    uvInput.value = '';
-    if(warn) warn.style.display = 'none';
+  if(uvInput){
+    const fld  = uvInput.closest('.fld');
+    const na   = fld && fld.querySelector('.rpt-na');
+    const warn = fld && fld.querySelector('.rpt-range-warn');
+    const max  = parseFloat(uvInput.dataset.gatemax);
+    const lim  = isNaN(max) ? 20 : max;
+    const applies = wlNum != null && wlNum <= lim;
+    uvInput.style.display = applies ? '' : 'none';
+    if(na) na.style.display = applies ? 'none' : 'block';
+    if(applies){
+      if(typeof _rptRangeCheck === 'function') _rptRangeCheck(uvInput);
+    } else {
+      uvInput.value = '';
+      if(warn) warn.style.display = 'none';
+    }
   }
+  // Light-meter pickers — enable only the meter whose regime the lux
+  // value selects (≤ gatemax → UV-A meter, ≥ gatemin → white-light
+  // meter); the other is greyed out.
+  ['uvmeter','lightmeter'].forEach(key => {
+    const sel = document.getElementById(wlInput.id.replace('whitelight', key));
+    if(!sel) return;
+    const min = parseFloat(sel.dataset.gatemin);
+    const max = parseFloat(sel.dataset.gatemax);
+    const applies = wlNum != null
+      && (isNaN(min) || wlNum >= min)
+      && (isNaN(max) || wlNum <= max);
+    _rptSetGateState(sel, applies);
+  });
+}
+// Toggle a gated equipment <select> between active and greyed-out.
+function _rptSetGateState(sel, applies){
+  sel.disabled = !applies;
+  sel.style.opacity = applies ? '' : '.45';
+  if(!applies && sel.value) sel.value = '';
+  const fld  = sel.closest('.fld');
+  const hint = fld && fld.querySelector('.rpt-gate-hint');
+  if(hint) hint.style.display = applies ? 'none' : 'block';
 }
 
 // Equipment-register dropdown — used by any RPT_FORM / TPL_FIELDS field
@@ -426,7 +456,7 @@ function _rptLightGate(wlInput){
 // shows "OUT OF CAL" + disabled for past-due items, and falls back to
 // a free-text input when the register is empty so the form still works
 // on day one.
-function equipmentSelectHtml(methodId, f, val, fid) {
+function equipmentSelectHtml(methodId, f, val, fid, data) {
   const list = (typeof eqLoad === 'function') ? eqLoad() : [];
   // A typed field (f.eqType — the UV-A / white-light meter pickers)
   // lists only that register Type. The main NDT-equipment field lists
@@ -465,8 +495,27 @@ function equipmentSelectHtml(methodId, f, val, fid) {
     if(expired) bits.push('— OUT OF CAL');
     return `<option value="${escapeHtml(r.id)}"${selectedId===r.id?' selected':''}${expired?' disabled':''}>${escapeHtml(bits.join(' '))}</option>`;
   }).join('');
+  // Gating — a light-meter picker (f.gatedBy the white-light lux field)
+  // renders disabled / greyed until the lux value puts the exam in its
+  // regime (≤ gateMax → UV-A meter, ≥ gateMin → white-light meter).
+  let gateAttrs = '', gateHint = '', disAttr = '', selStyle = '';
+  if(f.gatedBy){
+    const raw = data && (data['eq_'+f.gatedBy] != null ? data['eq_'+f.gatedBy] : data[f.gatedBy]);
+    const gv  = parseFloat(raw == null ? '' : raw);
+    const applies = !isNaN(gv)
+      && (f.gateMin == null || gv >= f.gateMin)
+      && (f.gateMax == null || gv <= f.gateMax);
+    gateAttrs = ` data-gatedby="${escapeHtml(f.gatedBy)}"`
+      + (f.gateMin != null ? ` data-gatemin="${f.gateMin}"` : '')
+      + (f.gateMax != null ? ` data-gatemax="${f.gateMax}"` : '');
+    const cond = f.gateMin != null ? `the white-light reading is ≥ ${f.gateMin} lux`
+               : f.gateMax != null ? `the white-light reading is ≤ ${f.gateMax} lux`
+               : '';
+    gateHint = `<div class="rpt-gate-hint" style="display:${applies?'none':'block'};font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">Applies when ${cond}.</div>`;
+    if(!applies){ disAttr = ' disabled'; selStyle = ' style="opacity:.45"'; }
+  }
   return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· from Settings → Equipment</span></label>
-    <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}"><option value="">— Select —</option>${opts}</select>
+    <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}"${gateAttrs}${disAttr}${selStyle}><option value="">— Select —</option>${opts}</select>${gateHint}
   </div>`;
 }
 

@@ -1699,6 +1699,10 @@ function ovOpenReport(idx){
   const reports = ls(KEYS.reports, []);
   const r = reports[idx];
   if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
+  // Came from the Reports page — switch to the Overview page first, since
+  // ovNewReport only activates the new-report SECTION within it. Without
+  // this the form is built on a page that isn't on screen.
+  if(typeof showPage === 'function') showPage('overview', document.querySelector('.tn'));
   ovNewReport(r.method, null, r);
 }
 

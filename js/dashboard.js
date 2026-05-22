@@ -10,6 +10,32 @@ var _ovItems = [{}];
 // to detect whether the user has bumped the revision so the save handler
 // can demand a reason (required) and append a row to report.revisions.
 var _ovRevisionOriginal = '';
+// Set when an existing saved report has been opened for revision (via
+// ovOpenReport). Holds the original report record. ovSaveReport uses it
+// to keep the same report number, write a NEW record at the next
+// revision, carry the revision history forward, and skip the numbering
+// counter. Null for a fresh new report.
+var _ovReviseSource = null;
+// Next-revision string from a numeric revision ("00" → "01", "01" → "02").
+function _ovBumpRevision(rev){
+  return String((parseInt(rev, 10) || 0) + 1).padStart(2, '0');
+}
+// True when the form-built report differs in any editable content from
+// its revision source. Metadata (revision, dates, audit, history,
+// derived equipment-snapshot ids) is ignored, so reopening and re-saving
+// with no edits creates no revision.
+function _ovReportChanged(next, src){
+  if(!src) return true;
+  const skip = new Set(['revision','revisions','revisedFrom','createdAt','createdBy',
+    'updatedAt','auditLog','stage','id','eq_id','eq_svid','eq_caldate']);
+  const norm = v => JSON.stringify(v == null ? '' : v);
+  const keys = new Set([...Object.keys(next || {}), ...Object.keys(src || {})]);
+  for(const k of keys){
+    if(skip.has(k)) continue;
+    if(norm(next[k]) !== norm(src[k])) return true;
+  }
+  return false;
+}
 // Set when a non-admin opens a new report for a method their
 // certification doesn't cover (missing / expired). Holds the reason
 // string; ovSaveReport refuses to save while it's set.
@@ -998,7 +1024,7 @@ function webhookLoadIntoUi(){
 // stage change delivered two webhooks per subscriber. Removed — single wrap
 // is the source of truth.
 
-function ovNewReport(methodId, btn) {
+function ovNewReport(methodId, btn, sourceReport) {
   _ovMethod = methodId;
   const m = NDT_METHODS.find(x => x.id === methodId); if(!m) return;
 
@@ -1008,37 +1034,53 @@ function ovNewReport(methodId, btn) {
   el('ov-newreport').classList.add('active');
   if(btn) btn.classList.add('active');
 
-  el('ov-nr-title').textContent = `New ${m.id} report — ${escapeHtml(m.name)}`;
-  el('ov-nr-desc').textContent = `Fill in the ${escapeHtml(m.name)} report details below. Fields are pre-filled from your saved templates.`;
+  if(sourceReport){
+    const _nextRev = _ovBumpRevision((sourceReport.revision || '00').trim());
+    el('ov-nr-title').textContent = `Revise ${m.id} report — ${escapeHtml(sourceReport.reportNo || '')} Rev ${_nextRev}`;
+    el('ov-nr-desc').textContent  = `Saving creates revision ${_nextRev} of this report. The report number stays the same; a reason for the change is required.`;
+  } else {
+    el('ov-nr-title').textContent = `New ${m.id} report — ${escapeHtml(m.name)}`;
+    el('ov-nr-desc').textContent = `Fill in the ${escapeHtml(m.name)} report details below. Fields are pre-filled from your saved templates.`;
+  }
 
   // Load template data
   loadTemplates();
   const tpl = _tplData[methodId] || {};
   const rptForm = _rptForms[methodId] || {};
 
-  // Merge: rptForm values override tpl values
-  const merged = { ...rptForm };
+  // Merge: rptForm values override tpl values. A revision opens against
+  // the saved report's own values rather than the method-template form.
+  const merged = sourceReport ? { ...sourceReport } : { ...rptForm };
+  _ovReviseSource = sourceReport || null;
 
-  // Generate report number — pulls the per-report method code into the
-  // configured numMethodPos slot so each method (UT, MT, VT, …) shows up
-  // automatically in the report's identifier.
-  const s = ls(KEYS.settings, {});
-  const prefix = s.numPrefix || 'INS';
-  const sep = s.numSep !== undefined ? s.numSep : '-';
-  const yrDigits = parseInt(s.numYear || '4');
-  const digits = parseInt(s.numDigits || '3');
-  const next = parseInt(s.numNext || '1');
-  const methodPos = s.numMethodPos || 'none';
-  const yr = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
-  const seq = String(next).padStart(digits, '0');
-  const mCode = (methodId || merged.method || '').toUpperCase();
-  const parts = [prefix];
-  if(methodPos === 'after-prefix' && mCode) parts.push(mCode);
-  if(yr) parts.push(yr);
-  if(methodPos === 'after-year' && mCode) parts.push(mCode);
-  parts.push(seq);
-  merged.reportNo = parts.filter(Boolean).join(sep);
-  if(!merged.revision) merged.revision = '00';
+  if(sourceReport){
+    // Revision of an existing report — keep the report number, advance
+    // the revision number. The reason guardrail in ovSaveReport keys off
+    // _ovRevisionOriginal (set below to the source's own revision).
+    merged.reportNo = sourceReport.reportNo || merged.reportNo || '';
+    merged.revision = _ovBumpRevision((sourceReport.revision || '00').trim());
+  } else {
+    // Generate report number — pulls the per-report method code into the
+    // configured numMethodPos slot so each method (UT, MT, VT, …) shows up
+    // automatically in the report's identifier.
+    const s = ls(KEYS.settings, {});
+    const prefix = s.numPrefix || 'INS';
+    const sep = s.numSep !== undefined ? s.numSep : '-';
+    const yrDigits = parseInt(s.numYear || '4');
+    const digits = parseInt(s.numDigits || '3');
+    const next = parseInt(s.numNext || '1');
+    const methodPos = s.numMethodPos || 'none';
+    const yr = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
+    const seq = String(next).padStart(digits, '0');
+    const mCode = (methodId || merged.method || '').toUpperCase();
+    const parts = [prefix];
+    if(methodPos === 'after-prefix' && mCode) parts.push(mCode);
+    if(yr) parts.push(yr);
+    if(methodPos === 'after-year' && mCode) parts.push(mCode);
+    parts.push(seq);
+    merged.reportNo = parts.filter(Boolean).join(sep);
+    if(!merged.revision) merged.revision = '00';
+  }
 
   // Items table — seed row 0 from any top-level values the template /
   // saved-form may have pre-filled, so the user doesn't lose data when the
@@ -1109,12 +1151,21 @@ function ovNewReport(methodId, btn) {
   // Capture the revision baseline and attach the bump-detector. The
   // listener fires the reason-required UI as soon as the user changes
   // the value away from the baseline (and hides it again if they revert).
-  _ovRevisionOriginal = (merged.revision || '').trim();
+  // Baseline = the source's own revision when revising (merged.revision
+  // already holds the bumped value, so the guardrail sees the change),
+  // else the new report's current revision.
+  _ovRevisionOriginal = (sourceReport ? (sourceReport.revision || '00') : (merged.revision || '')).trim();
   setTimeout(() => {
     const rev = document.getElementById(`rf-${methodId}-revision`);
     if(rev) {
       rev.addEventListener('input',  ovRevisionMaybePromptReason);
       rev.addEventListener('change', ovRevisionMaybePromptReason);
+      // In revision mode the revision number is system-assigned — lock
+      // the field and surface the reason box from the start.
+      if(sourceReport){
+        rev.readOnly = true;
+        ovRevisionMaybePromptReason();
+      }
     }
   }, 30);
 }
@@ -1477,6 +1528,19 @@ function ovSaveReport() {
   const remarksEl = document.getElementById('ov-exam-remarks');
   const examRemarks = remarksEl ? remarksEl.value.trim() : '';
   if(examRemarks) report.examRemarks = examRemarks;
+  // Revising an existing report: do nothing if no editable content
+  // changed (a no-op open/save creates no revision), keep the original
+  // report number, and seed report.revisions with the source's history
+  // so the guardrail below appends to it.
+  if(_ovReviseSource){
+    if(!_ovReportChanged(report, _ovReviseSource)){
+      toast(t('toast.revision_no_change','No changes were made — no revision created.'), 'info');
+      return;
+    }
+    report.reportNo    = _ovReviseSource.reportNo || report.reportNo;
+    report.revisedFrom = _ovReviseSource.reportNo || '';
+    report.revisions   = Array.isArray(_ovReviseSource.revisions) ? _ovReviseSource.revisions.slice() : [];
+  }
   // Revision-change guardrail — if the user bumped the revision number,
   // require a non-empty reason and log it. Without a reason the save is
   // blocked and the textarea is focused so the inspector can supply one.
@@ -1502,15 +1566,18 @@ function ovSaveReport() {
   report.stage = 'Draft';
   report.auditLog = [];
   if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
-  addReportAudit(report, 'created', 'Report created');
+  addReportAudit(report, 'created', _ovReviseSource ? ('Revision ' + (report.revision||'') + ' created') : 'Report created');
   // Save
   const reports = ls(KEYS.reports, []);
   reports.push(report);
   lss(KEYS.reports, reports);
-  // Increment numbering
-  const s = ls(KEYS.settings, {});
-  s.numNext = (parseInt(s.numNext || '1')) + 1;
-  lss(KEYS.settings, s);
+  // Increment numbering — a revision keeps the original report number,
+  // so the counter only advances for a genuinely new report.
+  if(!_ovReviseSource){
+    const s = ls(KEYS.settings, {});
+    s.numNext = (parseInt(s.numNext || '1')) + 1;
+    lss(KEYS.settings, s);
+  }
   updateReportCount();
   if(typeof updateInboxBadge === 'function') updateInboxBadge();
   toast(`${m.id} report saved.`);
@@ -1531,7 +1598,7 @@ function ovRenderRecentList() {
     return;
   }
   let html = `<table class="tbl" style="width:100%"><thead><tr>
-    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:60px"></th>
+    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:118px"></th>
   </tr></thead><tbody>`;
   reports.slice().reverse().forEach((r, i) => {
     const md = NDT_METHODS.find(x => x.id === r.method);
@@ -1543,11 +1610,21 @@ function ovRenderRecentList() {
       <td>${escapeHtml(r.client||'—')}</td>
       <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
       <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
-      <td><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
     </tr>`;
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+// Open a saved report for revision. Loads it back into the report form
+// in revision mode (see ovNewReport's sourceReport path) — same report
+// number, next revision, reason required on save.
+function ovOpenReport(idx){
+  const reports = ls(KEYS.reports, []);
+  const r = reports[idx];
+  if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
+  ovNewReport(r.method, null, r);
 }
 
 async function ovDeleteReport(idx) {

@@ -260,10 +260,10 @@ var CV_LAYOUT_ITEMS = [
 var CV_PALETTE_GROUPS = [
   {id:'company',   label:'🏢 Company (live)', fields:['co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-website-smart','co-vat-smart','co-logo-smart','co-block','co-footer-smart','co-confidstmt-smart']},
   {id:'template',  label:'📋 Report template', fields:['tpl-number']},
-  {id:'identity',  label:'Identity',      fields:['report-no','revision','exam-date','method']},
+  {id:'identity',  label:'Identity',      fields:['report-no','revision','method','exam-date']},
   {id:'client',    label:'Client info',   fields:['client','project','project-no','location','sv-order','order-no','req-no','ref-client']},
-  {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','welders','weld-process','material','weld-prep','heat-treat','thickness','surf-cond','temperature','weld-pos','part-exam']},
-  {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage']},
+  {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','material','thickness','weld-prep','weld-process','welders','heat-treat','surf-cond','weld-pos','part-exam']},
+  {id:'criteria',  label:'Criteria',      fields:['exam-type','extent','spec','acc-crit','procedure','proc-rev','stage','temperature']},
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},

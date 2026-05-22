@@ -52,13 +52,14 @@ var TPL_FIELDS = {
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. The white-light lux reading is
-    // entered first and gates the meter pickers and the UV-A reading:
-    // ≤ 20 lux is a fluorescent inspection (UV-A meter / reading apply);
-    // ≥ 50 lux is a visible white-light inspection (white-light meter
-    // applies). The non-applicable picker / reading is greyed out.
+    // entered first and gates the meter pickers and the UV-A reading at
+    // a single 20-lux threshold: 20 lux or below is a fluorescent
+    // inspection (UV-A meter / reading apply); above 20 lux is a visible
+    // white-light inspection (white-light meter applies). The other is
+    // greyed out.
     { id:'whitelight', label:'White light (lux)',         placeholder:'e.g. 500',  options:['5','10','15','20','50','350','500','1000','1500','2000'], editable:true, numeric:true, gates:'uvirr' },
     { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light',    gatedBy:'whitelight', gateMax:20 },
-    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:50 },
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:20 },
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   VT: [
@@ -76,13 +77,14 @@ var TPL_FIELDS = {
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
     { id:'lightsource',label:'Light source',     placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. The white-light lux reading is
-    // entered first and gates the meter pickers and the UV-A reading:
-    // ≤ 20 lux is a fluorescent inspection (UV-A meter / reading apply);
-    // ≥ 50 lux is a visible white-light inspection (white-light meter
-    // applies). The non-applicable picker / reading is greyed out.
+    // entered first and gates the meter pickers and the UV-A reading at
+    // a single 20-lux threshold: 20 lux or below is a fluorescent
+    // inspection (UV-A meter / reading apply); above 20 lux is a visible
+    // white-light inspection (white-light meter applies). The other is
+    // greyed out.
     { id:'whitelight', label:'White light (lux)',         placeholder:'e.g. 500',  options:['5','10','15','20','50','350','500','1000','1500','2000'], editable:true, numeric:true, gates:'uvirr' },
     { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light',    gatedBy:'whitelight', gateMax:20 },
-    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:50 },
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:20 },
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   PMI:[
@@ -435,7 +437,7 @@ function _rptLightGate(wlInput){
     const min = parseFloat(sel.dataset.gatemin);
     const max = parseFloat(sel.dataset.gatemax);
     const applies = wlNum != null
-      && (isNaN(min) || wlNum >= min)
+      && (isNaN(min) || wlNum > min)
       && (isNaN(max) || wlNum <= max);
     _rptSetGateState(sel, applies);
   });
@@ -497,19 +499,21 @@ function equipmentSelectHtml(methodId, f, val, fid, data) {
   }).join('');
   // Gating — a light-meter picker (f.gatedBy the white-light lux field)
   // renders disabled / greyed until the lux value puts the exam in its
-  // regime (≤ gateMax → UV-A meter, ≥ gateMin → white-light meter).
+  // regime. gateMax is inclusive (≤, fluorescent → UV-A meter); gateMin
+  // is exclusive (>, visible → white-light meter) so the two pickers
+  // partition the lux range at one threshold with no gap or overlap.
   let gateAttrs = '', gateHint = '', disAttr = '', selStyle = '';
   if(f.gatedBy){
     const raw = data && (data['eq_'+f.gatedBy] != null ? data['eq_'+f.gatedBy] : data[f.gatedBy]);
     const gv  = parseFloat(raw == null ? '' : raw);
     const applies = !isNaN(gv)
-      && (f.gateMin == null || gv >= f.gateMin)
+      && (f.gateMin == null || gv > f.gateMin)
       && (f.gateMax == null || gv <= f.gateMax);
     gateAttrs = ` data-gatedby="${escapeHtml(f.gatedBy)}"`
       + (f.gateMin != null ? ` data-gatemin="${f.gateMin}"` : '')
       + (f.gateMax != null ? ` data-gatemax="${f.gateMax}"` : '');
-    const cond = f.gateMin != null ? `the white-light reading is ≥ ${f.gateMin} lux`
-               : f.gateMax != null ? `the white-light reading is ≤ ${f.gateMax} lux`
+    const cond = f.gateMin != null ? `the white-light reading is above ${f.gateMin} lux`
+               : f.gateMax != null ? `the white-light reading is ${f.gateMax} lux or below`
                : '';
     gateHint = `<div class="rpt-gate-hint" style="display:${applies?'none':'block'};font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">Applies when ${cond}.</div>`;
     if(!applies){ disAttr = ' disabled'; selStyle = ' style="opacity:.45"'; }

@@ -424,13 +424,17 @@ function _rptLightGate(wlInput){
 // on day one.
 function equipmentSelectHtml(methodId, f, val, fid) {
   const list = (typeof eqLoad === 'function') ? eqLoad() : [];
-  let filtered = list.filter(r => !Array.isArray(r.methods) || !r.methods.length || r.methods.includes(methodId));
+  // Light meters / UV-A lamps live in the register too, but they belong
+  // to the lighting smart cards (which resolve by Type), not the main
+  // examination-equipment field — so exclude them here.
+  const exam = list.filter(r => r.type !== 'white-light' && r.type !== 'uv-light');
+  let filtered = exam.filter(r => !Array.isArray(r.methods) || !r.methods.length || r.methods.includes(methodId));
   // Nothing is tagged for this method but the register has equipment —
-  // show the whole register rather than dropping to a free-text box, so
-  // the inspector can still pick their gear. (Method tags are a filter
-  // convenience, not a hard gate; tag the item with this method in
-  // Settings → Equipment to have it shown method-filtered.)
-  if(!filtered.length && list.length) filtered = list.slice();
+  // show the whole (examination) register rather than dropping to a
+  // free-text box, so the inspector can still pick their gear. (Method
+  // tags are a filter convenience, not a hard gate; tag the item with
+  // this method in Settings → Equipment to have it shown method-filtered.)
+  if(!filtered.length && exam.length) filtered = exam.slice();
   if(!filtered.length) {
     return `<div class="fld"><label>${escapeHtml(f.label)}</label>
       <input id="${fid}" type="text" value="${escapeHtml(val||'')}" placeholder="No equipment in register — add via Settings → Equipment"/>

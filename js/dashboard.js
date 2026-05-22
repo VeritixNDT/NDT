@@ -27,7 +27,7 @@ function _ovBumpRevision(rev){
 function _ovReportChanged(next, src){
   if(!src) return true;
   const skip = new Set(['revision','revisions','revisedFrom','createdAt','createdBy',
-    'updatedAt','auditLog','stage','id','eq_id','eq_svid','eq_caldate']);
+    'updatedAt','auditLog','stage','id','eq_id','eq_svid','eq_caldate','frozenHtml']);
   const norm = v => JSON.stringify(v == null ? '' : v);
   const keys = new Set([...Object.keys(next || {}), ...Object.keys(src || {})]);
   for(const k of keys){
@@ -1567,6 +1567,12 @@ function ovSaveReport() {
   report.auditLog = [];
   if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
   addReportAudit(report, 'created', _ovReviseSource ? ('Revision ' + (report.revision||'') + ' created') : 'Report created');
+  // Stage 2 — freeze the fully rendered report so reprints are identical
+  // regardless of any later template / register change. Stored as a
+  // self-contained HTML document on the record.
+  try {
+    if(typeof ovBuildReportSnapshot === 'function') report.frozenHtml = ovBuildReportSnapshot(report);
+  } catch(e){ console.warn('report snapshot failed', e); }
   // Save
   const reports = ls(KEYS.reports, []);
   reports.push(report);
@@ -1598,7 +1604,7 @@ function ovRenderRecentList() {
     return;
   }
   let html = `<table class="tbl" style="width:100%"><thead><tr>
-    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:118px"></th>
+    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:168px"></th>
   </tr></thead><tbody>`;
   reports.slice().reverse().forEach((r, i) => {
     const md = NDT_METHODS.find(x => x.id === r.method);
@@ -1610,7 +1616,7 @@ function ovRenderRecentList() {
       <td>${escapeHtml(r.client||'—')}</td>
       <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
       <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
-      <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
     </tr>`;
   });
   html += '</tbody></table>';

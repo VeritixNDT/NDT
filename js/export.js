@@ -297,7 +297,13 @@ function cvPrintOrExport(opts){
     return;
   }
 
-  // Hidden iframe → print()
+  _vxPrintHtml(html);
+}
+
+/** Print a standalone HTML document via a hidden iframe + the browser
+ *  print dialog. Shared by the editor's Print / PDF (cvPrintOrExport)
+ *  and saved-report reprints (ovPrintReport). */
+function _vxPrintHtml(html){
   let iframe = document.getElementById('vx-print-iframe');
   if(iframe) iframe.remove();
   iframe = document.createElement('iframe');
@@ -337,6 +343,60 @@ function cvPrintOrExport(opts){
       requestAnimationFrame(() => requestAnimationFrame(triggerPrint));
     });
   }
+}
+
+// ── Saved-report snapshot & reprint (Stage 2) ─────────────────────────
+// A report is frozen on save: cvBuildPrintHTML is rendered through the
+// method's saved template and the resulting self-contained HTML document
+// is stored on the record (report.frozenHtml). Reprinting replays that
+// HTML, so a saved report is identical forever regardless of any later
+// template / procedure / certificate / equipment change.
+
+/** Build the frozen print HTML for a report — rendered through its
+ *  method's saved template, without disturbing the editor's live canvas.
+ *  Returns '' when the method has no saved template. */
+function ovBuildReportSnapshot(report){
+  if(typeof cvBuildPrintHTML !== 'function' || !report) return '';
+  const method = report.method || '';
+  let tpl = null;
+  try { tpl = (typeof ls === 'function') ? ls(CV_METHOD_TPL_PREFIX + method, null) : null; } catch(e){}
+  if(!tpl || !Array.isArray(tpl.pages) || !tpl.pages.length) return '';
+  // Swap the method template onto the editor globals cvBuildPrintHTML
+  // reads, build, then restore — so a report save never disturbs whatever
+  // the user has open on the editor canvas.
+  const _pages = cvPages, _page = cvCurrentPage, _ppv = cvPpvMethod;
+  let html = '';
+  try {
+    cvPages = tpl.pages;
+    cvCurrentPage = 0;
+    cvPpvMethod = method;
+    if(typeof cvSync === 'function') cvSync();
+    html = cvBuildPrintHTML(report);
+  } catch(e){
+    console.warn('ovBuildReportSnapshot failed', e);
+    html = '';
+  } finally {
+    cvPages = _pages;
+    cvCurrentPage = _page;
+    cvPpvMethod = _ppv;
+    if(typeof cvSync === 'function') cvSync();
+  }
+  return html;
+}
+
+/** Reprint a saved report from its frozen snapshot. Falls back to a live
+ *  rebuild for reports saved before snapshots existed. */
+function ovPrintReport(idx){
+  const reports = (typeof ls === 'function') ? ls(KEYS.reports, []) : [];
+  const r = reports[idx];
+  if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
+  let html = r.frozenHtml;
+  if(!html) html = ovBuildReportSnapshot(r);
+  if(!html){
+    toast(t('toast.report_no_snapshot','No printable layout for this report — its method has no saved template.'),'error');
+    return;
+  }
+  _vxPrintHtml(html);
 }
 
 /** Open the rendered template in a new tab for inspection / manual printing. */

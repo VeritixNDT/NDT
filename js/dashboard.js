@@ -1147,10 +1147,12 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Section 6: Result
   html += ovFormSection('Result & sign-off', RPT_FORM.result.filter(f => !omit.has(f.id)), methodId, merged, m);
 
-  // Save bar — at the foot of the form. "Save" stores the report as a
-  // Draft; "For review" stores it at the Submitted stage so it lands in
-  // the reviewers' Inbox.
-  html += `<div style="display:flex;justify-content:flex-end;gap:10px;margin:20px 14px 12px;padding-top:16px;border-top:1px solid var(--border)">
+  // Save bar — at the foot of the form. Cancel closes the form without
+  // saving; "Save" issues the report (Approved); "For review" sends it
+  // to the Submitted stage / reviewers' Inbox.
+  html += `<div style="display:flex;align-items:center;gap:10px;margin:20px 14px 12px;padding-top:16px;border-top:1px solid var(--border)">
+    <button class="btn" data-action="ovCancelReport">Cancel</button>
+    <span style="flex:1"></span>
     <button class="btn" data-action="ovSaveReport" data-args="'review'">For review</button>
     <button class="btn btn-primary" data-action="ovSaveReport">Save</button>
   </div>`;
@@ -1651,6 +1653,22 @@ function ovSaveReport(mode) {
   if(typeof updateInboxBadge === 'function') updateInboxBadge();
   toast(forReview ? `${m.id} report submitted for review.` : `${m.id} report saved.`);
   ovShowSection('dashboard', el('ovi-dashboard'));
+}
+
+// Close the report form without saving — e.g. a report opened by
+// mistake. Returns to the Reports page when this was an opened report,
+// else back to the dashboard. Nothing is written, so the original
+// report and any revisions are untouched.
+async function ovCancelReport(){
+  if(typeof vxConfirm === 'function'){
+    const ok = await vxConfirm({ message: 'Close this report without saving? Any changes you have made will be lost.', okLabel: 'Close', cancelLabel: 'Keep editing' });
+    if(!ok) return;
+  }
+  if(_ovReviseSource && typeof showPage === 'function'){
+    showPage('reports', document.querySelectorAll('.tn')[2]);
+  } else {
+    ovShowSection('dashboard', el('ovi-dashboard'));
+  }
 }
 
 async function ovResetReport() {

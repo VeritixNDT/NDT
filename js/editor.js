@@ -3250,9 +3250,24 @@ function cvRenderBlockContent(block, report, preview){
   }
   if(def.sig){
     const sh = Math.max(0, block.h-26);
+    // The inspector-signature card auto-fills from the selected
+    // inspector's registered signature image (Settings → Inspectors).
+    let sigImg = '';
+    if(key === 'insp-sig' && preview && report && report.inspector){
+      try {
+        const _ins = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS) && INSPECTORS.length)
+          ? INSPECTORS
+          : (typeof ls === 'function' ? ls('vx-inspectors-v1', []) : []);
+        const _m = (_ins || []).find(p => p && (p.name === report.inspector || p.id === report.inspector));
+        if(_m && _m.signature) sigImg = _m.signature;
+      } catch(e){}
+    }
+    const sigInner = sigImg
+      ? `<img src="${sigImg}" alt="signature" style="height:${Math.max(10, sh-3)}px;max-width:100%;object-fit:contain;object-position:${al==='right'?'right':al==='center'?'center':'left'} bottom"/>`
+      : '';
     return `<div style="height:100%;padding:3px 7px;text-align:${al}">
       <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px">${lblEsc}</div>
-      <div style="height:${sh}px;${block.showBorder?'border-bottom:0.5px solid #000;':''}"></div>
+      <div style="height:${sh}px;${block.showBorder?'border-bottom:0.5px solid #000;':''}">${sigInner}</div>
     </div>`;
   }
   if(def.multi){

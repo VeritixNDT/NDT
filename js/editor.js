@@ -1479,7 +1479,7 @@ function cvRenderPageTabs(){
     const active=i===cvCurrentPage?'active':'';
     const rename=`<span class="pg-close" data-action="cvRenamePage" data-args="${i}" data-stop-prop="1" title="Rename page">✎</span>`;
     const close=cvPages.length>1?`<span class="pg-close" data-action="cvDeletePage" data-args="${i}" data-stop-prop="1" title="Delete page">✕</span>`:'';
-    return `<button class="canvas-page-tab ${active}" data-action="cvSwitchPage" data-args="${i}" title="${_h(p.label)}">${_h(p.label)}${rename}${close}</button>`;
+    return `<button class="canvas-page-tab ${active}" data-action="cvSwitchPage" data-args="${i}" title="${escapeHtml(p.label||'')}">${escapeHtml(p.label||'')}${rename}${close}</button>`;
   }).join('')
     + `<button class="canvas-page-add" data-action="cvDuplicatePage" title="Duplicate current page">⧉</button>`
     + `<button class="canvas-page-add" data-action="cvAddPage" title="Add blank page">+</button>`;

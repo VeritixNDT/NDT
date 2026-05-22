@@ -1113,7 +1113,6 @@ function ovNewReport(methodId, btn, sourceReport) {
   // (read from the linked procedure), and witness / 3rd party.
   const omit = new Set([...RPT_ITEM_FIELD_IDS, 'revision','verdict','procRev','witness']);
   const clientShared  = RPT_FORM.client.filter(f => !omit.has(f.id));
-  const subjectShared = RPT_FORM.subject.filter(f => !omit.has(f.id));
   const examShared    = RPT_FORM.exam.filter(f => !omit.has(f.id));
 
   // Revision mode opens with a mandatory reason box at the top — the
@@ -1125,13 +1124,11 @@ function ovNewReport(methodId, btn, sourceReport) {
       <textarea id="ov-revision-reason" rows="2" placeholder="What changed in this revision?" style="width:100%;font-family:var(--font);font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box"></textarea>
     </div>`;
   }
-  // Section 1: Report revision & Client
+  // Client & report identity
   html += ovFormSection('Report revision & client information', clientShared, methodId, merged, m);
-  // Section 2: Subject (shared across all items)
-  html += ovFormSection('Subject information', subjectShared, methodId, merged, m);
-  // Section 3: Examination details (expandable table + remarks)
+  // Examination details (expandable table + remarks)
   html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
-  // Section 4: Exam criteria
+  // Examination criteria
   html += ovFormSection('Examination criteria', examShared, methodId, merged, m);
   // Section 5: Equipment & parameters. Includes TPL_FIELDS._common
   // (specification, acceptance criteria, procedure, equipment) AND the
@@ -1181,6 +1178,8 @@ function ovNewReport(methodId, btn, sourceReport) {
 }
 
 function ovFormSection(title, fields, methodId, data, m) {
+  // Method-gated fields (def.methodsOnly) render only for their methods.
+  fields = fields.filter(f => !f.methodsOnly || f.methodsOnly.includes(methodId));
   let html = `<div class="sc" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">${title}</span></div><div class="sc-body" style="padding:14px 16px">`;
   for(let i = 0; i < fields.length; i += 2) {
     const f1 = fields[i], f2 = fields[i+1];

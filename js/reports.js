@@ -112,16 +112,18 @@ var RPT_FORM = {
     { id:'dimensions', label:'Dimensions / thickness',placeholder:'e.g. Ø219.1 × 8.2mm' },
     { id:'weldType',   label:'Weld type / prep',     placeholder:'e.g. Butt weld, Fillet', options:['V-prep','K-prep','½V-prep','Single bevel','Double V','J-prep','Fillet','Square butt','No prep'] },
     { id:'weldProcess',label:'Welding process',      placeholder:'e.g. SMAW, GTAW', options:['SMAW','GTAW','GMAW','FCAW','SAW','SMAW/GTAW','PAW','ESW','OFW'] },
-    { id:'heatTreat',  label:'Heat treatment',       placeholder:'e.g. PWHT, As-welded', options:['PWHT','APWHT','n.a.','Before','After'] },
-    { id:'surfCond',   label:'Surface condition',    placeholder:'e.g. Ground, As-welded', options:['As welded','Machined','Blasted','Painted','Ground','As cast','As forged','Electropolished'] },
-    { id:'weldPos',    label:'Welding position',     placeholder:'e.g. PA (1G)', options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
-    { id:'partExam',   label:'Part examined',        placeholder:'Describe the examined area' },
   ],
+  // Examination criteria. surfCond / heatTreat were moved here from the
+  // Subject section. stage and weldPos carry methodsOnly:['VT'] — they
+  // render only on VT reports (and VT method templates).
   exam: [
     { id:'examType',   label:'Examination type',    placeholder:'e.g. Initial', options:['Weld surface examination','Surface examination','Crack examination','Forging examination','Casting examination','Positive Material Identification','Hardness test','Wall thickness measurements','Lamination examination','Ultrasonic examination'] },
-    { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
-    { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
+    { id:'surfCond',   label:'Surface condition',    placeholder:'e.g. Ground, As-welded', options:['As welded','Machined','Blasted','Painted','Ground','As cast','As forged','Electropolished'] },
     { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
+    { id:'heatTreat',  label:'Heat treatment',       placeholder:'e.g. PWHT, As-welded', options:['PWHT','APWHT','n.a.','Before','After'] },
+    { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', methodsOnly:['VT'], options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
+    { id:'weldPos',    label:'Welding position',     placeholder:'e.g. PA (1G)', methodsOnly:['VT'], options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
+    { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
   ],
   result: [
     { id:'verdict',    label:'Overall verdict',     placeholder:'', type:'select', options:['— Select —','Acceptable','Not acceptable','For information','Inconclusive'] },
@@ -276,6 +278,8 @@ function tplRenderForm(methodId, m) {
 }
 
 function tplFormSection(title, fields, methodId, data) {
+  // Method-gated fields (def.methodsOnly) render only for their methods.
+  fields = fields.filter(f => !f.methodsOnly || f.methodsOnly.includes(methodId));
   let html = `<div class="sc" style="margin-bottom:14px"><div class="sc-head"><span class="sc-title">${title}</span></div><div class="sc-body" style="padding:14px 16px">`;
   for(let i=0;i<fields.length;i+=2){
     const f1=fields[i], f2=fields[i+1];

@@ -1618,15 +1618,15 @@ function ovSaveReport(mode) {
       author: CURRENT_USER ? (CURRENT_USER.name || CURRENT_USER.email || '') : '',
     });
   }
-  // V6: ensure new report has stage + audit log. "For review" saves the
-  // report straight to the Submitted stage so it appears in the
-  // reviewers' Inbox; a plain Save keeps it as the inspector's Draft.
+  // V6: ensure new report has stage + audit log. "Save" issues the report
+  // straight to the Approved stage; "For review" puts it at the Submitted
+  // stage so it appears in the reviewers' Inbox instead.
   const forReview = (mode === 'review');
-  report.stage = forReview ? 'Submitted' : 'Draft';
+  report.stage = forReview ? 'Submitted' : 'Approved';
   report.auditLog = [];
   if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
   addReportAudit(report, 'created', _ovReviseSource ? ('Revision ' + (report.revision||'') + ' created') : 'Report created');
-  if(forReview) addReportAudit(report, 'submitted', 'Submitted for review');
+  addReportAudit(report, forReview ? 'submitted' : 'approved', forReview ? 'Submitted for review' : 'Approved on save');
   // Stage 2 — freeze the fully rendered report so reprints are identical
   // regardless of any later template / register change. Stored as a
   // self-contained HTML document on the record.

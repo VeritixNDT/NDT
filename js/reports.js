@@ -1225,12 +1225,10 @@ var RPT_STAGE_COLORS = {
   'Draft':     { bg:'rgba(127,140,170,.10)', fg:'var(--t2)',     accent:'#7f8caa' },
   'Submitted': { bg:'rgba(0,212,255,.10)',   fg:'var(--cyan)',   accent:'#00d4ff' },
   'Reviewed':  { bg:'rgba(167,139,250,.10)', fg:'var(--violet)', accent:'#a78bfa' },
-  // Approved is the terminal "signed off / officially issued" state. Uses
-  // brand red — same colour as the checkmark in the Veritix shield — to
-  // echo the wordmark and treat the stage badge as an official stamp.
-  // Distinct from verdict colours (Pass = green, Fail = red) which signal
-  // technical inspection outcome rather than administrative workflow.
-  'Approved':  { bg:'rgba(242,92,92,.08)',   fg:'var(--red)',    accent:'#f25c5c' },
+  // Approved is the terminal "signed off / officially issued" state.
+  // Green — matching the (green) checkmark in the Veritix shield — so the
+  // stage badge reads as an official, passed stamp.
+  'Approved':  { bg:'rgba(62,207,142,.10)',  fg:'var(--green)',  accent:'#3ecf8e' },
   'Archived':  { bg:'rgba(255,255,255,.04)', fg:'var(--t3)',     accent:'#5a6880' },
 };
 function getReportStage(r){ return r.stage || 'Draft'; }

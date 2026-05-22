@@ -78,6 +78,7 @@ var CV_FIELD_DEFS = {
   'equipment':    {label:'Equipment',                     ph:'SIUI Smartor 16',               get:r=>r.eq_equip||r.equip||_cvEqLookup(r,'name')||'—',     w:185,h:38, mapTo:'eq_equip / equip'},
   'sv-id':        {label:'SV-ID No.',                     ph:'SV-UT-004',                     get:r=>r.eq_svid||r.eqSvId||_cvEqLookup(r,'svId')||'—',     w:110,h:38, mapTo:'eq_svid'},
   'cal-date':     {label:'Calibration date',              ph:'2025-01-10',                    get:r=>r.eq_caldate||r.eqCalDate||_cvEqLookup(r,'calLastAt')||'—',w:130,h:38, mapTo:'eq_caldate'},
+  'light-source': {label:'Light source',                  ph:'Daylight',                      get:r=>r.eq_lightsource||r.lightsource||'—',                w:150,h:38, mapTo:'eq_lightsource'},
   // Method-equipment cell — a single place card showing one method-data
   // field (block.methodField). Free-drag; parents to a method-block
   // container when dropped inside one. Custom render (def.methodCell).
@@ -264,7 +265,7 @@ var CV_PALETTE_GROUPS = [
   {id:'client',    label:'Client info',   fields:['client','project','project-no','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','material','thickness','weld-prep','weld-process','welders']},
   {id:'criteria',  label:'Criteria',      fields:['exam-type','surf-cond','temperature','heat-treat','extent','spec','acc-crit','procedure','proc-rev','stage','weld-pos']},
-  {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','method-cell']},
+  {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','light-source','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
   {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','light-status','uv-light-status','light-conditions','accept-eval']},

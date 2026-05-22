@@ -44,6 +44,7 @@ var TPL_FIELDS = {
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black','Visible red','Dry powder black','Dry powder red'] },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
+    { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. White light gates the UV-A
     // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
     // above 20 lux it is a visible white-light inspection (UV-A N/A).
@@ -52,6 +53,7 @@ var TPL_FIELDS = {
   ],
   VT: [
     { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 350', options:['350','500','1000'] },
+    { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch', options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     { id:'magn', label:'Magnification',            placeholder:'e.g. ×2', options:['×1','×2','×3','×5','×10'] },
     { id:'dist', label:'Viewing distance',         placeholder:'e.g. 600 mm max', options:['300 mm max','600 mm max','Direct visual'] },
     { id:'vtequip',label:'Equipment',              placeholder:'e.g. Welding gauge set', options:['Inspection kit','Universal cam gauge','Borescope','Welding gauge set','AWS bridge cam gauge'] },
@@ -62,6 +64,7 @@ var TPL_FIELDS = {
     { id:'ddwell', label:'Developer dwell time', placeholder:'e.g. 10 mins', options:['7 mins','10 mins','10-20 mins','15 mins','20 mins','30 mins'] },
     { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
+    { id:'lightsource',label:'Light source',     placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. White light gates the UV-A
     // reading: at or below 20 lux the exam is fluorescent (UV-A applies);
     // above 20 lux it is a visible white-light inspection (UV-A N/A).

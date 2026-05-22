@@ -14,8 +14,12 @@ function saveRptForms()  { lss(RPT_KEY, _rptForms); }
 
 var TPL_FIELDS = {
   _common: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 17638:2016','EN-ISO 17638:2017','EN-ISO 3452-1:2021','EN-ISO 16809:2019','EN-ISO 6507-1','ASME BPVC Section V Art.4 Ed.2023','ASME BPVC Section V Art.6 Ed.2023','ASME BPVC Section V Art.7 Ed.2023','ASME BPVC Section V Art.9 Ed.2023','ASME BPVC 2021: Section II'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 level 2','EN-ISO 11666:2018 level 3','EN-ISO 23278:2016 Level 1','EN-ISO 23278:2016 Level 2','EN-ISO 23278:2016 Level 3','EN-ISO 5817:2014','AWS D1.1','ASME BPVC Section VIII div.1 Ed.2023','For client information'] },
+    // Specification & acceptance options — the single canonical list
+    // shared by the report form AND the procedure register, so a
+    // procedure's spec/acceptance always matches a report's exactly.
+    // The edition year is kept — it is part of the traceable record.
+    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 17638:2016','EN-ISO 17638:2017','EN-ISO 3452-1:2021','EN-ISO 16809:2019','EN-ISO 6507-1','ASME BPV Code, Section V Art. 4 (2023)','ASME BPV Code, Section V Art. 6 (2023)','ASME BPV Code, Section V Art. 7 (2023)','ASME BPV Code, Section V Art. 9 (2023)','ASME BPV Code, Section II (2021)'] },
+    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 level 2','EN-ISO 11666:2018 level 3','EN-ISO 23278:2016 Level 1','EN-ISO 23278:2016 Level 2','EN-ISO 23278:2016 Level 3','EN-ISO 5817:2014','AWS D1.1','ASME BPV Code, Section VIII Div. 1 (2023)','ASME BPV Code, Section I (2023)','ASME BPV Code, Section I A-260 (2023)','ASME BPV Code, B31.3 (2022)','For client information'] },
     { id:'proc',  label:'Default procedure no.',       placeholder:'e.g. SV2023-004-NDTD-PRO-0009', options:['SV2023-004-NDTD-PRO-0009','SV2023-004-NDTD-PRO-0005','SV2023-004-NDTD-PRO-0003','SV2023-004-NDTD-PRO-0007','SV2023-004-NDTD-PRO-0013','SV2023-004-NDTD-PRO-0014'] },
     // `equip` is rendered by a custom renderer (equipmentSelectHtml) in
     // the new-report form — it sources its options from the equipment

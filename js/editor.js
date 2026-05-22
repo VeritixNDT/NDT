@@ -4636,12 +4636,10 @@ function cvFitToView(){
   const area = document.getElementById('cv-scroll-area') || document.getElementById('cv-canvas-outer');
   if(!area) return;
   const margin = 32;
-  // Fit the whole A4 sheet — width AND height — so the full page is
-  // visible on open. The more constraining dimension sets the zoom.
-  const availW = area.clientWidth  - margin * 2;
-  const availH = area.clientHeight - margin * 2;
-  const fit = Math.min(availW / CV_PAGE_WIDTH_PX, availH / CV_PAGE_HEIGHT_PX);
-  cvZoom = Math.max(0.3, Math.min(2.0, fit));
+  // Fit the page to the full width of the canvas area; it scrolls
+  // vertically when the sheet is taller than the viewport.
+  const avail = area.clientWidth - margin * 2;
+  cvZoom = Math.max(0.3, Math.min(2.0, avail / CV_PAGE_WIDTH_PX));
   cvApplyZoom();
   area.scrollLeft = 0;
   area.scrollTop  = 0;

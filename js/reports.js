@@ -42,8 +42,10 @@ var TPL_FIELDS = {
     { id:'curint',     label:'Current intensity',  placeholder:'e.g. 2-3 Ampere',       options:['2-3 Ampere','15 Ampere'] },
     { id:'cur',        label:'Current',            placeholder:'e.g. AC',               options:['AC','HWDC','FWDC','DC','Permanent magnet'] },
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
+    { id:'suspBatch',  label:'Test suspension batch no.', placeholder:'e.g. 24A-0815' },
     { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black','Visible red','Dry powder black','Dry powder red'] },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
+    { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. White light gates the UV-A
     // reading: at or below 20 lux the exam is fluorescent (UV-A applies);

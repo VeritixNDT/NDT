@@ -547,7 +547,7 @@ var CV_SAMPLE = {
   },
   methodData: {
     UT:  {coup:'Waterbased', freq:'5 MHz', range:'0-100mm', probe:'Single crystal angle beam 70°', sens:'DAC + Transfer + 6dB', refblk:'K1 IIW 1', calblk:'EN-ISO 17640 32mm'},
-    MT:  {tech:'Yoke (AC)', mtmethod:'Wet fluorescent', syscontrol:'> 4,5 kg + ASTM Pie', demag:'Yes', curint:'2-3 Ampere', cur:'AC', susp:'Magnaflux 7HF', susptype:'Fluorescent water-based', contrast:'Not used', whitelight:'15', uvirr:'1200'},
+    MT:  {tech:'Yoke (AC)', mtmethod:'Wet fluorescent', syscontrol:'> 4,5 kg + ASTM Pie', demag:'Yes', curint:'2-3 Ampere', cur:'AC', susp:'Magnaflux 7HF', suspBatch:'24A-0815', susptype:'Fluorescent water-based', contrast:'Not used', whitelight:'15', uvirr:'1200'},
     VT:  {lux:'500', magn:'×2', dist:'600 mm max', vtequip:'Welding gauge set'},
     PT:  {pen:'Magnaflux ZL4C', pdwell:'15 mins', ddwell:'10-20 mins', clean:'Magnaflux SKC-S', dev:'Magnaflux SKD-S2', whitelight:'15', uvirr:'1200'},
     PMI: {ctrl:'316L Reference block', mode:'Alloy ID', pmiequip:'X-MET 8000 Expert'},
@@ -2973,11 +2973,28 @@ function cvRenderBlockContent(block, report, preview){
   // (block.methodField). The small grey label sits above the value
   // resolved from report.methodData; word-break lets the value wrap.
   if(def.methodCell){
+    const mf = block.methodField;
     const mFields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[cvPpvMethod]) ? TPL_FIELDS[cvPpvMethod] : [];
-    const fdef = mFields.find(f => f.id === block.methodField);
-    const label = fdef ? fdef.label : (block.methodField || 'Method field');
-    const val = (preview && report && report.methodData) ? (report.methodData[block.methodField] || '') : '';
-    const shown = val || (preview ? '—' : (block.methodField ? (fdef && fdef.placeholder || '') : 'Pick a field in Properties'));
+    const fdef = mFields.find(f => f.id === mf);
+    const label = fdef ? fdef.label : (mf || 'Method field');
+    // Resolve the value from the real report's eq_<field> first (what a
+    // saved report actually carries), then methodData (sample / preview
+    // data). Without the eq_ lookup a real report's method cells would
+    // only ever show the sample equipment values.
+    let val = '';
+    if(preview && report && mf){
+      const eqv = report['eq_' + mf];
+      val = (eqv != null && eqv !== '') ? String(eqv)
+          : (report.methodData ? (report.methodData[mf] || '') : '');
+    }
+    let shown = val || (preview ? '—' : (mf ? (fdef && fdef.placeholder || '') : 'Pick a field in Properties'));
+    // Test suspension and contrast paint are consumables — append the
+    // batch number the inspector recorded so it prints on the same card.
+    if(val && (mf === 'susp' || mf === 'contrast') && report){
+      const batch = report['eq_' + mf + 'Batch']
+        || (report.methodData && report.methodData[mf + 'Batch']) || '';
+      if(batch) shown = val + ' · Batch ' + batch;
+    }
     const valColor = val ? '#000' : (preview ? '#999' : '#bbb');
     return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;text-align:${al}">
       <div style="font-size:7px;color:#777;line-height:1.3;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_h(label)}</div>

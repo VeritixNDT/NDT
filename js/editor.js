@@ -2852,7 +2852,7 @@ function cvRenderBlockContent(block, report, preview){
             // matches the standard place-card height used everywhere else
             // on the report. height on a <td> acts as a minimum, so a cell
             // with unusually long content can still grow past it.
-            return `<td style="height:36px;padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:top;word-break:break-word;overflow:hidden">${inner}</td>`;
+            return `<td style="height:36px;padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:middle;text-align:center;word-break:break-word;overflow:hidden">${inner}</td>`;
           }).join('');
           return `<tr>${cells}</tr>`;
         }).join('');

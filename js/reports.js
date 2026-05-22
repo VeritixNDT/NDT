@@ -933,7 +933,7 @@ function rptRenderTable(list, allReports){
     wrap.innerHTML = `<div class="sc" style="margin-top:14px"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%"><thead><tr>
         <th scope="col" style="width:34px;padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select all visible reports" title="Select all visible"></th>
-        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="width:180px" data-i18n="col.actions">Actions</th>
+        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="width:70px" data-i18n="col.actions">Actions</th>
       </tr></thead><tbody></tbody></table></div></div>`;
     table = wrap.querySelector('table.tbl');
     tbody = table.querySelector('tbody');
@@ -1032,7 +1032,7 @@ function _rptRowInner(r, _origIdx) {
     <td>${escapeHtml(r.inspector||'—')}</td>
     <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(r.createdAt)}</td>
     <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>
-    <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovOpenReport" data-args="${_origIdx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="ovPrintReport" data-args="${_origIdx}" style="margin-right:4px">PDF</button><button class="btn btn-sm btn-danger" data-action="rptDelete" data-args="${_origIdx}" aria-label="Delete report ${escapeHtml(r.reportNo||'')}">Del</button></td>`;
+    <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${_origIdx}">PDF</button></td>`;
 }
 
 function rptRenderKanban(list, allReports){

@@ -1594,17 +1594,19 @@ async function ovResetReport() {
 function ovRenderRecentList() {
   const reports = ls(KEYS.reports, []);
   const wrap = el('ov-reports-table'); if(!wrap) return;
-  if(!reports.length) {
-    wrap.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:13px;padding:20px">No reports saved yet.</div>';
-    return;
-  }
   // TEST TOOL — bulk-clear button for wiping test data during local
-  // testing. Remove this block and ovClearAllReports() before release.
-  let html = `<div style="margin-bottom:10px;padding:6px 10px;border:1px dashed var(--amber);border-radius:6px;display:flex;align-items:center;gap:10px;background:rgba(245,166,35,.06);flex-wrap:wrap">
+  // testing. Built first so it shows in BOTH the empty and populated
+  // states. Remove this bar and ovClearAllReports() before release.
+  const _testBar = `<div style="margin-bottom:10px;padding:6px 10px;border:1px dashed var(--amber);border-radius:6px;display:flex;align-items:center;gap:10px;background:rgba(245,166,35,.06);flex-wrap:wrap">
     <span style="font-size:10px;font-family:var(--mono);color:var(--amber);text-transform:uppercase;letter-spacing:.05em">⚠ Test tool</span>
     <button class="btn btn-sm btn-danger" data-action="ovClearAllReports" style="font-size:11px">Delete all reports</button>
     <span style="font-size:10px;color:var(--t3)">Temporary — clears test data; remove before the cloud release.</span>
   </div>`;
+  if(!reports.length) {
+    wrap.innerHTML = _testBar + '<div style="text-align:center;color:var(--t3);font-size:13px;padding:20px">No reports saved yet.</div>';
+    return;
+  }
+  let html = _testBar;
   html += `<table class="tbl" style="width:100%"><thead><tr>
     <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:168px"></th>
   </tr></thead><tbody>`;

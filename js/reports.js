@@ -702,20 +702,30 @@ function rptSetView(view){
 
 function rptCollectFilters(){
   return {
-    search:    el('rpt-search')?.value || '',
     method:    el('rpt-fm')?.value || '',
     result:    el('rpt-fr')?.value || '',
     stage:     el('rpt-fstage')?.value || '',
+    repNo:     el('rpt-f-repno')?.value || '',
+    client:    el('rpt-f-client')?.value || '',
+    project:   el('rpt-f-project')?.value || '',
+    drawing:   el('rpt-f-drawing')?.value || '',
+    weldNo:    el('rpt-f-weldno')?.value || '',
+    inspector: el('rpt-f-insp')?.value || '',
     dateFrom:  el('rpt-f-datefrom')?.value || '',
     dateTo:    el('rpt-f-dateto')?.value || '',
   };
 }
 
 function rptApplyFilters(filters){
-  if(el('rpt-search'))     el('rpt-search').value     = filters.search    || '';
   if(el('rpt-fm'))         el('rpt-fm').value         = filters.method    || '';
   if(el('rpt-fr'))         el('rpt-fr').value         = filters.result    || '';
   if(el('rpt-fstage'))     el('rpt-fstage').value     = filters.stage     || '';
+  if(el('rpt-f-repno'))    el('rpt-f-repno').value    = filters.repNo     || '';
+  if(el('rpt-f-client'))   el('rpt-f-client').value   = filters.client    || '';
+  if(el('rpt-f-project'))  el('rpt-f-project').value  = filters.project   || '';
+  if(el('rpt-f-drawing'))  el('rpt-f-drawing').value  = filters.drawing   || '';
+  if(el('rpt-f-weldno'))   el('rpt-f-weldno').value   = filters.weldNo    || '';
+  if(el('rpt-f-insp'))     el('rpt-f-insp').value     = filters.inspector || '';
   if(el('rpt-f-datefrom')) el('rpt-f-datefrom').value = filters.dateFrom  || '';
   if(el('rpt-f-dateto'))   el('rpt-f-dateto').value   = filters.dateTo    || '';
 }
@@ -846,10 +856,15 @@ function rptBulkExportCsv(){
 function rptRender() {
   let list = ls(KEYS.reports, []);
   const allReports = list.slice(); // keep original index reference for selection
-  const search = (el('rpt-search')?.value || '').toLowerCase().trim();
   const fm = el('rpt-fm')?.value || '';
   const fr = el('rpt-fr')?.value || '';
   const fStage = el('rpt-fstage')?.value || '';
+  const fRepNo   = (el('rpt-f-repno')?.value   || '').toLowerCase().trim();
+  const fClient  = (el('rpt-f-client')?.value  || '').toLowerCase().trim();
+  const fProject = (el('rpt-f-project')?.value || '').toLowerCase().trim();
+  const fDrawing = (el('rpt-f-drawing')?.value || '').toLowerCase().trim();
+  const fWeldNo  = (el('rpt-f-weldno')?.value  || '').toLowerCase().trim();
+  const fInsp    = (el('rpt-f-insp')?.value    || '').toLowerCase().trim();
   const fDateFrom = el('rpt-f-datefrom')?.value || '';
   const fDateTo = el('rpt-f-dateto')?.value || '';
 
@@ -861,18 +876,19 @@ function rptRender() {
       else if(r.verdict !== fr) return false;
     }
     if(fStage && getReportStage(r) !== fStage) return false;
-    if(search) {
-      // Single search bar — report no, client, project, drawing, weld no,
-      // inspector.
-      const hay = [r.reportNo, r.client, r.project, r.drawing, r.weldNo, r.inspector].map(v => (v||'').toLowerCase()).join(' ');
-      if(!hay.includes(search)) return false;
-    }
+    // Per-field search boxes — each its own filter.
+    if(fRepNo   && !(r.reportNo  ||'').toLowerCase().includes(fRepNo))   return false;
+    if(fClient  && !(r.client    ||'').toLowerCase().includes(fClient))  return false;
+    if(fProject && !(r.project   ||'').toLowerCase().includes(fProject)) return false;
+    if(fDrawing && !(r.drawing   ||'').toLowerCase().includes(fDrawing)) return false;
+    if(fWeldNo  && !(r.weldNo    ||'').toLowerCase().includes(fWeldNo))  return false;
+    if(fInsp    && !(r.inspector ||'').toLowerCase().includes(fInsp))    return false;
     if(fDateFrom){ const d = (r.createdAt||'').split('T')[0]; if(d < fDateFrom) return false; }
     if(fDateTo)  { const d = (r.createdAt||'').split('T')[0]; if(d > fDateTo)   return false; }
     return true;
   });
 
-  const activeFilters = [fm, fr, fStage, search, fRepNo, fClient, fInsp, fSubject, fDrawing, fWeldNo, fDateFrom, fDateTo].filter(Boolean).length;
+  const activeFilters = [fm, fr, fStage, fRepNo, fClient, fProject, fDrawing, fWeldNo, fInsp, fDateFrom, fDateTo].filter(Boolean).length;
   // V31: translated subtitle. Plural-aware report count + "N filter(s) active"
   // when filters are in play. The {n} interpolation handles localization of
   // grammatical number for English / Dutch / German / French / Spanish.
@@ -1188,7 +1204,7 @@ function rptDelete(idx) {
 }
 
 function rptClearFilters() {
-  ['rpt-search','rpt-f-datefrom','rpt-f-dateto'].forEach(id => { const e=el(id); if(e) e.value=''; });
+  ['rpt-f-repno','rpt-f-client','rpt-f-project','rpt-f-drawing','rpt-f-weldno','rpt-f-insp','rpt-f-datefrom','rpt-f-dateto'].forEach(id => { const e=el(id); if(e) e.value=''; });
   const fm = el('rpt-fm'); if(fm) fm.value = '';
   const fr = el('rpt-fr'); if(fr) fr.value = '';
   const fStage = el('rpt-fstage'); if(fStage) fStage.value = '';

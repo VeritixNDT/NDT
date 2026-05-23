@@ -2763,8 +2763,12 @@ function cvRenderBlockContent(block, report, preview){
         // rule beneath. Per-block barColor still wins (Properties picker).
         const _tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
         const _headColor = _safeColor(block.barColor, _tplSectionColor);
-        // Grid: 2 rows × 3 photos per row = 6 slots.
-        const _rows = 2, _cols = 3, _slots = _rows * _cols;
+        // Grid: rows × photos-per-row, configurable per block via the
+        // Properties panel (defaults 2 × 3 = 6 slots). Clamped to a
+        // sensible range so a typo can't blow the layout out.
+        const _rows = Math.max(1, Math.min(10, parseInt(block.photoRows, 10) || 2));
+        const _cols = Math.max(1, Math.min(6,  parseInt(block.photoCols, 10) || 3));
+        const _slots = _rows * _cols;
         const boxes = Array.from({length:_slots},(_,i)=>`<div style="border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`).join('');
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:transparent;border-bottom:1px solid ${_headColor}">
@@ -3648,6 +3652,11 @@ function cvRenderProps(id){
         <button data-action="_wCvResetItemsColWidths" data-args="'${id}'" style="margin-top:4px;background:none;border:1px dashed var(--border);color:var(--t3);font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer">Reset to defaults</button>
       </div>`);
     })() : ''}
+    ${block.key === 'photo-page' ? row('Photo grid (rows × cols)', `<div style="display:flex;gap:6px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
+      <input type="number" min="1" max="10" value="${parseInt(block.photoRows,10)||2}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoRows'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Rows"/>
+      <span style="font-size:11px;color:var(--t3)">×</span>
+      <input type="number" min="1" max="6"  value="${parseInt(block.photoCols,10)||3}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoCols'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Photos per row"/>
+    </div>`) : ''}
     ${check('bold',block.bold,'Bold')}
     ${check('italic',block.italic,'Italic')}
     ${check('underline',block.underline,'Underline')}

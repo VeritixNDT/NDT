@@ -2775,7 +2775,12 @@ function cvRenderBlockContent(block, report, preview){
         const boxes = Array.from({length:_slots},(_,i)=>{
           const _p = _photos[i];
           if(_p){
-            return `<div style="border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center"><img src="${_p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:cover;display:block"/></div>`;
+            // object-fit:contain so the whole photo is visible (no crop) regardless
+            // of source aspect — phones (3:4 portrait) and cameras (3:2 landscape)
+            // both display in full. The slot stays a uniform grid cell so the page
+            // keeps its geometric rhythm; any unused space inside the slot reads as
+            // a thin matted frame (4 px white pad inside the grey border).
+            return `<div style="border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center"><img src="${_p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`;
           }
           return `<div style="border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`;
         }).join('');

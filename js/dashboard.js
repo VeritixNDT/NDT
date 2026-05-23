@@ -1480,7 +1480,7 @@ function _ovPhotosSectionHtml(){
   const enabled = Array.isArray(_ovPhotos) && _ovPhotos.length > 0;
   const slots = enabled ? _ovPhotos.map((p, i) => p
     ? `<div style="position:relative;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
-        <img src="${p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:cover;display:block"/>
+        <img src="${p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/>
         <button type="button" data-action="ovClearPhoto" data-args="${i}" title="Remove photo" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
       </div>`
     : `<label style="aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">

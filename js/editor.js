@@ -2861,6 +2861,40 @@ function cvRenderBlockContent(block, report, preview){
           ${slot}
         </div>`;
       }
+      case 'photo-details':{
+        // Companion to single-photo: a section-header-styled card whose
+        // body holds per-report typed text about the linked photo.
+        // Linked via block.linkedPhotoId; the photo and the details card
+        // hide together on print when the linked photo is unfilled, so
+        // each visible details card always belongs to a real photo above
+        // it (handled in export.js, not here).
+        //
+        // Body text comes from report.photoDetails[block.id]. In the
+        // design canvas (!preview) the body shows a soft placeholder
+        // hint so the inspector can see where the typed information will
+        // land; the hint is dropped in preview / print.
+        const _tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
+        const _headColor = _safeColor(block.barColor, _tplSectionColor);
+        const _txt = (report && report.photoDetails && typeof report.photoDetails === 'object')
+          ? (report.photoDetails[block.id] || '')
+          : '';
+        const _bodySize = block.fontSize || '9px';
+        const _bodyColor = _safeColor(block.color, '#222');
+        let _bodyContent;
+        if(_txt){
+          _bodyContent = _h(_txt).replace(/\n/g, '<br>');
+        } else if(!preview){
+          _bodyContent = `<span style="color:#aaa;font-style:italic">Details / information typed in the new-report form will appear here</span>`;
+        } else {
+          _bodyContent = '';
+        }
+        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
+          <div style="padding:4px 8px;background:${_headColor};text-align:center">
+            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Details / information')}</span>
+          </div>
+          <div style="flex:1;padding:6px 8px;font-size:${_bodySize};line-height:1.35;color:${_bodyColor};overflow:hidden;white-space:pre-wrap">${_bodyContent}</div>
+        </div>`;
+      }
       case 'additional-page':
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5;font-size:9px;font-weight:600;color:#333;text-align:${al}">${_h(block.text||'Additional information')}</div><div style="flex:1;padding:12px 8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;border:1px dashed #ddd;margin:8px;border-radius:3px">Place blocks inside for custom content</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
       case 'items-table':{
@@ -3713,7 +3747,7 @@ function cvRenderProps(id){
     ${(block.key === 'items-table' || block.key === 'method-block') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
-    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo' || block.key === 'single-drawing')
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details')
       ? row('Heading colour', colorPick('barColor', block.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040')))
       : ''}
     ${block.key === 'items-table' && typeof RPT_FORM !== 'undefined' && Array.isArray(RPT_FORM.items) ? (() => {

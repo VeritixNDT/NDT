@@ -11,6 +11,12 @@ var _ovItems = [{}];
 // holding base64 image data or null for an empty slot. Length 0 = page
 // not added; length > 0 = page added, slots possibly empty.
 var _ovPhotos = [];
+// Optional per-photo caption typed by the inspector under each slot —
+// parallel to _ovPhotos (same index = same slot). Empty string when no
+// caption was typed; persisted to report.photoCaptions on save (only
+// when the slot also carries a photo, so captions don't outlive their
+// images).
+var _ovPhotoCaptions = [];
 // Per-report images for any single-photo blocks present in the active
 // method's template. Map of block.id → dataURL; missing key = empty slot.
 // Each single-photo block in the template surfaces one upload tile in the
@@ -1115,6 +1121,7 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Photo page — preserve any photos already on the (sourceReport when
   // revising) report. Empty array = no photo page added yet.
   _ovPhotos = (sourceReport && Array.isArray(sourceReport.photos)) ? sourceReport.photos.slice() : [];
+  _ovPhotoCaptions = (sourceReport && Array.isArray(sourceReport.photoCaptions)) ? sourceReport.photoCaptions.slice() : [];
   _ovSinglePhotos = (sourceReport && sourceReport.singlePhotos && typeof sourceReport.singlePhotos === 'object')
     ? Object.assign({}, sourceReport.singlePhotos)
     : {};
@@ -1514,19 +1521,31 @@ function _ovSinglePhotoBlocks(){
 
 function _ovPhotosSectionHtml(){
   const enabled = Array.isArray(_ovPhotos) && _ovPhotos.length > 0;
-  const slots = enabled ? _ovPhotos.map((p, i) => p
-    ? `<div style="position:relative;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
-        <img src="${p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/>
-        <button type="button" data-action="ovRotatePhotoCCW" data-args="${i}" title="Rotate 90° counter-clockwise" style="position:absolute;top:4px;right:56px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↺</button>
-        <button type="button" data-action="ovRotatePhoto" data-args="${i}" title="Rotate 90° clockwise" style="position:absolute;top:4px;right:30px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↻</button>
-        <button type="button" data-action="ovClearPhoto" data-args="${i}" title="Remove photo" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
-      </div>`
-    : `<label style="aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">
-        <span style="font-size:24px">📷</span>
-        <span style="font-size:11px">Choose photo ${i+1}</span>
-        <input type="file" accept="image/*" style="display:none" data-on-change="ovSetPhotoFromFile" data-pass-el="1" data-args="${i}"/>
-      </label>`
-  ).join('') : '';
+  const slots = enabled ? _ovPhotos.map((p, i) => {
+    const tile = p
+      ? `<div style="position:relative;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
+          <img src="${p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/>
+          <button type="button" data-action="ovRotatePhotoCCW" data-args="${i}" title="Rotate 90° counter-clockwise" style="position:absolute;top:4px;right:56px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↺</button>
+          <button type="button" data-action="ovRotatePhoto" data-args="${i}" title="Rotate 90° clockwise" style="position:absolute;top:4px;right:30px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↻</button>
+          <button type="button" data-action="ovClearPhoto" data-args="${i}" title="Remove photo" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
+        </div>`
+      : `<label style="aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">
+          <span style="font-size:24px">📷</span>
+          <span style="font-size:11px">Choose photo ${i+1}</span>
+          <input type="file" accept="image/*" style="display:none" data-on-change="ovSetPhotoFromFile" data-pass-el="1" data-args="${i}"/>
+        </label>`;
+    // Caption input below every slot — typed text appears under the photo
+    // on the printed page; empty captions are dropped on save so unused
+    // slots stay clean. Wrapping tile + input in a <div> makes the grid
+    // cells uniform height regardless of caption-strip state.
+    const cap = (Array.isArray(_ovPhotoCaptions) && _ovPhotoCaptions[i]) || '';
+    return `<div>
+      ${tile}
+      <input type="text" placeholder="Caption (optional)" value="${escapeHtml(cap)}"
+        data-on-input="ovSetPhotoCaption" data-pass-el="1" data-args="${i}"
+        style="width:100%;margin-top:5px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:5px 8px;box-sizing:border-box"/>
+    </div>`;
+  }).join('') : '';
 
   // Single-photo blocks present in the active method's template — one
   // upload tile each, labelled with the block's text so the inspector
@@ -1590,6 +1609,7 @@ function ovRenderPhotosSection(){
 
 function ovAddPhotoPage(){
   _ovPhotos = new Array(6).fill(null);
+  _ovPhotoCaptions = new Array(6).fill('');
   ovRenderPhotosSection();
 }
 
@@ -1599,6 +1619,7 @@ async function ovRemovePhotoPage(){
     if(!ok) return;
   }
   _ovPhotos = [];
+  _ovPhotoCaptions = [];
   ovRenderPhotosSection();
 }
 
@@ -1613,6 +1634,7 @@ function ovSetPhotoFromFile(i, el){
   const reader = new FileReader();
   reader.onload = e => {
     if(!Array.isArray(_ovPhotos) || _ovPhotos.length === 0) _ovPhotos = new Array(6).fill(null);
+    if(!Array.isArray(_ovPhotoCaptions) || _ovPhotoCaptions.length === 0) _ovPhotoCaptions = new Array(6).fill('');
     _ovPhotos[i] = e.target.result;
     ovRenderPhotosSection();
   };
@@ -1621,7 +1643,20 @@ function ovSetPhotoFromFile(i, el){
 
 function ovClearPhoto(i){
   if(Array.isArray(_ovPhotos)) _ovPhotos[i] = null;
+  // Clear the caption too — a caption that outlives its photo would
+  // attach to whatever the inspector uploads next, which isn't what
+  // anyone would expect.
+  if(Array.isArray(_ovPhotoCaptions)) _ovPhotoCaptions[i] = '';
   ovRenderPhotosSection();
+}
+
+// Caption typed below a photo slot in the new-report form. Stored in
+// _ovPhotoCaptions[i] mirroring _ovPhotos[i]. Updated on every keystroke
+// so partial typing survives ovRenderPhotosSection redraws (rotate /
+// remove / re-upload). No re-render here — the input owns its DOM value.
+function ovSetPhotoCaption(i, el){
+  if(!Array.isArray(_ovPhotoCaptions)) _ovPhotoCaptions = new Array(6).fill('');
+  _ovPhotoCaptions[i] = (el && typeof el.value === 'string') ? el.value : '';
 }
 
 // Rotate a slot's photo by ±90°. The rotation is baked into the stored
@@ -1824,6 +1859,12 @@ function ovSaveReport(mode) {
   // (nulls preserved so the photo-page block renders slot-by-slot).
   if(Array.isArray(_ovPhotos) && _ovPhotos.length && _ovPhotos.some(p => !!p)){
     report.photos = _ovPhotos.map(p => p || null);
+    // Captions are stored only for slots that actually carry a photo —
+    // a caption typed into an empty slot is dropped on save so it can't
+    // resurface against whatever fills that slot on a later revision.
+    if(Array.isArray(_ovPhotoCaptions) && _ovPhotoCaptions.some((c, i) => !!_ovPhotos[i] && (c || '').trim())){
+      report.photoCaptions = _ovPhotos.map((p, i) => (p && _ovPhotoCaptions[i]) ? String(_ovPhotoCaptions[i]) : '');
+    }
   }
   // Single-photo blocks — copy any filled slots over (keyed by block.id so
   // each single-photo block in the template lands on its own render branch).

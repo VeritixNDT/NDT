@@ -2756,11 +2756,10 @@ function cvRenderBlockContent(block, report, preview){
       case 'photo-box':
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;gap:4px"><span style="font-size:24px">📷</span><span style="font-size:8.5px">${_h(block.text||'Photo placeholder')}</span></div>`;
       case 'photo-page':{
-        // Heading bar matches the rest of the report's section headers
-        // (uppercase, bold, letter-spaced) but with a transparent
-        // background — text in the template section colour (or a per-
-        // block barColor override from the Properties picker) with a
-        // thin rule beneath.
+        // Heading bar matches the rest of the report's section headers:
+        // a filled bar in the template section colour (or a per-block
+        // barColor override from the Properties picker), with white,
+        // uppercase, bold, letter-spaced text on top.
         const _tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
         const _headColor = _safeColor(block.barColor, _tplSectionColor);
         // Grid: rows × photos-per-row, configurable per block via the
@@ -2771,8 +2770,8 @@ function cvRenderBlockContent(block, report, preview){
         const _slots = _rows * _cols;
         const boxes = Array.from({length:_slots},(_,i)=>`<div style="border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`).join('');
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
-          <div style="padding:4px 8px;background:transparent;border-bottom:1px solid ${_headColor}">
-            <span style="font-size:11px;font-weight:700;color:${_headColor};text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Photo attachments')}</span>
+          <div style="padding:4px 8px;background:${_headColor};text-align:center">
+            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Photo attachments')}</span>
           </div>
           <div style="flex:1;padding:8px;display:grid;grid-template-columns:repeat(${_cols},1fr);grid-template-rows:repeat(${_rows},1fr);gap:8px">${boxes}</div>
         </div>`;

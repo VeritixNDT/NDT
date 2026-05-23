@@ -250,6 +250,7 @@ var CV_LAYOUT_ITEMS = [
   {key:'logo-co',        label:'Company logo',               w:140,h:56},
   {key:'photo-box',      label:'Photo placeholder',          w:220,h:150},
   {key:'photo-page',     label:'Photo page (6 slots)',       w:754,h:980},
+  {key:'single-photo',   label:'Single image (photo / screenshot)', w:360,h:280},
   {key:'additional-page',label:'Additional page',            w:754,h:980},
   {key:'defect-table',   label:'Defect / indication table',  w:754,h:90},
   {key:'items-table',    label:'Examination details',        w:754,h:90},
@@ -1531,7 +1532,7 @@ function cvInitCanvas(){
 function cvGetLayoutIcon(k){
   if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
-    'photo-box':'📷','photo-page':'📸','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
+    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
     'accent-bar':'█'}[k]||'□';
 }
 

@@ -2787,9 +2787,24 @@ function cvRenderBlockContent(block, report, preview){
         const _capItalic= block.captionItalic !== false;
         const _capBold  = block.captionBold  === true;
         const _capColor = _safeColor(block.captionColor, '#555555');
+        // Card mode + hide-empty — set on the photo-page block via the
+        // 'Per-photo details' Properties card. showCard upgrades each
+        // caption strip to a heading-bar + body card; hideEmpty drops
+        // cells without a photo on print (and in preview).
+        const _showCard  = !!block.showDetailsCard;
+        const _cardH     = Math.max(30, Math.min(240, parseInt(block.detailsCardHeight, 10) || 70));
+        const _hideEmpty = !!block.hideEmptySlots;
         const boxes = Array.from({length:_slots},(_,i)=>{
           const _p   = _photos[i];
           const _cap = (_captions[i] || '').toString();
+          // Hide-empty: in preview / print we drop the cell entirely
+          // (blank space, no dashed frame). In the design canvas we
+          // keep the dashed placeholder so the inspector can still see
+          // the slot layout while editing — otherwise the photo-page
+          // looks emptier than it actually is.
+          if(!_p && _hideEmpty && preview){
+            return `<div></div>`;
+          }
           let inner;
           if(_p){
             // object-fit:contain so the whole photo is visible (no crop) regardless
@@ -2801,29 +2816,35 @@ function cvRenderBlockContent(block, report, preview){
           } else {
             inner = `<div style="flex:1;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa;min-height:0"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`;
           }
-          // Caption strip — always allocated when captions are on so empty
-          // captions don't bump photos between cells out of vertical
-          // alignment; suppressed entirely when the inspector turns
-          // captions off in the Properties panel.
-          //
-          // In the design canvas (!preview) every strip shows a soft
-          // "Caption" hint in lighter grey so the inspector can see where
-          // captions will land — without the hint the empty strip is
-          // visually identical to nothing, which is why the cell looks
-          // absent in the editor. The hint is dropped in preview / print
-          // so it never reaches a real report.
+          // Caption strip vs styled card. In card mode the cell gets a
+          // section-header bar + body sized to detailsCardHeight; the
+          // caption styling (font / italic / bold / colour / align)
+          // applies to the body so one set of controls covers both
+          // looks. In strip mode (legacy default) the inline caption
+          // text sits directly below the photo.
           let capContent;
           if(_cap){
             capContent = _h(_cap);
           } else if(!preview){
-            capContent = `<span style="color:#aaa">Caption</span>`;
+            capContent = `<span style="color:#aaa">${_showCard ? 'Details / information typed in the new-report form will appear here' : 'Caption'}</span>`;
           } else {
             capContent = '';
           }
-          const capStrip = _showCap
-            ? `<div style="margin-top:3px;font-size:${_capSize};line-height:1.25;${_capItalic?'font-style:italic;':''}${_capBold?'font-weight:600;':''}color:${_capColor};text-align:${_capAlign};min-height:10px;padding:0 2px;overflow:hidden">${capContent}</div>`
-            : '';
-          return `<div style="display:flex;flex-direction:column;height:100%;min-height:0">${inner}${capStrip}</div>`;
+          let capArea = '';
+          if(_showCap){
+            if(_showCard){
+              const _bodyStyle = `flex:1;padding:5px 8px;font-size:${_capSize};line-height:1.3;${_capItalic?'font-style:italic;':''}${_capBold?'font-weight:600;':''}color:${_capColor};text-align:${_capAlign};overflow:hidden;white-space:pre-wrap`;
+              capArea = `<div style="margin-top:5px;height:${_cardH}px;display:flex;flex-direction:column;border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff">
+                <div style="padding:3px 8px;background:${_headColor};text-align:center">
+                  <span style="font-size:9.5px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.detailsTitle || 'Details / information')}</span>
+                </div>
+                <div style="${_bodyStyle}">${capContent}</div>
+              </div>`;
+            } else {
+              capArea = `<div style="margin-top:3px;font-size:${_capSize};line-height:1.25;${_capItalic?'font-style:italic;':''}${_capBold?'font-weight:600;':''}color:${_capColor};text-align:${_capAlign};min-height:10px;padding:0 2px;overflow:hidden">${capContent}</div>`;
+            }
+          }
+          return `<div style="display:flex;flex-direction:column;height:100%;min-height:0">${inner}${capArea}</div>`;
         }).join('');
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
           <div style="padding:4px 8px;background:${_headColor};text-align:center">

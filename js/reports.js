@@ -876,7 +876,11 @@ function rptRender() {
     if(_rptStatusFilter === 'review'   && getReportStage(r) !== 'Submitted') return false;
     if(_rptStatusFilter === 'approved' && getReportStage(r) !== 'Approved')  return false;
     if(search) {
-      const hay = [r.reportNo, r.client, r.project, r.drawing, r.weldNo, r.inspector].map(v => (v||'').toLowerCase()).join(' ');
+      // "Weld / object" — hits the top-level subject (mirrored from
+      // items[0]) AND every items-table row's subject, so a weld id is
+      // found regardless of which row it lives in. Legacy weldNo kept.
+      const _itemSubjects = Array.isArray(r.items) ? r.items.map(it => (it && it.subject) || '').join(' ') : '';
+      const hay = [r.reportNo, r.client, r.project, r.drawing, r.weldNo, r.subject, _itemSubjects, r.inspector].map(v => (v||'').toLowerCase()).join(' ');
       if(!hay.includes(search)) return false;
     }
     if(fDateFrom){ const d = (r.createdAt||'').split('T')[0]; if(d < fDateFrom) return false; }
@@ -959,7 +963,7 @@ function rptRenderTable(list, allReports){
     wrap.innerHTML = `<div class="sc" style="margin-top:14px"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%"><thead><tr>
         <th scope="col" style="width:34px;padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select all visible reports" title="Select all visible"></th>
-        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col" data-i18n="col.component">Component / Subject</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th>
+        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col">Weld / object</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th>
       </tr></thead><tbody></tbody></table></div></div>`;
     table = wrap.querySelector('table.tbl');
     tbody = table.querySelector('tbody');

@@ -2768,7 +2768,17 @@ function cvRenderBlockContent(block, report, preview){
         const _rows = Math.max(1, Math.min(10, parseInt(block.photoRows, 10) || 2));
         const _cols = Math.max(1, Math.min(6,  parseInt(block.photoCols, 10) || 3));
         const _slots = _rows * _cols;
-        const boxes = Array.from({length:_slots},(_,i)=>`<div style="border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`).join('');
+        // Fill slots from report.photos when present; otherwise show a
+        // placeholder so the template still reads as a photo page in the
+        // design canvas.
+        const _photos = (report && Array.isArray(report.photos)) ? report.photos : [];
+        const boxes = Array.from({length:_slots},(_,i)=>{
+          const _p = _photos[i];
+          if(_p){
+            return `<div style="border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center"><img src="${_p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:cover;display:block"/></div>`;
+          }
+          return `<div style="border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`;
+        }).join('');
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
           <div style="padding:4px 8px;background:${_headColor};text-align:center">
             <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Photo attachments')}</span>

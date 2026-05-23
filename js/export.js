@@ -192,10 +192,18 @@ function cvBuildPrintHTML(report){
     // page (it exists only to receive overflow rows).
     cvPages.forEach((p, i) => { if(i !== _contIdx) _plan.push({ page: p, slice: null }); });
   }
-  _cvPrintTotal = _plan.length;
+  // Photo page is opt-in per report — skip any page whose only body
+  // block is a photo-page when the report has no photos attached.
+  const _hasPhotos = !!(report && Array.isArray(report.photos) && report.photos.some(p => !!p));
+  const _planFinal = _plan.filter(entry => {
+    if(_hasPhotos) return true;
+    const _body = (entry.page.blocks || []).filter(b => b.zone !== 'header' && b.zone !== 'footer');
+    return !(_body.length === 1 && _body[0].key === 'photo-page');
+  });
+  _cvPrintTotal = _planFinal.length;
 
   let pagesHtml = '';
-  _plan.forEach((entry, sheetIdx) => {
+  _planFinal.forEach((entry, sheetIdx) => {
     // 1-based sheet number for the page-num field; the items-table row
     // slice for this sheet (null when the table isn't paginated).
     _cvPrintPageNum = sheetIdx + 1;

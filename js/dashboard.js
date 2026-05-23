@@ -6,6 +6,11 @@ var _ovMethod = null;
 // open. Held outside the DOM so + Add row / − Remove row can re-render the
 // section without losing typed-but-unsaved values from sibling rows.
 var _ovItems = [{}];
+// Photo-page working copy — null when the inspector hasn't added a
+// photo page to this report; otherwise an array of (currently) 6 slots
+// holding base64 image data or null for an empty slot. Length 0 = page
+// not added; length > 0 = page added, slots possibly empty.
+var _ovPhotos = [];
 // Snapshot of the revision number when the new-report form opened. Used
 // to detect whether the user has bumped the revision so the save handler
 // can demand a reason (required) and append a row to report.revisions.
@@ -1101,6 +1106,9 @@ function ovNewReport(methodId, btn, sourceReport) {
   // saved-form may have pre-filled, so the user doesn't lose data when the
   // items table takes over those fields from the single-instance sections.
   _ovItems = (Array.isArray(merged.items) && merged.items.length) ? merged.items.slice() : [{}];
+  // Photo page — preserve any photos already on the (sourceReport when
+  // revising) report. Empty array = no photo page added yet.
+  _ovPhotos = (sourceReport && Array.isArray(sourceReport.photos)) ? sourceReport.photos.slice() : [];
   RPT_ITEM_FIELD_IDS.forEach(fid => {
     if(_ovItems[0][fid] === undefined && merged[fid]) _ovItems[0][fid] = merged[fid];
   });
@@ -1146,6 +1154,11 @@ function ovNewReport(methodId, btn, sourceReport) {
   if(specific.length) html += ovFormSection(`${m.id} — Equipment & parameters`, specific, methodId, merged, m);
   // Section 6: Result
   html += ovFormSection('Result & sign-off', RPT_FORM.result.filter(f => !omit.has(f.id)), methodId, merged, m);
+
+  // Photos — optional photo-page section. Renders an "+ Add photo page"
+  // button when none has been added, or 6 photo slots + a "Remove photo
+  // page" Cancel when the inspector has opted in.
+  html += _ovPhotosSectionHtml();
 
   // Save bar — at the foot of the form. Cancel closes the form without
   // saving; "Save" issues the report (Approved); "For review" sends it
@@ -1458,6 +1471,80 @@ function ovItemsRemoveRow(idx) {
   ovItemsRerender();
 }
 
+// ── Photo page (optional, per-report) ──────────────────────────────────
+// Builds the "Photos" section that sits between Result and the save bar.
+// Six slots fixed for now (matches the photo-page block's default 2 × 3
+// grid); base64 image data is stored on _ovPhotos and saved onto the
+// report so the photo-page block can render them.
+function _ovPhotosSectionHtml(){
+  const enabled = Array.isArray(_ovPhotos) && _ovPhotos.length > 0;
+  const slots = enabled ? _ovPhotos.map((p, i) => p
+    ? `<div style="position:relative;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
+        <img src="${p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:cover;display:block"/>
+        <button type="button" data-action="ovClearPhoto" data-args="${i}" title="Remove photo" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
+      </div>`
+    : `<label style="aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">
+        <span style="font-size:24px">📷</span>
+        <span style="font-size:11px">Choose photo ${i+1}</span>
+        <input type="file" accept="image/*" style="display:none" data-on-change="ovSetPhotoFromFile" data-pass-el="1" data-args="${i}"/>
+      </label>`
+  ).join('') : '';
+  return `<div class="sc" id="ov-nr-photos-section" style="margin:0 14px 14px">
+    <div class="sc-head" style="display:flex;align-items:center">
+      <span class="sc-title">Photos</span>
+      <span style="flex:1"></span>
+      ${enabled ? `<button class="btn btn-sm" data-action="ovRemovePhotoPage" title="Cancel — remove the photo page from this report">Remove photo page</button>` : ''}
+    </div>
+    <div class="sc-body" style="padding:14px 16px">
+      ${enabled
+        ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${slots}</div>`
+        : `<button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button>`}
+    </div>
+  </div>`;
+}
+
+function ovRenderPhotosSection(){
+  const cur = document.getElementById('ov-nr-photos-section');
+  if(!cur) return;
+  cur.outerHTML = _ovPhotosSectionHtml();
+}
+
+function ovAddPhotoPage(){
+  _ovPhotos = new Array(6).fill(null);
+  ovRenderPhotosSection();
+}
+
+async function ovRemovePhotoPage(){
+  if(Array.isArray(_ovPhotos) && _ovPhotos.some(p => !!p) && typeof vxConfirm === 'function'){
+    const ok = await vxConfirm({ message: 'Remove the photo page from this report? Any photos you added will be cleared.', okLabel: 'Remove', cancelLabel: 'Keep', danger: true });
+    if(!ok) return;
+  }
+  _ovPhotos = [];
+  ovRenderPhotosSection();
+}
+
+function ovSetPhotoFromFile(i, el){
+  const file = el && el.files && el.files[0];
+  if(!file) return;
+  if(file.size > 2 * 1024 * 1024){
+    toast(t('toast.photo_too_large','Photo must be under 2 MB.'), 'error');
+    el.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    if(!Array.isArray(_ovPhotos) || _ovPhotos.length === 0) _ovPhotos = new Array(6).fill(null);
+    _ovPhotos[i] = e.target.result;
+    ovRenderPhotosSection();
+  };
+  reader.readAsDataURL(file);
+}
+
+function ovClearPhoto(i){
+  if(Array.isArray(_ovPhotos)) _ovPhotos[i] = null;
+  ovRenderPhotosSection();
+}
+
 function ovItemsRerender() {
   // Replace just the items-table section in place. The section is the only
   // .sc whose header contains the title "Examination details". Preserves
@@ -1572,6 +1659,11 @@ function ovSaveReport(mode) {
   // Overall verdict is derived from the inspected-items results — worst
   // case wins — rather than entered as a separate sign-off field.
   report.verdict = _ovOverallVerdict(items);
+  // Photo page — when the inspector has added one, store the slot array
+  // (nulls preserved so the photo-page block renders slot-by-slot).
+  if(Array.isArray(_ovPhotos) && _ovPhotos.length && _ovPhotos.some(p => !!p)){
+    report.photos = _ovPhotos.map(p => p || null);
+  }
   // Required-field guard — a saved report must carry the essentials.
   // Without this a report could be saved with no client, inspector or
   // examined items at all.

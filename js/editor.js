@@ -2757,8 +2757,23 @@ function cvRenderBlockContent(block, report, preview){
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;gap:4px"><span style="font-size:24px">📷</span><span style="font-size:8.5px">${_h(block.text||'Photo placeholder')}</span></div>`;
       case 'photo-page':{
         const repNo = _h(preview&&report ? (report.reportNo||'') : '[Report No.]');
-        const boxes = Array.from({length:6},(_,i)=>`<div style="flex:1;min-height:120px;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`).join('');
-        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5"><span style="font-size:9px;font-weight:600;color:#333">Photo attachment sheet</span><span style="font-size:7px;color:#777;font-family:monospace">${repNo}</span></div><div style="flex:1;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">${boxes}</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
+        // Heading bar matches the rest of the report's section headers
+        // (uppercase, bold, letter-spaced) but with a transparent
+        // background — text in the template section colour with a thin
+        // rule beneath. Per-block barColor still wins (Properties picker).
+        const _tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
+        const _headColor = _safeColor(block.barColor, _tplSectionColor);
+        // Grid: 2 rows × 3 photos per row = 6 slots.
+        const _rows = 2, _cols = 3, _slots = _rows * _cols;
+        const boxes = Array.from({length:_slots},(_,i)=>`<div style="border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`).join('');
+        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:transparent;border-bottom:1px solid ${_headColor}">
+            <span style="font-size:11px;font-weight:700;color:${_headColor};text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Photo attachments')}</span>
+            <span style="font-size:8px;color:${_headColor};font-family:var(--mono,monospace);opacity:.8">${repNo}</span>
+          </div>
+          <div style="flex:1;padding:8px;display:grid;grid-template-columns:repeat(${_cols},1fr);grid-template-rows:repeat(${_rows},1fr);gap:8px">${boxes}</div>
+          <div style="padding:3px 8px;font-size:6.5px;color:#888;text-align:center">${coName}</div>
+        </div>`;
       }
       case 'additional-page':
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5;font-size:9px;font-weight:600;color:#333;text-align:${al}">${_h(block.text||'Additional information')}</div><div style="flex:1;padding:12px 8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;border:1px dashed #ddd;margin:8px;border-radius:3px">Place blocks inside for custom content</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;

@@ -1815,6 +1815,13 @@ function ovSaveReport(mode) {
   if(Array.isArray(_ovPhotos) && _ovPhotos.length && _ovPhotos.some(p => !!p)){
     report.photos = _ovPhotos.map(p => p || null);
   }
+  // Single-photo blocks — copy any filled slots over (keyed by block.id so
+  // each single-photo block in the template lands on its own render branch).
+  if(_ovSinglePhotos && typeof _ovSinglePhotos === 'object'){
+    const _kept = {};
+    Object.keys(_ovSinglePhotos).forEach(k => { if(_ovSinglePhotos[k]) _kept[k] = _ovSinglePhotos[k]; });
+    if(Object.keys(_kept).length) report.singlePhotos = _kept;
+  }
   // Required-field guard — a saved report must carry the essentials.
   // Without this a report could be saved with no client, inspector or
   // examined items at all.

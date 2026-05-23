@@ -252,6 +252,7 @@ var CV_LAYOUT_ITEMS = [
   {key:'photo-page',     label:'Photo page (6 slots)',       w:754,h:980},
   {key:'single-photo',   label:'Single image (photo / screenshot)', w:360,h:280},
   {key:'single-drawing', label:'Single drawing',             w:360,h:280},
+  {key:'photo-details',  label:'Photo details / information', w:360,h:80},
   {key:'additional-page',label:'Additional page',            w:754,h:980},
   {key:'defect-table',   label:'Defect / indication table',  w:754,h:90},
   {key:'items-table',    label:'Examination details',        w:754,h:90},
@@ -1533,7 +1534,7 @@ function cvInitCanvas(){
 function cvGetLayoutIcon(k){
   if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
-    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','single-drawing':'📐','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
+    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','single-drawing':'📐','photo-details':'📝','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
     'accent-bar':'█'}[k]||'□';
 }
 

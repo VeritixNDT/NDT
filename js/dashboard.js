@@ -2071,7 +2071,7 @@ function ovRenderRecentList() {
       <td>${escapeHtml(r.client||'—')}</td>
       <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
       <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':r.verdict==='Various'?'amber':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
-      <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovViewReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Revise</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
     </tr>`;
   });
   html += '</tbody></table>';

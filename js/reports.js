@@ -814,8 +814,18 @@ function rptBulkPdf(){
 // be selected. ovOpenReport itself blocks superseded revisions.
 function rptBulkOpen(){
   const idxs = Array.from(_rptSelectedIdx);
-  if(idxs.length !== 1){ toast(t('toast.open_one','Select a single report to open.'), 'warn'); return; }
+  if(idxs.length !== 1){ toast(t('toast.open_one','Select a single report to revise.'), 'warn'); return; }
   if(typeof ovOpenReport === 'function') ovOpenReport(idxs[0]);
+}
+
+// Bulk View — opens the rendered report in a new tab as a read-only
+// PDF-like viewer. Single-select for now to stay friendly with browser
+// popup blockers (most browsers cap simultaneous window.open calls
+// from one user action at one).
+function rptBulkView(){
+  const idxs = Array.from(_rptSelectedIdx);
+  if(idxs.length !== 1){ toast(t('toast.open_one_view','Select a single report to open.'), 'warn'); return; }
+  if(typeof ovViewReport === 'function') ovViewReport(idxs[0]);
 }
 
 function rptBulkSetStage(stage){

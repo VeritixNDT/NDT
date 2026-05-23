@@ -475,6 +475,31 @@ function ovPrintReport(idx){
   _vxPrintHtml(html);
 }
 
+/** Open a saved report in a new browser tab as a viewable PDF-like page.
+ *  Same render pipeline as ovPrintReport but no auto-print — the inspector
+ *  can scroll, read, share, or print on demand (Ctrl+P) without the
+ *  print dialog popping up uninvited. Frozen snapshot first, live rebuild
+ *  as fallback for pre-snapshot reports. */
+function ovViewReport(idx){
+  const reports = (typeof ls === 'function') ? ls(KEYS.reports, []) : [];
+  const r = reports[idx];
+  if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
+  let html = r.frozenHtml;
+  if(!html) html = ovBuildReportSnapshot(r);
+  if(!html){
+    toast(t('toast.report_no_snapshot','No printable layout for this report — its method has no saved template.'),'error');
+    return;
+  }
+  const w = window.open('', '_blank');
+  if(!w){
+    toast(t('toast.popup_blocked','Pop-up blocked — allow pop-ups for this site to open the report viewer.'),'error');
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
 /** Open the rendered template in a new tab for inspection / manual printing. */
 function cvOpenInTab(){ cvPrintOrExport({ openInTab:true }); }
 

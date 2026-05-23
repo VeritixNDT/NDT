@@ -3776,6 +3776,33 @@ function cvRenderProps(id){
       <span style="font-size:11px;color:var(--t3)">×</span>
       <input type="number" min="1" max="6"  value="${parseInt(block.photoCols,10)||3}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoCols'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Photos per row"/>
     </div>`) : ''}
+    ${block.key === 'photo-details' ? (() => {
+      // Link to a single-photo block on the canvas. The print pipeline
+      // hides both the linked photo and this details card when the
+      // photo carries no uploaded image, so each visible pair always
+      // shows a real photo + its typed information.
+      const allPhotos = [];
+      try {
+        if(Array.isArray(cvPages)){
+          cvPages.forEach((pg, pi) => {
+            if(!pg || !Array.isArray(pg.blocks)) return;
+            pg.blocks.forEach(b => {
+              if(b && b.key === 'single-photo' && b.id){
+                allPhotos.push({ id: b.id, label: (b.text || 'Single image').toString(), page: pi + 1 });
+              }
+            });
+          });
+        }
+      } catch(e){}
+      const opts = `<option value="">— not linked —</option>` + allPhotos.map(p =>
+        `<option value="${escapeHtml(p.id)}" ${block.linkedPhotoId === p.id ? 'selected' : ''}>${escapeHtml(p.label)} (page ${p.page})</option>`
+      ).join('');
+      const hint = allPhotos.length
+        ? `Pairs this card with a photo above it. When the photo is left empty in a report, the pair hides together on print.`
+        : `Drop a 'Single image' block on the canvas first, then come back here to link the two together.`;
+      return row('Link to photo', `<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','linkedPhotoId'">${opts}</select>
+        <div style="font-size:9.5px;color:var(--t3);margin-top:4px;line-height:1.35">${hint}</div>`);
+    })() : ''}
     ${block.key === 'photo-page' ? (() => {
       // Caption styling — every control below is read by the photo-page
       // render branch via block.caption*. Show-captions off hides the

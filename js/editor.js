@@ -2792,6 +2792,29 @@ function cvRenderBlockContent(block, report, preview){
           <div style="flex:1;padding:8px;display:grid;grid-template-columns:repeat(${_cols},1fr);grid-template-rows:repeat(${_rows},1fr);gap:8px">${boxes}</div>
         </div>`;
       }
+      case 'single-photo':{
+        // One-image variant of photo-page: same heading-bar styling, single
+        // slot that fills the block, intended for a sketch / defect close-up /
+        // PDF screenshot. Per-report image lives on report.singlePhotos keyed
+        // by block.id (the new-report Photos section shows one upload tile
+        // per single-photo block present in the active method's template).
+        const _tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
+        const _headColor = _safeColor(block.barColor, _tplSectionColor);
+        const _img = (report && report.singlePhotos && typeof report.singlePhotos === 'object') ? report.singlePhotos[block.id] : null;
+        // Same contain + thin matted-frame treatment as photo-page slots so
+        // phones (portrait) and cameras (landscape) both display in full
+        // without crop; surrounding white pad inside the grey border reads
+        // as a deliberate mat.
+        const slot = _img
+          ? `<div style="flex:1;margin:6px;border:1px solid #ddd;border-radius:3px;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#fff"><img src="${_img}" alt="${_h(block.text||'Image')}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`
+          : `<div style="flex:1;margin:6px;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:8px;gap:4px;background:#fafafa"><span style="font-size:24px">🖼</span><span>${_h(block.text||'Single image')}</span></div>`;
+        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
+          <div style="padding:4px 8px;background:${_headColor};text-align:center">
+            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Image')}</span>
+          </div>
+          ${slot}
+        </div>`;
+      }
       case 'additional-page':
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5;font-size:9px;font-weight:600;color:#333;text-align:${al}">${_h(block.text||'Additional information')}</div><div style="flex:1;padding:12px 8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;border:1px dashed #ddd;margin:8px;border-radius:3px">Place blocks inside for custom content</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
       case 'items-table':{
@@ -3644,7 +3667,7 @@ function cvRenderProps(id){
     ${(block.key === 'items-table' || block.key === 'method-block') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
-    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page')
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo')
       ? row('Heading colour', colorPick('barColor', block.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040')))
       : ''}
     ${block.key === 'items-table' && typeof RPT_FORM !== 'undefined' && Array.isArray(RPT_FORM.items) ? (() => {

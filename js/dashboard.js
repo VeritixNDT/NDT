@@ -1481,6 +1481,7 @@ function _ovPhotosSectionHtml(){
   const slots = enabled ? _ovPhotos.map((p, i) => p
     ? `<div style="position:relative;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
         <img src="${p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/>
+        <button type="button" data-action="ovRotatePhotoCCW" data-args="${i}" title="Rotate 90° counter-clockwise" style="position:absolute;top:4px;right:56px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↺</button>
         <button type="button" data-action="ovRotatePhoto" data-args="${i}" title="Rotate 90° clockwise" style="position:absolute;top:4px;right:30px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↻</button>
         <button type="button" data-action="ovClearPhoto" data-args="${i}" title="Remove photo" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
       </div>`
@@ -1546,14 +1547,16 @@ function ovClearPhoto(i){
   ovRenderPhotosSection();
 }
 
-// Rotate a slot's photo 90° clockwise. The rotation is baked into the stored
+// Rotate a slot's photo by ±90°. The rotation is baked into the stored
 // dataURL via a canvas so the orientation is permanent — the saved report,
 // the photo-page block and the printed PDF all show the same rotated image.
 // Each press rotates a further 90°; four presses return to the original.
 // PNG sources keep their format (transparency preserved); everything else
 // re-encodes as JPEG at 0.9 quality, which keeps file size close to the
 // original after a couple of rotations.
-function ovRotatePhoto(i){
+//
+// dir = +1 → clockwise; dir = -1 → counter-clockwise.
+function _ovRotatePhotoBy(i, dir){
   if(!Array.isArray(_ovPhotos) || !_ovPhotos[i]) return;
   const src = _ovPhotos[i];
   const img = new Image();
@@ -1563,7 +1566,7 @@ function ovRotatePhoto(i){
     c.height = img.naturalWidth;
     const ctx = c.getContext('2d');
     ctx.translate(c.width / 2, c.height / 2);
-    ctx.rotate(Math.PI / 2);
+    ctx.rotate(dir * Math.PI / 2);
     ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
     const isPng = /^data:image\/png/i.test(src);
     _ovPhotos[i] = isPng ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9);
@@ -1572,6 +1575,8 @@ function ovRotatePhoto(i){
   img.onerror = () => { if(typeof toast === 'function') toast('Could not rotate photo.', 'error'); };
   img.src = src;
 }
+function ovRotatePhoto(i)    { _ovRotatePhotoBy(i, +1); }
+function ovRotatePhotoCCW(i) { _ovRotatePhotoBy(i, -1); }
 
 function ovItemsRerender() {
   // Replace just the items-table section in place. The section is the only

@@ -11,6 +11,12 @@ var _ovItems = [{}];
 // holding base64 image data or null for an empty slot. Length 0 = page
 // not added; length > 0 = page added, slots possibly empty.
 var _ovPhotos = [];
+// Per-report images for any single-photo blocks present in the active
+// method's template. Map of block.id → dataURL; missing key = empty slot.
+// Each single-photo block in the template surfaces one upload tile in the
+// new-report Photos section and stores its image under its own block.id
+// so multiple single-photo blocks can coexist without aliasing.
+var _ovSinglePhotos = {};
 // Snapshot of the revision number when the new-report form opened. Used
 // to detect whether the user has bumped the revision so the save handler
 // can demand a reason (required) and append a row to report.revisions.
@@ -1109,6 +1115,9 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Photo page — preserve any photos already on the (sourceReport when
   // revising) report. Empty array = no photo page added yet.
   _ovPhotos = (sourceReport && Array.isArray(sourceReport.photos)) ? sourceReport.photos.slice() : [];
+  _ovSinglePhotos = (sourceReport && sourceReport.singlePhotos && typeof sourceReport.singlePhotos === 'object')
+    ? Object.assign({}, sourceReport.singlePhotos)
+    : {};
   RPT_ITEM_FIELD_IDS.forEach(fid => {
     if(_ovItems[0][fid] === undefined && merged[fid]) _ovItems[0][fid] = merged[fid];
   });
@@ -1476,6 +1485,29 @@ function ovItemsRemoveRow(idx) {
 // Six slots fixed for now (matches the photo-page block's default 2 × 3
 // grid); base64 image data is stored on _ovPhotos and saved onto the
 // report so the photo-page block can render them.
+// Find every single-photo block in the active method's saved template.
+// Returns [{id, label}, …] in document order across all pages. Used by the
+// Photos section to surface one upload tile per block — each tile stores
+// its image under the block's id so multiple single-photo blocks in the
+// same template don't alias.
+function _ovSinglePhotoBlocks(){
+  if(!_ovMethod || typeof CV_METHOD_TPL_PREFIX === 'undefined' || typeof ls !== 'function') return [];
+  try {
+    const tpl = ls(CV_METHOD_TPL_PREFIX + _ovMethod, null);
+    if(!tpl || !Array.isArray(tpl.pages)) return [];
+    const out = [];
+    tpl.pages.forEach(pg => {
+      if(!pg || !Array.isArray(pg.blocks)) return;
+      pg.blocks.forEach(b => {
+        if(b && b.key === 'single-photo' && b.id){
+          out.push({ id: b.id, label: (b.text || 'Single image').toString() });
+        }
+      });
+    });
+    return out;
+  } catch(e){ return []; }
+}
+
 function _ovPhotosSectionHtml(){
   const enabled = Array.isArray(_ovPhotos) && _ovPhotos.length > 0;
   const slots = enabled ? _ovPhotos.map((p, i) => p
@@ -1491,16 +1523,51 @@ function _ovPhotosSectionHtml(){
         <input type="file" accept="image/*" style="display:none" data-on-change="ovSetPhotoFromFile" data-pass-el="1" data-args="${i}"/>
       </label>`
   ).join('') : '';
+
+  // Single-photo blocks present in the active method's template — one
+  // upload tile each, labelled with the block's text so the inspector
+  // knows which slot they're filling (e.g. "Site overview", "Defect 1").
+  const singleBlocks = _ovSinglePhotoBlocks();
+  const singleSlots = singleBlocks.map(b => {
+    const p = _ovSinglePhotos && _ovSinglePhotos[b.id];
+    const idArg = `'${b.id}'`;
+    return `<div>
+      <div style="font-size:10.5px;color:var(--t2);margin-bottom:4px">${escapeHtml(b.label)}</div>
+      ${p
+        ? `<div style="position:relative;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
+            <img src="${p}" alt="${escapeHtml(b.label)}" style="width:100%;height:100%;object-fit:contain;display:block"/>
+            <button type="button" data-action="ovRotateSinglePhotoCCW" data-args="${idArg}" title="Rotate 90° counter-clockwise" style="position:absolute;top:4px;right:56px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↺</button>
+            <button type="button" data-action="ovRotateSinglePhoto"    data-args="${idArg}" title="Rotate 90° clockwise"         style="position:absolute;top:4px;right:30px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↻</button>
+            <button type="button" data-action="ovClearSinglePhoto"     data-args="${idArg}" title="Remove image"                  style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
+          </div>`
+        : `<label style="aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">
+            <span style="font-size:24px">🖼</span>
+            <span style="font-size:11px">Choose image</span>
+            <input type="file" accept="image/*" style="display:none" data-on-change="ovSetSinglePhotoFromFile" data-pass-el="1" data-args="${idArg}"/>
+          </label>`}
+    </div>`;
+  }).join('');
+
+  // Section is shown whenever there's anything to offer: either the photo
+  // page can be added/edited, or the template has at least one single-photo
+  // block. If neither applies the section is still rendered with just the
+  // "+ Add photo page" button — same as before.
   return `<div class="sc" id="ov-nr-photos-section" style="margin:0 14px 14px">
     <div class="sc-head" style="display:flex;align-items:center">
       <span class="sc-title">Photos</span>
       <span style="flex:1"></span>
       ${enabled ? `<button class="btn btn-sm" data-action="ovRemovePhotoPage" title="Cancel — remove the photo page from this report">Remove photo page</button>` : ''}
     </div>
-    <div class="sc-body" style="padding:14px 16px">
+    <div class="sc-body" style="padding:14px 16px;display:flex;flex-direction:column;gap:14px">
       ${enabled
         ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${slots}</div>`
-        : `<button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button>`}
+        : `<div><button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button></div>`}
+      ${singleBlocks.length > 0
+        ? `<div>
+            <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Single images from this template</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${singleSlots}</div>
+          </div>`
+        : ''}
     </div>
   </div>`;
 }
@@ -1577,6 +1644,57 @@ function _ovRotatePhotoBy(i, dir){
 }
 function ovRotatePhoto(i)    { _ovRotatePhotoBy(i, +1); }
 function ovRotatePhotoCCW(i) { _ovRotatePhotoBy(i, -1); }
+
+// ── Single-photo block uploads ─────────────────────────────────────────
+// Each single-photo block in the active template surfaces one upload tile
+// in the Photos section. The image is stored on _ovSinglePhotos under the
+// block's id (stable across template re-orderings) and serialised to
+// report.singlePhotos on save so the single-photo render branch picks it
+// up directly. Same 2 MB cap, same canvas-rotate-and-bake mechanism as
+// the photo-page slots.
+function ovSetSinglePhotoFromFile(blockId, elInput){
+  const file = elInput && elInput.files && elInput.files[0];
+  if(!file) return;
+  if(file.size > 2 * 1024 * 1024){
+    toast(t('toast.photo_too_large','Photo must be under 2 MB.'), 'error');
+    elInput.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    if(!_ovSinglePhotos || typeof _ovSinglePhotos !== 'object') _ovSinglePhotos = {};
+    _ovSinglePhotos[blockId] = e.target.result;
+    ovRenderPhotosSection();
+  };
+  reader.readAsDataURL(file);
+}
+
+function ovClearSinglePhoto(blockId){
+  if(_ovSinglePhotos && typeof _ovSinglePhotos === 'object') delete _ovSinglePhotos[blockId];
+  ovRenderPhotosSection();
+}
+
+function _ovRotateSinglePhotoBy(blockId, dir){
+  if(!_ovSinglePhotos || !_ovSinglePhotos[blockId]) return;
+  const src = _ovSinglePhotos[blockId];
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width  = img.naturalHeight;
+    c.height = img.naturalWidth;
+    const ctx = c.getContext('2d');
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate(dir * Math.PI / 2);
+    ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    const isPng = /^data:image\/png/i.test(src);
+    _ovSinglePhotos[blockId] = isPng ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9);
+    ovRenderPhotosSection();
+  };
+  img.onerror = () => { if(typeof toast === 'function') toast('Could not rotate photo.', 'error'); };
+  img.src = src;
+}
+function ovRotateSinglePhoto(blockId)    { _ovRotateSinglePhotoBy(blockId, +1); }
+function ovRotateSinglePhotoCCW(blockId) { _ovRotateSinglePhotoBy(blockId, -1); }
 
 function ovItemsRerender() {
   // Replace just the items-table section in place. The section is the only

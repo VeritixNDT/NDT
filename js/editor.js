@@ -2775,15 +2775,20 @@ function cvRenderBlockContent(block, report, preview){
         // design canvas.
         const _photos   = (report && Array.isArray(report.photos))        ? report.photos        : [];
         const _captions = (report && Array.isArray(report.photoCaptions)) ? report.photoCaptions : [];
+        // Caption styling is configurable per block via the Properties
+        // panel. Defaults match the original drop (7.5 px italic centred
+        // mid-grey) so existing reports look identical until the inspector
+        // touches the controls. showCaptions=false hides the strip
+        // entirely, returning the full cell height to the photo.
+        const _showCap  = block.showCaptions !== false;
+        const _capSize  = block.captionSize  || '7.5px';
+        const _capAlign = block.captionAlign || 'center';
+        const _capItalic= block.captionItalic !== false;
+        const _capBold  = block.captionBold  === true;
+        const _capColor = _safeColor(block.captionColor, '#555555');
         const boxes = Array.from({length:_slots},(_,i)=>{
           const _p   = _photos[i];
           const _cap = (_captions[i] || '').toString();
-          // Each grid cell is a column: photo area on top (flex:1), caption
-          // strip beneath. The strip is always present so empty captions
-          // don't shift the photo heights between cells — keeps the 2×3
-          // grid in perfect rhythm. Caption italic + small grey so it
-          // reads as a caption rather than body copy; min-height of the
-          // strip is enough for one line at this font size.
           let inner;
           if(_p){
             // object-fit:contain so the whole photo is visible (no crop) regardless
@@ -2795,7 +2800,13 @@ function cvRenderBlockContent(block, report, preview){
           } else {
             inner = `<div style="flex:1;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa;min-height:0"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`;
           }
-          const capStrip = `<div style="margin-top:3px;font-size:7.5px;line-height:1.25;font-style:italic;color:#555;text-align:center;min-height:10px;padding:0 2px;overflow:hidden">${_h(_cap)}</div>`;
+          // Caption strip — always allocated when captions are on so empty
+          // captions don't bump photos between cells out of vertical
+          // alignment; suppressed entirely when the inspector turns
+          // captions off in the Properties panel.
+          const capStrip = _showCap
+            ? `<div style="margin-top:3px;font-size:${_capSize};line-height:1.25;${_capItalic?'font-style:italic;':''}${_capBold?'font-weight:600;':''}color:${_capColor};text-align:${_capAlign};min-height:10px;padding:0 2px;overflow:hidden">${_h(_cap)}</div>`
+            : '';
           return `<div style="display:flex;flex-direction:column;height:100%;min-height:0">${inner}${capStrip}</div>`;
         }).join('');
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
@@ -3715,6 +3726,45 @@ function cvRenderProps(id){
       <span style="font-size:11px;color:var(--t3)">×</span>
       <input type="number" min="1" max="6"  value="${parseInt(block.photoCols,10)||3}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoCols'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Photos per row"/>
     </div>`) : ''}
+    ${block.key === 'photo-page' ? (() => {
+      // Caption styling — every control below is read by the photo-page
+      // render branch via block.caption*. Show-captions off hides the
+      // strip entirely (photo gets full cell height); the other controls
+      // dim out while it's off but stay editable so the inspector can
+      // pre-tune the styling before flipping captions back on.
+      const capSize    = block.captionSize  || '7.5px';
+      const capAlign   = block.captionAlign || 'center';
+      const capItalic  = block.captionItalic !== false;
+      const capBold    = block.captionBold  === true;
+      const capColor   = block.captionColor || '#555555';
+      const showCap    = block.showCaptions !== false;
+      const _dim       = showCap ? '' : 'opacity:0.45;pointer-events:none';
+      const sizeOpts   = ['6px','7px','7.5px','8px','8.5px','9px','10px','11px','12px']
+        .map(s => `<option value="${s}" ${capSize===s?'selected':''}>${s}</option>`).join('');
+      const alignBtns  = ['left','center','right'].map(a =>
+        `<button data-action="cvUpdateBlock" data-args="'${id}','captionAlign','${a}'" style="padding:4px 8px;font-size:11px;border-radius:3px;border:1px solid var(--border);cursor:pointer;background:${capAlign===a?'var(--blue)':'var(--panel)'};color:${capAlign===a?'#fff':'var(--t2)'}" title="${a}">${a==='left'?'⬅':a==='center'?'↔':'➡'}</button>`).join('');
+      return row('Photo captions', `<div style="display:flex;flex-direction:column;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer">
+          <input type="checkbox" ${showCap?'checked':''} data-on-change="_wCvUpdateBlockChecked" data-pass-el="1" data-args="'${id}','showCaptions'"/> Show caption under each photo
+        </label>
+        <div style="display:flex;gap:6px;align-items:center;${_dim}">
+          <select style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','captionSize'" title="Caption font size">${sizeOpts}</select>
+          <div style="display:flex;gap:2px">${alignBtns}</div>
+        </div>
+        <div style="display:flex;gap:12px;${_dim}">
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2);cursor:pointer">
+            <input type="checkbox" ${capItalic?'checked':''} data-on-change="_wCvUpdateBlockChecked" data-pass-el="1" data-args="'${id}','captionItalic'"/> Italic
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2);cursor:pointer">
+            <input type="checkbox" ${capBold?'checked':''}   data-on-change="_wCvUpdateBlockChecked" data-pass-el="1" data-args="'${id}','captionBold'"/> Bold
+          </label>
+        </div>
+        <div style="${_dim}">
+          <div style="font-size:9.5px;color:var(--t3);margin-bottom:3px">Caption colour</div>
+          ${colorPick('captionColor', capColor)}
+        </div>
+      </div>`);
+    })() : ''}
     ${check('bold',block.bold,'Bold')}
     ${check('italic',block.italic,'Italic')}
     ${check('underline',block.underline,'Underline')}

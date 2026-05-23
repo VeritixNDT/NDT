@@ -1925,6 +1925,18 @@ function ovSaveReport(mode) {
     Object.keys(_ovSinglePhotos).forEach(k => { if(_ovSinglePhotos[k]) _kept[k] = _ovSinglePhotos[k]; });
     if(Object.keys(_kept).length) report.singlePhotos = _kept;
   }
+  // Photo-details cards — copy typed text (trimmed of trailing whitespace)
+  // for any details block that actually has content. Empty entries are
+  // dropped so saved reports stay compact and so an empty card with no
+  // text can't print a stray heading bar when its linked photo is empty.
+  if(_ovPhotoDetails && typeof _ovPhotoDetails === 'object'){
+    const _kept = {};
+    Object.keys(_ovPhotoDetails).forEach(k => {
+      const v = (_ovPhotoDetails[k] || '').replace(/\s+$/, '');
+      if(v) _kept[k] = v;
+    });
+    if(Object.keys(_kept).length) report.photoDetails = _kept;
+  }
   // Required-field guard — a saved report must carry the essentials.
   // Without this a report could be saved with no client, inspector or
   // examined items at all.

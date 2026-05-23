@@ -2995,8 +2995,11 @@ function cvRenderBlockContent(block, report, preview){
           } catch(e){}
         }
         revs = revs || [];
+        // Show only the current revision and the one immediately before
+        // it — the full audit trail lives in the report's audit log; the
+        // card is for at-a-glance context, not history scrolling.
         const body = revs.length
-          ? revs.map((rv, i) => `<div style="${i ? 'border-top:0.5px solid #e5e7eb;padding-top:2px;margin-top:2px;' : ''}font-size:${fs};line-height:1.35;color:${preview?'#000':'#bbb'};white-space:normal;word-break:break-word">
+          ? revs.slice(-2).map((rv, i) => `<div style="${i ? 'border-top:0.5px solid #e5e7eb;padding-top:2px;margin-top:2px;' : ''}font-size:${fs};line-height:1.35;color:${preview?'#000':'#bbb'};white-space:normal;word-break:break-word">
               <span style="font-family:var(--mono);font-weight:600;margin-right:6px">${_h(rv.rev||'—')}</span>${_h(rv.reason||'—')}
             </div>`).join('')
           : `<div style="font-size:${fs};color:${preview?'#999':'#bbb'};font-style:italic">No revisions logged</div>`;

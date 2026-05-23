@@ -1485,11 +1485,12 @@ function ovItemsRemoveRow(idx) {
 // Six slots fixed for now (matches the photo-page block's default 2 × 3
 // grid); base64 image data is stored on _ovPhotos and saved onto the
 // report so the photo-page block can render them.
-// Find every single-photo block in the active method's saved template.
-// Returns [{id, label}, …] in document order across all pages. Used by the
-// Photos section to surface one upload tile per block — each tile stores
-// its image under the block's id so multiple single-photo blocks in the
-// same template don't alias.
+// Find every single-photo / single-drawing block in the active method's
+// saved template. Returns [{id, label, kind}, …] in document order across
+// all pages. Used by the Photos section to surface one upload tile per
+// block — each tile stores its image under the block's id, so multiple
+// blocks of either kind can coexist without aliasing. kind drives the
+// placeholder icon shown in the tile when the slot is empty.
 function _ovSinglePhotoBlocks(){
   if(!_ovMethod || typeof CV_METHOD_TPL_PREFIX === 'undefined' || typeof ls !== 'function') return [];
   try {
@@ -1499,8 +1500,11 @@ function _ovSinglePhotoBlocks(){
     tpl.pages.forEach(pg => {
       if(!pg || !Array.isArray(pg.blocks)) return;
       pg.blocks.forEach(b => {
-        if(b && b.key === 'single-photo' && b.id){
-          out.push({ id: b.id, label: (b.text || 'Single image').toString() });
+        if(!b || !b.id) return;
+        if(b.key === 'single-photo'){
+          out.push({ id: b.id, kind: 'photo',   label: (b.text || 'Single image').toString() });
+        } else if(b.key === 'single-drawing'){
+          out.push({ id: b.id, kind: 'drawing', label: (b.text || 'Single drawing').toString() });
         }
       });
     });
@@ -1531,6 +1535,8 @@ function _ovPhotosSectionHtml(){
   const singleSlots = singleBlocks.map(b => {
     const p = _ovSinglePhotos && _ovSinglePhotos[b.id];
     const idArg = `'${b.id}'`;
+    const placeIco   = b.kind === 'drawing' ? '📐' : '🖼';
+    const placeLabel = b.kind === 'drawing' ? 'Choose drawing' : 'Choose image';
     return `<div>
       <div style="font-size:10.5px;color:var(--t2);margin-bottom:4px">${escapeHtml(b.label)}</div>
       ${p
@@ -1538,11 +1544,11 @@ function _ovPhotosSectionHtml(){
             <img src="${p}" alt="${escapeHtml(b.label)}" style="width:100%;height:100%;object-fit:contain;display:block"/>
             <button type="button" data-action="ovRotateSinglePhotoCCW" data-args="${idArg}" title="Rotate 90° counter-clockwise" style="position:absolute;top:4px;right:56px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↺</button>
             <button type="button" data-action="ovRotateSinglePhoto"    data-args="${idArg}" title="Rotate 90° clockwise"         style="position:absolute;top:4px;right:30px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↻</button>
-            <button type="button" data-action="ovClearSinglePhoto"     data-args="${idArg}" title="Remove image"                  style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
+            <button type="button" data-action="ovClearSinglePhoto"     data-args="${idArg}" title="Remove ${b.kind==='drawing'?'drawing':'image'}" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
           </div>`
         : `<label style="aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">
-            <span style="font-size:24px">🖼</span>
-            <span style="font-size:11px">Choose image</span>
+            <span style="font-size:24px">${placeIco}</span>
+            <span style="font-size:11px">${placeLabel}</span>
             <input type="file" accept="image/*" style="display:none" data-on-change="ovSetSinglePhotoFromFile" data-pass-el="1" data-args="${idArg}"/>
           </label>`}
     </div>`;
@@ -1564,7 +1570,11 @@ function _ovPhotosSectionHtml(){
         : `<div><button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button></div>`}
       ${singleBlocks.length > 0
         ? `<div>
-            <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Single images from this template</div>
+            <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${
+              singleBlocks.every(b => b.kind === 'drawing') ? 'Drawings from this template'
+              : singleBlocks.every(b => b.kind === 'photo') ? 'Single images from this template'
+              : 'Images & drawings from this template'
+            }</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${singleSlots}</div>
           </div>`
         : ''}

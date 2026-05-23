@@ -251,6 +251,7 @@ var CV_LAYOUT_ITEMS = [
   {key:'photo-box',      label:'Photo placeholder',          w:220,h:150},
   {key:'photo-page',     label:'Photo page (6 slots)',       w:754,h:980},
   {key:'single-photo',   label:'Single image (photo / screenshot)', w:360,h:280},
+  {key:'single-drawing', label:'Single drawing',             w:360,h:280},
   {key:'additional-page',label:'Additional page',            w:754,h:980},
   {key:'defect-table',   label:'Defect / indication table',  w:754,h:90},
   {key:'items-table',    label:'Examination details',        w:754,h:90},
@@ -1532,7 +1533,7 @@ function cvInitCanvas(){
 function cvGetLayoutIcon(k){
   if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
-    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
+    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','single-drawing':'📐','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
     'accent-bar':'█'}[k]||'□';
 }
 
@@ -2792,12 +2793,18 @@ function cvRenderBlockContent(block, report, preview){
           <div style="flex:1;padding:8px;display:grid;grid-template-columns:repeat(${_cols},1fr);grid-template-rows:repeat(${_rows},1fr);gap:8px">${boxes}</div>
         </div>`;
       }
-      case 'single-photo':{
+      case 'single-photo':
+      case 'single-drawing':{
         // One-image variant of photo-page: same heading-bar styling, single
         // slot that fills the block, intended for a sketch / defect close-up /
-        // PDF screenshot. Per-report image lives on report.singlePhotos keyed
-        // by block.id (the new-report Photos section shows one upload tile
-        // per single-photo block present in the active method's template).
+        // PDF screenshot (single-photo) or a drawing / diagram (single-drawing).
+        // Per-report image lives on report.singlePhotos keyed by block.id —
+        // both keys share the same storage (block.id is unique) and the same
+        // upload tile mechanism, only the placeholder icon and default label
+        // differ so the palette reads as two distinct picks.
+        const _isDrawing = block.key === 'single-drawing';
+        const _defLabel  = _isDrawing ? 'Drawing' : 'Image';
+        const _placeIco  = _isDrawing ? '📐' : '🖼';
         const _tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
         const _headColor = _safeColor(block.barColor, _tplSectionColor);
         const _img = (report && report.singlePhotos && typeof report.singlePhotos === 'object') ? report.singlePhotos[block.id] : null;
@@ -2806,11 +2813,11 @@ function cvRenderBlockContent(block, report, preview){
         // without crop; surrounding white pad inside the grey border reads
         // as a deliberate mat.
         const slot = _img
-          ? `<div style="flex:1;margin:6px;border:1px solid #ddd;border-radius:3px;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#fff"><img src="${_img}" alt="${_h(block.text||'Image')}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`
-          : `<div style="flex:1;margin:6px;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:8px;gap:4px;background:#fafafa"><span style="font-size:24px">🖼</span><span>${_h(block.text||'Single image')}</span></div>`;
+          ? `<div style="flex:1;margin:6px;border:1px solid #ddd;border-radius:3px;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#fff"><img src="${_img}" alt="${_h(block.text||_defLabel)}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`
+          : `<div style="flex:1;margin:6px;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:8px;gap:4px;background:#fafafa"><span style="font-size:24px">${_placeIco}</span><span>${_h(block.text||('Single '+_defLabel.toLowerCase()))}</span></div>`;
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
           <div style="padding:4px 8px;background:${_headColor};text-align:center">
-            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Image')}</span>
+            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||_defLabel)}</span>
           </div>
           ${slot}
         </div>`;
@@ -3667,7 +3674,7 @@ function cvRenderProps(id){
     ${(block.key === 'items-table' || block.key === 'method-block') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
-    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo')
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo' || block.key === 'single-drawing')
       ? row('Heading colour', colorPick('barColor', block.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040')))
       : ''}
     ${block.key === 'items-table' && typeof RPT_FORM !== 'undefined' && Array.isArray(RPT_FORM.items) ? (() => {

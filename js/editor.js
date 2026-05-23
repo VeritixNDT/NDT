@@ -3804,6 +3804,31 @@ function cvRenderProps(id){
         <div style="font-size:9.5px;color:var(--t3);margin-top:4px;line-height:1.35">${hint}</div>`);
     })() : ''}
     ${block.key === 'photo-page' ? (() => {
+      // Per-photo details / hide-empty controls. When 'Show details card'
+      // is on, each filled cell renders photo on top + a styled card
+      // (heading bar in section colour + body) beneath — same look as a
+      // standalone photo-details card, but managed centrally from the
+      // photo-page block. Hide-empty drops unfilled cells on print so a
+      // report with 1 photo shows 1 visible pair, not 1 + 5 placeholders.
+      const showCard   = !!block.showDetailsCard;
+      const cardH      = parseInt(block.detailsCardHeight, 10) || 70;
+      const hideEmpty  = !!block.hideEmptySlots;
+      return row('Per-photo details', `<div style="display:flex;flex-direction:column;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer">
+          <input type="checkbox" ${showCard?'checked':''} data-on-change="_wCvUpdateBlockChecked" data-pass-el="1" data-args="'${id}','showDetailsCard'"/> Show details card under each photo
+        </label>
+        <div style="display:flex;gap:6px;align-items:center;${showCard?'':'opacity:0.45;pointer-events:none'}">
+          <span style="font-size:10.5px;color:var(--t3);min-width:88px">Card height</span>
+          <input type="number" min="30" max="240" value="${cardH}" data-on-change="_wCvUpdateBlockNumber" data-on-input="_wCvUpdateBlockNumber" data-pass-el="1" data-args="'${id}','detailsCardHeight'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Card height in px"/>
+          <span style="font-size:10.5px;color:var(--t3)">px</span>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;border-top:1px solid var(--border);padding-top:6px;margin-top:2px">
+          <input type="checkbox" ${hideEmpty?'checked':''} data-on-change="_wCvUpdateBlockChecked" data-pass-el="1" data-args="'${id}','hideEmptySlots'"/> Hide empty slots on print
+        </label>
+        <div style="font-size:9.5px;color:var(--t3);line-height:1.35">${showCard?'Card body shares the caption font / colour controls below — same styling whether the cell renders as a plain caption strip or a styled card.':'Off: each photo gets a plain italic caption beneath it (legacy look).'}</div>
+      </div>`);
+    })() : ''}
+    ${block.key === 'photo-page' ? (() => {
       // Caption styling — every control below is read by the photo-page
       // render branch via block.caption*. Show-captions off hides the
       // strip entirely (photo gets full cell height); the other controls

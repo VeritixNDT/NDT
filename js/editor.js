@@ -2773,18 +2773,30 @@ function cvRenderBlockContent(block, report, preview){
         // Fill slots from report.photos when present; otherwise show a
         // placeholder so the template still reads as a photo page in the
         // design canvas.
-        const _photos = (report && Array.isArray(report.photos)) ? report.photos : [];
+        const _photos   = (report && Array.isArray(report.photos))        ? report.photos        : [];
+        const _captions = (report && Array.isArray(report.photoCaptions)) ? report.photoCaptions : [];
         const boxes = Array.from({length:_slots},(_,i)=>{
-          const _p = _photos[i];
+          const _p   = _photos[i];
+          const _cap = (_captions[i] || '').toString();
+          // Each grid cell is a column: photo area on top (flex:1), caption
+          // strip beneath. The strip is always present so empty captions
+          // don't shift the photo heights between cells — keeps the 2×3
+          // grid in perfect rhythm. Caption italic + small grey so it
+          // reads as a caption rather than body copy; min-height of the
+          // strip is enough for one line at this font size.
+          let inner;
           if(_p){
             // object-fit:contain so the whole photo is visible (no crop) regardless
             // of source aspect — phones (3:4 portrait) and cameras (3:2 landscape)
             // both display in full. The slot stays a uniform grid cell so the page
             // keeps its geometric rhythm; any unused space inside the slot reads as
             // a thin matted frame (4 px white pad inside the grey border).
-            return `<div style="border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center"><img src="${_p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`;
+            inner = `<div style="flex:1;border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-height:0"><img src="${_p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`;
+          } else {
+            inner = `<div style="flex:1;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa;min-height:0"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`;
           }
-          return `<div style="border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`;
+          const capStrip = `<div style="margin-top:3px;font-size:7.5px;line-height:1.25;font-style:italic;color:#555;text-align:center;min-height:10px;padding:0 2px;overflow:hidden">${_h(_cap)}</div>`;
+          return `<div style="display:flex;flex-direction:column;height:100%;min-height:0">${inner}${capStrip}</div>`;
         }).join('');
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
           <div style="padding:4px 8px;background:${_headColor};text-align:center">

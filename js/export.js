@@ -212,8 +212,33 @@ function cvBuildPrintHTML(report){
     // Body blocks only — zone-tagged blocks are in the header/footer
     // fragments. Filter before sort so sort never mutates page.blocks.
     let bodyHtml = '';
+    // Build the list of body blocks for this sheet. Two stages of
+    // filtering: drop zone-tagged blocks (they're in the header/footer
+    // fragments), then drop image/details blocks whose content wasn't
+    // attached on this report so the printed page doesn't carry empty
+    // photo frames or orphaned details cards. The check resolves the
+    // image map once per sheet to keep the filter cheap; positions are
+    // preserved (no reflow), so a filled pair always prints in its
+    // original spot.
+    const _hasSingle = (id) => !!(report && report.singlePhotos && id && report.singlePhotos[id]);
     const bodyBlocks = page.blocks
       .filter(b => b.zone !== 'header' && b.zone !== 'footer')
+      .filter(b => {
+        // single-photo / single-drawing: hide when no image was uploaded
+        // for this slot. Without this an unfilled slot would print the
+        // dashed placeholder on the report PDF, which we don't want.
+        if(b.key === 'single-photo' || b.key === 'single-drawing'){
+          return _hasSingle(b.id);
+        }
+        // photo-details: hide when linked to a single-photo that has
+        // no image attached, so each visible details card always sits
+        // beneath a real photo. Unlinked details cards (linkedPhotoId
+        // unset) always print — they're standalone notes by intent.
+        if(b.key === 'photo-details' && b.linkedPhotoId){
+          return _hasSingle(b.linkedPhotoId);
+        }
+        return true;
+      })
       .sort((a,b) => (a.zIndex||0) - (b.zIndex||0));
     bodyBlocks.forEach(block => { bodyHtml += renderBlock(block, bodyBlocks); });
     const hdrFragment = _hdrShow ? headerBlocks.map(b => renderBlock(b, headerBlocks)).join('') : '';

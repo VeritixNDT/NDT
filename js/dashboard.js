@@ -23,6 +23,12 @@ var _ovPhotoCaptions = [];
 // new-report Photos section and stores its image under its own block.id
 // so multiple single-photo blocks can coexist without aliasing.
 var _ovSinglePhotos = {};
+// Per-report typed text for any photo-details block in the active
+// template. Map of photo-details block.id → string. The new-report form
+// surfaces each photo-details block as a textarea below its linked
+// single-photo upload tile (or as a standalone tile when no link is
+// set); persisted to report.photoDetails on save.
+var _ovPhotoDetails = {};
 // Snapshot of the revision number when the new-report form opened. Used
 // to detect whether the user has bumped the revision so the save handler
 // can demand a reason (required) and append a row to report.revisions.
@@ -1125,6 +1131,9 @@ function ovNewReport(methodId, btn, sourceReport) {
   _ovSinglePhotos = (sourceReport && sourceReport.singlePhotos && typeof sourceReport.singlePhotos === 'object')
     ? Object.assign({}, sourceReport.singlePhotos)
     : {};
+  _ovPhotoDetails = (sourceReport && sourceReport.photoDetails && typeof sourceReport.photoDetails === 'object')
+    ? Object.assign({}, sourceReport.photoDetails)
+    : {};
   RPT_ITEM_FIELD_IDS.forEach(fid => {
     if(_ovItems[0][fid] === undefined && merged[fid]) _ovItems[0][fid] = merged[fid];
   });
@@ -1493,25 +1502,44 @@ function ovItemsRemoveRow(idx) {
 // grid); base64 image data is stored on _ovPhotos and saved onto the
 // report so the photo-page block can render them.
 // Find every single-photo / single-drawing block in the active method's
-// saved template. Returns [{id, label, kind}, …] in document order across
-// all pages. Used by the Photos section to surface one upload tile per
-// block — each tile stores its image under the block's id, so multiple
-// blocks of either kind can coexist without aliasing. kind drives the
-// placeholder icon shown in the tile when the slot is empty.
+// saved template. Returns [{id, label, kind, detailsBlockId?}, …] in
+// document order across all pages. Used by the Photos section to surface
+// one upload tile per block — each tile stores its image under the
+// block's id, so multiple blocks of either kind can coexist without
+// aliasing. kind drives the placeholder icon shown when the slot is
+// empty; detailsBlockId, when set, surfaces a textarea below the tile
+// for typed information that will print under the photo on the report.
 function _ovSinglePhotoBlocks(){
   if(!_ovMethod || typeof CV_METHOD_TPL_PREFIX === 'undefined' || typeof ls !== 'function') return [];
   try {
     const tpl = ls(CV_METHOD_TPL_PREFIX + _ovMethod, null);
     if(!tpl || !Array.isArray(tpl.pages)) return [];
+    // First pass — gather all single-photo / single-drawing entries.
     const out = [];
+    const byId = {};
     tpl.pages.forEach(pg => {
       if(!pg || !Array.isArray(pg.blocks)) return;
       pg.blocks.forEach(b => {
         if(!b || !b.id) return;
         if(b.key === 'single-photo'){
-          out.push({ id: b.id, kind: 'photo',   label: (b.text || 'Single image').toString() });
+          const e = { id: b.id, kind: 'photo',   label: (b.text || 'Single image').toString() };
+          out.push(e); byId[b.id] = e;
         } else if(b.key === 'single-drawing'){
-          out.push({ id: b.id, kind: 'drawing', label: (b.text || 'Single drawing').toString() });
+          const e = { id: b.id, kind: 'drawing', label: (b.text || 'Single drawing').toString() };
+          out.push(e); byId[b.id] = e;
+        }
+      });
+    });
+    // Second pass — for each photo-details block, attach its block id to
+    // the linked photo entry so the tile can render the textarea inline.
+    // Last-write-wins on multiple details blocks pointing at the same
+    // photo (the inspector can always reassign in the Properties panel).
+    tpl.pages.forEach(pg => {
+      if(!pg || !Array.isArray(pg.blocks)) return;
+      pg.blocks.forEach(b => {
+        if(b && b.key === 'photo-details' && b.linkedPhotoId && byId[b.linkedPhotoId]){
+          byId[b.linkedPhotoId].detailsBlockId = b.id;
+          byId[b.linkedPhotoId].detailsLabel   = (b.text || 'Details / information').toString();
         }
       });
     });
@@ -1556,6 +1584,19 @@ function _ovPhotosSectionHtml(){
     const idArg = `'${b.id}'`;
     const placeIco   = b.kind === 'drawing' ? '📐' : '🖼';
     const placeLabel = b.kind === 'drawing' ? 'Choose drawing' : 'Choose image';
+    // Details textarea — present only when the template has a
+    // photo-details block linked to this photo. Stored under the
+    // details-block id so multiple photo-details blocks (each linked to
+    // a different photo) stay independent.
+    let detailsBox = '';
+    if(b.detailsBlockId){
+      const dArg = `'${b.detailsBlockId}'`;
+      const txt = (_ovPhotoDetails && _ovPhotoDetails[b.detailsBlockId]) || '';
+      detailsBox = `<textarea data-on-input="ovSetPhotoDetails" data-pass-el="1" data-args="${dArg}"
+        placeholder="${escapeHtml(b.detailsLabel || 'Details / information')}"
+        rows="3"
+        style="width:100%;margin-top:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:6px 8px;box-sizing:border-box;font-family:inherit;resize:vertical;min-height:54px">${escapeHtml(txt)}</textarea>`;
+    }
     return `<div>
       <div style="font-size:10.5px;color:var(--t2);margin-bottom:4px">${escapeHtml(b.label)}</div>
       ${p
@@ -1570,6 +1611,7 @@ function _ovPhotosSectionHtml(){
             <span style="font-size:11px">${placeLabel}</span>
             <input type="file" accept="image/*" style="display:none" data-on-change="ovSetSinglePhotoFromFile" data-pass-el="1" data-args="${idArg}"/>
           </label>`}
+      ${detailsBox}
     </div>`;
   }).join('');
 
@@ -1740,6 +1782,16 @@ function _ovRotateSinglePhotoBy(blockId, dir){
 }
 function ovRotateSinglePhoto(blockId)    { _ovRotateSinglePhotoBy(blockId, +1); }
 function ovRotateSinglePhotoCCW(blockId) { _ovRotateSinglePhotoBy(blockId, -1); }
+
+// Per-photo details textarea handler. Stored on _ovPhotoDetails under
+// the photo-details block's id (not the photo's) so each details card
+// keeps its own text independently. Updated on every keystroke so partial
+// typing survives any redraw of the Photos section (rotate, re-upload).
+// No re-render here — the textarea owns its DOM value.
+function ovSetPhotoDetails(blockId, elInput){
+  if(!_ovPhotoDetails || typeof _ovPhotoDetails !== 'object') _ovPhotoDetails = {};
+  _ovPhotoDetails[blockId] = (elInput && typeof elInput.value === 'string') ? elInput.value : '';
+}
 
 function ovItemsRerender() {
   // Replace just the items-table section in place. The section is the only

@@ -2804,8 +2804,23 @@ function cvRenderBlockContent(block, report, preview){
           // captions don't bump photos between cells out of vertical
           // alignment; suppressed entirely when the inspector turns
           // captions off in the Properties panel.
+          //
+          // In the design canvas (!preview) every strip shows a soft
+          // "Caption" hint in lighter grey so the inspector can see where
+          // captions will land — without the hint the empty strip is
+          // visually identical to nothing, which is why the cell looks
+          // absent in the editor. The hint is dropped in preview / print
+          // so it never reaches a real report.
+          let capContent;
+          if(_cap){
+            capContent = _h(_cap);
+          } else if(!preview){
+            capContent = `<span style="color:#aaa">Caption</span>`;
+          } else {
+            capContent = '';
+          }
           const capStrip = _showCap
-            ? `<div style="margin-top:3px;font-size:${_capSize};line-height:1.25;${_capItalic?'font-style:italic;':''}${_capBold?'font-weight:600;':''}color:${_capColor};text-align:${_capAlign};min-height:10px;padding:0 2px;overflow:hidden">${_h(_cap)}</div>`
+            ? `<div style="margin-top:3px;font-size:${_capSize};line-height:1.25;${_capItalic?'font-style:italic;':''}${_capBold?'font-weight:600;':''}color:${_capColor};text-align:${_capAlign};min-height:10px;padding:0 2px;overflow:hidden">${capContent}</div>`
             : '';
           return `<div style="display:flex;flex-direction:column;height:100%;min-height:0">${inner}${capStrip}</div>`;
         }).join('');

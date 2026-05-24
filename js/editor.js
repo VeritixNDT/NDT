@@ -3139,11 +3139,109 @@ function cvRenderBlockContent(block, report, preview){
         </div>`;
       }
       case 'defect-table':{
-        if(preview && report && report.defects && report.defects.length){
-          const rows = report.defects.map(d=>`<tr><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.type||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd;font-weight:bold;color:${d.sev==='High'?'#991b1b':'#065f46'}">${_h(d.sev||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.loc||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.depth||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.len||'—')}</td><td style="padding:2px 5px;border:0.5px solid #ddd">${_h(d.disp||'—')}</td></tr>`).join('');
-          return `<table style="width:100%;border-collapse:collapse;font-size:7.5px"><thead><tr style="background:#404040;color:#fff"><th scope="col" style="padding:3px 5px;text-align:left">Type</th><th scope="col" style="padding:3px 5px;text-align:left">Sev.</th><th scope="col" style="padding:3px 5px;text-align:left">Location</th><th scope="col" style="padding:3px 5px;text-align:left">Depth</th><th scope="col" style="padding:3px 5px;text-align:left">Length</th><th scope="col" style="padding:3px 5px;text-align:left">Disposition</th></tr></thead><tbody>${rows}</tbody></table>`;
+        // Defect / indication table — mirrors the items-table layout but
+        // filters to inspected items the inspector marked as 'Not
+        // acceptable'. Each rejected item becomes one row:
+        //   • Weld / object   pulled from item.subject
+        //   • Drawing         pulled from item.drawing
+        //   • Defect type     typed per item in the Defects form section
+        //   • Size            typed per item in the Defects form section
+        //
+        // Source items in the same fallback order as items-table — active
+        // report → live _ovItems (form being typed right now) → last saved
+        // report → sample row. Then filter by verdict.
+        let liveItems = null;
+        if(report && Array.isArray(report.items) && report.items.length){
+          liveItems = report.items;
         }
-        return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;font-size:8.5px;gap:3px"><span style="font-size:20px">⊟</span>Defect / indication table</div>`;
+        if(!liveItems && typeof _ovItems !== 'undefined' && Array.isArray(_ovItems)){
+          const live = _ovItems
+            .map(r => {
+              const o = {}; if(!r) return o;
+              Object.keys(r).forEach(k => { if(r[k] && String(r[k]).trim()) o[k] = String(r[k]).trim(); });
+              return o;
+            })
+            .filter(r => Object.keys(r).length);
+          if(live.length) liveItems = live;
+        }
+        if(!liveItems){
+          try {
+            if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
+              const reports = ls(KEYS.reports, []) || [];
+              for(let i = reports.length - 1; i >= 0; i--){
+                if(reports[i] && Array.isArray(reports[i].items) && reports[i].items.length){
+                  liveItems = reports[i].items;
+                  break;
+                }
+              }
+            }
+          } catch(e){}
+        }
+        // Filter to rejected items. In design mode (no real / live items)
+        // synthesise two placeholder rows so the inspector can see the
+        // table shape while editing the template.
+        const rejected = (liveItems || []).filter(it => it && it.verdict === 'Not acceptable');
+        let drawItems = rejected;
+        if(!drawItems.length){
+          if(preview){
+            drawItems = []; // real report with no rejections — print empty body
+          } else {
+            drawItems = [
+              { subject:'[Weld / object]', drawing:'[Drawing]', defectType:'[Defect type]', defectSize:'[Size]' },
+              { subject:'[Weld / object]', drawing:'[Drawing]', defectType:'[Defect type]', defectSize:'[Size]' },
+            ];
+          }
+        }
+        // Column definition. Defaults to 4 columns; per-block colWidths
+        // honoured so the inspector can drag them from the Properties
+        // panel (same mechanism as items-table).
+        const defectCols = [
+          { id:'subject',     label:'Weld / object', width:180 },
+          { id:'drawing',     label:'Drawing no.',   width:120 },
+          { id:'defectType',  label:'Defect type',   width:160 },
+          { id:'defectSize',  label:'Size',          width:120 },
+        ];
+        const widthsArr = (Array.isArray(block.colWidths) && block.colWidths.length === defectCols.length)
+          ? block.colWidths.map(w => (typeof w === 'number' && w > 0) ? w : 130)
+          : defectCols.map(c => c.width || 130);
+        const totalW = widthsArr.reduce((s, w) => s + w, 0);
+        const pcts = widthsArr.map(w => +((w / totalW) * 100).toFixed(4));
+        const sumExceptLast = pcts.slice(0, -1).reduce((s, p) => s + p, 0);
+        pcts[pcts.length - 1] = +(100 - sumExceptLast).toFixed(4);
+        const colgroup = `<colgroup>${pcts.map(p => `<col style="width:${p}%"/>`).join('')}</colgroup>`;
+        const titleFs = _safeFs(block.titleFontSize, '11px');
+        const colFs   = '7.5px';
+        const cellFs  = fs; // _safeFs(block.fontSize, '8.5px') from above
+        const headCells = defectCols.map(c => `<th scope="col" style="padding:3px 5px;text-align:left;font-size:${colFs};font-weight:600;color:#fff;letter-spacing:.02em">${_h(c.label)}</th>`).join('');
+        const lastCol = defectCols.length - 1;
+        const rows = drawItems.map((it, ri) => {
+          const cells = defectCols.map((c, ci) => {
+            const v = (it && it[c.id] != null && it[c.id] !== '') ? String(it[c.id]) : '—';
+            const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
+            const borderBottom = 'border-bottom:0.5px solid #ddd;';
+            return `<td style="height:36px;padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:middle;word-break:break-word;overflow:hidden">${_h(v)}</td>`;
+          }).join('');
+          return `<tr>${cells}</tr>`;
+        }).join('');
+        const tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
+        const barColor = _safeColor(block.barColor, tplSectionColor);
+        const title = _h((block.text || 'Defect / indication table')).toUpperCase();
+        // Empty-body placeholder — preview path renders a soft 'No defects
+        // recorded' message into the rows area so a clean report doesn't
+        // print a stray heading bar with nothing underneath.
+        const emptyMsg = (preview && !drawItems.length)
+          ? `<tr><td colspan="${defectCols.length}" style="padding:14px 8px;text-align:center;font-size:${cellFs};color:#999;font-style:italic">No defects recorded on this report.</td></tr>`
+          : '';
+        return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
+          <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;flex-shrink:0">
+            ${colgroup}
+            <thead style="background:${barColor}">
+              <tr><th colspan="${defectCols.length}" style="padding:4px 8px;color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};text-align:center;letter-spacing:.06em;border-bottom:0.5px solid rgba(255,255,255,.18)">${title}</th></tr>
+              <tr>${headCells}</tr>
+            </thead>
+            <tbody>${rows}${emptyMsg}</tbody>
+          </table>
+        </div>`;
       }
       case 'method-block':{
         // Titled container. The user drops "Method equipment cell" place
@@ -3762,13 +3860,13 @@ function cvRenderProps(id){
       <option value="" ${!block.fontFamily?'selected':''}>Default (Arial)</option>
       ${CV_FONT_LIST.map(f=>`<option value="${f}" ${block.fontFamily===f?'selected':''}>${f}</option>`).join('')}
     </select>`)}
-    ${row(block.key === 'items-table' ? 'Table font size' : 'Font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontSize'">
+    ${row((block.key === 'items-table' || block.key === 'defect-table') ? 'Table font size' : 'Font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','fontSize'">
       ${['6px','7px','7.5px','8px','8.5px','9px','10px','11px','12px','14px','16px','20px'].map(s=>`<option value="${s}" ${block.fontSize===s?'selected':''}>${s}</option>`).join('')}
     </select>`)}
-    ${(block.key === 'items-table' || block.key === 'method-block') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'defect-table') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
-    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details')
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details' || block.key === 'defect-table')
       ? row('Heading colour', colorPick('barColor', block.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040')))
       : ''}
     ${block.key === 'items-table' && typeof RPT_FORM !== 'undefined' && Array.isArray(RPT_FORM.items) ? (() => {

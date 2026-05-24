@@ -2060,6 +2060,10 @@ function ovSaveReport(mode) {
           const v = (row[fid] || '').toString().trim();
           if(v) clean[fid] = v;
         });
+        // defectPhoto isn't trimmed (it's a dataURL, not a text field);
+        // copy it across as-is when present so the defect-table render
+        // branch can show it on the printed report.
+        if(row.defectPhoto) clean.defectPhoto = row.defectPhoto;
       }
       return clean;
     })

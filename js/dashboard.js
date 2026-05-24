@@ -1978,6 +1978,18 @@ function ovSaveReport(mode) {
         if(fid === 'dimensions' && v) v = ovFormatDimensions(v);
         if(v) clean[fid] = v;
       });
+      // Defect detail fields — typed in the Defects section of the form
+      // and persisted on the item itself. Carried only when verdict is
+      // 'Not acceptable' so an inspector who toggles a verdict back to
+      // 'Acceptable' doesn't leave stale defect text against an accepted
+      // item (and so the defect-table render branch's filter pulls in
+      // exactly the rows the inspector intended).
+      if(clean.verdict === 'Not acceptable'){
+        ['defectType','defectSize'].forEach(fid => {
+          const v = (row[fid] || '').toString().trim();
+          if(v) clean[fid] = v;
+        });
+      }
       return clean;
     })
     .filter(row => Object.keys(row).length > 0);

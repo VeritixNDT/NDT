@@ -243,6 +243,18 @@ function _cvBuildCrossRefMap(report){
   return map;
 }
 
+// Column definition for the defect-table block. Render branch + Properties
+// panel column-width editor share this so they stay in sync; per-block
+// block.colWidths overrides drive the visible widths once the inspector
+// has dragged any column. Photo is rendered as a thumbnail cell.
+var CV_DEFECT_COLS = [
+  { id:'subject',      label:'Weld / object', width:170 },
+  { id:'drawing',      label:'Drawing no.',   width:110 },
+  { id:'defectType',   label:'Defect type',   width:150 },
+  { id:'defectSize',   label:'Size',          width:110 },
+  { id:'defectPhoto',  label:'Photo',         width:90  },
+];
+
 var CV_LAYOUT_ITEMS = [
   {key:'section-header', label:'Section header bar',         w:754,h:24},
   {key:'text-block',     label:'Free text / note',           w:360,h:48},
@@ -3192,15 +3204,11 @@ function cvRenderBlockContent(block, report, preview){
             ];
           }
         }
-        // Column definition. Defaults to 4 columns; per-block colWidths
-        // honoured so the inspector can drag them from the Properties
-        // panel (same mechanism as items-table).
-        const defectCols = [
-          { id:'subject',     label:'Weld / object', width:180 },
-          { id:'drawing',     label:'Drawing no.',   width:120 },
-          { id:'defectType',  label:'Defect type',   width:160 },
-          { id:'defectSize',  label:'Size',          width:120 },
-        ];
+        // Columns defined module-scope on CV_DEFECT_COLS so the Properties
+        // panel column-width editor shares the same definition; per-block
+        // colWidths overrides the defaults when the inspector has dragged
+        // any column (same mechanism as items-table).
+        const defectCols = CV_DEFECT_COLS;
         const widthsArr = (Array.isArray(block.colWidths) && block.colWidths.length === defectCols.length)
           ? block.colWidths.map(w => (typeof w === 'number' && w > 0) ? w : 130)
           : defectCols.map(c => c.width || 130);
@@ -3214,12 +3222,31 @@ function cvRenderBlockContent(block, report, preview){
         const cellFs  = fs; // _safeFs(block.fontSize, '8.5px') from above
         const headCells = defectCols.map(c => `<th scope="col" style="padding:3px 5px;text-align:left;font-size:${colFs};font-weight:600;color:#fff;letter-spacing:.02em">${_h(c.label)}</th>`).join('');
         const lastCol = defectCols.length - 1;
+        // Row height is taller than items-table (60 instead of 36) to give
+        // the photo thumbnail enough room to read — at 36 the photo cell
+        // crushes to ~32 px tall, which looks more like a marker than a
+        // photo. 60 px shows recognisable defect imagery without breaking
+        // the table's visual weight against the items table above it.
+        const rowH = 60;
         const rows = drawItems.map((it, ri) => {
           const cells = defectCols.map((c, ci) => {
-            const v = (it && it[c.id] != null && it[c.id] !== '') ? String(it[c.id]) : '—';
             const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
             const borderBottom = 'border-bottom:0.5px solid #ddd;';
-            return `<td style="height:36px;padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:middle;word-break:break-word;overflow:hidden">${_h(v)}</td>`;
+            // Photo column renders the dataURL as a contained thumbnail
+            // (no crop) inside a thin grey frame; empty cells show a clean
+            // blank in preview / print and a dashed placeholder in design
+            // mode so the column is visible while editing.
+            if(c.id === 'defectPhoto'){
+              const dURL = (it && it.defectPhoto) ? String(it.defectPhoto) : '';
+              const inner = dURL
+                ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:3px;box-sizing:border-box"><img src="${dURL}" alt="Defect ${ri+1}" style="max-width:100%;max-height:100%;object-fit:contain;display:block"/></div>`
+                : (preview
+                    ? `<div style="width:100%;height:100%"></div>`
+                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px">📷</div>`);
+              return `<td style="height:${rowH}px;padding:0;${borderRight}${borderBottom}vertical-align:middle">${inner}</td>`;
+            }
+            const v = (it && it[c.id] != null && it[c.id] !== '') ? String(it[c.id]) : '—';
+            return `<td style="height:${rowH}px;padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:middle;word-break:break-word;overflow:hidden">${_h(v)}</td>`;
           }).join('');
           return `<tr>${cells}</tr>`;
         }).join('');

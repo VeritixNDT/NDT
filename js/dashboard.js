@@ -1532,10 +1532,28 @@ function _ovDefectsSectionHtml(){
     body = rejected.map(({ idx, item }) => {
       const subj = (item.subject || '').toString().trim() || `Item ${idx + 1}`;
       const dwg  = (item.drawing || '').toString().trim() || '—';
-      const type = item.defectType || '';
-      const size = item.defectSize || '';
+      const type = item.defectType  || '';
+      const size = item.defectSize  || '';
+      const ph   = item.defectPhoto || '';
       const ctrlStyle = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font)';
-      return `<div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr);gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border)">
+      // Photo tile — same upload+rotate+remove controls as the
+      // single-photo tiles in the Photos section, but compact (76 px
+      // wide, 4:3 aspect) so it sits next to the four input cells
+      // without forcing a separate row. When filled the photo prints
+      // into the new defect-table photo column on the report.
+      const photoTile = ph
+        ? `<div style="position:relative;width:76px;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
+            <img src="${ph}" alt="Defect ${idx+1}" style="width:100%;height:100%;object-fit:contain;display:block"/>
+            <button type="button" data-action="ovDefectsRotatePhotoCCW" data-args="${idx}" title="Rotate 90° counter-clockwise" style="position:absolute;top:2px;right:42px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0">↺</button>
+            <button type="button" data-action="ovDefectsRotatePhoto"    data-args="${idx}" title="Rotate 90° clockwise"         style="position:absolute;top:2px;right:22px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0">↻</button>
+            <button type="button" data-action="ovDefectsClearPhoto"     data-args="${idx}" title="Remove photo"                  style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0">✕</button>
+          </div>`
+        : `<label style="width:76px;aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:2px">
+            <span style="font-size:18px;line-height:1">📷</span>
+            <span style="font-size:9.5px">Photo</span>
+            <input type="file" accept="image/*" style="display:none" data-on-change="ovDefectsSetPhoto" data-pass-el="1" data-args="${idx}"/>
+          </label>`;
+      return `<div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,0.9fr) minmax(0,1.3fr) minmax(0,0.9fr) auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="min-width:0">
           <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Weld / object</div>
           <div style="font-size:12.5px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subj)}">${escapeHtml(subj)}</div>
@@ -1555,6 +1573,10 @@ function _ovDefectsSectionHtml(){
           <input type="text" value="${escapeHtml(size)}" placeholder="e.g. 12 mm × 0.5 mm"
             data-on-input="ovDefectsCapture" data-args="${idx},'defectSize'" data-pass-el="1"
             style="${ctrlStyle}"/>
+        </div>
+        <div style="min-width:0">
+          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Photo</div>
+          ${photoTile}
         </div>
       </div>`;
     }).join('');
@@ -1582,6 +1604,55 @@ function ovDefectsCapture(rowIdx, fieldId, target){
   if(!Array.isArray(_ovItems) || !_ovItems[rowIdx]) return;
   _ovItems[rowIdx][fieldId] = target.value;
 }
+
+// Defect-row photo handlers. Lives on item.defectPhoto so storage stays
+// on the item itself (one source of truth — save, frozen snapshot,
+// defect-table render all read from items). 2 MB cap, canvas-rotate-
+// and-bake so the chosen orientation is permanent and prints correctly.
+function ovDefectsSetPhoto(rowIdx, elInput){
+  if(!Array.isArray(_ovItems) || !_ovItems[rowIdx]) return;
+  const file = elInput && elInput.files && elInput.files[0];
+  if(!file) return;
+  if(file.size > 2 * 1024 * 1024){
+    toast(t('toast.photo_too_large','Photo must be under 2 MB.'), 'error');
+    elInput.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    _ovItems[rowIdx].defectPhoto = e.target.result;
+    ovRenderDefectsSection();
+  };
+  reader.readAsDataURL(file);
+}
+
+function ovDefectsClearPhoto(rowIdx){
+  if(!Array.isArray(_ovItems) || !_ovItems[rowIdx]) return;
+  _ovItems[rowIdx].defectPhoto = '';
+  ovRenderDefectsSection();
+}
+
+function _ovDefectsRotatePhotoBy(rowIdx, dir){
+  if(!Array.isArray(_ovItems) || !_ovItems[rowIdx] || !_ovItems[rowIdx].defectPhoto) return;
+  const src = _ovItems[rowIdx].defectPhoto;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width  = img.naturalHeight;
+    c.height = img.naturalWidth;
+    const ctx = c.getContext('2d');
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate(dir * Math.PI / 2);
+    ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    const isPng = /^data:image\/png/i.test(src);
+    _ovItems[rowIdx].defectPhoto = isPng ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9);
+    ovRenderDefectsSection();
+  };
+  img.onerror = () => { if(typeof toast === 'function') toast('Could not rotate photo.', 'error'); };
+  img.src = src;
+}
+function ovDefectsRotatePhoto(rowIdx)    { _ovDefectsRotatePhotoBy(rowIdx, +1); }
+function ovDefectsRotatePhotoCCW(rowIdx) { _ovDefectsRotatePhotoBy(rowIdx, -1); }
 
 // ── Photo page (optional, per-report) ──────────────────────────────────
 // Builds the "Photos" section that sits between Result and the save bar.

@@ -3917,6 +3917,30 @@ function cvRenderProps(id){
         <button data-action="_wCvResetItemsColWidths" data-args="'${id}'" style="margin-top:4px;background:none;border:1px dashed var(--border);color:var(--t3);font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer">Reset to defaults</button>
       </div>`);
     })() : ''}
+    ${block.key === 'defect-table' && typeof CV_DEFECT_COLS !== 'undefined' && Array.isArray(CV_DEFECT_COLS) ? (() => {
+      // Defect-table column-widths editor — mirrors the items-table
+      // version above, driven by CV_DEFECT_COLS so the column list stays
+      // in sync with the render branch.
+      const defCols = CV_DEFECT_COLS;
+      const widths = (Array.isArray(block.colWidths) && block.colWidths.length === defCols.length)
+        ? block.colWidths
+        : defCols.map(c => c.width || 130);
+      return row('Column widths (relative)', `<div style="display:flex;flex-direction:column;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
+        ${defCols.map((c, i) => `<div style="display:flex;align-items:center;gap:6px">
+          <span style="flex:1;font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.label)}</span>
+          <div style="display:flex;align-items:stretch;width:80px;flex-shrink:0">
+            <input type="number" min="20" max="500" step="5" value="${widths[i]}" data-colw="${i}" class="cv-num"
+              data-on-change="_wCvSetDefectColWidth" data-on-input="_wCvSetDefectColWidth" data-pass-el="1" data-args="'${id}',${i}"
+              style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono)"/>
+            <div style="display:flex;flex-direction:column;width:22px;flex-shrink:0">
+              <button type="button" class="cv-step" data-action="cvStepDefectColWidth" data-args="'${id}',${i},1"  style="border-radius:0 4px 0 0;border-bottom:none">▲</button>
+              <button type="button" class="cv-step" data-action="cvStepDefectColWidth" data-args="'${id}',${i},-1" style="border-radius:0 0 4px 0">▼</button>
+            </div>
+          </div>
+        </div>`).join('')}
+        <button data-action="_wCvResetDefectColWidths" data-args="'${id}'" style="margin-top:4px;background:none;border:1px dashed var(--border);color:var(--t3);font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer">Reset to defaults</button>
+      </div>`);
+    })() : ''}
     ${block.key === 'photo-page' ? row('Photo grid (rows × cols)', `<div style="display:flex;gap:6px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
       <input type="number" min="1" max="10" value="${parseInt(block.photoRows,10)||2}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoRows'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Rows"/>
       <span style="font-size:11px;color:var(--t3)">×</span>
@@ -4374,6 +4398,38 @@ function cvStepColWidth(id, colIdx, delta){
 // because cvUpdateBlock skips that for props starting with 'c' (intended
 // for active text-typing — colWidths inherits the skip incorrectly).
 function _wCvResetItemsColWidths(id) {
+  cvUpdateBlock(id, 'colWidths', null);
+  cvRenderProps(id);
+}
+
+// Defect-table column-width handlers — mirror the items-table trio
+// (above) but reference CV_DEFECT_COLS so the column list stays
+// authoritative across both tables.
+function _wCvSetDefectColWidth(id, colIdx, el) {
+  const block = cvBlocks.find(b => b.id === id);
+  if(!block || typeof CV_DEFECT_COLS === 'undefined' || !Array.isArray(CV_DEFECT_COLS)) return;
+  const cols = CV_DEFECT_COLS;
+  const widths = (Array.isArray(block.colWidths) && block.colWidths.length === cols.length)
+    ? block.colWidths.slice()
+    : cols.map(c => c.width || 130);
+  const v = +el.value;
+  widths[colIdx] = (Number.isFinite(v) && v >= 20) ? v : (cols[colIdx]?.width || 130);
+  cvUpdateBlock(id, 'colWidths', widths);
+}
+function cvStepDefectColWidth(id, colIdx, delta){
+  const block = cvBlocks.find(b => b.id === id);
+  if(!block || typeof CV_DEFECT_COLS === 'undefined' || !Array.isArray(CV_DEFECT_COLS)) return;
+  const cols = CV_DEFECT_COLS;
+  const widths = (Array.isArray(block.colWidths) && block.colWidths.length === cols.length)
+    ? block.colWidths.slice()
+    : cols.map(c => c.width || 130);
+  const cur = (+widths[colIdx]) || (cols[colIdx]?.width || 130);
+  widths[colIdx] = Math.min(500, Math.max(20, cur + (+delta || 0) * 5));
+  cvUpdateBlock(id, 'colWidths', widths);
+  const inp = document.querySelector('#cv-props-body [data-colw="' + colIdx + '"]');
+  if(inp) inp.value = widths[colIdx];
+}
+function _wCvResetDefectColWidths(id) {
   cvUpdateBlock(id, 'colWidths', null);
   cvRenderProps(id);
 }

@@ -1180,6 +1180,12 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Section 6: Result
   html += ovFormSection('Result & sign-off', RPT_FORM.result.filter(f => !omit.has(f.id)), methodId, merged, m);
 
+  // Defects — auto-built from inspected items the inspector marked as
+  // 'Not acceptable'. Renders one Type + Size row per rejected item.
+  // Lives between Result and Photos because defects logically belong to
+  // the inspection result, while photos are supporting evidence.
+  html += _ovDefectsSectionHtml();
+
   // Photos — optional photo-page section. Renders an "+ Add photo page"
   // button when none has been added, or 6 photo slots + a "Remove photo
   // page" Cancel when the inspector has opted in.
@@ -1436,6 +1442,11 @@ function ovItemsCapture(rowIdx, fieldId, target) {
   if(fieldId === 'verdict') {
     const ctrlStyle = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font)';
     target.style.cssText = `${ctrlStyle};${ovVerdictStyle(target.value)}`;
+    // Defects section is driven by which items are 'Not acceptable' —
+    // a verdict change adds or removes a defect row, so refresh the
+    // section in place. The Type / Size inputs inside it own their DOM
+    // value so any partial typing in the OTHER rows survives the redraw.
+    if(typeof ovRenderDefectsSection === 'function') ovRenderDefectsSection();
   }
   // Auto-grow — as soon as the user puts a value into the last row, add
   // a fresh empty row underneath so they can keep filling out items
@@ -1494,6 +1505,82 @@ function ovItemsRemoveRow(idx) {
   if(_ovItems.length <= 1) return;
   _ovItems.splice(idx, 1);
   ovItemsRerender();
+}
+
+// ── Defects (auto-built from rejected items) ───────────────────────────
+// Lists every _ovItems entry with verdict==='Not acceptable' and gives
+// the inspector two inputs per row: Defect type + Size. Weld/object +
+// drawing are echoed read-only so the row reads like a mini-row of the
+// defect-table that will print on the report. Values land on the item
+// itself (item.defectType / item.defectSize) so save persistence and
+// the defect-table render share one source of truth.
+function _ovDefectsSectionHtml(){
+  const rejected = [];
+  if(Array.isArray(_ovItems)){
+    _ovItems.forEach((it, ri) => {
+      if(it && it.verdict === 'Not acceptable'){
+        rejected.push({ idx: ri, item: it });
+      }
+    });
+  }
+  let body = '';
+  if(!rejected.length){
+    body = `<div style="padding:10px 14px;background:rgba(62,207,142,.06);border:1px dashed rgba(62,207,142,.25);border-radius:4px;font-size:11.5px;color:var(--t2);line-height:1.45">
+      Mark an item as <strong>Not acceptable</strong> in the examination details table above and it will appear here for defect details.
+    </div>`;
+  } else {
+    body = rejected.map(({ idx, item }) => {
+      const subj = (item.subject || '').toString().trim() || `Item ${idx + 1}`;
+      const dwg  = (item.drawing || '').toString().trim() || '—';
+      const type = item.defectType || '';
+      const size = item.defectSize || '';
+      const ctrlStyle = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font)';
+      return `<div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr);gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="min-width:0">
+          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Weld / object</div>
+          <div style="font-size:12.5px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subj)}">${escapeHtml(subj)}</div>
+        </div>
+        <div style="min-width:0">
+          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Drawing</div>
+          <div style="font-size:12.5px;color:var(--t1);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(dwg)}">${escapeHtml(dwg)}</div>
+        </div>
+        <div style="min-width:0">
+          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Defect type</div>
+          <input type="text" value="${escapeHtml(type)}" placeholder="Crack, porosity, slag, lack of fusion…"
+            data-on-input="ovDefectsCapture" data-args="${idx},'defectType'" data-pass-el="1"
+            style="${ctrlStyle}"/>
+        </div>
+        <div style="min-width:0">
+          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Size</div>
+          <input type="text" value="${escapeHtml(size)}" placeholder="e.g. 12 mm × 0.5 mm"
+            data-on-input="ovDefectsCapture" data-args="${idx},'defectSize'" data-pass-el="1"
+            style="${ctrlStyle}"/>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return `<div class="sc" id="ov-nr-defects-section" style="margin:0 14px 14px">
+    <div class="sc-head" style="display:flex;align-items:center">
+      <span class="sc-title">Defects / indications</span>
+      <span style="flex:1"></span>
+      ${rejected.length ? `<span style="font-size:11px;color:var(--t3)">${rejected.length} item${rejected.length===1?'':'s'} flagged</span>` : ''}
+    </div>
+    <div class="sc-body" style="padding:6px 16px 14px">${body}</div>
+  </div>`;
+}
+
+function ovRenderDefectsSection(){
+  const cur = document.getElementById('ov-nr-defects-section');
+  if(!cur) return;
+  cur.outerHTML = _ovDefectsSectionHtml();
+}
+
+// Capture handler for the Defects inputs. Stores onto the same item the
+// Examination details row already owns, so save / round-trip / defect-
+// table render all read from one place (item.defectType / defectSize).
+function ovDefectsCapture(rowIdx, fieldId, target){
+  if(!Array.isArray(_ovItems) || !_ovItems[rowIdx]) return;
+  _ovItems[rowIdx][fieldId] = target.value;
 }
 
 // ── Photo page (optional, per-report) ──────────────────────────────────

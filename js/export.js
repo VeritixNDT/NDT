@@ -192,13 +192,18 @@ function cvBuildPrintHTML(report){
     // page (it exists only to receive overflow rows).
     cvPages.forEach((p, i) => { if(i !== _contIdx) _plan.push({ page: p, slice: null }); });
   }
-  // Photo page is opt-in per report — skip any page whose only body
-  // block is a photo-page when the report has no photos attached.
-  const _hasPhotos = !!(report && Array.isArray(report.photos) && report.photos.some(p => !!p));
+  // Photo page / drawing page are opt-in per report — skip any page
+  // whose only body block is one of those when the corresponding array
+  // on the report is empty.
+  const _hasPhotos   = !!(report && Array.isArray(report.photos)   && report.photos.some(p => !!p));
+  const _hasDrawings = !!(report && Array.isArray(report.drawings) && report.drawings.some(p => !!p));
   const _planFinal = _plan.filter(entry => {
-    if(_hasPhotos) return true;
     const _body = (entry.page.blocks || []).filter(b => b.zone !== 'header' && b.zone !== 'footer');
-    return !(_body.length === 1 && _body[0].key === 'photo-page');
+    if(_body.length === 1){
+      if(_body[0].key === 'photo-page'   && !_hasPhotos)   return false;
+      if(_body[0].key === 'drawing-page' && !_hasDrawings) return false;
+    }
+    return true;
   });
   _cvPrintTotal = _planFinal.length;
 

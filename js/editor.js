@@ -262,6 +262,7 @@ var CV_LAYOUT_ITEMS = [
   {key:'logo-co',        label:'Company logo',               w:140,h:56},
   {key:'photo-box',      label:'Photo placeholder',          w:220,h:150},
   {key:'photo-page',     label:'Photo page (6 slots)',       w:754,h:980},
+  {key:'drawing-page',   label:'Drawing page',                w:754,h:980},
   {key:'single-photo',   label:'Single image (photo / screenshot)', w:360,h:280},
   {key:'single-drawing', label:'Single drawing',             w:360,h:280},
   {key:'photo-details',  label:'Photo details / information', w:360,h:80},
@@ -1546,7 +1547,7 @@ function cvInitCanvas(){
 function cvGetLayoutIcon(k){
   if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
-    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','single-drawing':'📐','photo-details':'📝','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
+    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','single-drawing':'📐','drawing-page':'📐','photo-details':'📝','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
     'accent-bar':'█'}[k]||'□';
 }
 
@@ -2770,24 +2771,39 @@ function cvRenderBlockContent(block, report, preview){
       }
       case 'photo-box':
         return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ccc;':''}color:#bbb;gap:4px"><span style="font-size:24px">📷</span><span style="font-size:8.5px">${_h(block.text||'Photo placeholder')}</span></div>`;
+      case 'drawing-page':
       case 'photo-page':{
+        // Both blocks share the same grid + slot render. Drawing-page is
+        // semantically a 'photo-page for drawings' — pulls from
+        // report.drawings / _ovDrawings instead of report.photos /
+        // _ovPhotos, defaults to a 1×1 grid (drawings are usually
+        // singular and large), uses the 📐 placeholder.
+        const _isDrawing = block.key === 'drawing-page';
         // Heading bar matches the rest of the report's section headers:
         // a filled bar in the template section colour (or a per-block
         // barColor override from the Properties picker), with white,
         // uppercase, bold, letter-spaced text on top.
         const _tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
         const _headColor = _safeColor(block.barColor, _tplSectionColor);
-        // Grid: rows × photos-per-row, configurable per block via the
-        // Properties panel (defaults 2 × 3 = 6 slots). Clamped to a
-        // sensible range so a typo can't blow the layout out.
-        const _rows = Math.max(1, Math.min(10, parseInt(block.photoRows, 10) || 2));
-        const _cols = Math.max(1, Math.min(6,  parseInt(block.photoCols, 10) || 3));
+        // Grid: rows × items-per-row, configurable per block via the
+        // Properties panel. Photo-page defaults to 2 × 3 (six slots);
+        // drawing-page defaults to 1 × 1 (one large slot — drawings are
+        // usually singular). Clamped to a sensible range so a typo can't
+        // blow the layout out.
+        const _rows = Math.max(1, Math.min(10, parseInt(block.photoRows, 10) || (_isDrawing ? 1 : 2)));
+        const _cols = Math.max(1, Math.min(6,  parseInt(block.photoCols, 10) || (_isDrawing ? 1 : 3)));
         const _slots = _rows * _cols;
-        // Fill slots from report.photos when present; otherwise show a
-        // placeholder so the template still reads as a photo page in the
-        // design canvas.
-        const _photos   = (report && Array.isArray(report.photos))        ? report.photos        : [];
-        const _captions = (report && Array.isArray(report.photoCaptions)) ? report.photoCaptions : [];
+        // Fill slots from the appropriate per-report source — photos for
+        // photo-page, drawings for drawing-page. Captions only apply to
+        // photo-page (drawing-page renders a single image grid; details
+        // for drawings live in dedicated photo-details / single-drawing
+        // blocks if needed).
+        const _photos   = _isDrawing
+          ? ((report && Array.isArray(report.drawings)) ? report.drawings : [])
+          : ((report && Array.isArray(report.photos))   ? report.photos   : []);
+        const _captions = _isDrawing
+          ? []
+          : ((report && Array.isArray(report.photoCaptions)) ? report.photoCaptions : []);
         // Caption styling is configurable per block via the Properties
         // panel. Defaults match the original drop (7.5 px italic centred
         // mid-grey) so existing reports look identical until the inspector
@@ -2824,9 +2840,11 @@ function cvRenderBlockContent(block, report, preview){
             // both display in full. The slot stays a uniform grid cell so the page
             // keeps its geometric rhythm; any unused space inside the slot reads as
             // a thin matted frame (4 px white pad inside the grey border).
-            inner = `<div style="flex:1;border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-height:0"><img src="${_p}" alt="Photo ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`;
+            inner = `<div style="flex:1;border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;padding:4px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-height:0"><img src="${_p}" alt="${_isDrawing?'Drawing':'Photo'} ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/></div>`;
           } else {
-            inner = `<div style="flex:1;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa;min-height:0"><span style="font-size:18px">📷</span>Photo ${i+1}</div>`;
+            const _placeIco = _isDrawing ? '📐' : '📷';
+            const _placeLbl = _isDrawing ? 'Drawing' : 'Photo';
+            inner = `<div style="flex:1;border:1px dashed #bbb;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#bbb;font-size:7px;gap:4px;background:#fafafa;min-height:0"><span style="font-size:18px">${_placeIco}</span>${_placeLbl} ${i+1}</div>`;
           }
           // Caption strip vs styled card. In card mode the cell gets a
           // section-header bar + body sized to detailsCardHeight; the
@@ -2860,7 +2878,7 @@ function cvRenderBlockContent(block, report, preview){
         }).join('');
         return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
           <div style="padding:4px 8px;background:${_headColor};text-align:center">
-            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Photo attachments')}</span>
+            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text || (_isDrawing ? 'Drawings' : 'Photo attachments'))}</span>
           </div>
           <div style="flex:1;padding:8px;display:grid;grid-template-columns:repeat(${_cols},1fr);grid-template-rows:repeat(${_rows},1fr);gap:8px">${boxes}</div>
         </div>`;
@@ -3894,7 +3912,7 @@ function cvRenderProps(id){
     ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'defect-table') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
-    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details' || block.key === 'defect-table')
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'drawing-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details' || block.key === 'defect-table')
       ? row('Heading colour', colorPick('barColor', block.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040')))
       : ''}
     ${block.key === 'items-table' && typeof RPT_FORM !== 'undefined' && Array.isArray(RPT_FORM.items) ? (() => {
@@ -3946,10 +3964,10 @@ function cvRenderProps(id){
       <input type="number" min="32" max="120" step="2" value="${parseInt(block.rowHeight,10)||60}" data-on-change="_wCvUpdateBlockNumber" data-on-input="_wCvUpdateBlockNumber" data-pass-el="1" data-args="'${id}','rowHeight'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Row height in px"/>
       <span style="font-size:11px;color:var(--t3)">px</span>
     </div>`) : ''}
-    ${block.key === 'photo-page' ? row('Photo grid (rows × cols)', `<div style="display:flex;gap:6px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
-      <input type="number" min="1" max="10" value="${parseInt(block.photoRows,10)||2}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoRows'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Rows"/>
+    ${(block.key === 'photo-page' || block.key === 'drawing-page') ? row((block.key === 'drawing-page' ? 'Drawing grid' : 'Photo grid') + ' (rows × cols)', `<div style="display:flex;gap:6px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
+      <input type="number" min="1" max="10" value="${parseInt(block.photoRows,10) || (block.key === 'drawing-page' ? 1 : 2)}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoRows'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Rows"/>
       <span style="font-size:11px;color:var(--t3)">×</span>
-      <input type="number" min="1" max="6"  value="${parseInt(block.photoCols,10)||3}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoCols'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Photos per row"/>
+      <input type="number" min="1" max="6"  value="${parseInt(block.photoCols,10) || (block.key === 'drawing-page' ? 1 : 3)}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoCols'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Items per row"/>
     </div>`) : ''}
     ${block.key === 'photo-details' ? (() => {
       // Link to a single-photo block on the canvas. The print pipeline

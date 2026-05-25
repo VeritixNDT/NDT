@@ -2163,7 +2163,7 @@ function ovSaveReport(mode) {
       // item (and so the defect-table render branch's filter pulls in
       // exactly the rows the inspector intended).
       if(clean.verdict === 'Not acceptable'){
-        ['defectType','defectSize'].forEach(fid => {
+        ['defectLocation','defectType','defectSize'].forEach(fid => {
           const v = (row[fid] || '').toString().trim();
           if(v) clean[fid] = v;
         });

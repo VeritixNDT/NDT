@@ -1809,24 +1809,18 @@ function _ovPhotosSectionHtml(){
       ${drawingsEnabled ? `<button class="btn btn-sm" data-action="ovRemoveDrawingPage" title="Cancel — remove the drawing page from this report">Remove drawing page</button>` : ''}
     </div>
     <div class="sc-body" style="padding:14px 16px;display:flex;flex-direction:column;gap:14px">
-      ${(!enabled && !drawingsEnabled) ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-sm" data-action="ovAddPhotoPage"   style="padding:8px 14px;font-size:12px">+ Add photo page</button>
-        <button class="btn btn-sm" data-action="ovAddDrawingPage" style="padding:8px 14px;font-size:12px">+ Add drawing page</button>
-      </div>` : ''}
       ${enabled
         ? `<div>
             <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Photo page</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${slots}</div>
           </div>`
-        : ''}
-      ${(!enabled && drawingsEnabled) ? `<div><button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button></div>` : ''}
+        : `<div><button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button></div>`}
       ${drawingsEnabled
         ? `<div>
             <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Drawing page</div>
             <div style="display:grid;grid-template-columns:repeat(${Math.min(3, _ovDrawings.length)},1fr);gap:10px">${drawingSlots}</div>
           </div>`
-        : ''}
-      ${(enabled && !drawingsEnabled) ? `<div><button class="btn btn-sm" data-action="ovAddDrawingPage" style="padding:8px 14px;font-size:12px">+ Add drawing page</button></div>` : ''}
+        : `<div><button class="btn btn-sm" data-action="ovAddDrawingPage" style="padding:8px 14px;font-size:12px">+ Add drawing page</button></div>`}
       ${singleBlocks.length > 0
         ? `<div>
             <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${

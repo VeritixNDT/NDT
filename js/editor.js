@@ -3222,12 +3222,13 @@ function cvRenderBlockContent(block, report, preview){
         const cellFs  = fs; // _safeFs(block.fontSize, '8.5px') from above
         const headCells = defectCols.map(c => `<th scope="col" style="padding:3px 5px;text-align:left;font-size:${colFs};font-weight:600;color:#fff;letter-spacing:.02em">${_h(c.label)}</th>`).join('');
         const lastCol = defectCols.length - 1;
-        // Row height is taller than items-table (60 instead of 36) to give
-        // the photo thumbnail enough room to read — at 36 the photo cell
-        // crushes to ~32 px tall, which looks more like a marker than a
-        // photo. 60 px shows recognisable defect imagery without breaking
-        // the table's visual weight against the items table above it.
-        const rowH = 60;
+        // Row height is configurable per block via the Properties panel
+        // (block.rowHeight). Default 60 px gives the photo thumbnail enough
+        // room to read — at 36 the photo cell crushes to ~32 px tall, which
+        // looks more like a marker than a photo. Inspectors with longer
+        // defect descriptions can raise it; tighter layouts can lower it.
+        // Bounded 32–120 so a typo can't blow the layout out.
+        const rowH = Math.max(32, Math.min(120, parseInt(block.rowHeight, 10) || 60));
         const rows = drawItems.map((it, ri) => {
           const cells = defectCols.map((c, ci) => {
             const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
@@ -3941,6 +3942,10 @@ function cvRenderProps(id){
         <button data-action="_wCvResetDefectColWidths" data-args="'${id}'" style="margin-top:4px;background:none;border:1px dashed var(--border);color:var(--t3);font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer">Reset to defaults</button>
       </div>`);
     })() : ''}
+    ${block.key === 'defect-table' ? row('Row height', `<div style="display:flex;gap:6px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
+      <input type="number" min="32" max="120" step="2" value="${parseInt(block.rowHeight,10)||60}" data-on-change="_wCvUpdateBlockNumber" data-on-input="_wCvUpdateBlockNumber" data-pass-el="1" data-args="'${id}','rowHeight'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Row height in px"/>
+      <span style="font-size:11px;color:var(--t3)">px</span>
+    </div>`) : ''}
     ${block.key === 'photo-page' ? row('Photo grid (rows × cols)', `<div style="display:flex;gap:6px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
       <input type="number" min="1" max="10" value="${parseInt(block.photoRows,10)||2}" data-on-change="_wCvUpdateBlockValue" data-on-input="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','photoRows'" class="cv-num" style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono);text-align:center" title="Rows"/>
       <span style="font-size:11px;color:var(--t3)">×</span>

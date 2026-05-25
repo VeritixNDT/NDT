@@ -11,6 +11,11 @@ var _ovItems = [{}];
 // holding base64 image data or null for an empty slot. Length 0 = page
 // not added; length > 0 = page added, slots possibly empty.
 var _ovPhotos = [];
+// Per-report drawings array — parallel to _ovPhotos but for the
+// drawing-page block. Empty = drawing page not opted in; populated =
+// inspector has clicked '+ Add drawing page' and the array carries N
+// slots (default 1) of dataURL-or-null.
+var _ovDrawings = [];
 // Optional per-photo caption typed by the inspector under each slot —
 // parallel to _ovPhotos (same index = same slot). Empty string when no
 // caption was typed; persisted to report.photoCaptions on save (only
@@ -1127,6 +1132,7 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Photo page — preserve any photos already on the (sourceReport when
   // revising) report. Empty array = no photo page added yet.
   _ovPhotos = (sourceReport && Array.isArray(sourceReport.photos)) ? sourceReport.photos.slice() : [];
+  _ovDrawings = (sourceReport && Array.isArray(sourceReport.drawings)) ? sourceReport.drawings.slice() : [];
   _ovPhotoCaptions = (sourceReport && Array.isArray(sourceReport.photoCaptions)) ? sourceReport.photoCaptions.slice() : [];
   _ovSinglePhotos = (sourceReport && sourceReport.singlePhotos && typeof sourceReport.singlePhotos === 'object')
     ? Object.assign({}, sourceReport.singlePhotos)
@@ -1772,20 +1778,55 @@ function _ovPhotosSectionHtml(){
     </div>`;
   }).join('');
 
-  // Section is shown whenever there's anything to offer: either the photo
-  // page can be added/edited, or the template has at least one single-photo
-  // block. If neither applies the section is still rendered with just the
-  // "+ Add photo page" button — same as before.
+  // Drawing-page tiles — parallel mechanism to the photo-page slots but
+  // for drawings. _ovDrawings.length === 0 means the inspector hasn't
+  // opted in yet; > 0 means the drawing page is added and the slots are
+  // ready to upload to. Defaults to a single slot (most reports carry
+  // one drawing); inspector can opt out via the Remove button.
+  const drawingsEnabled = Array.isArray(_ovDrawings) && _ovDrawings.length > 0;
+  const drawingSlots = drawingsEnabled ? _ovDrawings.map((d, i) => d
+    ? `<div style="position:relative;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
+        <img src="${d}" alt="Drawing ${i+1}" style="width:100%;height:100%;object-fit:contain;display:block"/>
+        <button type="button" data-action="ovRotateDrawingCCW" data-args="${i}" title="Rotate 90° counter-clockwise" style="position:absolute;top:4px;right:56px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↺</button>
+        <button type="button" data-action="ovRotateDrawing"    data-args="${i}" title="Rotate 90° clockwise"         style="position:absolute;top:4px;right:30px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↻</button>
+        <button type="button" data-action="ovClearDrawing"     data-args="${i}" title="Remove drawing"                style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
+      </div>`
+    : `<label style="aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">
+        <span style="font-size:24px">📐</span>
+        <span style="font-size:11px">Choose drawing ${i+1}</span>
+        <input type="file" accept="image/*" style="display:none" data-on-change="ovSetDrawingFromFile" data-pass-el="1" data-args="${i}"/>
+      </label>`
+  ).join('') : '';
+
+  // Section is shown whenever there's anything to offer: photo page,
+  // drawing page, or single-image template blocks. The Add buttons sit
+  // side-by-side so the inspector picks whichever they need.
   return `<div class="sc" id="ov-nr-photos-section" style="margin:0 14px 14px">
     <div class="sc-head" style="display:flex;align-items:center">
-      <span class="sc-title">Photos</span>
+      <span class="sc-title">Photos &amp; drawings</span>
       <span style="flex:1"></span>
-      ${enabled ? `<button class="btn btn-sm" data-action="ovRemovePhotoPage" title="Cancel — remove the photo page from this report">Remove photo page</button>` : ''}
+      ${enabled ? `<button class="btn btn-sm" data-action="ovRemovePhotoPage" title="Cancel — remove the photo page from this report" style="margin-right:6px">Remove photo page</button>` : ''}
+      ${drawingsEnabled ? `<button class="btn btn-sm" data-action="ovRemoveDrawingPage" title="Cancel — remove the drawing page from this report">Remove drawing page</button>` : ''}
     </div>
     <div class="sc-body" style="padding:14px 16px;display:flex;flex-direction:column;gap:14px">
+      ${(!enabled && !drawingsEnabled) ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" data-action="ovAddPhotoPage"   style="padding:8px 14px;font-size:12px">+ Add photo page</button>
+        <button class="btn btn-sm" data-action="ovAddDrawingPage" style="padding:8px 14px;font-size:12px">+ Add drawing page</button>
+      </div>` : ''}
       ${enabled
-        ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${slots}</div>`
-        : `<div><button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button></div>`}
+        ? `<div>
+            <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Photo page</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${slots}</div>
+          </div>`
+        : ''}
+      ${(!enabled && drawingsEnabled) ? `<div><button class="btn btn-sm" data-action="ovAddPhotoPage" style="padding:8px 14px;font-size:12px">+ Add photo page</button></div>` : ''}
+      ${drawingsEnabled
+        ? `<div>
+            <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Drawing page</div>
+            <div style="display:grid;grid-template-columns:repeat(${Math.min(3, _ovDrawings.length)},1fr);gap:10px">${drawingSlots}</div>
+          </div>`
+        : ''}
+      ${(enabled && !drawingsEnabled) ? `<div><button class="btn btn-sm" data-action="ovAddDrawingPage" style="padding:8px 14px;font-size:12px">+ Add drawing page</button></div>` : ''}
       ${singleBlocks.length > 0
         ? `<div>
             <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${
@@ -1848,6 +1889,67 @@ function ovClearPhoto(i){
   if(Array.isArray(_ovPhotoCaptions)) _ovPhotoCaptions[i] = '';
   ovRenderPhotosSection();
 }
+
+// ── Drawing page (optional, per-report) ────────────────────────────────
+// Parallel to _ovPhotos but for drawings — fills the drawing-page block
+// in the template. Single slot by default (drawings are usually one per
+// report); inspector can ovAddDrawingPage again to widen or just leave
+// as-is. Storage and rotate-bake reuse the same canvas mechanism as the
+// photo handlers above so all rotated images print in the chosen
+// orientation regardless of source.
+function ovAddDrawingPage(){
+  _ovDrawings = new Array(1).fill(null);
+  ovRenderPhotosSection();
+}
+async function ovRemoveDrawingPage(){
+  if(Array.isArray(_ovDrawings) && _ovDrawings.some(d => !!d) && typeof vxConfirm === 'function'){
+    const ok = await vxConfirm({ message: 'Remove the drawing page from this report? Any drawings you added will be cleared.', okLabel: 'Remove', cancelLabel: 'Keep', danger: true });
+    if(!ok) return;
+  }
+  _ovDrawings = [];
+  ovRenderPhotosSection();
+}
+function ovSetDrawingFromFile(i, el){
+  const file = el && el.files && el.files[0];
+  if(!file) return;
+  if(file.size > 2 * 1024 * 1024){
+    toast(t('toast.photo_too_large','Photo must be under 2 MB.'), 'error');
+    el.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    if(!Array.isArray(_ovDrawings) || _ovDrawings.length === 0) _ovDrawings = new Array(1).fill(null);
+    _ovDrawings[i] = e.target.result;
+    ovRenderPhotosSection();
+  };
+  reader.readAsDataURL(file);
+}
+function ovClearDrawing(i){
+  if(Array.isArray(_ovDrawings)) _ovDrawings[i] = null;
+  ovRenderPhotosSection();
+}
+function _ovRotateDrawingBy(i, dir){
+  if(!Array.isArray(_ovDrawings) || !_ovDrawings[i]) return;
+  const src = _ovDrawings[i];
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width  = img.naturalHeight;
+    c.height = img.naturalWidth;
+    const ctx = c.getContext('2d');
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate(dir * Math.PI / 2);
+    ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    const isPng = /^data:image\/png/i.test(src);
+    _ovDrawings[i] = isPng ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9);
+    ovRenderPhotosSection();
+  };
+  img.onerror = () => { if(typeof toast === 'function') toast('Could not rotate drawing.', 'error'); };
+  img.src = src;
+}
+function ovRotateDrawing(i)    { _ovRotateDrawingBy(i, +1); }
+function ovRotateDrawingCCW(i) { _ovRotateDrawingBy(i, -1); }
 
 // Caption typed below a photo slot in the new-report form. Stored in
 // _ovPhotoCaptions[i] mirroring _ovPhotos[i]. Updated on every keystroke
@@ -2090,6 +2192,12 @@ function ovSaveReport(mode) {
     if(Array.isArray(_ovPhotoCaptions) && _ovPhotoCaptions.some((c, i) => !!_ovPhotos[i] && (c || '').trim())){
       report.photoCaptions = _ovPhotos.map((p, i) => (p && _ovPhotoCaptions[i]) ? String(_ovPhotoCaptions[i]) : '');
     }
+  }
+  // Drawing page — parallel persistence path. Only attached when at least
+  // one slot carries a drawing so reports that opted in but uploaded
+  // nothing don't bloat the save (and print pipeline drops the page).
+  if(Array.isArray(_ovDrawings) && _ovDrawings.length && _ovDrawings.some(d => !!d)){
+    report.drawings = _ovDrawings.map(d => d || null);
   }
   // Single-photo blocks — copy any filled slots over (keyed by block.id so
   // each single-photo block in the template lands on its own render branch).

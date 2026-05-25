@@ -243,16 +243,28 @@ function _cvBuildCrossRefMap(report){
   return map;
 }
 
-// Column definition for the defect-table block. Render branch + Properties
-// panel column-width editor share this so they stay in sync; per-block
-// block.colWidths overrides drive the visible widths once the inspector
-// has dragged any column. Photo is rendered as a thumbnail cell.
+// Column definition for the defect-table block. Each defect now renders
+// as a two-row card: three data columns (each with a top + bottom field)
+// plus a photo column that spans both rows. The render branch + the
+// Properties-panel column-width editor share this so they stay in sync;
+// per-block block.colWidths overrides drive the visible widths once the
+// inspector has dragged any column.
+//
+//   ┌──────────┬──────────┬──────────┬───────┐
+//   │ Subject  │ Drawing  │ Material │ Photo │
+//   ├──────────┼──────────┼──────────┤ (2×)  │
+//   │ Location │ Type     │ Size     │       │
+//   └──────────┴──────────┴──────────┴───────┘
+//
+// Column 1's data cells: subject (top) + defectLocation (bottom)
+// Column 2's data cells: drawing (top) + defectType     (bottom)
+// Column 3's data cells: material (top) + defectSize    (bottom)
+// Column 4:              defectPhoto rowspan 2
 var CV_DEFECT_COLS = [
-  { id:'subject',      label:'Weld / object', width:170 },
-  { id:'drawing',      label:'Drawing no.',   width:110 },
-  { id:'defectType',   label:'Defect type',   width:150 },
-  { id:'defectSize',   label:'Size',          width:110 },
-  { id:'defectPhoto',  label:'Photo',         width:90  },
+  { label:'Col 1 (Weld / Location)', width:160, topId:'subject',  topLabel:'Weld / object', botId:'defectLocation', botLabel:'Location' },
+  { label:'Col 2 (Drawing / Type)',  width:140, topId:'drawing',  topLabel:'Drawing no.',   botId:'defectType',     botLabel:'Defect type' },
+  { label:'Col 3 (Material / Size)', width:140, topId:'material', topLabel:'Material',      botId:'defectSize',     botLabel:'Size' },
+  { label:'Photo (full height)',     width:120, photoId:'defectPhoto' },
 ];
 
 var CV_LAYOUT_ITEMS = [
@@ -3217,8 +3229,8 @@ function cvRenderBlockContent(block, report, preview){
             drawItems = []; // real report with no rejections — print empty body
           } else {
             drawItems = [
-              { subject:'[Weld / object]', drawing:'[Drawing]', defectType:'[Defect type]', defectSize:'[Size]' },
-              { subject:'[Weld / object]', drawing:'[Drawing]', defectType:'[Defect type]', defectSize:'[Size]' },
+              { subject:'[Weld / object]', drawing:'[Drawing]', material:'[Material]', defectLocation:'[Location]', defectType:'[Defect type]', defectSize:'[Size]' },
+              { subject:'[Weld / object]', drawing:'[Drawing]', material:'[Material]', defectLocation:'[Location]', defectType:'[Defect type]', defectSize:'[Size]' },
             ];
           }
         }
@@ -3238,7 +3250,15 @@ function cvRenderBlockContent(block, report, preview){
         const titleFs = _safeFs(block.titleFontSize, '11px');
         const colFs   = '7.5px';
         const cellFs  = fs; // _safeFs(block.fontSize, '8.5px') from above
-        const headCells = defectCols.map(c => `<th scope="col" style="padding:3px 5px;text-align:left;font-size:${colFs};font-weight:600;color:#fff;letter-spacing:.02em">${_h(c.label)}</th>`).join('');
+        // Column header row labels each data column by its top field
+        // (e.g. 'Weld / object'); the bottom field's label is shown
+        // inline above the value in the body cell so the inspector
+        // doesn't need two stacked header rows to know what each value
+        // is. Photo column gets a plain 'Photo'.
+        const headCells = defectCols.map(c => {
+          const label = c.photoId ? 'Photo' : (c.topLabel || c.label);
+          return `<th scope="col" style="padding:3px 5px;text-align:left;font-size:${colFs};font-weight:600;color:#fff;letter-spacing:.02em">${_h(label)}</th>`;
+        }).join('');
         const lastCol = defectCols.length - 1;
         // Row height is configurable per block via the Properties panel
         // (block.rowHeight). Default 60 px gives the photo thumbnail enough
@@ -3246,28 +3266,49 @@ function cvRenderBlockContent(block, report, preview){
         // looks more like a marker than a photo. Inspectors with longer
         // defect descriptions can raise it; tighter layouts can lower it.
         // Bounded 32–120 so a typo can't blow the layout out.
-        const rowH = Math.max(32, Math.min(120, parseInt(block.rowHeight, 10) || 60));
+        // Each defect now spans TWO table rows (a card with 3 data
+        // columns + photo column rowspanning both). rowHeight is the
+        // height of each half-row, so the full card is 2 × halfRowH —
+        // the photo cell fills that doubled height (2 × halfRowH).
+        const halfRowH = Math.max(32, Math.min(120, parseInt(block.rowHeight, 10) || 60));
+        const _val = (it, fid) => (it && it[fid] != null && it[fid] !== '') ? String(it[fid]) : '—';
+        // Small grey field label above each value — mirrors the place-
+        // card 7 px label used elsewhere in the report so the defect
+        // card visually belongs with the rest of the report typography.
+        const _lblStyle = 'font-size:6.5px;color:#888;line-height:1.2;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:1px;font-weight:600';
         const rows = drawItems.map((it, ri) => {
-          const cells = defectCols.map((c, ci) => {
-            const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
-            const borderBottom = 'border-bottom:0.5px solid #ddd;';
-            // Photo column renders the dataURL as a contained thumbnail
-            // (no crop) inside a thin grey frame; empty cells show a clean
-            // blank in preview / print and a dashed placeholder in design
-            // mode so the column is visible while editing.
-            if(c.id === 'defectPhoto'){
+          // Top row of this defect card — each data column's topId
+          // value (subject / drawing / material) plus the photo cell
+          // rowspanning both rows on the right.
+          const topCells = defectCols.map((c, ci) => {
+            const borderRight = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
+            if(c.photoId){
               const dURL = (it && it.defectPhoto) ? String(it.defectPhoto) : '';
               const inner = dURL
                 ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:3px;box-sizing:border-box"><img src="${dURL}" alt="Defect ${ri+1}" style="max-width:100%;max-height:100%;object-fit:contain;display:block"/></div>`
                 : (preview
                     ? `<div style="width:100%;height:100%"></div>`
                     : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px">📷</div>`);
-              return `<td style="height:${rowH}px;padding:0;${borderRight}${borderBottom}vertical-align:middle">${inner}</td>`;
+              return `<td rowspan="2" style="height:${halfRowH*2}px;padding:0;${borderRight}border-bottom:0.5px solid #ddd;vertical-align:middle">${inner}</td>`;
             }
-            const v = (it && it[c.id] != null && it[c.id] !== '') ? String(it[c.id]) : '—';
-            return `<td style="height:${rowH}px;padding:2px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.3;vertical-align:middle;word-break:break-word;overflow:hidden">${_h(v)}</td>`;
+            const v = _val(it, c.topId);
+            return `<td style="height:${halfRowH}px;padding:3px 5px;${borderRight}font-size:${cellFs};line-height:1.25;vertical-align:top;word-break:break-word;overflow:hidden">
+              <span style="${_lblStyle}">${_h(c.topLabel || '')}</span>${_h(v)}
+            </td>`;
           }).join('');
-          return `<tr>${cells}</tr>`;
+          // Bottom row — each data column's botId value (location /
+          // defectType / defectSize). Photo cell is already emitted with
+          // rowspan from the top row, so it's skipped here.
+          const botCells = defectCols.map((c, ci) => {
+            if(c.photoId) return '';
+            const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
+            const borderBottom = 'border-bottom:0.5px solid #ddd;';
+            const v = _val(it, c.botId);
+            return `<td style="height:${halfRowH}px;padding:3px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.25;vertical-align:top;word-break:break-word;overflow:hidden">
+              <span style="${_lblStyle}">${_h(c.botLabel || '')}</span>${_h(v)}
+            </td>`;
+          }).join('');
+          return `<tr>${topCells}</tr><tr>${botCells}</tr>`;
         }).join('');
         const tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
         const barColor = _safeColor(block.barColor, tplSectionColor);

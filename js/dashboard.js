@@ -1664,20 +1664,23 @@ function ovDefectsRotatePhotoCCW(rowIdx) { _ovDefectsRotatePhotoBy(rowIdx, -1); 
 // Six slots fixed for now (matches the photo-page block's default 2 × 3
 // grid); base64 image data is stored on _ovPhotos and saved onto the
 // report so the photo-page block can render them.
-// Find every single-photo / single-drawing block in the active method's
-// saved template. Returns [{id, label, kind, detailsBlockId?}, …] in
-// document order across all pages. Used by the Photos section to surface
-// one upload tile per block — each tile stores its image under the
-// block's id, so multiple blocks of either kind can coexist without
-// aliasing. kind drives the placeholder icon shown when the slot is
-// empty; detailsBlockId, when set, surfaces a textarea below the tile
-// for typed information that will print under the photo on the report.
+// Find every single-photo block in the active method's saved template.
+// Returns [{id, label, detailsBlockId?}, …] in document order across all
+// pages. Used by the 'Single images from this template' subsection to
+// surface one upload tile per block — each tile stores its image under
+// the block's id, so multiple single-photo blocks coexist without
+// aliasing. detailsBlockId, when set, surfaces a textarea below the
+// tile for typed information that will print under the photo on the
+// report. single-drawing blocks are intentionally excluded — the
+// drawing-page block + '+ Add drawing page' button is the single
+// drawing-upload path in the form now.
 function _ovSinglePhotoBlocks(){
   if(!_ovMethod || typeof CV_METHOD_TPL_PREFIX === 'undefined' || typeof ls !== 'function') return [];
   try {
     const tpl = ls(CV_METHOD_TPL_PREFIX + _ovMethod, null);
     if(!tpl || !Array.isArray(tpl.pages)) return [];
-    // First pass — gather all single-photo / single-drawing entries.
+    // First pass — gather single-photo entries (single-drawing is
+    // deliberately not surfaced here).
     const out = [];
     const byId = {};
     tpl.pages.forEach(pg => {
@@ -1685,10 +1688,7 @@ function _ovSinglePhotoBlocks(){
       pg.blocks.forEach(b => {
         if(!b || !b.id) return;
         if(b.key === 'single-photo'){
-          const e = { id: b.id, kind: 'photo',   label: (b.text || 'Single image').toString() };
-          out.push(e); byId[b.id] = e;
-        } else if(b.key === 'single-drawing'){
-          const e = { id: b.id, kind: 'drawing', label: (b.text || 'Single drawing').toString() };
+          const e = { id: b.id, kind: 'photo', label: (b.text || 'Single image').toString() };
           out.push(e); byId[b.id] = e;
         }
       });
@@ -1818,16 +1818,12 @@ function _ovPhotosSectionHtml(){
       ${drawingsEnabled
         ? `<div>
             <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Drawing page</div>
-            <div style="display:grid;grid-template-columns:repeat(${Math.min(3, _ovDrawings.length)},1fr);gap:10px">${drawingSlots}</div>
+            <div style="display:grid;grid-template-columns:repeat(${Math.min(3, Math.max(2, _ovDrawings.length))},1fr);gap:10px;max-width:50%">${drawingSlots}</div>
           </div>`
         : `<div><button class="btn btn-sm" data-action="ovAddDrawingPage" style="padding:8px 14px;font-size:12px">+ Add drawing page</button></div>`}
       ${singleBlocks.length > 0
         ? `<div>
-            <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${
-              singleBlocks.every(b => b.kind === 'drawing') ? 'Drawings from this template'
-              : singleBlocks.every(b => b.kind === 'photo') ? 'Single images from this template'
-              : 'Images & drawings from this template'
-            }</div>
+            <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Single images from this template</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${singleSlots}</div>
           </div>`
         : ''}

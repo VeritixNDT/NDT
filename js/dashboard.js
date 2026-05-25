@@ -1535,53 +1535,69 @@ function _ovDefectsSectionHtml(){
     </div>`;
   } else {
     body = rejected.map(({ idx, item }) => {
-      const subj = (item.subject || '').toString().trim() || `Item ${idx + 1}`;
-      const dwg  = (item.drawing || '').toString().trim() || '—';
+      const subj = (item.subject  || '').toString().trim() || `Item ${idx + 1}`;
+      const dwg  = (item.drawing  || '').toString().trim() || '—';
+      const mat  = (item.material || '').toString().trim() || '—';
+      const loc  = item.defectLocation || '';
       const type = item.defectType  || '';
       const size = item.defectSize  || '';
       const ph   = item.defectPhoto || '';
       const ctrlStyle = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font)';
-      // Photo tile — same upload+rotate+remove controls as the
-      // single-photo tiles in the Photos section, but compact (76 px
-      // wide, 4:3 aspect) so it sits next to the four input cells
-      // without forcing a separate row. When filled the photo prints
-      // into the new defect-table photo column on the report.
+      // Photo tile — rowspans both rows of the card so it sits at
+      // double the height of the data cells, matching the printed
+      // defect-table layout exactly. CSS grid handles the rowspan via
+      // grid-row:span 2.
       const photoTile = ph
-        ? `<div style="position:relative;width:76px;aspect-ratio:4/3;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
+        ? `<div style="position:relative;width:100%;height:100%;min-height:118px;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg2)">
             <img src="${ph}" alt="Defect ${idx+1}" style="width:100%;height:100%;object-fit:contain;display:block"/>
-            <button type="button" data-action="ovDefectsRotatePhotoCCW" data-args="${idx}" title="Rotate 90° counter-clockwise" style="position:absolute;top:2px;right:42px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0">↺</button>
-            <button type="button" data-action="ovDefectsRotatePhoto"    data-args="${idx}" title="Rotate 90° clockwise"         style="position:absolute;top:2px;right:22px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0">↻</button>
-            <button type="button" data-action="ovDefectsClearPhoto"     data-args="${idx}" title="Remove photo"                  style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:10px;line-height:1;padding:0">✕</button>
+            <button type="button" data-action="ovDefectsRotatePhotoCCW" data-args="${idx}" title="Rotate 90° counter-clockwise" style="position:absolute;top:4px;right:56px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↺</button>
+            <button type="button" data-action="ovDefectsRotatePhoto"    data-args="${idx}" title="Rotate 90° clockwise"         style="position:absolute;top:4px;right:30px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">↻</button>
+            <button type="button" data-action="ovDefectsClearPhoto"     data-args="${idx}" title="Remove photo"                  style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
           </div>`
-        : `<label style="width:76px;aspect-ratio:4/3;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:2px">
-            <span style="font-size:18px;line-height:1">📷</span>
-            <span style="font-size:9.5px">Photo</span>
+        : `<label style="width:100%;height:100%;min-height:118px;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);color:var(--t3);gap:4px">
+            <span style="font-size:28px;line-height:1">📷</span>
+            <span style="font-size:11px">Defect photo</span>
             <input type="file" accept="image/*" style="display:none" data-on-change="ovDefectsSetPhoto" data-pass-el="1" data-args="${idx}"/>
           </label>`;
-      return `<div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,0.9fr) minmax(0,1.3fr) minmax(0,0.9fr) auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border)">
+      // Card layout mirrors the printed defect-table: 4 grid columns,
+      // 2 grid rows, photo at column 4 rowspanning both rows.
+      const lblStyle = 'font-size:10.5px;color:var(--t3);margin-bottom:3px';
+      const valStyle = 'font-size:12.5px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      const monoStyle = 'font-size:12.5px;color:var(--t1);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      return `<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 160px;grid-template-rows:auto auto;gap:8px 12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)">
         <div style="min-width:0">
-          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Weld / object</div>
-          <div style="font-size:12.5px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subj)}">${escapeHtml(subj)}</div>
+          <div style="${lblStyle}">Weld / object</div>
+          <div style="${valStyle}" title="${escapeHtml(subj)}">${escapeHtml(subj)}</div>
         </div>
         <div style="min-width:0">
-          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Drawing</div>
-          <div style="font-size:12.5px;color:var(--t1);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(dwg)}">${escapeHtml(dwg)}</div>
+          <div style="${lblStyle}">Drawing</div>
+          <div style="${monoStyle}" title="${escapeHtml(dwg)}">${escapeHtml(dwg)}</div>
         </div>
         <div style="min-width:0">
-          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Defect type</div>
+          <div style="${lblStyle}">Material</div>
+          <div style="${valStyle}" title="${escapeHtml(mat)}">${escapeHtml(mat)}</div>
+        </div>
+        <div style="grid-column:4;grid-row:1 / span 2;display:flex;flex-direction:column">
+          <div style="${lblStyle}">Photo</div>
+          ${photoTile}
+        </div>
+        <div style="min-width:0">
+          <div style="${lblStyle}">Location</div>
+          <input type="text" value="${escapeHtml(loc)}" placeholder="Toe, root, cap, HAZ…"
+            data-on-input="ovDefectsCapture" data-args="${idx},'defectLocation'" data-pass-el="1"
+            style="${ctrlStyle}"/>
+        </div>
+        <div style="min-width:0">
+          <div style="${lblStyle}">Defect type</div>
           <input type="text" value="${escapeHtml(type)}" placeholder="Crack, porosity, slag, lack of fusion…"
             data-on-input="ovDefectsCapture" data-args="${idx},'defectType'" data-pass-el="1"
             style="${ctrlStyle}"/>
         </div>
         <div style="min-width:0">
-          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Size</div>
+          <div style="${lblStyle}">Size</div>
           <input type="text" value="${escapeHtml(size)}" placeholder="e.g. 12 mm × 0.5 mm"
             data-on-input="ovDefectsCapture" data-args="${idx},'defectSize'" data-pass-el="1"
             style="${ctrlStyle}"/>
-        </div>
-        <div style="min-width:0">
-          <div style="font-size:10.5px;color:var(--t3);margin-bottom:3px">Photo</div>
-          ${photoTile}
         </div>
       </div>`;
     }).join('');

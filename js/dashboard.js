@@ -1164,6 +1164,11 @@ function ovNewReport(methodId, btn, sourceReport) {
   html += ovFormSection('Report revision & client information', clientShared, methodId, merged, m);
   // Examination details (expandable table + remarks)
   html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
+  // Defects / indications — sits right after the items table so the
+  // inspector captures defect details next to the verdicts that drive
+  // them, instead of scrolling to the bottom of the form. Auto-built
+  // from items with verdict==='Not acceptable'; empty when none.
+  html += _ovDefectsSectionHtml();
   // Examination criteria
   html += ovFormSection('Examination criteria', examShared, methodId, merged, m);
   // Section 5: Equipment & parameters. Includes TPL_FIELDS._common
@@ -1179,12 +1184,6 @@ function ovNewReport(methodId, btn, sourceReport) {
   if(specific.length) html += ovFormSection(`${m.id} — Equipment & parameters`, specific, methodId, merged, m);
   // Section 6: Result
   html += ovFormSection('Result & sign-off', RPT_FORM.result.filter(f => !omit.has(f.id)), methodId, merged, m);
-
-  // Defects — auto-built from inspected items the inspector marked as
-  // 'Not acceptable'. Renders one Type + Size row per rejected item.
-  // Lives between Result and Photos because defects logically belong to
-  // the inspection result, while photos are supporting evidence.
-  html += _ovDefectsSectionHtml();
 
   // Photos — optional photo-page section. Renders an "+ Add photo page"
   // button when none has been added, or 6 photo slots + a "Remove photo

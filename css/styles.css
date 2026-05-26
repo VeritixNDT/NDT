@@ -1649,8 +1649,8 @@
 .snav-org-block.is-empty { display: none; } /* JS adds this when no logo + no name */
 .snav-org-logo {
   width: 100%;
-  max-width: 140px;
-  height: 56px;
+  max-width: 180px;
+  height: 78px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1663,13 +1663,24 @@
   display: block;
 }
 .snav-org-logo.is-placeholder { opacity: 0.55; }
+/* Invert filter — applied to the sidebar logo only when the user has
+   ticked 'Invert on dark backgrounds' in Settings → Company AND the
+   current theme is the dark default. Uses invert + hue-rotate so colour
+   logos at least keep their hue identity (still imperfect for full-
+   colour logos, but acceptable for the common dark-monochrome case the
+   toggle was added for). Light-theme bodies skip the filter so a logo
+   that's correct on white background stays unmodified there. */
+body:not([data-theme="light"]) .snav-org-logo.is-inverted img {
+  filter: invert(1) hue-rotate(180deg);
+}
 .snav-org-name {
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--t1);
-  line-height: 1.25;
+  line-height: 1.3;
   word-break: break-word;
+  letter-spacing: -0.01em;
 }
 .snav-org-name:empty { display: none; }
 
@@ -1680,7 +1691,7 @@
   margin: 4px 6px;
 }
 [data-sidebar-collapsed="true"] .snav-org-logo {
-  height: 36px;
+  height: 40px;
 }
 [data-sidebar-collapsed="true"] .snav-org-name { display: none; }
 

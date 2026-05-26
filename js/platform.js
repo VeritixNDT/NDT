@@ -2539,10 +2539,12 @@ function _vxUpdateOrgPill(name){
  *  quietly per element. */
 function vxRenderSidebarOrgBlock(name){
   var logoSrc = '';
+  var invertOnDark = false;
   try {
     if(typeof ls === 'function' && typeof KEYS !== 'undefined' && KEYS && KEYS.company){
       var c = ls(KEYS.company, {}) || {};
       if(c && c.logo) logoSrc = String(c.logo);
+      invertOnDark = !!(c && c.logoInvertOnDark);
     }
   } catch(e){}
   var nameStr = (name && String(name).trim()) ? String(name).trim() : '';
@@ -2553,6 +2555,10 @@ function vxRenderSidebarOrgBlock(name){
     var logoEl = block.querySelector('.snav-org-logo');
     var nameEl = block.querySelector('.snav-org-name');
     if(logoEl){
+      // is-inverted class drives the CSS filter; only applies in dark
+      // themes via the body:not([data-theme="light"]) guard in styles.css.
+      if(invertOnDark) logoEl.classList.add('is-inverted');
+      else             logoEl.classList.remove('is-inverted');
       if(logoSrc){
         logoEl.innerHTML = '<img src="' + logoSrc.replace(/"/g, '&quot;') + '" alt="Company logo"/>';
         logoEl.classList.remove('is-placeholder');

@@ -899,7 +899,12 @@
                   <button class="btn btn-sm" id="logo-upload-btn" type="button" data-i18n="co.logo.upload">⬆ Upload image</button>
                   <button class="btn btn-sm" id="logo-crop-btn" type="button" style="display:none" data-i18n="co.logo.crop">✂ Crop / adjust</button>
                   <button class="btn btn-sm btn-danger" id="logo-remove-btn" type="button" style="display:none" data-i18n="co.logo.remove">✕ Remove</button>
-                  <div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5" data-i18n="co.logo.hint" data-i18n-html="1">
+                  <label style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);font-size:12px;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="logo-invert-dark" data-on-change="logoSetInvertOnDark" data-pass-el="1"/>
+                    <span>Invert on dark backgrounds</span>
+                  </label>
+                  <div style="font-size:10.5px;color:var(--t3);line-height:1.4;margin-top:-2px">For dark / black logos that disappear when the UI switches to dark mode. Doesn't affect the printed PDF.</div>
+                  <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5" data-i18n="co.logo.hint" data-i18n-html="1">
                     After uploading, click <strong style="color:var(--t2)">Crop / adjust</strong> to trim and position.
                   </div>
                 </div>

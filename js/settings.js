@@ -904,6 +904,25 @@ function logoLoadSaved() {
     }
   }
   if(saved) logoSetPreview(saved);
+  // Restore the invert-on-dark checkbox state from the company entity.
+  // The sidebar render reads the same flag, so the two stay in sync the
+  // moment Company settings finish loading.
+  const invertCb = document.getElementById('logo-invert-dark');
+  if(invertCb) invertCb.checked = !!company.logoInvertOnDark;
+}
+
+// Persist the 'Invert on dark backgrounds' checkbox state. Stored on the
+// company entity (so it travels through the same sync path the logo
+// itself uses) and pushed straight to the sidebar so the change is
+// visible without a reload.
+function logoSetInvertOnDark(el){
+  const company = ls(KEYS.company, {});
+  company.logoInvertOnDark = !!(el && el.checked);
+  lss(KEYS.company, company);
+  if(typeof vxRenderSidebarOrgBlock === 'function'){
+    const pillName = document.getElementById('vx-org-pill-name');
+    vxRenderSidebarOrgBlock(pillName ? pillName.textContent : '');
+  }
 }
 
 // Direct event wiring for the logo flow. Bypasses the central dispatcher

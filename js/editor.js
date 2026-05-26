@@ -3405,9 +3405,16 @@ function cvRenderBlockContent(block, report, preview){
     // value at preview AND in design mode (their value is always available).
     if(def.smartLink === 'company'){
       const co2 = _cvCompany();
-      // Company logo: live image render
+      // Company logo: live image render. The 'Use on reports' checkbox
+      // in Settings → Company → Logo area picks the slot (primary vs
+      // dark); falls back to the other slot when the chosen one is
+      // empty so the report always prints whatever's available.
       if(def.isLogo){
-        const src = _safeUrl(co2.logo);
+        const _useReports = (co2 && co2.logoUseOnReports === 'dark') ? 'dark' : 'primary';
+        const _pri = co2.logo || '';
+        const _drk = co2.logoDark || '';
+        const _chosen = (_useReports === 'dark') ? (_drk || _pri) : (_pri || _drk);
+        const src = _safeUrl(_chosen);
         if(src){
           return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:4px"><img src="${src}" style="max-height:100%;max-width:100%;object-fit:contain"/></div>`;
         }

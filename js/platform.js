@@ -2541,28 +2541,33 @@ function vxRenderSidebarOrgBlock(name){
   var primarySrc = '';
   var darkSrc = '';
   var invertOnDark = false;
+  var useOnSystem = 'primary';
   try {
     if(typeof ls === 'function' && typeof KEYS !== 'undefined' && KEYS && KEYS.company){
       var c = ls(KEYS.company, {}) || {};
       if(c && c.logo)     primarySrc = String(c.logo);
       if(c && c.logoDark) darkSrc    = String(c.logoDark);
       invertOnDark = !!(c && c.logoInvertOnDark);
+      if(c && c.logoUseOnSystem === 'dark') useOnSystem = 'dark';
     }
   } catch(e){}
-  // Pick the right source for the current theme. data-theme lives on
-  // <html>; absence = the dark default, 'light' = the light theme,
-  // 'field' = the field theme (which is also dark-styled — uses the
-  // dark logo where the inspector has uploaded one).
+  // The 'Use on system' checkbox in Settings → Company → Logo area is
+  // the source of truth for which slot fills the sidebar. Falls back to
+  // the other slot when the chosen one is empty, then applies the
+  // invert filter on dark themes if the inspector ticked the toggle
+  // (so the legacy invert-only path still works for users who haven't
+  // uploaded a dark variant).
   var isLightTheme = (document.documentElement.getAttribute('data-theme') === 'light');
-  var logoSrc;
+  var logoSrc = '';
   var useInvert = false;
-  if(isLightTheme){
-    logoSrc = primarySrc;
-  } else if(darkSrc){
+  if(useOnSystem === 'dark' && darkSrc){
     logoSrc = darkSrc;
   } else {
-    logoSrc = primarySrc;
-    useInvert = invertOnDark; // fallback path — invert when no dark slot set
+    logoSrc = primarySrc || darkSrc;
+    // Invert only when actually showing the primary on a dark theme
+    // (a dark slot already gets the light/white variant; inverting it
+    // would un-do what the user uploaded). Light theme never inverts.
+    if(!isLightTheme && invertOnDark && logoSrc === primarySrc) useInvert = true;
   }
   var nameStr = (name && String(name).trim()) ? String(name).trim() : '';
   var blockIds = ['ov-snav-org-block', 'stg-snav-org-block'];

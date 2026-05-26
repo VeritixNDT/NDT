@@ -899,7 +899,18 @@
                   <button class="btn btn-sm" id="logo-upload-btn" type="button" data-i18n="co.logo.upload">⬆ Upload image</button>
                   <button class="btn btn-sm" id="logo-crop-btn" type="button" style="display:none" data-i18n="co.logo.crop">✂ Crop / adjust</button>
                   <button class="btn btn-sm btn-danger" id="logo-remove-btn" type="button" style="display:none" data-i18n="co.logo.remove">✕ Remove</button>
-                  <label style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);font-size:12px;color:var(--t2);cursor:pointer">
+                  <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg2)">
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Use this logo for</div>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+                      <input type="checkbox" id="logo-use-reports" data-on-change="logoSetUsage" data-pass-el="1" data-args="'primary','reports'"/>
+                      <span>Reports (PDF)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+                      <input type="checkbox" id="logo-use-system" data-on-change="logoSetUsage" data-pass-el="1" data-args="'primary','system'"/>
+                      <span>System (sidebar)</span>
+                    </label>
+                  </div>
+                  <label style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);font-size:12px;color:var(--t2);cursor:pointer">
                     <input type="checkbox" id="logo-invert-dark" data-on-change="logoSetInvertOnDark" data-pass-el="1"/>
                     <span>Invert on dark backgrounds</span>
                   </label>
@@ -926,8 +937,19 @@
                   <input type="file" id="logo-dark-file-inp" accept="image/*" style="display:none"/>
                   <button class="btn btn-sm" id="logo-dark-upload-btn" type="button">⬆ Upload dark logo</button>
                   <button class="btn btn-sm btn-danger" id="logo-dark-remove-btn" type="button" style="display:none">✕ Remove dark logo</button>
+                  <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg2)">
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Use this logo for</div>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+                      <input type="checkbox" id="logo-dark-use-reports" data-on-change="logoSetUsage" data-pass-el="1" data-args="'dark','reports'"/>
+                      <span>Reports (PDF)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+                      <input type="checkbox" id="logo-dark-use-system" data-on-change="logoSetUsage" data-pass-el="1" data-args="'dark','system'"/>
+                      <span>System (sidebar)</span>
+                    </label>
+                  </div>
                   <div style="font-size:10.5px;color:var(--t3);line-height:1.5;margin-top:2px">
-                    A white / light variant of your logo, used in the sidebar when the UI is in dark mode. Falls back to the primary logo when empty.
+                    A white / light variant of your logo. Tick the boxes above to override which slot is used for reports or the sidebar.
                   </div>
                 </div>
 

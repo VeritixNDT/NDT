@@ -909,6 +909,9 @@ function logoLoadSaved() {
   // moment Company settings finish loading.
   const invertCb = document.getElementById('logo-invert-dark');
   if(invertCb) invertCb.checked = !!company.logoInvertOnDark;
+  // Restore the four per-slot usage checkboxes from the saved usage
+  // flags (defaults: both contexts on 'primary').
+  _logoApplyUsageToCheckboxes(company);
   // Pair-load the dark-logo preview so the section's two halves come
   // up with the inspector's saved data at the same time.
   if(typeof logoDarkLoadSaved === 'function') logoDarkLoadSaved();
@@ -926,6 +929,56 @@ function logoSetInvertOnDark(el){
     const pillName = document.getElementById('vx-org-pill-name');
     vxRenderSidebarOrgBlock(pillName ? pillName.textContent : '');
   }
+}
+
+// Per-slot 'Use this logo for {reports,system}' checkboxes.
+// slot = 'primary' | 'dark', context = 'reports' | 'system'.
+// Mutually exclusive within a context — ticking primary's 'reports'
+// auto-unticks dark's 'reports' (and vice versa) so the user always
+// gets one logo per context. State stored on company.logoUseOnReports
+// / .logoUseOnSystem (values: 'primary' | 'dark'); the inverse slot's
+// checkbox is updated in the DOM to match.
+function logoSetUsage(slot, context, el){
+  if(!el || !el.checked) {
+    // Unticking would leave the context with neither slot selected —
+    // force the inverse slot on instead so the context always has a
+    // logo. Keeps the UI from getting into a 'no logo for reports' state.
+    el.checked = true;
+    return;
+  }
+  const company = ls(KEYS.company, {});
+  if(context === 'reports') company.logoUseOnReports = slot;
+  else if(context === 'system') company.logoUseOnSystem = slot;
+  lss(KEYS.company, company);
+  // Update the inverse slot's checkbox so the UI mirrors the new state.
+  const inverseSlot = (slot === 'primary') ? 'dark' : 'primary';
+  const inverseId = (inverseSlot === 'primary')
+    ? ('logo-use-' + context)
+    : ('logo-dark-use-' + context);
+  const inverseCb = document.getElementById(inverseId);
+  if(inverseCb) inverseCb.checked = false;
+  // Refresh consumers.
+  if(typeof vxRenderSidebarOrgBlock === 'function'){
+    const pillName = document.getElementById('vx-org-pill-name');
+    vxRenderSidebarOrgBlock(pillName ? pillName.textContent : '');
+  }
+}
+
+// Helper used by the load paths below to apply the saved usage flags to
+// the 4 checkboxes. Defaults: both contexts use 'primary'.
+function _logoApplyUsageToCheckboxes(company){
+  const onReports = (company && company.logoUseOnReports === 'dark') ? 'dark' : 'primary';
+  const onSystem  = (company && company.logoUseOnSystem  === 'dark') ? 'dark' : 'primary';
+  const map = {
+    'logo-use-reports'      : onReports === 'primary',
+    'logo-dark-use-reports' : onReports === 'dark',
+    'logo-use-system'       : onSystem  === 'primary',
+    'logo-dark-use-system'  : onSystem  === 'dark',
+  };
+  Object.keys(map).forEach(id => {
+    const cb = document.getElementById(id);
+    if(cb) cb.checked = map[id];
+  });
 }
 
 // ── Dark-theme logo variant ────────────────────────────────────────────

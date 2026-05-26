@@ -227,12 +227,14 @@
   <!-- Workspace pill: shows the current Supabase orgs.name. Clickable —
        jumps to Settings → Company where the user can rename it. Hidden
        until vxLoadOrgName populates it (no flash of empty pill on boot). -->
+  <!-- Workspace pill removed — the workspace name now lives at the top of
+       the sidebar (.snav-org-block) under the company logo. Same click
+       target (vxOpenWorkspaceSettings). _vxUpdateOrgPill still runs but
+       no-ops cleanly when this element is absent. -->
   <button class="vx-org-pill" id="vx-org-pill" type="button"
           data-action="vxOpenWorkspaceSettings"
-          title="Workspace — click to rename"
           aria-label="Workspace settings"
-          style="display:none">
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;opacity:.7"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
+          style="display:none" hidden>
     <span id="vx-org-pill-name"></span>
   </button>
 
@@ -359,6 +361,17 @@
     <div class="settings-wrap">
       <!-- Overview sidebar -->
       <nav class="snav" id="ov-snav">
+        <!-- Workspace block — company logo on top, workspace name below.
+             Click anywhere to jump to Settings → Company (same target as
+             the old topbar pill that used to live in the header). Hidden
+             contents are populated by vxRenderSidebarOrgBlock on boot and
+             refreshed whenever the company logo or workspace name changes. -->
+        <button class="snav-org-block" id="ov-snav-org-block" type="button"
+                data-action="vxOpenWorkspaceSettings"
+                aria-label="Workspace — click to open Company settings">
+          <div class="snav-org-logo" id="ov-snav-org-logo"></div>
+          <div class="snav-org-name" id="ov-snav-org-name"></div>
+        </button>
         <button class="snav-collapse-btn" data-action="toggleSidebar" title="Collapse sidebar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>
         <div class="snav-group">
           <div class="snav-label" data-i18n="side.dashboard">Dashboard</div>
@@ -750,7 +763,13 @@
     <div class="settings-wrap">
 
       <!-- Settings sidebar -->
-      <nav class="snav">
+      <nav class="snav" id="stg-snav">
+        <button class="snav-org-block" id="stg-snav-org-block" type="button"
+                data-action="vxOpenWorkspaceSettings"
+                aria-label="Workspace — click to open Company settings">
+          <div class="snav-org-logo" id="stg-snav-org-logo"></div>
+          <div class="snav-org-name" id="stg-snav-org-name"></div>
+        </button>
         <button class="snav-collapse-btn" data-action="toggleSidebar" title="Collapse sidebar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>
         <div class="snav-group">
           <div class="snav-label" data-i18n="side.group_organisation">Organisation</div>

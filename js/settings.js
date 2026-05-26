@@ -861,6 +861,14 @@ function logoSetPreview(dataURL) {
   const removeBtn = el('logo-remove-btn');
   if(cropBtn)   cropBtn.style.display   = dataURL ? '' : 'none';
   if(removeBtn) removeBtn.style.display = dataURL ? '' : 'none';
+  // Refresh the sidebar workspace block so the new logo (or its removal)
+  // shows immediately at the top of the sidebar without waiting for a
+  // page reload. Pass through the live pill name (set by vxLoadOrgName /
+  // _vxUpdateOrgPill) so the workspace name persists across the call.
+  if(typeof vxRenderSidebarOrgBlock === 'function'){
+    const pillName = document.getElementById('vx-org-pill-name');
+    vxRenderSidebarOrgBlock(pillName ? pillName.textContent : '');
+  }
 }
 
 async function logoRemove() {

@@ -2506,20 +2506,88 @@ async function vxLoadOrgName(){
   } catch(e){ console.warn('vx: loadOrgName failed', e); return null; }
 }
 
-/** Update the topbar workspace pill. Pass null/empty to hide it (trial
- *  mode, signed out, no org yet). */
+/** Update the topbar workspace pill (legacy — the pill is now hidden in
+ *  HTML and the workspace name lives in the sidebar block instead, but
+ *  the function survives for any callers that pass through here. Sidebar
+ *  is updated via vxRenderSidebarOrgBlock for the new path.) */
 function _vxUpdateOrgPill(name){
   var pill = document.getElementById('vx-org-pill');
-  if(!pill) return;
-  var label = document.getElementById('vx-org-pill-name');
-  if(name && String(name).trim()){
-    if(label) label.textContent = String(name).trim();
-    pill.style.display = 'inline-flex';
-  } else {
-    if(label) label.textContent = '';
-    pill.style.display = 'none';
+  if(pill){
+    var label = document.getElementById('vx-org-pill-name');
+    if(name && String(name).trim()){
+      if(label) label.textContent = String(name).trim();
+      // Pill itself is hidden via the inline `hidden` attribute now —
+      // updating textContent is harmless and keeps any debug inspection
+      // showing the live workspace name on the (invisible) element.
+    } else {
+      if(label) label.textContent = '';
+    }
+  }
+  // Sidebar block — the actual user-visible workspace identity now.
+  if(typeof vxRenderSidebarOrgBlock === 'function') vxRenderSidebarOrgBlock(name);
+}
+
+/** Render the workspace block at the top of each sidebar — company logo
+ *  on top, workspace name below. Reads the logo straight from the local
+ *  company entity (so it stays in sync with Settings → Company even when
+ *  offline); the name comes from the cloud workspace record and is
+ *  passed in by _vxUpdateOrgPill / vxLoadOrgName.
+ *
+ *  When neither logo nor name is set, hides the whole block via
+ *  .is-empty so the sidebar header stays clean for first-run users.
+ *  Safe to call before the sidebar HTML is in the DOM — bails out
+ *  quietly per element. */
+function vxRenderSidebarOrgBlock(name){
+  var logoSrc = '';
+  try {
+    if(typeof ls === 'function' && typeof KEYS !== 'undefined' && KEYS && KEYS.company){
+      var c = ls(KEYS.company, {}) || {};
+      if(c && c.logo) logoSrc = String(c.logo);
+    }
+  } catch(e){}
+  var nameStr = (name && String(name).trim()) ? String(name).trim() : '';
+  var blockIds = ['ov-snav-org-block', 'stg-snav-org-block'];
+  for(var i = 0; i < blockIds.length; i++){
+    var block = document.getElementById(blockIds[i]);
+    if(!block) continue;
+    var logoEl = block.querySelector('.snav-org-logo');
+    var nameEl = block.querySelector('.snav-org-name');
+    if(logoEl){
+      if(logoSrc){
+        logoEl.innerHTML = '<img src="' + logoSrc.replace(/"/g, '&quot;') + '" alt="Company logo"/>';
+        logoEl.classList.remove('is-placeholder');
+      } else {
+        // Light building-silhouette glyph as the empty-state placeholder
+        // so the block still has visible structure before the user
+        // uploads a logo. Same icon family as the old topbar pill.
+        logoEl.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>';
+        logoEl.classList.add('is-placeholder');
+      }
+    }
+    if(nameEl) nameEl.textContent = nameStr;
+    // Hide the whole block when neither logo nor name is set — keeps the
+    // sidebar header from showing an empty box for first-run / signed-out
+    // users. Reappears as soon as either is set.
+    if(!logoSrc && !nameStr) block.classList.add('is-empty');
+    else                     block.classList.remove('is-empty');
   }
 }
+
+// Listen for cross-tab company changes so the sidebar logo refreshes
+// when the user uploads a new logo in another tab. Storage event fires
+// only in OTHER tabs (not the one that wrote) so the in-tab refresh
+// path is handled by settings.js calling vxRenderSidebarOrgBlock
+// directly after logoSetPreview / logoRemove.
+try {
+  window.addEventListener('storage', function(e){
+    if(!e || !e.key) return;
+    if(typeof KEYS !== 'undefined' && KEYS && e.key === KEYS.company){
+      var pillName = document.getElementById('vx-org-pill-name');
+      var n = pillName ? pillName.textContent : '';
+      vxRenderSidebarOrgBlock(n);
+    }
+  });
+} catch(_e){}
 
 /** Click handler for the topbar workspace pill — navigates to the
  *  Company settings tab where the user can rename their workspace. */

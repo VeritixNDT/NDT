@@ -2538,15 +2538,32 @@ function _vxUpdateOrgPill(name){
  *  Safe to call before the sidebar HTML is in the DOM — bails out
  *  quietly per element. */
 function vxRenderSidebarOrgBlock(name){
-  var logoSrc = '';
+  var primarySrc = '';
+  var darkSrc = '';
   var invertOnDark = false;
   try {
     if(typeof ls === 'function' && typeof KEYS !== 'undefined' && KEYS && KEYS.company){
       var c = ls(KEYS.company, {}) || {};
-      if(c && c.logo) logoSrc = String(c.logo);
+      if(c && c.logo)     primarySrc = String(c.logo);
+      if(c && c.logoDark) darkSrc    = String(c.logoDark);
       invertOnDark = !!(c && c.logoInvertOnDark);
     }
   } catch(e){}
+  // Pick the right source for the current theme. data-theme lives on
+  // <html>; absence = the dark default, 'light' = the light theme,
+  // 'field' = the field theme (which is also dark-styled — uses the
+  // dark logo where the inspector has uploaded one).
+  var isLightTheme = (document.documentElement.getAttribute('data-theme') === 'light');
+  var logoSrc;
+  var useInvert = false;
+  if(isLightTheme){
+    logoSrc = primarySrc;
+  } else if(darkSrc){
+    logoSrc = darkSrc;
+  } else {
+    logoSrc = primarySrc;
+    useInvert = invertOnDark; // fallback path — invert when no dark slot set
+  }
   var nameStr = (name && String(name).trim()) ? String(name).trim() : '';
   var blockIds = ['ov-snav-org-block', 'stg-snav-org-block'];
   for(var i = 0; i < blockIds.length; i++){
@@ -2555,10 +2572,12 @@ function vxRenderSidebarOrgBlock(name){
     var logoEl = block.querySelector('.snav-org-logo');
     var nameEl = block.querySelector('.snav-org-name');
     if(logoEl){
-      // is-inverted class drives the CSS filter; only applies in dark
-      // themes via the body:not([data-theme="light"]) guard in styles.css.
-      if(invertOnDark) logoEl.classList.add('is-inverted');
-      else             logoEl.classList.remove('is-inverted');
+      // is-inverted class drives the CSS filter. We only add it on the
+      // fallback path — when the inspector has a dedicated dark logo,
+      // there's no need to invert (and inverting would make the dark
+      // logo look wrong against the dark sidebar).
+      if(useInvert) logoEl.classList.add('is-inverted');
+      else          logoEl.classList.remove('is-inverted');
       if(logoSrc){
         logoEl.innerHTML = '<img src="' + logoSrc.replace(/"/g, '&quot;') + '" alt="Company logo"/>';
         logoEl.classList.remove('is-placeholder');
@@ -2593,6 +2612,24 @@ try {
       vxRenderSidebarOrgBlock(n);
     }
   });
+} catch(_e){}
+
+// Theme-switch reactivity. apApplyTheme writes data-theme onto <html>
+// when the user picks a non-dark theme (and removes it for dark). We
+// observe that attribute so the sidebar swaps its logo source between
+// the primary (light) and dark variants the moment Appearance settings
+// flips themes — no reload, no re-render of the whole sidebar.
+try {
+  var _themeObserver = new MutationObserver(function(muts){
+    for(var i = 0; i < muts.length; i++){
+      if(muts[i].attributeName === 'data-theme'){
+        var pillName = document.getElementById('vx-org-pill-name');
+        vxRenderSidebarOrgBlock(pillName ? pillName.textContent : '');
+        return;
+      }
+    }
+  });
+  _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 } catch(_e){}
 
 /** Click handler for the topbar workspace pill — navigates to the

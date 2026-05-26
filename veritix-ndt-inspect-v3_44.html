@@ -903,9 +903,31 @@
                     <input type="checkbox" id="logo-invert-dark" data-on-change="logoSetInvertOnDark" data-pass-el="1"/>
                     <span>Invert on dark backgrounds</span>
                   </label>
-                  <div style="font-size:10.5px;color:var(--t3);line-height:1.4;margin-top:-2px">For dark / black logos that disappear when the UI switches to dark mode. Doesn't affect the printed PDF.</div>
+                  <div style="font-size:10.5px;color:var(--t3);line-height:1.4;margin-top:-2px">Fallback for dark / black monochrome logos when no dark-theme variant is uploaded below. Doesn't affect the printed PDF.</div>
                   <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5" data-i18n="co.logo.hint" data-i18n-html="1">
                     After uploading, click <strong style="color:var(--t2)">Crop / adjust</strong> to trim and position.
+                  </div>
+                </div>
+              </div>
+              <!-- Dark-theme logo (optional). Used by the sidebar when the
+                   UI is in dark mode and this slot is set; otherwise the
+                   primary logo above is used (optionally with the invert
+                   filter via the checkbox). PDFs always use the primary. -->
+              <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px dashed var(--border)">
+                <div id="logo-dark-drop-zone" class="logo-drop-zone" style="background:#1f2228">
+                  <img id="logo-dark-preview-img" src="" alt="" style="display:none;max-width:100%;max-height:100%;object-fit:contain;border-radius:3px"/>
+                  <div id="logo-dark-drop-hint">
+                    <div style="font-size:24px;margin-bottom:6px;opacity:.45">🌙</div>
+                    <div style="font-size:12px;color:#cbd2da;font-weight:500">Dark-theme logo</div>
+                    <div style="font-size:11px;color:#8a93a0;margin-top:3px">Optional · used in dark UI only</div>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;min-width:170px">
+                  <input type="file" id="logo-dark-file-inp" accept="image/*" style="display:none"/>
+                  <button class="btn btn-sm" id="logo-dark-upload-btn" type="button">⬆ Upload dark logo</button>
+                  <button class="btn btn-sm btn-danger" id="logo-dark-remove-btn" type="button" style="display:none">✕ Remove dark logo</button>
+                  <div style="font-size:10.5px;color:var(--t3);line-height:1.5;margin-top:2px">
+                    A white / light variant of your logo, used in the sidebar when the UI is in dark mode. Falls back to the primary logo when empty.
                   </div>
                 </div>
 

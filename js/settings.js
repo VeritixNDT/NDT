@@ -909,6 +909,9 @@ function logoLoadSaved() {
   // moment Company settings finish loading.
   const invertCb = document.getElementById('logo-invert-dark');
   if(invertCb) invertCb.checked = !!company.logoInvertOnDark;
+  // Pair-load the dark-logo preview so the section's two halves come
+  // up with the inspector's saved data at the same time.
+  if(typeof logoDarkLoadSaved === 'function') logoDarkLoadSaved();
 }
 
 // Persist the 'Invert on dark backgrounds' checkbox state. Stored on the
@@ -923,6 +926,115 @@ function logoSetInvertOnDark(el){
     const pillName = document.getElementById('vx-org-pill-name');
     vxRenderSidebarOrgBlock(pillName ? pillName.textContent : '');
   }
+}
+
+// ── Dark-theme logo variant ────────────────────────────────────────────
+// A second logo slot stored on company.logoDark. Used by the sidebar
+// when the UI is in dark mode; falls back to the primary company.logo
+// (with optional invert filter) when empty. Printed PDFs always use the
+// primary logo regardless of this slot.
+//
+// Kept lightweight on purpose — no crop UI (user crops offline), no
+// drag-and-drop. The primary logo above handles those cases; the dark
+// variant is just 'upload a ready-to-use light/white variant'.
+function logoDarkSetPreview(dataURL){
+  const img  = el('logo-dark-preview-img');
+  const hint = el('logo-dark-drop-hint');
+  const zone = el('logo-dark-drop-zone');
+  const rm   = el('logo-dark-remove-btn');
+  if(!img) return;
+  if(dataURL){
+    img.src = dataURL;
+    img.style.display = 'block';
+    if(hint) hint.style.display = 'none';
+    if(zone) zone.classList.add('has-logo');
+    if(rm)   rm.style.display = '';
+  } else {
+    img.src = '';
+    img.style.display = 'none';
+    if(hint) hint.style.display = '';
+    if(zone) zone.classList.remove('has-logo');
+    if(rm)   rm.style.display = 'none';
+  }
+  // Sidebar refresh — same pattern the primary logo uses.
+  if(typeof vxRenderSidebarOrgBlock === 'function'){
+    const pillName = document.getElementById('vx-org-pill-name');
+    vxRenderSidebarOrgBlock(pillName ? pillName.textContent : '');
+  }
+}
+
+function logoDarkLoadFile(file){
+  if(!file || !file.type || !file.type.startsWith('image/')){
+    toast(t('toast.image_load_failed','Could not load image.'),'error');
+    return;
+  }
+  // 2 MB cap — same as the primary logo's effective working size after
+  // crop. SVGs squeeze well under this; bitmap logos typically too.
+  if(file.size > 10 * 1024 * 1024){
+    toast(t('toast.logo_too_large','Logo file must be under 10 MB.'),'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataURL = e.target.result;
+    const company = ls(KEYS.company, {});
+    company.logoDark = dataURL;
+    lss(KEYS.company, company);
+    logoDarkSetPreview(dataURL);
+    toast(t('toast.logo_dark_saved','Dark-theme logo saved.'),'success');
+  };
+  reader.onerror = () => toast(t('toast.image_load_failed','Could not load image.'),'error');
+  reader.readAsDataURL(file);
+}
+
+async function logoDarkRemove(){
+  const ok = await vxConfirm({
+    message: 'Remove the dark-theme logo? The sidebar will fall back to your primary logo (with the invert filter, if enabled).',
+    okLabel: t('vxc.remove','Remove'),
+    danger:  true,
+  });
+  if(!ok) return;
+  const company = ls(KEYS.company, {});
+  delete company.logoDark;
+  lss(KEYS.company, company);
+  logoDarkSetPreview(null);
+  toast(t('toast.logo_dark_removed','Dark-theme logo removed.'));
+}
+
+function logoDarkLoadSaved(){
+  const company = ls(KEYS.company, {});
+  if(company.logoDark) logoDarkSetPreview(company.logoDark);
+}
+
+// Wire the dark-logo controls. Mirrors _wireLogoSection but trimmed —
+// upload button + remove + click-to-pick on the zone. No drag/drop, no
+// crop button. Idempotent guard so re-wiring on a re-render is safe.
+var _logoDarkWired = false;
+function _wireLogoDarkSection(){
+  if(_logoDarkWired) return;
+  const zone  = el('logo-dark-drop-zone');
+  const inp   = el('logo-dark-file-inp');
+  const upBtn = el('logo-dark-upload-btn');
+  const rmBtn = el('logo-dark-remove-btn');
+  if(!zone || !inp || !upBtn || !rmBtn) return;
+  const pick = () => inp.click();
+  zone.addEventListener('click', pick);
+  upBtn.addEventListener('click', pick);
+  rmBtn.addEventListener('click', logoDarkRemove);
+  inp.addEventListener('change', () => {
+    if(inp.files && inp.files.length) logoDarkLoadFile(inp.files[0]);
+    inp.value = '';
+  });
+  // Drag-and-drop kept light — the primary logo already has the full
+  // drag handler; mirroring it here keeps parity with no extra weight.
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if(e.dataTransfer && e.dataTransfer.files.length) logoDarkLoadFile(e.dataTransfer.files[0]);
+  });
+  _logoDarkWired = true;
 }
 
 // Direct event wiring for the logo flow. Bypasses the central dispatcher
@@ -981,6 +1093,10 @@ function _wireLogoSection() {
 
   _logoWired = true;
   console.log('[logo] wiring complete');
+  // Pair-wire the dark-logo controls so the two sections come up
+  // together. Idempotent guard inside the dark-logo wirer covers re-
+  // calls.
+  if(typeof _wireLogoDarkSection === 'function') _wireLogoDarkSection();
 }
 
 // ══════════════════════════════════════════════

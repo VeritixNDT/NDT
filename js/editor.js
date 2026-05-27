@@ -2966,7 +2966,11 @@ function cvRenderBlockContent(block, report, preview){
         </div>`;
       }
       case 'additional-page':
-        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box;border:0.5px solid #ddd"><div style="padding:6px 8px;border-bottom:0.5px solid #ccc;background:#f5f5f5;font-size:9px;font-weight:600;color:#333;text-align:${al}">${_h(block.text||'Additional information')}</div><div style="flex:1;padding:12px 8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;border:1px dashed #ddd;margin:8px;border-radius:3px">Place blocks inside for custom content</div><div style="padding:3px 8px;background:#f5f5f5;border-top:0.5px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
+        // outline (not border) so the wrapper doesn't inset its content by
+        // the border width — header / footer strips line up flush with
+        // child blocks placed at the same x. See method-block for the
+        // full rationale.
+        return `<div style="height:100%;display:flex;flex-direction:column;outline:1px solid #ddd"><div style="padding:6px 8px;border-bottom:1px solid #ccc;background:#f5f5f5;font-size:9px;font-weight:600;color:#333;text-align:${al}">${_h(block.text||'Additional information')}</div><div style="flex:1;padding:12px 8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;border:1px dashed #ddd;margin:8px;border-radius:3px">Place blocks inside for custom content</div><div style="padding:3px 8px;background:#f5f5f5;border-top:1px solid #ddd;font-size:6.5px;color:#888">${coName}</div></div>`;
       case 'items-table':{
         // Examination-details table — mirrors RPT_FORM.items columns onto a
         // table that fills the block. table-layout:fixed + percentage col
@@ -3128,17 +3132,17 @@ function cvRenderBlockContent(block, report, preview){
         const remarksHtml = liveRemarks
           ? `<div style="flex:1;padding:6px 8px;font-size:${remarksFs};line-height:1.4;color:#000;white-space:pre-wrap;word-break:break-word;overflow:hidden;border-top:0.5px solid #ddd">${_h(liveRemarks)}</div>`
           : `<div style="flex:1;padding:6px 8px;font-size:${remarksFs};line-height:1.4;color:#bbb;font-style:italic;overflow:hidden;border-top:0.5px solid #ddd">${preview?'':'Inspector remarks / comments…'}</div>`;
-        // Wrapper owns the outer border — keeps the card's outer rectangle
-        // pixel-aligned with cards stacked above the table. Without this,
-        // border-collapse on the cells would shift the edge by a half-pixel
-        // and the table would visibly mismatch one side.
+        // Wrapper outline (not border) so the table inside fills the
+        // block's full width and lines up flush with any card stacked
+        // above or below at the same x — border + box-sizing was
+        // insetting the table by 0.5px on each side.
         // The heading colour is set on <thead> — one fill behind BOTH
         // header rows — so the title bar and the column-header row share a
         // single rectangle and align exactly. Backgrounding the title
         // colspan cell and the column-header row separately let the two
         // drift by a sub-pixel at some zooms / column widths (the colspan
         // cell rounds once, the N column cells round independently).
-        return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
+        return `<div style="width:100%;height:100%;outline:1px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
           <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;flex-shrink:0">
             ${colgroup}
             <thead style="background:${barColor}">
@@ -3326,7 +3330,10 @@ function cvRenderBlockContent(block, report, preview){
         const emptyMsg = (preview && !drawItems.length)
           ? `<tr><td colspan="${defectCols.length}" style="padding:14px 8px;text-align:center;font-size:${cellFs};color:#999;font-style:italic">No defects recorded on this report.</td></tr>`
           : '';
-        return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
+        // Wrapper outline (not border) — same rationale as items-table:
+        // border + box-sizing was insetting the table by 0.5px so its
+        // edges didn't line up with neighbouring cards.
+        return `<div style="width:100%;height:100%;outline:1px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
           <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;flex-shrink:0">
             ${colgroup}
             <thead style="background:${barColor}">
@@ -3357,14 +3364,18 @@ function cvRenderBlockContent(block, report, preview){
         const body = (!preview && !childCount)
           ? `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:8.5px;font-style:italic;text-align:center;padding:6px;gap:3px"><span style="font-size:16px">⚙</span> Drop method-equipment cells inside</div>`
           : `<div style="flex:1"></div>`;
-        // The header strip carries its own border-bottom in the same
-        // colour as the container outline so the outline visibly closes
-        // around the title (not just around the body) — without it the
-        // 0.5px container border can round inconsistently against the
-        // coloured fill and the header reads as 1px narrower than the
-        // body it sits on.
-        return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
-          <div style="height:${barH}px;box-sizing:border-box;border-bottom:0.5px solid #ddd;padding:0 8px;background:${barColor};color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};letter-spacing:.06em;flex-shrink:0;display:flex;align-items:center;justify-content:center">${title}</div>
+        // outline (not border) on the container: border + box-sizing:
+        // border-box was insetting the header by the border width, so
+        // the coloured strip sat 0.5–1px inside the block bounds while
+        // child cells (positioned at the block's true x/y) ran flush
+        // to the edge — making the header read as narrower than the
+        // cells / items table sitting inside it. `outline` doesn't take
+        // layout space, so the header now spans the full block width
+        // and lines up with the cells beneath it. The header keeps a
+        // 1px border-bottom so the divider line between title strip
+        // and body stays visible.
+        return `<div style="width:100%;height:100%;outline:1px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:${barH}px;box-sizing:border-box;border-bottom:1px solid #ddd;padding:0 8px;background:${barColor};color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};letter-spacing:.06em;flex-shrink:0;display:flex;align-items:center;justify-content:center">${title}</div>
           ${body}
         </div>`;
       }

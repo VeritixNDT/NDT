@@ -89,19 +89,19 @@ var TPL_FIELDS = {
   // Settings → Equipment.
   _common: [],
   UT: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 22825:2017','EN-ISO 16809:2019','ASME BPVC Sec. V, Art. 4 — 2025 Edition','ASME BPVC Sec. V, Art. 5 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part E)','ISO 17640:2018 via NORSOK M-101 (Ed. 6, 2022)'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 Level 1','EN-ISO 11666:2018 Level 2','EN-ISO 11666:2018 Level 3','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.6 / 341.3.2','ASME VIII Div. 1, Mandatory App. 12 — 2025','AWS D1.1/D1.1M:2025 Table 8.2','AWS D1.1/D1.1M:2025 Table 8.3','No cracks'] },
-    { id:'coup',  label:'Default couplant',     placeholder:'e.g. Ultragel II', options:['Waterbased','Oil','Ultragel II','Sono 600','Sonagel W','Glycerin'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 22825:2017','EN-ISO 16809:2019','ASME BPVC Sec. V, Art. 4 — 2025 Edition','ASME BPVC Sec. V, Art. 5 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part E)','ISO 17640:2018 via NORSOK M-101 (Ed. 6, 2022)'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 Level 1','EN-ISO 11666:2018 Level 2','EN-ISO 11666:2018 Level 3','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.6 / 341.3.2','ASME VIII Div. 1, Mandatory App. 12 — 2025','AWS D1.1/D1.1M:2025 Table 8.2','AWS D1.1/D1.1M:2025 Table 8.3','No cracks'] },
+    { id:'coup',  label:'Couplant',     placeholder:'e.g. Ultragel II', options:['Waterbased','Oil','Ultragel II','Sono 600','Sonagel W','Glycerin'] },
     { id:'freq',  label:'Frequency (MHz)',       placeholder:'e.g. 5', options:['1','1.5','2','2.25','3.5','4','5','7.5','10','15'] },
     { id:'range', label:'Calibration range',     placeholder:'e.g. 0-100mm', options:['0-50mm','0-100mm','0-200mm','0-300mm','0-500mm','25-100mm','50-250mm','100-400mm'] },
-    { id:'probe', label:'Default probe',         placeholder:'e.g. MWB 60-4', options:['0°','45°','60°','70°','80°'] },
+    { id:'probe', label:'Probe',         placeholder:'e.g. MWB 60-4', options:['0°','45°','60°','70°','80°'] },
     { id:'sens',  label:'Sensitivity',           placeholder:'e.g. DAC + 6dB', options:['DAC + 6dB','DAC + Transfer + 6dB','DAC - 6dB','TCG','6 dB drop','20 dB drop'] },
     { id:'refblk',label:'Reference block',       placeholder:'e.g. K1 IIW 1', options:['K1 IIW 1','K2 IIW 2','A2 block','A7 block','Custom SDH block'] },
     { id:'calblk',label:'Calibration block',     placeholder:'e.g. Step wedge', options:['EN-ISO 17640 19mm','EN-ISO 17640 12mm','ASME V SDH block','Step wedge 5-45mm'] },
   ],
   MT: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17638:2016', options:['EN-ISO 17638:2016','EN 1090-2:2018+A1:2024','ASME BPVC Sec. V, Art. 7 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part F)','ISO 17638:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. ISO 23278:2015 Level 2', options:['ISO 23278:2015 Level 1','ISO 23278:2015 Level 2','ISO 23278:2015 Level 2X','ISO 23278:2015 Level 3','ISO 23278:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.3 / 341.3.2','ASME B31.1-2024, para. 136.4.3','ASME VIII Div. 1, Mandatory App. 6 — 2025','ASME VIII Div. 2, Part 7 (Table 7.16) — 2025','No cracks'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17638:2016', options:['EN-ISO 17638:2016','EN 1090-2:2018+A1:2024','ASME BPVC Sec. V, Art. 7 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part F)','ISO 17638:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. ISO 23278:2015 Level 2', options:['ISO 23278:2015 Level 1','ISO 23278:2015 Level 2','ISO 23278:2015 Level 2X','ISO 23278:2015 Level 3','ISO 23278:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.3 / 341.3.2','ASME B31.1-2024, para. 136.4.3','ASME VIII Div. 1, Mandatory App. 6 — 2025','ASME VIII Div. 2, Part 7 (Table 7.16) — 2025','No cracks'] },
     // Equipment & parameters order tracks ISO 17638:2016 Annex A
     // (report content) — magnetisation technique first, then method
     // type, current type / intensity, system-performance check, then
@@ -131,8 +131,8 @@ var TPL_FIELDS = {
     { id:'demag',      label:'Demagnetised',       placeholder:'e.g. Yes',              options:['Yes','No','Not required'] },
   ],
   VT: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 5817:2014 Level B', options:['EN-ISO 5817:2014 Level B','EN-ISO 5817:2014 Level C','EN-ISO 5817:2014 Level D','EN-ISO 10042:2018 Level B','EN-ISO 10042:2018 Level C','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 341.3.2','ASME VIII Div. 1, UW-51 / UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.1','No cracks'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 5817:2014 Level B', options:['EN-ISO 5817:2014 Level B','EN-ISO 5817:2014 Level C','EN-ISO 5817:2014 Level D','EN-ISO 10042:2018 Level B','EN-ISO 10042:2018 Level C','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 341.3.2','ASME VIII Div. 1, UW-51 / UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.1','No cracks'] },
     { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 350', options:['350','500','1000'] },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch', options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     { id:'magn', label:'Magnification',            placeholder:'e.g. ×2', options:['×1','×2','×3','×5','×10'] },
@@ -140,8 +140,8 @@ var TPL_FIELDS = {
     { id:'vtequip',label:'Equipment',              placeholder:'e.g. Welding gauge set', options:['Inspection kit','Universal cam gauge','Borescope','Welding gauge set','AWS bridge cam gauge'] },
   ],
   PT: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 3452-1:2021', options:['EN-ISO 3452-1:2021','ASME BPVC Sec. V, Art. 6 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part D)','EN 1090-2:2018+A1:2024','ISO 3452-1:2021 via NORSOK M-101 (Ed. 6, 2022)'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 23277:2015 Level 2', options:['EN-ISO 23277:2015 Level 1','EN-ISO 23277:2015 Level 2','EN-ISO 23277:2015 Level 2X','EN-ISO 23277:2015 Level 3','EN-ISO 23277:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.4','ASME VIII Div. 1, Mandatory App. 8 — 2025','No cracks'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 3452-1:2021', options:['EN-ISO 3452-1:2021','ASME BPVC Sec. V, Art. 6 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part D)','EN 1090-2:2018+A1:2024','ISO 3452-1:2021 via NORSOK M-101 (Ed. 6, 2022)'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 23277:2015 Level 2', options:['EN-ISO 23277:2015 Level 1','EN-ISO 23277:2015 Level 2','EN-ISO 23277:2015 Level 2X','EN-ISO 23277:2015 Level 3','EN-ISO 23277:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.4','ASME VIII Div. 1, Mandatory App. 8 — 2025','No cracks'] },
     // PT type (penetrant type) and PT method (excess penetrant removal)
     // per EN-ISO 3452-1:2021 §4.3 / ASME V Art. 6 T-621. Specs cite the
     // two together — "Type I Method A" — so render them side-by-side at
@@ -163,7 +163,8 @@ var TPL_FIELDS = {
     // line as the post-dwell remover but logged separately so the
     // record reflects the procedure followed.
     { id:'precleaner', label:'Pre-cleaner', placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5','Solvent wipe','Vapour degrease','Alkaline cleaner','Mechanical clean'] },
-    { id:'pen',    label:'Default penetrant',    placeholder:'e.g. Magnaflux ZL4C', options:['Magnaflux ZL4C','Magnaflux ZL-60D','MR Chemie MR 68','Ardrox 970-P22'] },
+    { id:'pen',      label:'Penetrant',    placeholder:'e.g. Magnaflux ZL4C', options:['Magnaflux ZL4C','Magnaflux ZL-60D','MR Chemie MR 68','Ardrox 970-P22'] },
+    { id:'penBatch', label:'Penetrant batch no.',  placeholder:'e.g. 24P-0815' },
     { id:'pdwell', label:'Penetrant dwell time', placeholder:'check spec for material — e.g. 10-20 mins', options:['5 mins','5-10 mins','10 mins','10-20 mins','15 mins','20 mins','20-30 mins','30 mins','30-60 mins','45 mins','60 mins'] },
     // Emulsifier dwell time — only applies to Method B (lipophilic) and
     // Method D (hydrophilic). ISO 3452-1 §6.3 / ASME V Art. 6 T-674
@@ -177,7 +178,8 @@ var TPL_FIELDS = {
     { id:'dryTime',  label:'Drying time',           placeholder:'e.g. 5-10 mins', options:['Until dry','5 mins','5-10 mins','10 mins','10-15 mins','15 mins','20 mins','30 mins'] },
     { id:'ddwell', label:'Developer dwell time', placeholder:'e.g. 10 mins', options:['7 mins','10 mins','10-20 mins','15 mins','20 mins','30 mins'] },
     { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
-    { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
+    { id:'dev',      label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },
+    { id:'devBatch', label:'Developer batch no.',  placeholder:'e.g. 24D-1102' },
     { id:'lightsource',label:'Light source',     placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. The white-light lux reading is
     // entered first and gates the meter pickers and the UV-A reading at
@@ -191,30 +193,30 @@ var TPL_FIELDS = {
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   PMI:[
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. ASTM E1476-20', options:['ASTM E1476-20','ASTM E322-20','API RP 578 (3rd Ed., 2018)','EN 10204:2004','ASME BPVC Sec. II Part A — 2025','ISO 9712:2021 (qualification)'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. Material grade match', options:['Material grade match','Client specification','Project material list','API RP 578 PMI requirements','ASME Sec. II / project ITP','No deviation from WPS material'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. ASTM E1476-20', options:['ASTM E1476-20','ASTM E322-20','API RP 578 (3rd Ed., 2018)','EN 10204:2004','ASME BPVC Sec. II Part A — 2025','ISO 9712:2021 (qualification)'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. Material grade match', options:['Material grade match','Client specification','Project material list','API RP 578 PMI requirements','ASME Sec. II / project ITP','No deviation from WPS material'] },
     { id:'ctrl',label:'System control',placeholder:'e.g. 316L Reference block',options:['316L Reference block','304 Reference block','Duplex reference block','Carbon steel reference block']},
     { id:'mode',label:'Analysis mode',placeholder:'e.g. Alloy ID',options:['Alloy ID','Grade ID','Residuals','Full quantitative']},
     { id:'pmiequip',label:'Equipment',placeholder:'e.g. X-MET 8000',options:['X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Niton XL3t']},
   ],
   HT: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 6507-1:2018', options:['EN-ISO 6507-1:2018 (Vickers)','EN-ISO 6506-1:2014 (Brinell)','EN-ISO 6508-1:2016 (Rockwell)','EN-ISO 16859-1:2015 (Leeb)','ASTM E384-22','ASTM E92-23','ASTM E110-22'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. NACE MR0175 / ISO 15156-2', options:['NACE MR0175 / ISO 15156-2','ASME B31.3-2024, para. 331','ASME VIII Div. 1, UW-39 — 2025','AWS D1.1/D1.1M:2025 Clause 6.10','Client specification','Project ITP / WPS'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 6507-1:2018', options:['EN-ISO 6507-1:2018 (Vickers)','EN-ISO 6506-1:2014 (Brinell)','EN-ISO 6508-1:2016 (Rockwell)','EN-ISO 16859-1:2015 (Leeb)','ASTM E384-22','ASTM E92-23','ASTM E110-22'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. NACE MR0175 / ISO 15156-2', options:['NACE MR0175 / ISO 15156-2','ASME B31.3-2024, para. 331','ASME VIII Div. 1, UW-39 — 2025','AWS D1.1/D1.1M:2025 Clause 6.10','Client specification','Project ITP / WPS'] },
     { id:'scale',label:'Hardness scale',placeholder:'e.g. HV10, HRC',options:['HV10','HV5','HRC','HB','HRB','HL (Leeb)']},
     { id:'method',label:'Test method',placeholder:'e.g. UCI, Rebound',options:['UCI','Rebound (Leeb)','Vickers','Rockwell','Brinell']},
     { id:'htequip',label:'Equipment',placeholder:'e.g. Mic 10',options:['Mic 10','Sonodur 3','Dynamic','Proceq Equotip 550','TH170']},
   ],
   RT: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17636-1:2022', options:['EN-ISO 17636-1:2022','EN-ISO 17636-2:2022','ASME BPVC Sec. V, Art. 2 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part B)','EN 1090-2:2018+A1:2024'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 10675-1:2016', options:['EN-ISO 10675-1:2016','EN-ISO 10675-2:2017','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.5','ASME VIII Div. 1, UW-51 — 2025','ASME VIII Div. 1, UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.2','AWS D1.1/D1.1M:2025 Table 8.3','No cracks'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17636-1:2022', options:['EN-ISO 17636-1:2022','EN-ISO 17636-2:2022','ASME BPVC Sec. V, Art. 2 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part B)','EN 1090-2:2018+A1:2024'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 10675-1:2016', options:['EN-ISO 10675-1:2016','EN-ISO 10675-2:2017','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.5','ASME VIII Div. 1, UW-51 — 2025','ASME VIII Div. 1, UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.2','AWS D1.1/D1.1M:2025 Table 8.3','No cracks'] },
     { id:'source',label:'Radiation source',placeholder:'e.g. Ir-192',options:['Ir-192','Se-75','Co-60','X-ray 160kV','X-ray 200kV','X-ray 300kV']},
     { id:'film',label:'Film/detector',placeholder:'e.g. D7',options:['D4 / Kodak MX','D5 / Kodak T200','D7 / Kodak AA400','DR panel','CR plate']},
     { id:'iqitype',label:'IQI type',placeholder:'e.g. Wire EN 462-1',options:['Wire type EN 462-1','Step-hole EN 462-2','ASTM wire penetrameter','ASTM hole penetrameter']},
     { id:'sfd',label:'Source-film distance',placeholder:'e.g. 700 mm',options:['350 mm','500 mm','700 mm','1000 mm']},
   ],
   ET: [
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17643:2015', options:['EN-ISO 17643:2015','EN-ISO 15549:2019','ASME BPVC Sec. V, Art. 8 — 2025 Edition','ASTM E309-22','ASTM E215-22'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 17643:2015 (acceptance)', options:['EN-ISO 17643:2015 (acceptance)','ASME B31.3-2024, para. 344.7','ASME VIII Div. 1 — 2025','EXC 1','EXC 2','EXC 3','EXC 4','Client specification','No cracks'] },
+    { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17643:2015', options:['EN-ISO 17643:2015','EN-ISO 15549:2019','ASME BPVC Sec. V, Art. 8 — 2025 Edition','ASTM E309-22','ASTM E215-22'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 17643:2015 (acceptance)', options:['EN-ISO 17643:2015 (acceptance)','ASME B31.3-2024, para. 344.7','ASME VIII Div. 1 — 2025','EXC 1','EXC 2','EXC 3','EXC 4','Client specification','No cracks'] },
     { id:'freq',label:'Test frequency (kHz)',placeholder:'e.g. 100',options:['10','50','100','200','500','1000']},
     { id:'coil',label:'Coil/probe type',placeholder:'e.g. Absolute pencil',options:['Absolute pencil probe','Differential probe','Encircling coil','Sector probe']},
     { id:'ref',label:'Reference standard',placeholder:'e.g. 1.0mm EDM notch',options:['0.5mm EDM notch','1.0mm EDM notch','1.5mm EDM notch','Through-hole 1.0mm']},

@@ -3357,8 +3357,14 @@ function cvRenderBlockContent(block, report, preview){
         const body = (!preview && !childCount)
           ? `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:8.5px;font-style:italic;text-align:center;padding:6px;gap:3px"><span style="font-size:16px">⚙</span> Drop method-equipment cells inside</div>`
           : `<div style="flex:1"></div>`;
+        // The header strip carries its own border-bottom in the same
+        // colour as the container outline so the outline visibly closes
+        // around the title (not just around the body) — without it the
+        // 0.5px container border can round inconsistently against the
+        // coloured fill and the header reads as 1px narrower than the
+        // body it sits on.
         return `<div style="width:100%;height:100%;box-sizing:border-box;border:0.5px solid #ddd;overflow:hidden;display:flex;flex-direction:column">
-          <div style="height:${barH}px;box-sizing:border-box;padding:0 8px;background:${barColor};color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};letter-spacing:.06em;flex-shrink:0;display:flex;align-items:center;justify-content:center">${title}</div>
+          <div style="height:${barH}px;box-sizing:border-box;border-bottom:0.5px solid #ddd;padding:0 8px;background:${barColor};color:#fff;font-size:${titleFs};font-weight:700;font-style:${fi};letter-spacing:.06em;flex-shrink:0;display:flex;align-items:center;justify-content:center">${title}</div>
           ${body}
         </div>`;
       }

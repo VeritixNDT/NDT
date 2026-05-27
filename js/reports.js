@@ -102,12 +102,16 @@ var TPL_FIELDS = {
   MT: [
     { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17638:2016', options:['EN-ISO 17638:2016','EN 1090-2:2018+A1:2024','ASME BPVC Sec. V, Art. 7 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part F)','ISO 17638:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
     { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. ISO 23278:2015 Level 2', options:['ISO 23278:2015 Level 1','ISO 23278:2015 Level 2','ISO 23278:2015 Level 2X','ISO 23278:2015 Level 3','ISO 23278:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.3 / 341.3.2','ASME B31.1-2024, para. 136.4.3','ASME VIII Div. 1, Mandatory App. 6 — 2025','ASME VIII Div. 2, Part 7 (Table 7.16) — 2025','No cracks'] },
+    // Equipment & parameters order tracks ISO 17638:2016 Annex A
+    // (report content) — magnetisation technique first, then method
+    // type, current type / intensity, system-performance check, then
+    // particles / contrast, light conditions, with demagnetisation at
+    // the end of the procedure.
     { id:'tech',       label:'Technique',          placeholder:'e.g. Yoke (AC)',        options:['Yoke (AC)','Yoke (DC)','Permanent magnet','Prods','Coil','Central conductor','Bench head shot','Flexible cable wrap'] },
     { id:'mtmethod',   label:'Method',             placeholder:'e.g. Wet fluorescent',  options:['Wet fluorescent','Wet visible (colour contrast)','Dry visible','Dry fluorescent'] },
-    { id:'syscontrol', label:'System control',     placeholder:'e.g. > 4,5 kg + ASTM Pie', options:['> 4,5 kg + Dr. Berthold','> 4,5 kg + ASTM Pie','> 4,5 kg + Castrol strip','> 18 kg + Dr. Berthold','> 18 kg + ASTM Pie','> 18 kg + Castrol strip'] },
-    { id:'demag',      label:'Demagnetised',       placeholder:'e.g. Yes',              options:['Yes','No','Not required'] },
-    { id:'curint',     label:'Current intensity',  placeholder:'e.g. 2-3 Ampere',       options:['2-3 Ampere','15 Ampere'] },
     { id:'cur',        label:'Current',            placeholder:'e.g. AC',               options:['AC','HWDC','FWDC','DC','Permanent magnet'] },
+    { id:'curint',     label:'Current intensity',  placeholder:'e.g. 2-3 Ampere',       options:['2-3 Ampere','15 Ampere'] },
+    { id:'syscontrol', label:'System control',     placeholder:'e.g. > 4,5 kg + ASTM Pie', options:['> 4,5 kg + Dr. Berthold','> 4,5 kg + ASTM Pie','> 4,5 kg + Castrol strip','> 18 kg + Dr. Berthold','> 18 kg + ASTM Pie','> 18 kg + Castrol strip'] },
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'suspBatch',  label:'Test suspension batch no.', placeholder:'e.g. 24A-0815' },
     { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black water-based','Visible black oil-based','Visible red water-based','Visible red oil-based','Dry powder black','Dry powder red'] },
@@ -124,6 +128,7 @@ var TPL_FIELDS = {
     { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light',    gatedBy:'whitelight', gateMax:20 },
     { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:20 },
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
+    { id:'demag',      label:'Demagnetised',       placeholder:'e.g. Yes',              options:['Yes','No','Not required'] },
   ],
   VT: [
     { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
@@ -148,6 +153,11 @@ var TPL_FIELDS = {
     // (with ½ the lowest, 4 the highest). Manufacturer publishes the
     // level on the product data sheet.
     { id:'ptsens',   label:'PT sensitivity level', placeholder:'e.g. Level 2 — Medium',  options:['Level ½ — Ultra-low','Level 1 — Low','Level 2 — Medium','Level 3 — High','Level 4 — Ultra-high'] },
+    // Reference test panel used to verify system sensitivity per
+    // EN-ISO 3452-3:2013 / ASME V Art. 6 T-665. PSM-5 and TAM are the
+    // shop workhorses; the ISO Type 1 / Type 2 panels are the spec
+    // references they emulate.
+    { id:'testplate',label:'Test panel / reference block', placeholder:'e.g. PSM-5', options:['PSM-5 (Magnaflux — half-chrome, 5 zones)','TAM Panel (Sherwin)','ISO 3452-3 Type 1 (Ni-Cr plated brass, 5 zones)','ISO 3452-3 Type 2 (quench-cracked aluminium)','AMS-2644 reference panel','Customer-supplied reference block'] },
     // Pre-cleaner — the procedural step before penetrant application
     // (ISO 3452-1 §6.1 / ASME V Art. 6 T-642). Often the same product
     // line as the post-dwell remover but logged separately so the
@@ -211,11 +221,17 @@ var TPL_FIELDS = {
   ],
 };
 
-// Report form field definitions (common to all methods)
+// Report form field definitions (common to all methods). Section
+// groupings mirror the PDF editor's palette groups so each part of the
+// new-report form lines up with the cards available in the layout
+// editor — identity / client / criteria / result / sign-off.
 var RPT_FORM = {
-  client: [
+  identity: [
     { id:'reportNo',  label:'Report no.',       placeholder:'Auto-generated', readonly:true },
     { id:'revision',   label:'Report revision',   placeholder:'00' },
+    { id:'examDate',   label:'Examination date',    placeholder:'dd/mm/yyyy', type:'date' },
+  ],
+  client: [
     { id:'client',     label:'Client',             placeholder:'Client name' },
     { id:'project',    label:'Project',            placeholder:'Project name or number' },
     { id:'projectNo',  label:'Project no.',        placeholder:'PRJ-2026-014' },
@@ -224,7 +240,6 @@ var RPT_FORM = {
     { id:'orderNo',    label:'Order no.',           placeholder:'Order number' },
     { id:'requestNo',  label:'Request no.',         placeholder:'Request number' },
     { id:'clientRef',  label:'Client reference',    placeholder:'Client reference' },
-    { id:'examDate',   label:'Examination date',    placeholder:'dd/mm/yyyy', type:'date' },
   ],
   subject: [
     { id:'subject',    label:'Weld / object',       placeholder:'Pipe, vessel, structure…' },
@@ -235,7 +250,10 @@ var RPT_FORM = {
   ],
   // Examination criteria. surfCond / heatTreat were moved here from the
   // Subject section. stage and weldPos carry methodsOnly:['VT'] — they
-  // render only on VT reports (and VT method templates).
+  // render only on VT reports (and VT method templates). spec / acc
+  // are method-specific (TPL_FIELDS[methodId]) but render in this
+  // section on the new-report form so they sit next to the rest of
+  // the criteria, matching the PDF editor's Criteria palette group.
   exam: [
     { id:'examType',   label:'Examination type',    placeholder:'e.g. Initial', options:['Weld surface examination','Surface examination','Crack examination','Forging examination','Casting examination','Positive Material Identification','Hardness test','Wall thickness measurements','Lamination examination','Ultrasonic examination'] },
     { id:'surfCond',   label:'Surface condition',    placeholder:'e.g. Ground, As-welded', options:['As welded','Machined','Blasted','Painted','Ground','As cast','As forged','Electropolished'] },
@@ -248,6 +266,8 @@ var RPT_FORM = {
   result: [
     { id:'verdict',    label:'Overall verdict',     placeholder:'', type:'select', options:['— Select —','Acceptable','Not acceptable','For information','Inconclusive'] },
     { id:'remarks',    label:'Remarks / observations',placeholder:'Closing remarks…', type:'textarea' },
+  ],
+  signoff: [
     { id:'inspector',  label:'Inspector name',      placeholder:'Name of inspector', useInspectorRegister:true },
     { id:'witness',    label:'Witness / 3rd party',  placeholder:'Witness name' },
     { id:'signDate',   label:'Date signed',          placeholder:'dd/mm/yyyy', type:'date' },
@@ -273,6 +293,27 @@ var RPT_FORM = {
 // out of the standalone subject / client sections so the user types each
 // value in exactly one place.
 var RPT_ITEM_FIELD_IDS = (RPT_FORM.items || []).map(f => f.id);
+
+// Flat union of every form-section field — every save / draft path
+// iterates this so adding a new section (or moving fields between
+// existing ones) only changes RPT_FORM, not the read/write logic.
+function rptAllFormFields(){
+  return [
+    ...(RPT_FORM.identity || []),
+    ...(RPT_FORM.client   || []),
+    ...(RPT_FORM.subject  || []),
+    ...(RPT_FORM.exam     || []),
+    ...(RPT_FORM.result   || []),
+    ...(RPT_FORM.signoff  || []),
+  ];
+}
+
+// Method-specific TPL_FIELDS entries that semantically belong to the
+// Examination criteria section rather than Equipment & parameters
+// (the PDF editor places spec / acc-crit cards under the Criteria
+// palette group). Used to split TPL_FIELDS[methodId] across the
+// two sections on the new-report form.
+var TPL_CRITERIA_FIELD_IDS = new Set(['spec','acc']);
 
 function tplBuildTabs() {
   const tabs = el('tpl-method-tabs'); if(!tabs) return;
@@ -372,24 +413,30 @@ function tplRenderForm(methodId, m) {
     <div>Fill in this form as you would a live <strong>${m.id}</strong> report. Click <strong>Save as template</strong> to pre-fill future reports. The revision number auto-increments when you re-open a saved report.</div>
   </div>`;
 
-  // Section 1: Report revision & Client info
-  html += tplFormSection('Report revision & client information', RPT_FORM.client, methodId, f);
-  // Examination criteria (common + method-specific from defaults). The
-  // standalone Subject section was dropped to match the new-report form —
-  // its fields are item-table columns / live in Examination criteria.
-  const examFields = [...RPT_FORM.exam];
-  // Add method defaults as pre-filled context
-  html += tplFormSection('Examination criteria', examFields, methodId, f);
+  // Section layout matches the live new-report form so this template
+  // editor mirrors what the inspector sees: Identity → Client →
+  // Equipment → Criteria → Result → Sign-off. The standalone Subject
+  // section is dropped — its fields are captured in the items table
+  // on the live form.
+  html += tplFormSection('Identity', RPT_FORM.identity, methodId, f);
+  html += tplFormSection('Client information', RPT_FORM.client, methodId, f);
 
-  // Section 4: Method-specific equipment
-  const specific = TPL_FIELDS[methodId] || [];
-  if(specific.length) {
-    const equipFields = specific.map(s => ({...s, id:'eq_'+s.id, label:s.label.replace('Default ','')}));
-    html += tplFormSection(`${m.id} — Equipment & parameters`, equipFields, methodId, f);
-  }
+  const methodFields = TPL_FIELDS[methodId] || [];
+  // Equipment & parameters — method-specific TPL_FIELDS minus spec/acc.
+  const equipFromMethod = methodFields
+    .filter(s => !TPL_CRITERIA_FIELD_IDS.has(s.id))
+    .map(s => ({...s, id:'eq_'+s.id, label:s.label.replace('Default ','')}));
+  if(equipFromMethod.length) html += tplFormSection(`${m.id} — Equipment & parameters`, equipFromMethod, methodId, f);
 
-  // Section 5: Result
-  html += tplFormSection('Result & sign-off', RPT_FORM.result, methodId, f);
+  // Examination criteria — RPT_FORM.exam plus method-specific spec /
+  // acceptance criteria (eq_-prefixed) lifted from TPL_FIELDS[methodId].
+  const criteriaFromMethod = methodFields
+    .filter(s => TPL_CRITERIA_FIELD_IDS.has(s.id))
+    .map(s => ({...s, id:'eq_'+s.id, label:s.label.replace('Default ','')}));
+  html += tplFormSection('Examination criteria', [...RPT_FORM.exam, ...criteriaFromMethod], methodId, f);
+
+  html += tplFormSection('Result',   RPT_FORM.result,  methodId, f);
+  html += tplFormSection('Sign-off', RPT_FORM.signoff, methodId, f);
 
   html += `<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:12px;border-top:1px solid var(--border)">
     <button class="btn btn-sm" data-action="rptFormClear" data-args="'${methodId}'">Clear form</button>
@@ -680,7 +727,7 @@ function inspectorSelectHtml(methodId, f, val, fid) {
 
 function rptFormSave(methodId) {
   const m = NDT_METHODS.find(x=>x.id===methodId); if(!m) return;
-  const allFields = [...RPT_FORM.client,...RPT_FORM.subject,...RPT_FORM.exam,...RPT_FORM.result];
+  const allFields = rptAllFormFields();
   const specific = (TPL_FIELDS[methodId]||[]).map(s=>({...s,id:'eq_'+s.id}));
   const all = [...allFields,...specific];
   const data = {};
@@ -2240,11 +2287,15 @@ function captureWizardStart(){
   const m = NDT_METHODS.find(x => x.id === _ovMethod); if(!m) return;
   const specific = (TPL_FIELDS[_ovMethod] || []).map(f => ({...f, id:'eq_'+f.id}));
   _wizardSteps = [
-    { title: t('wiz.client_title','Client & project'),  help: t('wiz.client_help','Who is this inspection for?'), fields: RPT_FORM.client },
+    // Wizard steps combine the new identity / client and result / sign-off
+    // pairs so existing single-step flows stay one screen each — the
+    // split into separate sections only applies to the long-form
+    // new-report layout.
+    { title: t('wiz.client_title','Client & project'),  help: t('wiz.client_help','Who is this inspection for?'), fields: [...RPT_FORM.identity, ...RPT_FORM.client] },
     { title: t('wiz.subject_title','Subject of inspection'), help: t('wiz.subject_help','What is being inspected?'), fields: RPT_FORM.subject },
     { title: t('wiz.exam_title','Examination details'),  help: t('wiz.exam_help','When, where, with what.'), fields: RPT_FORM.exam },
     { title: t('wiz.method_title','Method-specific data'),  help: tf('wiz.method_help','{method} — equipment, technique, parameters.', {method: m.id}), fields: specific.length ? specific : [] },
-    { title: t('wiz.result_title','Result & verdict'),  help: t('wiz.result_help','Findings, acceptance, sign-off.'), fields: RPT_FORM.result },
+    { title: t('wiz.result_title','Result & verdict'),  help: t('wiz.result_help','Findings, acceptance, sign-off.'), fields: [...RPT_FORM.result, ...RPT_FORM.signoff] },
   ].filter(s => s.fields && s.fields.length);
   _wizardStep = 0;
   let overlay = document.getElementById('capture-wizard');

@@ -161,7 +161,7 @@ function _ovDraftClear(methodId){
 // excluded by design (see header comment).
 function _ovDraftCollect(){
   if(!_ovMethod) return null;
-  const allFields = [...RPT_FORM.client, ...RPT_FORM.subject, ...RPT_FORM.exam, ...RPT_FORM.result];
+  const allFields = rptAllFormFields();
   const specific  = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])].map(f => ({...f, id:'eq_'+f.id}));
   const all = [...allFields, ...specific];
   const form = {};
@@ -1366,8 +1366,11 @@ function ovNewReport(methodId, btn, sourceReport) {
   // verdict (rolled up from the item results on save), procedure revision
   // (read from the linked procedure), and witness / 3rd party.
   const omit = new Set([...RPT_ITEM_FIELD_IDS, 'revision','verdict','procRev','witness']);
-  const clientShared  = RPT_FORM.client.filter(f => !omit.has(f.id));
-  const examShared    = RPT_FORM.exam.filter(f => !omit.has(f.id));
+  const identityShared = (RPT_FORM.identity || []).filter(f => !omit.has(f.id));
+  const clientShared   = (RPT_FORM.client   || []).filter(f => !omit.has(f.id));
+  const examShared     = (RPT_FORM.exam     || []).filter(f => !omit.has(f.id));
+  const resultShared   = (RPT_FORM.result   || []).filter(f => !omit.has(f.id));
+  const signoffShared  = (RPT_FORM.signoff  || []).filter(f => !omit.has(f.id));
 
   // Revision mode opens with a mandatory reason box at the top — the
   // revision number itself is system-assigned, so there is no field for
@@ -1378,30 +1381,47 @@ function ovNewReport(methodId, btn, sourceReport) {
       <textarea id="ov-revision-reason" rows="2" placeholder="What changed in this revision?" style="width:100%;font-family:var(--font);font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box"></textarea>
     </div>`;
   }
-  // Client & report identity
-  html += ovFormSection('Report revision & client information', clientShared, methodId, merged, m);
-  // Examination details (expandable table + remarks)
+
+  // Method-specific TPL_FIELDS are split across two sections, matching
+  // the PDF editor palette: spec / acceptance criteria go into
+  // Examination criteria; everything else (couplant, frequency, MT
+  // suspension, PT type / method / sensitivity / timings, etc.) stays
+  // in Equipment & parameters. Both render with the eq_-prefixed ids
+  // used on the report data, and both inherit the template defaults
+  // pre-filled into `merged` here.
+  const methodFields = TPL_FIELDS[methodId] || [];
+  const _renameMethod = f => {
+    const field = {...f, id:'eq_'+f.id, label:f.label.replace('Default ','')};
+    if(!merged['eq_'+f.id] && tpl[f.id]) merged['eq_'+f.id] = tpl[f.id];
+    return field;
+  };
+  const criteriaFromMethod = methodFields.filter(s => TPL_CRITERIA_FIELD_IDS.has(s.id)).map(_renameMethod);
+  const equipFromMethod    = methodFields.filter(s => !TPL_CRITERIA_FIELD_IDS.has(s.id)).map(_renameMethod);
+
+  // Section order — Equipment & parameters sits directly under the
+  // client block so the inspector confirms the gear and parameters
+  // they walked in with before moving on to criteria and the per-item
+  // table. Criteria still sits above the items table so the spec /
+  // acceptance basis is locked before any examination detail rows:
+  //   Identity → Client → Equipment → Criteria → Items (Subject +
+  //   details) → Defects → Result → Sign-off → Photos.
+  if(identityShared.length) html += ovFormSection('Identity', identityShared, methodId, merged, m);
+  if(clientShared.length)   html += ovFormSection('Client information', clientShared, methodId, merged, m);
+  // Equipment & parameters — method-specific fields excluding spec/acc.
+  if(equipFromMethod.length) html += ovFormSection(`${m.id} — Equipment & parameters`, equipFromMethod, methodId, merged, m);
+  // Examination criteria — RPT_FORM.exam plus the method's spec / acc
+  // (eq_-prefixed) so they sit alongside surface condition, heat
+  // treatment, etc., matching the editor's Criteria palette group.
+  html += ovFormSection('Examination criteria', [...examShared, ...criteriaFromMethod], methodId, merged, m);
+  // Subject is captured per-row in the items table (one row per weld /
+  // object inspected under this report cover).
   html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
   // Defects / indications — sits right after the items table so the
   // inspector captures defect details next to the verdicts that drive
-  // them, instead of scrolling to the bottom of the form. Auto-built
-  // from items with verdict==='Not acceptable'; empty when none.
+  // them. Auto-built from items with verdict === 'Not acceptable'.
   html += _ovDefectsSectionHtml();
-  // Examination criteria
-  html += ovFormSection('Examination criteria', examShared, methodId, merged, m);
-  // Section 5: Equipment & parameters. Includes TPL_FIELDS._common
-  // (specification, acceptance criteria, procedure, equipment) AND the
-  // per-method fields. _common was previously template-editor-only, so
-  // the equipment dropdown never rendered on the new-report form.
-  const specific = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[methodId] || [])].map(f => {
-    const field = {...f, id:'eq_'+f.id, label:f.label.replace('Default ','')};
-    // Pre-fill from template defaults
-    if(!merged['eq_'+f.id] && tpl[f.id]) merged['eq_'+f.id] = tpl[f.id];
-    return field;
-  });
-  if(specific.length) html += ovFormSection(`${m.id} — Equipment & parameters`, specific, methodId, merged, m);
-  // Section 6: Result
-  html += ovFormSection('Result & sign-off', RPT_FORM.result.filter(f => !omit.has(f.id)), methodId, merged, m);
+  if(resultShared.length)  html += ovFormSection('Result',   resultShared,  methodId, merged, m);
+  if(signoffShared.length) html += ovFormSection('Sign-off', signoffShared, methodId, merged, m);
 
   // Photos — optional photo-page section. Renders an "+ Add photo page"
   // button when none has been added, or 6 photo slots + a "Remove photo
@@ -2314,7 +2334,7 @@ function ovSaveReport(mode) {
     }
     return;
   }
-  const allFields = [...RPT_FORM.client, ...RPT_FORM.subject, ...RPT_FORM.exam, ...RPT_FORM.result];
+  const allFields = rptAllFormFields();
   const specific = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])].map(f => ({...f, id:'eq_'+f.id}));
   const all = [...allFields, ...specific];
   const report = { method: _ovMethod, createdAt: new Date().toISOString() };

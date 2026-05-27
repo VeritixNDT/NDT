@@ -1684,6 +1684,16 @@ body:not([data-theme="light"]) .snav-org-logo.is-inverted img {
 }
 .snav-org-name:empty { display: none; }
 
+/* No-logo mode — Option B: when no company logo is configured, the
+   workspace name takes over as the identifier and the empty logo slot
+   collapses so the block doesn't leave a tall vertical gap. Paint the
+   name a touch larger so it has presence as a standalone identifier. */
+.snav-org-block.no-logo-mode .snav-org-logo { display: none; }
+.snav-org-block.no-logo-mode .snav-org-name {
+  font-size: 17px;
+  padding: 6px 4px;
+}
+
 /* Collapsed-sidebar variant — keep the logo visible at a small size,
    hide the workspace name (no room for text at 56 px wide). */
 [data-sidebar-collapsed="true"] .snav-org-block {
@@ -1694,6 +1704,9 @@ body:not([data-theme="light"]) .snav-org-logo.is-inverted img {
   height: 40px;
 }
 [data-sidebar-collapsed="true"] .snav-org-name { display: none; }
+/* Collapsed + no-logo-mode = nothing meaningful to show in 56px width,
+   so hide the whole block until the sidebar expands again. */
+[data-sidebar-collapsed="true"] .snav-org-block.no-logo-mode { display: none; }
 
 /* Offline indicator */
 .signal.offline {

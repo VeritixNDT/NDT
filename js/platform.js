@@ -2570,31 +2570,41 @@ function vxRenderSidebarOrgBlock(name){
     if(!isLightTheme && invertOnDark && logoSrc === primarySrc) useInvert = true;
   }
   var nameStr = (name && String(name).trim()) ? String(name).trim() : '';
+  // Option B: logo XOR name. When a logo is configured it carries the
+  // workspace identity on its own and the name is hidden to avoid
+  // duplication. When no logo is set, the name takes over as the
+  // identifier (and the empty-logo slot collapses so it doesn't leave a
+  // 78px gap). Click target stays the same — the whole block routes to
+  // Settings → Company in both modes.
   var blockIds = ['ov-snav-org-block', 'stg-snav-org-block'];
   for(var i = 0; i < blockIds.length; i++){
     var block = document.getElementById(blockIds[i]);
     if(!block) continue;
     var logoEl = block.querySelector('.snav-org-logo');
     var nameEl = block.querySelector('.snav-org-name');
-    if(logoEl){
-      // is-inverted class drives the CSS filter. We only add it on the
-      // fallback path — when the inspector has a dedicated dark logo,
-      // there's no need to invert (and inverting would make the dark
-      // logo look wrong against the dark sidebar).
-      if(useInvert) logoEl.classList.add('is-inverted');
-      else          logoEl.classList.remove('is-inverted');
-      if(logoSrc){
+    if(logoSrc){
+      // Logo mode — paint the image and clear the name so the existing
+      // `.snav-org-name:empty { display: none; }` rule hides it.
+      if(logoEl){
+        if(useInvert) logoEl.classList.add('is-inverted');
+        else          logoEl.classList.remove('is-inverted');
         logoEl.innerHTML = '<img src="' + logoSrc.replace(/"/g, '&quot;') + '" alt="Company logo"/>';
         logoEl.classList.remove('is-placeholder');
-      } else {
-        // Light building-silhouette glyph as the empty-state placeholder
-        // so the block still has visible structure before the user
-        // uploads a logo. Same icon family as the old topbar pill.
-        logoEl.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>';
-        logoEl.classList.add('is-placeholder');
       }
+      if(nameEl) nameEl.textContent = '';
+      block.classList.remove('no-logo-mode');
+    } else {
+      // No-logo mode — surface the name as the primary identifier and
+      // collapse the empty logo slot via `.no-logo-mode` (CSS hides it).
+      // No placeholder building-silhouette here: it would compete
+      // visually with the standalone name.
+      if(logoEl){
+        logoEl.innerHTML = '';
+        logoEl.classList.remove('is-placeholder', 'is-inverted');
+      }
+      if(nameEl) nameEl.textContent = nameStr;
+      block.classList.add('no-logo-mode');
     }
-    if(nameEl) nameEl.textContent = nameStr;
     // Hide the whole block when neither logo nor name is set — keeps the
     // sidebar header from showing an empty box for first-run / signed-out
     // users. Reappears as soon as either is set.

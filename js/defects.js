@@ -599,17 +599,12 @@ function procShowUpload(editIdx){
   const mSel = el('proc-method');
   if(mSel) mSel.innerHTML = getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
   if(extractBanner) extractBanner.style.display = 'none';
-  // Specification / Acceptance dropdowns share the report form's
-  // canonical lists (TPL_FIELDS._common) so a procedure's values always
-  // match a report's exactly. When the admin has curated those lists
-  // via the + / − buttons in Settings → Report templates, the same
-  // overrides apply here (tplEffectiveOptions handles the lookup).
-  const _tc = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS._common) || [];
-  const _specF = _tc.find(f => f.id === 'spec');
-  const _accF  = _tc.find(f => f.id === 'acc');
-  const specOpts = (typeof tplEffectiveOptions === 'function' && _specF) ? tplEffectiveOptions('UT', _specF) : ((_specF && _specF.options) || []);
-  const accOpts  = (typeof tplEffectiveOptions === 'function' && _accF)  ? tplEffectiveOptions('UT', _accF)  : ((_accF  && _accF.options)  || []);
 
+  // Spec / acceptance lists are now defined per NDT method, so they
+  // shift when the user picks a different method on this form. The
+  // change listener below re-runs the same lookup against the newly
+  // selected method, keeping any previously-typed value as a one-off
+  // if it falls outside the new list.
   if(_procEditIdx >= 0){
     const all = procGetAll();
     const p = all[_procEditIdx]; if(!p) return;
@@ -621,8 +616,7 @@ function procShowUpload(editIdx){
     el('proc-review').value = p.reviewDate||'';
     el('proc-status').value = p.status||'Active';
     if(mSel) mSel.value = p.method||'UT';
-    _procFillSelect('proc-standard', specOpts, p.standard);
-    _procFillSelect('proc-acceptance', accOpts, p.acceptance);
+    procRefreshSpecAcc(p.standard || '', p.acceptance || '');
     if(p.fileName && queueEl){
       const fIcon = p.fileType?(p.fileType.includes('pdf')?'📕':p.fileType.includes('image')?'🖼':'📘'):'📄';
       queueEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel2);border-radius:6px;font-size:12px;color:var(--t2)">${fIcon} ${escapeHtml(p.fileName)} <span style="color:var(--t3);font-size:10px">(current file — upload new to replace)</span></div>`;
@@ -631,14 +625,34 @@ function procShowUpload(editIdx){
     if(titleEl) titleEl.textContent = 'Upload procedure';
     if(saveBtn) saveBtn.textContent = 'Save procedure';
     ['proc-no','proc-title','proc-rev','proc-review'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
-    _procFillSelect('proc-standard', specOpts, '');
-    _procFillSelect('proc-acceptance', accOpts, '');
     el('proc-status').value = 'Active';
     if(mSel) mSel.selectedIndex = 0;
+    procRefreshSpecAcc('', '');
     if(queueEl) queueEl.innerHTML = '';
   }
+  // Re-render spec/acc whenever the method changes — the lists belong
+  // to the selected method (TPL_FIELDS[methodId]) and the curated
+  // overrides live under the same scope.
+  if(mSel) mSel.onchange = () => procRefreshSpecAcc(el('proc-standard')?.value || '', el('proc-acceptance')?.value || '');
   wrap.style.display = 'block';
   wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// Look up the spec / acceptance lists for the currently-selected method
+// and (re-)populate the procedure form's two dropdowns. Preserves the
+// value passed in as the selection — useful when restoring an edited
+// procedure or when the user has already chosen a value before
+// switching methods.
+function procRefreshSpecAcc(curSpec, curAcc){
+  const mSel = el('proc-method');
+  const methodId = (mSel && mSel.value) || 'UT';
+  const fields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[methodId]) || [];
+  const _specF = fields.find(f => f.id === 'spec');
+  const _accF  = fields.find(f => f.id === 'acc');
+  const specOpts = (typeof tplEffectiveOptions === 'function' && _specF) ? tplEffectiveOptions(methodId, _specF) : ((_specF && _specF.options) || []);
+  const accOpts  = (typeof tplEffectiveOptions === 'function' && _accF)  ? tplEffectiveOptions(methodId, _accF)  : ((_accF  && _accF.options)  || []);
+  _procFillSelect('proc-standard',  specOpts, curSpec || '');
+  _procFillSelect('proc-acceptance', accOpts, curAcc  || '');
 }
 
 function procHideUpload(){

@@ -99,6 +99,218 @@ function _ovCurrentUserInspector() {
       || null;
 }
 
+// ── Autosave draft of the in-progress new-report form ────────────────────
+// Persists form values + items table + exam remarks under KEYS.rptDraft,
+// keyed by method id. Photos / drawings / single-photo blocks are
+// deliberately NOT included — dataURLs are heavy and would risk
+// localStorage quota errors. The indicator next to the title only claims
+// what is actually saved.
+//
+// Lifecycle:
+//   ovNewReport         — wires a delegated input/change listener on
+//                         #ov-nr-body, surfaces a Restore-draft banner if
+//                         a fresh form (not a revision) finds an existing
+//                         draft for this method.
+//   _ovDraftSchedule    — debounces saves to 600ms after the last change.
+//   _ovDraftFlush       — collects + persists, updates the indicator.
+//   _ovDraftClear       — called by ovSaveReport on success and by
+//                         ovCancelReport when the user confirms close.
+//   _ovDraftIndicator   — paints the #ov-nr-saved span. Ticks every 15s
+//                         so "Saved 30s ago" stays accurate.
+var _ovDraftSaveTimer = null;
+var _ovDraftTickTimer = null;
+var _ovDraftSavedAt   = 0;
+var _ovDraftWired     = false;
+
+function _ovDraftRelTime(ms){
+  const s = Math.floor(ms / 1000);
+  if(s < 5)   return 'just now';
+  if(s < 60)  return s + 's ago';
+  const mins = Math.floor(s / 60);
+  if(mins < 60) return mins + (mins === 1 ? ' min ago' : ' mins ago');
+  const hrs = Math.floor(mins / 60);
+  return hrs + (hrs === 1 ? ' hr ago' : ' hrs ago');
+}
+
+function _ovDraftIndicator(state, when){
+  const ind = document.getElementById('ov-nr-saved');
+  if(!ind) return;
+  if(state === 'idle')    { ind.setAttribute('data-state','idle');   ind.textContent = ''; return; }
+  if(state === 'saving')  { ind.setAttribute('data-state','saving'); ind.textContent = 'Saving…'; return; }
+  if(state === 'saved')   {
+    ind.setAttribute('data-state','saved');
+    ind.textContent = 'Saved ' + _ovDraftRelTime(Date.now() - (when || _ovDraftSavedAt));
+    return;
+  }
+}
+
+function _ovDraftAllStore(){ return ls(KEYS.rptDraft, {}) || {}; }
+function _ovDraftLoad(methodId){
+  const all = _ovDraftAllStore();
+  return (methodId && all[methodId]) ? all[methodId] : null;
+}
+function _ovDraftClear(methodId){
+  if(!methodId) return;
+  const all = _ovDraftAllStore();
+  if(!all[methodId]) return;
+  delete all[methodId];
+  lss(KEYS.rptDraft, all);
+}
+
+// Snapshot the current form into a plain object. Photos / drawings are
+// excluded by design (see header comment).
+function _ovDraftCollect(){
+  if(!_ovMethod) return null;
+  const allFields = [...RPT_FORM.client, ...RPT_FORM.subject, ...RPT_FORM.exam, ...RPT_FORM.result];
+  const specific  = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])].map(f => ({...f, id:'eq_'+f.id}));
+  const all = [...allFields, ...specific];
+  const form = {};
+  all.forEach(f => {
+    const inp = el(`rf-${_ovMethod}-${f.id}`);
+    if(inp) form[f.id] = (f.type === 'select') ? inp.value : (inp.value || '');
+  });
+  // Items table — read live DOM values so any chars typed since the last
+  // ovItemsCapture (e.g. user still has focus) are captured.
+  (typeof ovItemsSync === 'function') && ovItemsSync();
+  const items = Array.isArray(_ovItems) ? _ovItems.map(r => Object.assign({}, r)) : [];
+  const remarksEl = document.getElementById('ov-exam-remarks');
+  const reasonEl  = document.getElementById('ov-revision-reason');
+  return {
+    method: _ovMethod,
+    form,
+    items,
+    examRemarks:    remarksEl ? remarksEl.value : '',
+    revisionReason: reasonEl  ? reasonEl.value  : '',
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function _ovDraftFlush(){
+  if(!_ovMethod) return;
+  const draft = _ovDraftCollect();
+  if(!draft) return;
+  try {
+    const all = _ovDraftAllStore();
+    all[_ovMethod] = draft;
+    lss(KEYS.rptDraft, all);
+    _ovDraftSavedAt = Date.now();
+    _ovDraftIndicator('saved');
+  } catch(e){
+    // Quota / serialisation failure — fall back to a quiet error indicator
+    // rather than throwing inside an input event handler.
+    console.warn('autosave failed', e);
+    const ind = document.getElementById('ov-nr-saved');
+    if(ind){ ind.setAttribute('data-state','saved'); ind.textContent = 'Autosave failed'; }
+  }
+}
+
+function _ovDraftSchedule(){
+  if(!_ovMethod) return;
+  _ovDraftIndicator('saving');
+  if(_ovDraftSaveTimer) clearTimeout(_ovDraftSaveTimer);
+  _ovDraftSaveTimer = setTimeout(() => {
+    _ovDraftSaveTimer = null;
+    _ovDraftFlush();
+  }, 600);
+}
+
+// Re-paint the relative time string every 15s so "Saved 30s ago" doesn't
+// stall at "Saved just now". Stops itself when the form is left.
+function _ovDraftStartTick(){
+  if(_ovDraftTickTimer) clearInterval(_ovDraftTickTimer);
+  _ovDraftTickTimer = setInterval(() => {
+    if(!_ovMethod){ _ovDraftStopTick(); return; }
+    if(_ovDraftSavedAt) _ovDraftIndicator('saved');
+  }, 15000);
+}
+function _ovDraftStopTick(){
+  if(_ovDraftTickTimer){ clearInterval(_ovDraftTickTimer); _ovDraftTickTimer = null; }
+}
+
+// Wire the delegated listener exactly once (the host element #ov-nr-body
+// is in the static HTML — its identity is stable across ovNewReport
+// rerenders). The handler no-ops when no method is active.
+function _ovDraftWireOnce(){
+  if(_ovDraftWired) return;
+  const body = document.getElementById('ov-nr-body');
+  if(!body) return;
+  const handler = (e) => {
+    if(!_ovMethod) return;
+    // Ignore non-form mutations (e.g. button clicks bubbling up).
+    const t = e.target;
+    if(!t || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    _ovDraftSchedule();
+  };
+  body.addEventListener('input',  handler);
+  body.addEventListener('change', handler);
+  _ovDraftWired = true;
+}
+
+// Hydrate the form from a stored draft. Called when the user clicks
+// Restore on the banner. The form has already been rendered with template
+// defaults; this overwrites those values with the draft's.
+function _ovDraftRestore(){
+  if(!_ovMethod) return;
+  const draft = _ovDraftLoad(_ovMethod);
+  if(!draft || draft.method !== _ovMethod) return;
+  // Hydrate top-level form inputs
+  Object.keys(draft.form || {}).forEach(fid => {
+    const inp = el(`rf-${_ovMethod}-${fid}`);
+    if(inp) inp.value = draft.form[fid] == null ? '' : draft.form[fid];
+  });
+  // Items table — replace working copy then re-render so the row markup
+  // reflects restored verdicts (swatch colours, defect rows, etc.).
+  if(Array.isArray(draft.items) && draft.items.length){
+    _ovItems = draft.items.slice();
+  }
+  if(typeof ovItemsRerender === 'function') ovItemsRerender();
+  // Exam remarks + revision reason
+  const remarksEl = document.getElementById('ov-exam-remarks');
+  if(remarksEl && draft.examRemarks != null) remarksEl.value = draft.examRemarks;
+  const reasonEl  = document.getElementById('ov-revision-reason');
+  if(reasonEl  && draft.revisionReason)      reasonEl.value  = draft.revisionReason;
+  // Remove the banner and paint a fresh "Saved" indicator anchored to the
+  // draft's own savedAt — gives the user honest "Saved 2 mins ago" copy
+  // rather than implying the restore re-saved.
+  const banner = document.getElementById('ov-nr-restore');
+  if(banner) banner.remove();
+  _ovDraftSavedAt = draft.savedAt ? Date.parse(draft.savedAt) : Date.now();
+  _ovDraftIndicator('saved');
+}
+
+function _ovDraftDiscard(){
+  if(!_ovMethod) return;
+  _ovDraftClear(_ovMethod);
+  const banner = document.getElementById('ov-nr-restore');
+  if(banner) banner.remove();
+  _ovDraftSavedAt = 0;
+  _ovDraftIndicator('idle');
+}
+
+// Build the restore banner for a fresh (non-revision) report when a draft
+// exists for this method. Inserted at the top of #ov-nr-body so the rest
+// of the form renders untouched.
+function _ovDraftMaybeShowRestoreBanner(){
+  if(!_ovMethod || _ovReviseSource) return;
+  const draft = _ovDraftLoad(_ovMethod);
+  if(!draft || draft.method !== _ovMethod) return;
+  const body = document.getElementById('ov-nr-body');
+  if(!body) return;
+  const when = draft.savedAt ? _ovDraftRelTime(Date.now() - Date.parse(draft.savedAt)) : '';
+  const banner = document.createElement('div');
+  banner.className = 'ov-nr-restore';
+  banner.id = 'ov-nr-restore';
+  banner.innerHTML = `
+    <div class="ov-nr-restore-text">
+      You have an unsaved <b>${escapeHtml(_ovMethod)}</b> draft from <span class="ov-nr-restore-when">${escapeHtml(when || 'earlier')}</span>.
+    </div>
+    <div class="ov-nr-restore-actions">
+      <button class="btn btn-sm" data-action="_ovDraftDiscard">Discard</button>
+      <button class="btn btn-sm btn-primary" data-action="_ovDraftRestore">Restore draft</button>
+    </div>`;
+  body.insertBefore(banner, body.firstChild);
+}
+
 function ovInit() {
   // Build new report method buttons
   const wrap = el('ov-new-report-btns'); if(!wrap) return;
@@ -1248,6 +1460,15 @@ function ovNewReport(methodId, btn, sourceReport) {
   // (00 for a new report, the next number for a revision) — and in
   // revision mode the reason box is rendered into the form above.
   _ovRevisionOriginal = (sourceReport ? (sourceReport.revision || '00') : '00').trim();
+
+  // Autosave wiring — attach the delegated listener once (handler reads
+  // _ovMethod live so it adapts to method changes), reset the indicator,
+  // surface the restore banner for fresh forms with a pending draft.
+  _ovDraftWireOnce();
+  _ovDraftSavedAt = 0;
+  _ovDraftIndicator('idle');
+  _ovDraftStartTick();
+  _ovDraftMaybeShowRestoreBanner();
 }
 
 // Auto-pick the Procedure field from Settings → NDT procedures, matching
@@ -2303,6 +2524,11 @@ function ovSaveReport(mode) {
   }
   updateReportCount();
   if(typeof updateInboxBadge === 'function') updateInboxBadge();
+  // The form's autosave draft is now superseded by the persisted record —
+  // clear it so the next "New <method> report" opens clean.
+  _ovDraftClear(_ovMethod);
+  _ovDraftStopTick();
+  _ovDraftIndicator('idle');
   toast(forReview ? `${m.id} report submitted for review.` : `${m.id} report saved.`);
   ovShowSection('dashboard', el('ovi-dashboard'));
 }
@@ -2316,6 +2542,11 @@ async function ovCancelReport(){
     const ok = await vxConfirm({ message: 'Close this report without saving? Any changes you have made will be lost.', okLabel: 'Close', cancelLabel: 'Keep editing' });
     if(!ok) return;
   }
+  // The user explicitly opted to abandon. Drop any autosave draft so the
+  // next open of this method's New report is clean.
+  if(_ovMethod) _ovDraftClear(_ovMethod);
+  _ovDraftStopTick();
+  _ovDraftIndicator('idle');
   if(_ovReviseSource && typeof showPage === 'function'){
     showPage('reports', document.querySelectorAll('.tn')[2]);
   } else {

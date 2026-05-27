@@ -147,6 +147,10 @@ var KEYS = {
   // disabled) and feeds the equipment / sv-id / cal-date place cards
   // via the snapshot fields ovSaveReport writes onto the report.
   equipment:'vx-equipment-v1',
+  // Per-method draft of the in-progress new-report form. Persisted on
+  // every field change (debounced) so the user can see a "Saved Xs ago"
+  // indicator and resume on reopen. Cleared on successful save / cancel.
+  rptDraft: 'vx-rptdraft-v1',
 };
 
 // Method names use the formal "Examination" suffix per ASME / EN

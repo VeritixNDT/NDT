@@ -495,6 +495,12 @@
               <div class="sh-title" id="ov-nr-title">New report</div>
               <div class="sh-desc" id="ov-nr-desc">Fill in the report details below.</div>
             </div>
+            <div class="sh-actions">
+              <!-- Autosave indicator — populated by _ovDraftIndicator. Hidden
+                   until the first field change so a freshly opened form
+                   doesn't claim "Saved" before the user has typed anything. -->
+              <span class="ov-nr-saved" id="ov-nr-saved" aria-live="polite" data-state="idle"></span>
+            </div>
           </div>
           <div id="ov-nr-body"></div>
         </div>

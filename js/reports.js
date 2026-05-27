@@ -86,8 +86,8 @@ var TPL_FIELDS = {
     // shared by the report form AND the procedure register, so a
     // procedure's spec/acceptance always matches a report's exactly.
     // The edition year is kept — it is part of the traceable record.
-    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 17638:2016','EN-ISO 17638:2017','EN-ISO 3452-1:2021','EN-ISO 16809:2019','EN-ISO 6507-1','ASME BPV Code, Section V Art. 4 (2023)','ASME BPV Code, Section V Art. 6 (2023)','ASME BPV Code, Section V Art. 7 (2023)','ASME BPV Code, Section V Art. 9 (2023)','ASME BPV Code, Section II (2021)'] },
-    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 level 2','EN-ISO 11666:2018 level 3','EN-ISO 23278:2016 Level 1','EN-ISO 23278:2016 Level 2','EN-ISO 23278:2016 Level 3','EN-ISO 5817:2014','AWS D1.1','ASME BPV Code, Section VIII Div. 1 (2023)','ASME BPV Code, Section I (2023)','ASME BPV Code, Section I A-260 (2023)','ASME BPV Code, B31.3 (2022)','For client information'] },
+    { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17638:2016', options:['EN-ISO 17638:2016','EN 1090-2:2018+A1:2024','ASME BPVC Sec. V, Art. 7 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part F)','ISO 17638:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
+    { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. ISO 23278:2015 Level 2', options:['ISO 23278:2015 Level 1','ISO 23278:2015 Level 2','ISO 23278:2015 Level 2X','ISO 23278:2015 Level 3','ISO 23278:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.3 / 341.3.2','ASME B31.1-2024, para. 136.4.3','ASME VIII Div. 1, Mandatory App. 6 — 2025','ASME VIII Div. 2, Part 7 (Table 7.16) — 2025','No cracks'] },
     // Procedure no. and NDT equipment used to live here as Default
     // dropdowns. They were removed: the printed report now sources both
     // from the smart place cards (`procedure-link` → Settings → NDT
@@ -114,7 +114,7 @@ var TPL_FIELDS = {
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'suspBatch',  label:'Test suspension batch no.', placeholder:'e.g. 24A-0815' },
     { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black water-based','Visible black oil-based','Visible red water-based','Visible red oil-based','Dry powder black','Dry powder red'] },
-    { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
+    { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. The white-light lux reading is

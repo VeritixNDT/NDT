@@ -138,7 +138,7 @@ var TPL_FIELDS = {
     { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 3452-1:2021', options:['EN-ISO 3452-1:2021','ASME BPVC Sec. V, Art. 6 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part D)','EN 1090-2:2018+A1:2024','ISO 3452-1:2021 via NORSOK M-101 (Ed. 6, 2022)'] },
     { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 23277:2015 Level 2', options:['EN-ISO 23277:2015 Level 1','EN-ISO 23277:2015 Level 2','EN-ISO 23277:2015 Level 2X','EN-ISO 23277:2015 Level 3','EN-ISO 23277:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.4','ASME VIII Div. 1, Mandatory App. 8 — 2025','No cracks'] },
     { id:'pen',    label:'Default penetrant',    placeholder:'e.g. Magnaflux ZL4C', options:['Magnaflux ZL4C','Magnaflux ZL-60D','MR Chemie MR 68','Ardrox 970-P22'] },
-    { id:'pdwell', label:'Penetrant dwell time', placeholder:'e.g. 15 mins', options:['5 mins','10 mins','15 mins','20 mins','30 mins'] },
+    { id:'pdwell', label:'Penetrant dwell time', placeholder:'check spec for material — e.g. 10-20 mins', options:['5 mins','5-10 mins','10 mins','10-20 mins','15 mins','20 mins','20-30 mins','30 mins','30-60 mins','45 mins','60 mins'] },
     { id:'ddwell', label:'Developer dwell time', placeholder:'e.g. 10 mins', options:['7 mins','10 mins','10-20 mins','15 mins','20 mins','30 mins'] },
     { id:'clean',  label:'Cleaner/remover',      placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5'] },
     { id:'dev',    label:'Developer',            placeholder:'e.g. Magnaflux SKD-S2', options:['Magnaflux SKD-S2','MR Chemie MR 70','Ardrox 9D1B'] },

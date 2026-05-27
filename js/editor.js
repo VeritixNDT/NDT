@@ -75,6 +75,20 @@ var CV_FIELD_DEFS = {
   'acc-crit':     {label:'Acceptance criteria',           ph:'EN-ISO 11666:2018 level 2',     get:r=>r.eq_acc||r.accCrit||'—',     w:200,h:38, mapTo:'eq_acc / accCrit'},
   'procedure':    {label:'Procedure no.',                 ph:'SV2023-004-NDTD-PRO-0009',      get:r=>r.eq_proc||r.proc||'—',       w:210,h:38, mapTo:'eq_proc / proc'},
   'proc-rev':     {label:'Procedure revision',            ph:'01',                            get:r=>r.procRev||'—',               w:90, h:38, mapTo:'procRev'},
+  // PT type / method (ISO 3452-1 §4.3 / ASME V Art. 6 T-621). Specs
+  // cite the two together — "Type I Method A" — so the cards are
+  // sized to drop next to each other on the page.
+  'pt-type':      {label:'PT type',                       ph:'Type I — Fluorescent',          get:r=>r.eq_pttype||r.pttype||'—',     w:220,h:38, mapTo:'eq_pttype / pttype'},
+  'pt-method':    {label:'PT method',                     ph:'Method A — Water washable',     get:r=>r.eq_ptmethod||r.ptmethod||'—', w:240,h:38, mapTo:'eq_ptmethod / ptmethod'},
+  // PT sensitivity level per EN-ISO 3452-2:2021 (½ low → 4 ultra-high).
+  'pt-sens':      {label:'PT sensitivity',                ph:'Level 2 — Medium',              get:r=>r.eq_ptsens||r.ptsens||'—',     w:200,h:38, mapTo:'eq_ptsens / ptsens'},
+  // PT pre-cleaner (ISO 3452-1 §6.1 / ASME V Art. 6 T-642).
+  'pt-precleaner':{label:'PT pre-cleaner',                ph:'Magnaflux SKC-S',               get:r=>r.eq_precleaner||r.precleaner||'—', w:185,h:38, mapTo:'eq_precleaner / precleaner'},
+  // PT timings — emulsification (Method B / D only) and post-wash
+  // drying. Both are captured on the report's Equipment & parameters
+  // section per ISO 3452-1 §6.3 / §6.5 and ASME V Art. 6 T-674 / T-676.4.
+  'pt-emul-time': {label:'Emulsifier dwell time',         ph:'1-2 mins',                       get:r=>r.eq_emulTime||r.emulTime||'—', w:170,h:38, mapTo:'eq_emulTime / emulTime'},
+  'pt-dry-time':  {label:'Drying time',                   ph:'5-10 mins',                      get:r=>r.eq_dryTime||r.dryTime||'—',   w:140,h:38, mapTo:'eq_dryTime / dryTime'},
   'equipment':    {label:'Equipment',                     ph:'SIUI Smartor 16',               get:r=>r.eq_equip||r.equip||_cvEqLookup(r,'name')||'—',     w:185,h:38, mapTo:'eq_equip / equip'},
   'sv-id':        {label:'SV-ID No.',                     ph:'SV-UT-004',                     get:r=>r.eq_svid||r.eqSvId||_cvEqLookup(r,'svId')||'—',     w:110,h:38, mapTo:'eq_svid'},
   'cal-date':     {label:'Calibration date',              ph:'2025-01-10',                    get:r=>r.eq_caldate||r.eqCalDate||_cvEqLookup(r,'calLastAt')||'—',w:130,h:38, mapTo:'eq_caldate'},
@@ -292,7 +306,7 @@ var CV_PALETTE_GROUPS = [
   {id:'identity',  label:'Identity',      fields:['report-no','revision','method','exam-date']},
   {id:'client',    label:'Client info',   fields:['client','project','project-no','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','material','thickness','weld-prep','weld-process','welders']},
-  {id:'criteria',  label:'Criteria',      fields:['exam-type','surf-cond','temperature','heat-treat','extent','spec','acc-crit','procedure','proc-rev','stage','weld-pos']},
+  {id:'criteria',  label:'Criteria',      fields:['exam-type','surf-cond','temperature','heat-treat','extent','spec','acc-crit','procedure','proc-rev','pt-type','pt-method','pt-sens','pt-precleaner','pt-emul-time','pt-dry-time','stage','weld-pos']},
   {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','light-source','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},

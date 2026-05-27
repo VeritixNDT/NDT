@@ -601,10 +601,14 @@ function procShowUpload(editIdx){
   if(extractBanner) extractBanner.style.display = 'none';
   // Specification / Acceptance dropdowns share the report form's
   // canonical lists (TPL_FIELDS._common) so a procedure's values always
-  // match a report's exactly.
+  // match a report's exactly. When the admin has curated those lists
+  // via the + / − buttons in Settings → Report templates, the same
+  // overrides apply here (tplEffectiveOptions handles the lookup).
   const _tc = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS._common) || [];
-  const specOpts = (_tc.find(f => f.id === 'spec') || {}).options || [];
-  const accOpts  = (_tc.find(f => f.id === 'acc')  || {}).options || [];
+  const _specF = _tc.find(f => f.id === 'spec');
+  const _accF  = _tc.find(f => f.id === 'acc');
+  const specOpts = (typeof tplEffectiveOptions === 'function' && _specF) ? tplEffectiveOptions('UT', _specF) : ((_specF && _specF.options) || []);
+  const accOpts  = (typeof tplEffectiveOptions === 'function' && _accF)  ? tplEffectiveOptions('UT', _accF)  : ((_accF  && _accF.options)  || []);
 
   if(_procEditIdx >= 0){
     const all = procGetAll();

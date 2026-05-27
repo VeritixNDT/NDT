@@ -1746,6 +1746,10 @@ function selAddOption(selId) {
     sel.appendChild(opt);
     sel.value = txt;
     row.remove();
+    // Persist additions made in the report-template editor so the
+    // option list survives a tab-switch / page re-render. No-op for
+    // dropdowns outside that editor (selId not prefixed with "tpl-").
+    if(typeof tplPersistFieldOpts === 'function') tplPersistFieldOpts(selId);
     toast(t('toast.option_added', 'Option added.'));
   };
   confirmBtn.onclick = commit;
@@ -1761,6 +1765,8 @@ async function selDelOption(selId) {
   if(!await vxConfirm({ message: `Are you sure you want to remove "${txt}"?`, okLabel: t('vxc.remove','Remove'), danger: true })) return;
   sel.remove(idx);
   sel.selectedIndex = 0;
+  // Persist removals from the report-template editor (see selAddOption).
+  if(typeof tplPersistFieldOpts === 'function') tplPersistFieldOpts(selId);
   toast(t('toast.option_removed', 'Option removed.'));
 }
 

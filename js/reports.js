@@ -3,14 +3,82 @@
 // ══════════════════════════════════════════════
 var TPL_KEY = 'vx-templates-v1';
 var RPT_KEY = 'vx-rptforms-v1';
+// Per-field option overrides — populated when the user uses the + / −
+// buttons on a dropdown in Settings → Report templates. Shape:
+//   { "common.spec": ["EN-ISO …", "Custom A"], "UT.coup": [...] }
+// "common" covers TPL_FIELDS._common entries (shared across methods); the
+// methodId prefix scopes overrides to that method's tab. tplEffectiveOptions
+// merges this on top of TPL_FIELDS defaults so the rendered dropdown
+// reflects whatever the admin has curated.
+var TPL_OPTS_KEY = 'vx-tpl-field-options-v1';
 var _tplData = {};
 var _rptForms = {};
+var _tplFieldOpts = {};
 var _tplActiveMethod = null;
 var _tplView = 'defaults'; // 'defaults' | 'form'
 
-function loadTemplates() { _tplData = ls(TPL_KEY, {}); _rptForms = ls(RPT_KEY, {}); }
+function loadTemplates() {
+  _tplData = ls(TPL_KEY, {});
+  _rptForms = ls(RPT_KEY, {});
+  _tplFieldOpts = ls(TPL_OPTS_KEY, {});
+}
 function saveTemplates() { lss(TPL_KEY, _tplData); }
 function saveRptForms()  { lss(RPT_KEY, _rptForms); }
+function saveTplFieldOpts() { lss(TPL_OPTS_KEY, _tplFieldOpts); }
+
+// Resolve which scope a TPL_FIELDS entry belongs to: 'common' for
+// _common shared fields, the methodId for method-specific fields, or
+// null if not found (in which case overrides don't apply). The
+// new-report form renames equipment fields to "eq_${id}" when rendering
+// the Equipment & parameters section, so strip that prefix before
+// matching against TPL_FIELDS so a single override list serves both
+// the templates editor and the live report form.
+function _tplFieldScope(methodId, fieldId) {
+  const id = (typeof fieldId === 'string' && fieldId.startsWith('eq_')) ? fieldId.slice(3) : fieldId;
+  if((TPL_FIELDS._common || []).some(f => f.id === id)) return { scope:'common', id };
+  if((TPL_FIELDS[methodId] || []).some(f => f.id === id)) return { scope:methodId, id };
+  return null;
+}
+
+// Effective option list for a (methodId, field) pair. Returns the stored
+// override list when one exists; otherwise the field's hard-coded
+// defaults. Always returns a fresh array — callers may mutate.
+function tplEffectiveOptions(methodId, field) {
+  if(!field) return [];
+  const m = _tplFieldScope(methodId, field.id);
+  if(m) {
+    const store = (typeof _tplFieldOpts === 'object' && _tplFieldOpts) ? _tplFieldOpts : ls(TPL_OPTS_KEY, {});
+    const custom = store[m.scope + '.' + m.id];
+    if(Array.isArray(custom)) return custom.slice();
+  }
+  return Array.isArray(field.options) ? field.options.slice() : [];
+}
+
+// Snapshot a <select>'s current option list and persist it as the
+// override for that field. Called after selAddOption / selDelOption
+// updates the DOM so the change survives a re-render. selId is the
+// rendered field id (`tpl-${methodId}-${fieldId}` for the templates
+// editor); we no-op for selects in other parts of the UI.
+function tplPersistFieldOpts(selId) {
+  if(typeof selId !== 'string' || !selId.startsWith('tpl-')) return;
+  const rest = selId.slice(4);
+  const dash = rest.indexOf('-');
+  if(dash < 0) return;
+  const methodId = rest.slice(0, dash);
+  const fieldId  = rest.slice(dash + 1);
+  const m = _tplFieldScope(methodId, fieldId);
+  if(!m) return;
+  const sel = (typeof el === 'function' ? el(selId) : document.getElementById(selId));
+  if(!sel) return;
+  // The "— Select —" placeholder has value="" and is not part of the
+  // editable option list — drop it before snapshotting.
+  const opts = Array.from(sel.options)
+    .filter(o => o.value !== '')
+    .map(o => o.text);
+  if(!_tplFieldOpts || typeof _tplFieldOpts !== 'object') _tplFieldOpts = ls(TPL_OPTS_KEY, {});
+  _tplFieldOpts[m.scope + '.' + m.id] = opts;
+  saveTplFieldOpts();
+}
 
 var TPL_FIELDS = {
   _common: [
@@ -20,14 +88,12 @@ var TPL_FIELDS = {
     // The edition year is kept — it is part of the traceable record.
     { id:'spec',  label:'Default specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 17638:2016','EN-ISO 17638:2017','EN-ISO 3452-1:2021','EN-ISO 16809:2019','EN-ISO 6507-1','ASME BPV Code, Section V Art. 4 (2023)','ASME BPV Code, Section V Art. 6 (2023)','ASME BPV Code, Section V Art. 7 (2023)','ASME BPV Code, Section V Art. 9 (2023)','ASME BPV Code, Section II (2021)'] },
     { id:'acc',   label:'Default acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 level 2','EN-ISO 11666:2018 level 3','EN-ISO 23278:2016 Level 1','EN-ISO 23278:2016 Level 2','EN-ISO 23278:2016 Level 3','EN-ISO 5817:2014','AWS D1.1','ASME BPV Code, Section VIII Div. 1 (2023)','ASME BPV Code, Section I (2023)','ASME BPV Code, Section I A-260 (2023)','ASME BPV Code, B31.3 (2022)','For client information'] },
-    { id:'proc',  label:'Default procedure no.',       placeholder:'e.g. SV2023-004-NDTD-PRO-0009', options:['SV2023-004-NDTD-PRO-0009','SV2023-004-NDTD-PRO-0005','SV2023-004-NDTD-PRO-0003','SV2023-004-NDTD-PRO-0007','SV2023-004-NDTD-PRO-0013','SV2023-004-NDTD-PRO-0014'] },
-    // `equip` is rendered by a custom renderer (equipmentSelectHtml) in
-    // the new-report form — it sources its options from the equipment
-    // register (Settings → Equipment) and disables out-of-cal items.
-    // The options array is kept as a fallback for the template editor
-    // (Settings → Report templates) where the equipment context isn't
-    // available; for new reports the live equipment register wins.
-    { id:'equip', label:'NDT equipment',                placeholder:'Pick from the equipment register…', useEquipmentRegister:true, options:['SIUI Smartor','Olympus EPOCH 650','Olympus EPOCH 6LT','Sonatest Veo+','GE USM 36','Inspection kit','Universal cam gauge','Welding gauge set','X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Mic 10','Sonodur 3','Proceq Equotip 550'] },
+    // Procedure no. and NDT equipment used to live here as Default
+    // dropdowns. They were removed: the printed report now sources both
+    // from the smart place cards (`procedure-link` → Settings → NDT
+    // procedures; `equipment` / `calib-status` → Settings → Equipment),
+    // so the value picked at inspection time wins and there is no
+    // "default" to seed from this editor.
   ],
   UT: [
     { id:'coup',  label:'Default couplant',     placeholder:'e.g. Ultragel II', options:['Waterbased','Oil','Ultragel II','Sono 600','Sonagel W','Glycerin'] },
@@ -47,7 +113,7 @@ var TPL_FIELDS = {
     { id:'cur',        label:'Current',            placeholder:'e.g. AC',               options:['AC','HWDC','FWDC','DC','Permanent magnet'] },
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'suspBatch',  label:'Test suspension batch no.', placeholder:'e.g. 24A-0815' },
-    { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black','Visible red','Dry powder black','Dry powder red'] },
+    { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black water-based','Visible black oil-based','Visible red water-based','Visible red oil-based','Dry powder black','Dry powder red'] },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Not used','Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
@@ -326,12 +392,17 @@ function rptFieldHtml(methodId, f, data) {
   // selected to sign the report.
   if(f.useInspectorRegister) return inspectorSelectHtml(methodId, f, val, fid);
   if(f.type==='textarea') return `<div class="fld"><label>${f.label}</label><textarea id="${fid}" rows="2" placeholder="${f.placeholder}">${val}</textarea></div>`;
+  // Effective option list — when the admin has curated the dropdown via
+  // the + / − buttons in Settings → Report templates, those overrides
+  // win here too. For RPT_FORM fields (client / exam / result) the
+  // lookup falls through to the field's hard-coded defaults.
+  const fieldOpts = tplEffectiveOptions(methodId, f);
   // Editable combo — free-typed value with the presets offered as datalist
   // suggestions, so an inspector can enter an exact reading (e.g. 1187)
   // and still pick a common value in one click.
-  if(f.editable && f.options && f.options.length) {
+  if(f.editable && fieldOpts.length) {
     const dl = fid + '-dl';
-    const opts = f.options.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+    const opts = fieldOpts.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
     // Numeric fields (UV-A, white-light) restrict input to numbers and
     // raise a decimal keypad on tablets; non-numeric fields stay free text.
     const numAttrs = f.numeric ? ' type="number" min="0" step="any" inputmode="decimal"' : ' type="text"';
@@ -365,20 +436,19 @@ function rptFieldHtml(methodId, f, data) {
       <input id="${fid}" list="${dl}"${numAttrs}${warnAttrs}${gateAttrs}${gateData} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"${inpStyle?` style="${inpStyle}"`:''}/>
       <datalist id="${dl}">${opts}</datalist>${warnHtml}${naHtml}</div>`;
   }
+  // Dropdown fields on the new-report form are read-only with respect to
+  // their option list — inspectors pick from the values defined under
+  // Settings → Report templates, and cannot add or remove options here.
   if(f.type==='select') {
-    return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
-      <select id="${fid}" style="flex:1">${(f.options||[]).map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>
-      <button type="button" class="sel-add-btn" data-action="selAddOption" data-args="'${fid}'" title="Add option">+</button>
-      <button type="button" class="sel-del-btn" data-action="selDelOption" data-args="'${fid}'" title="Remove selected">−</button>
-    </div></div>`;
+    return `<div class="fld"><label>${f.label}</label>
+      <select id="${fid}">${fieldOpts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>
+    </div>`;
   }
-  if(f.options && f.options.length) {
-    const opts = f.options.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
-    return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
-      <select id="${fid}" style="flex:1"><option value="">— Select —</option>${opts}</select>
-      <button type="button" class="sel-add-btn" data-action="selAddOption" data-args="'${fid}'" title="Add option">+</button>
-      <button type="button" class="sel-del-btn" data-action="selDelOption" data-args="'${fid}'" title="Remove selected">−</button>
-    </div></div>`;
+  if(fieldOpts.length) {
+    const opts = fieldOpts.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
+    return `<div class="fld"><label>${f.label}</label>
+      <select id="${fid}"><option value="">— Select —</option>${opts}</select>
+    </div>`;
   }
   return `<div class="fld"><label>${f.label}</label><input id="${fid}" type="${f.type||'text'}" value="${val}" placeholder="${f.placeholder||''}" ${f.readonly?'readonly style="color:var(--t3);font-style:italic"':''}/></div>`;
 }
@@ -600,11 +670,15 @@ async function rptFormClear(methodId) {
 function tplFieldHtml(methodId, f, tpl) {
   const val = tpl[f.id]||'';
   const fid = `tpl-${methodId}-${f.id}`;
+  // Effective option list = TPL_FIELDS defaults merged with any add/delete
+  // edits the admin has saved on this field. Falls back to the static
+  // defaults when no overrides exist.
+  const fieldOpts = tplEffectiveOptions(methodId, f);
   // Editable combo — same as the new-report form: free text with the
   // presets as datalist suggestions (see rptFieldHtml).
-  if(f.editable && f.options && f.options.length) {
+  if(f.editable && fieldOpts.length) {
     const dl = fid + '-dl';
-    const opts = f.options.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+    const opts = fieldOpts.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
     // Numeric fields (UV-A, white-light) restrict input to numbers and
     // raise a decimal keypad on tablets; non-numeric fields stay free text.
     const numAttrs = f.numeric ? ' type="number" min="0" step="any" inputmode="decimal"' : ' type="text"';
@@ -612,8 +686,8 @@ function tplFieldHtml(methodId, f, tpl) {
       <input id="${fid}" list="${dl}"${numAttrs} value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder||'')}" autocomplete="off"/>
       <datalist id="${dl}">${opts}</datalist></div>`;
   }
-  if(f.options && f.options.length) {
-    const opts = f.options.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
+  if(fieldOpts.length) {
+    const opts = fieldOpts.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
     return `<div class="fld"><label>${f.label}</label><div style="display:flex;gap:6px;align-items:stretch">
       <select id="${fid}" style="flex:1"><option value="">— Select —</option>${opts}</select>
       <button type="button" class="sel-add-btn" data-action="selAddOption" data-args="'${fid}'" title="Add option">+</button>
@@ -649,6 +723,12 @@ function tplSave(methodId) {
   }
   _tplData[methodId]=tpl;
   saveTemplates();
+  // Re-render the editor body from the just-saved state. Without this the
+  // form keeps showing the DOM values the user typed; on a tab-switch /
+  // page revisit the body re-renders from _tplData, which is jarring if
+  // anything was inadvertently dropped on save. Re-rendering immediately
+  // makes the persisted state visible.
+  tplRenderBody(methodId);
   toast(`${m.id} template saved.`);
 }
 

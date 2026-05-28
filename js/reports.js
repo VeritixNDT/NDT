@@ -159,6 +159,11 @@ var TPL_FIELDS = {
   VT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 5817:2014 Level B', options:['EN-ISO 5817:2014 Level B','EN-ISO 5817:2014 Level C','EN-ISO 5817:2014 Level D','EN-ISO 10042:2018 Level B','EN-ISO 10042:2018 Level C','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 341.3.2','ASME VIII Div. 1, UW-51 / UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.1','No cracks'] },
+    // Welding position per EN-ISO 6947 (PA/PB/…) with the ASME 1G/2G/…
+    // equivalents in brackets so the inspector reads one card and the
+    // shop's record matches whichever standard the WPS cites.
+    { id:'weldPos',  label:'Welding position',     placeholder:'e.g. PA (1G)',
+      options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
     // Time-after-welding hold per applicable code — covers delayed
     // (hydrogen-induced) cracking risk. AWS D1.1 §8.15.1 requires 48 h
     // for steels with yield ≥ 690 MPa; ASME B31.3 §341.3.2 calls for a
@@ -317,7 +322,6 @@ var RPT_FORM = {
     { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
     { id:'heatTreat',  label:'Heat treatment',       placeholder:'e.g. PWHT, As-welded', options:['PWHT','APWHT','n.a.','Before','After'] },
     { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', methodsOnly:['VT'], options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
-    { id:'weldPos',    label:'Welding position',     placeholder:'e.g. PA (1G)', methodsOnly:['VT'], options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
     { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
   ],
   result: [

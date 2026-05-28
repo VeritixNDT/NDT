@@ -274,6 +274,28 @@ var CV_DEFECT_COLS = [
   { label:'Photo (full height)',     width:60,  photoId:'defectPhoto' },
 ];
 
+// Method-cell field pairs — when the "Method-specific field" place card
+// is bound to one of these fields, the paired field's value is appended
+// after the separator so two related procedural pieces print on a
+// single line (e.g. "Magnaflux ZL4C · Batch 24P-0815").
+//   MT  susp + suspBatch, contrast + contrastBatch
+//   PT  pen + penBatch, dev + devBatch, precleaner + dryTime
+// CV_METHOD_FIELD_HIDDEN is derived from this — the paired secondary
+// fields are hidden from the Properties panel's Method field picker,
+// because they're already rendered alongside their primary partner
+// (a standalone Penetrant batch / Developer batch / Drying time cell
+// would just repeat what's already on the consumable's card).
+var CV_METHOD_FIELD_PAIRS = {
+  susp:       { with:'suspBatch',     prefix:' · Batch ' },
+  contrast:   { with:'contrastBatch', prefix:' · Batch ' },
+  pen:        { with:'penBatch',      prefix:' · Batch ' },
+  dev:        { with:'devBatch',      prefix:' · Batch ' },
+  precleaner: { with:'dryTime',       prefix:' · Dry ' },
+};
+var CV_METHOD_FIELD_HIDDEN = new Set(
+  Object.values(CV_METHOD_FIELD_PAIRS).map(p => p.with)
+);
+
 var CV_LAYOUT_ITEMS = [
   {key:'section-header', label:'Section header bar',         w:754,h:24},
   {key:'text-block',     label:'Free text / note',           w:360,h:48},
@@ -3423,24 +3445,13 @@ function cvRenderBlockContent(block, report, preview){
           : (report.methodData ? (report.methodData[mf] || '') : '');
     }
     let shown = val || (preview ? '—' : (mf ? (fdef && fdef.placeholder || '') : 'Pick a field in Properties'));
-    // Field-pair table — when a method-cell renders one of these fields,
-    // the paired field's value is appended after a small separator so
-    // the place card prints two related procedural pieces on one line.
-    //   MT: test suspension + batch, contrast paint + batch.
-    //   PT: penetrant + batch, developer + batch, pre-cleaner + drying
-    //       time (the material applied and how long the surface was
-    //       left to dry before the next step).
-    // The paired value lives on report.eq_<paired-field> when the
-    // inspector typed it on the form (or methodData[<paired-field>]
-    // for sample / preview data).
-    const _fieldPairs = {
-      susp:       { with:'suspBatch',     prefix:' · Batch ' },
-      contrast:   { with:'contrastBatch', prefix:' · Batch ' },
-      pen:        { with:'penBatch',      prefix:' · Batch ' },
-      dev:        { with:'devBatch',      prefix:' · Batch ' },
-      precleaner: { with:'dryTime',       prefix:' · Dry ' },
-    };
-    const _pair = _fieldPairs[mf];
+    // Field-pair table (CV_METHOD_FIELD_PAIRS) lives at module level so
+    // both this renderer and the Properties-panel field picker share
+    // the same definition — see the comment by CV_METHOD_FIELD_PAIRS
+    // for the meaning of each pairing. The paired value lives on
+    // report.eq_<paired-field> when the inspector typed it on the form
+    // (or methodData[<paired-field>] for sample / preview data).
+    const _pair = (typeof CV_METHOD_FIELD_PAIRS !== 'undefined') ? CV_METHOD_FIELD_PAIRS[mf] : null;
     if(val && _pair && report){
       const paired = report['eq_' + _pair.with]
         || (report.methodData && report.methodData[_pair.with]) || '';
@@ -3995,10 +4006,18 @@ function cvRenderProps(id){
     ${scanUI}
     ${row('Label / text', input('text', block.text))}
     ${block.key === 'method-cell' ? row('Method field', (() => {
+      // The paired "secondary" fields (batch numbers, drying time)
+      // are rendered alongside their primary partner via
+      // CV_METHOD_FIELD_PAIRS, so they're hidden here to avoid the
+      // user dropping a duplicate cell that just repeats what's
+      // already on the consumable's place card. The previously-saved
+      // selection is still honoured if it points at a hidden field.
       const mf = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[cvPpvMethod]) ? TPL_FIELDS[cvPpvMethod] : [];
+      const hidden = (typeof CV_METHOD_FIELD_HIDDEN !== 'undefined') ? CV_METHOD_FIELD_HIDDEN : new Set();
+      const visible = mf.filter(f => !hidden.has(f.id) || f.id === block.methodField);
       return `<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','methodField'">
         <option value="" ${!block.methodField?'selected':''}>— select —</option>
-        ${mf.map(f=>`<option value="${escapeHtml(f.id)}" ${block.methodField===f.id?'selected':''}>${escapeHtml(f.label)}</option>`).join('')}
+        ${visible.map(f=>`<option value="${escapeHtml(f.id)}" ${block.methodField===f.id?'selected':''}>${escapeHtml(f.label)}</option>`).join('')}
       </select>`;
     })()) : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px">

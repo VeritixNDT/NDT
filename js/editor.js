@@ -123,6 +123,12 @@ var CV_FIELD_DEFS = {
   // ── PROCEDURE / CERT / CALIBRATION STATUS ───────────────────────
   'procedure-link':  {label:'Procedure (linked)',    ph:'SV-PRO-009 Rev 02',  get:r=>'',w:280,h:46, smartLink:'procedure'},
   'cert-status':     {label:'Inspector cert status', ph:'Level II UT · valid', get:r=>'',w:240,h:46, smartLink:'cert'},
+  // Eye-sight test cert (EN-ISO 17637:2016 §6) — resolves the signoff
+  // inspector's annual near-vision certificate, in the same shape as
+  // cert-status. On VT reports the smart card surfaces Valid / Expiring
+  // / Expired; on the printed PDF the card hyperlinks to the cert in
+  // Annex A when an uploaded file is on file.
+  'eye-cert-status': {label:'Eye-sight test cert',    ph:'Eye-sight · valid',   get:r=>'',w:240,h:46, smartLink:'eyecert'},
   'calib-status':    {label:'Equipment calibration', ph:'Cal valid until Q3 2025', get:r=>'',w:240,h:46, smartLink:'calib'},
   // Light-equipment calibration cards — same shape and status logic as
   // calib-status. They resolve a register record (Settings → Equipment)
@@ -353,7 +359,7 @@ var CV_PALETTE_GROUPS = [
   {id:'equipment', label:'Equipment',     fields:['light-source','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
-  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','light-status','uv-light-status','light-conditions','accept-eval']},
+  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','eye-cert-status','calib-status','light-status','uv-light-status','light-conditions','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},
   {id:'components',label:'⬢ My components', isComponents:true},
@@ -1013,6 +1019,39 @@ function cvResolveSmartLink(block, report){
     }
     return _cvSmartCardHtml('— UNKNOWN',
       [insp], ['Inspector not found in directory']);
+  }
+  if(k === 'eye-cert-status'){
+    // Eye-sight test cert smart card (EN-ISO 17637:2016 §6). Resolves
+    // in two steps so historical reports stay stable:
+    //   1. Prefer the snapshot frozen onto the report at save time
+    //      (report.inspectorEyeTest) — captures the cert as it stood
+    //      when the report was signed.
+    //   2. Fall back to the live inspector record if the report
+    //      pre-dates the snapshot field (legacy data) or is being
+    //      previewed in the editor without a saved report.
+    const insp = report?.inspector || '—';
+    let et = report && report.inspectorEyeTest;
+    if(!et){
+      const list = (typeof INSPECTORS !== 'undefined') ? INSPECTORS : (typeof ls==='function' ? ls('vx-inspectors-v1',[]) : []);
+      const match = list.find(i => i.name === insp);
+      et = match && match.eyeTest;
+    }
+    if(et && (et.expiry || et.certNo || et.authority)){
+      const expired = !!et.expiry && (typeof certStatus === 'function'
+        ? certStatus(et.expiry) === 'expired'
+        : (!!new Date(et.expiry) && new Date() > new Date(et.expiry)));
+      const lbl = expired ? '⚠ EXPIRED' : '✓ VALID';
+      const certNo = et.certNo || et.authority || '—';
+      return _cvSmartCardHtml(lbl,
+        [insp],
+        ['Eye-sight test' + (et.authority ? ' · ' + et.authority : '')],
+        ['Cert no. ' + certNo, et.expiry ? 'expires ' + fmtDate(et.expiry) : '']);
+    }
+    // Inspector found but no eye-test cert recorded.
+    if(insp && insp !== '—') return _cvSmartCardHtml('⚠ NO EYE-CERT',
+      [insp], ['No eye-sight certificate on file — upload via Settings → Inspectors']);
+    return _cvSmartCardHtml('— UNKNOWN',
+      ['—'], ['Inspector not set']);
   }
   if(k === 'calib-status'){
     // Calibration validity is judged against today, matching Settings →
@@ -3603,7 +3642,8 @@ function cvRenderBlockContent(block, report, preview){
     // way the company smart fields do.
     const liveSmart = def.smartLink === 'cert' || def.smartLink === 'calib'
       || def.smartLink === 'light' || def.smartLink === 'uvlight'
-      || def.smartLink === 'lightcond' || def.smartLink === 'procedure';
+      || def.smartLink === 'lightcond' || def.smartLink === 'procedure'
+      || def.smartLink === 'eyecert';
     const smartReport = report || (liveSmart ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects) : null);
     const inner = smartReport
       ? cvResolveSmartLink(block, smartReport)
@@ -3978,9 +4018,13 @@ function cvRenderProps(id){
         ${row('Standard / source', input('standard', block.standard||''))}
       </div>`;
   }
-  if(def && (def.smartLink === 'procedure' || def.smartLink === 'cert' || def.smartLink === 'calib')){
+  if(def && (def.smartLink === 'procedure' || def.smartLink === 'cert' || def.smartLink === 'calib' || def.smartLink === 'eyecert')){
+    const _slSrc = def.smartLink === 'procedure' ? 'procedures store'
+      : def.smartLink === 'cert'   ? 'inspector directory'
+      : def.smartLink === 'eyecert' ? 'inspector eye-sight certificate'
+      : 'equipment calibration data';
     smartLinkUI = `<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:4px;padding:7px 8px;margin-bottom:9px;font-size:10px;color:#a78bfa">
-      ⚡ <strong>Smart link</strong> — auto-resolves from ${def.smartLink === 'procedure' ? 'procedures store' : def.smartLink === 'cert' ? 'inspector directory' : 'equipment calibration data'} at preview/export
+      ⚡ <strong>Smart link</strong> — auto-resolves from ${_slSrc} at preview/export
     </div>`;
   }
 

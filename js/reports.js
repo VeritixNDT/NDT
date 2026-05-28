@@ -195,14 +195,16 @@ var TPL_FIELDS = {
     // can record the exact certificate date if their shop tracks it.
     { id:'eyeTest', label:'Eye-sight test', placeholder:'e.g. Confirmed — current',
       options:['Confirmed — current','Confirmed — expires within 1 month','Not applicable'], editable:true },
-    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 500', options:['< 350 lux','350','500','750','1000','1500'], editable:true, numeric:true },
+    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 500', options:['< 350 lux','350','500','750','1000','1500'], editable:true, numeric:true, gates:'lightmeter' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch', options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // White-light meter pick — same register-backed dropdown MT and PT
     // expose for their fluorescent / visible inspection regimes. VT is
     // a daylight-or-white-light technique by default; the meter records
     // the actual lux reading at the examination position (ISO 17637
     // §5.3 — Minimum 350 lux, recommended 500+ lux on the surface).
-    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light' },
+    // Gated by lux > 0 so the picker lights up as soon as the inspector
+    // records any reading; until then it sits greyed with a hint.
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'lux', gateMin:0 },
     // Viewing angle per EN-ISO 17637:2016 §5.3.1 — eye position must
     // be ≥ 30° from the surface. Most inspections meet the minimum;
     // higher angles or perpendicular for through-hole / port views.
@@ -696,11 +698,17 @@ function _rptGateUpdate(srcInput){
     if(Array.isArray(tf.gatedByExclude) && tf.gatedByExclude.length){
       applies = srcRaw !== '' && !tf.gatedByExclude.some(ex => srcRaw.toLowerCase().includes(String(ex).toLowerCase()));
     } else {
-      const max = (tf.gateMax != null) ? tf.gateMax : 20;
-      const min = (tf.gateMin != null) ? tf.gateMin : null;
+      // null on either bound = "no bound" — matches the initial-render
+      // logic in equipmentSelectHtml. Without this, MT's lightmeter
+      // (gateMin:20, no gateMax) was always disabled at runtime
+      // because the implicit default cap of 20 collapsed the band to
+      // srcNum > 20 && srcNum <= 20 — i.e. empty. VT's lightmeter
+      // (gateMin:0, no gateMax) needs the same treatment.
+      const max = tf.gateMax;
+      const min = tf.gateMin;
       applies = !isNaN(srcNum)
         && (min == null || srcNum > min)
-        && srcNum <= max;
+        && (max == null || srcNum <= max);
     }
     if(tf.useEquipmentRegister){
       _rptSetGateState(targetInput, applies);
@@ -755,8 +763,16 @@ function equipmentSelectHtml(methodId, f, val, fid, data) {
   // Settings → Equipment to have it shown method-filtered.)
   if(!filtered.length && pool.length) filtered = pool.slice();
   if(!filtered.length) {
-    return `<div class="fld"><label>${escapeHtml(f.label)}</label>
-      <input id="${fid}" type="text" value="${escapeHtml(val||'')}" placeholder="No equipment in register — add via Settings → Equipment"/>
+    // Render a disabled select rather than a text input so the form
+    // stays visually consistent — two equipment cells in a row both
+    // look like dropdowns even if the register is empty for one of
+    // them. The single placeholder option tells the inspector where
+    // to add gear without breaking the layout.
+    return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· from Settings → Equipment</span></label>
+      <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}" disabled style="opacity:.55">
+        <option value="">— No ${escapeHtml(f.eqType==='white-light'?'white-light meter':f.eqType==='uv-light'?'UV-A meter':'equipment')} in register —</option>
+      </select>
+      <div style="font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">Add via Settings → Equipment, tag for ${escapeHtml(methodId)}.</div>
     </div>`;
   }
   // Resolve which option to mark selected. `val` may be the equipment id

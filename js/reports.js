@@ -159,6 +159,13 @@ var TPL_FIELDS = {
   VT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 5817:2014 Level B', options:['EN-ISO 5817:2014 Level B','EN-ISO 5817:2014 Level C','EN-ISO 5817:2014 Level D','EN-ISO 10042:2018 Level B','EN-ISO 10042:2018 Level C','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 341.3.2','ASME VIII Div. 1, UW-51 / UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.1','No cracks'] },
+    // Time-after-welding hold per applicable code — covers delayed
+    // (hydrogen-induced) cracking risk. AWS D1.1 §8.15.1 requires 48 h
+    // for steels with yield ≥ 690 MPa; ASME B31.3 §341.3.2 calls for a
+    // hold on impact-tested / hardenable materials; most EN work cites
+    // 16–24 h. Editable so the inspector can record a WPS-specific hold.
+    { id:'timeAfterWeld', label:'Time after welding', placeholder:'e.g. 24 h',
+      options:['Immediate / at ambient','16 h','24 h','48 h','72 h','Per WPS / procedure'], editable:true },
     // Examination technique per EN-ISO 17637:2016 §5.3 — distinguishes
     // the three inspection modes the standard recognises.
     { id:'examTechnique', label:'Examination technique', placeholder:'e.g. Direct visual',

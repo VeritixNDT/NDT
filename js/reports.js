@@ -163,14 +163,14 @@ var TPL_FIELDS = {
     // line as the post-dwell remover but logged separately so the
     // record reflects the procedure followed.
     { id:'precleaner', label:'Pre-cleaner', placeholder:'e.g. Magnaflux SKC-S', options:['Magnaflux SKC-S','MR Chemie MR 79','Ardrox 9PR5','Solvent wipe','Vapour degrease','Alkaline cleaner','Mechanical clean'] },
-    { id:'pen',      label:'Penetrant',    placeholder:'e.g. Magnaflux ZL4C', options:['Magnaflux ZL4C','Magnaflux ZL-60D','MR Chemie MR 68','Ardrox 970-P22'] },
+    { id:'pen',      label:'Penetrant',    placeholder:'e.g. Magnaflux SKL-WP2', options:['Magnaflux SKL-WP2','Magnaflux SKL-SP2','Magnaflux ZL4C','Magnaflux ZL-60D','MR Chemie MR 68','Ardrox 970-P22'] },
     { id:'penBatch', label:'Penetrant batch no.',  placeholder:'e.g. 24P-0815' },
     { id:'pdwell', label:'Penetrant dwell time', placeholder:'check spec for material — e.g. 10-20 mins', options:['5 mins','5-10 mins','10 mins','10-20 mins','15 mins','20 mins','20-30 mins','30 mins','30-60 mins','45 mins','60 mins'] },
     // Emulsifier dwell time — only applies to Method B (lipophilic) and
     // Method D (hydrophilic). ISO 3452-1 §6.3 / ASME V Art. 6 T-674
     // call for the manufacturer-recommended time, validated by a
     // sensitivity trial. Typical band 30 secs - 3 mins.
-    { id:'emulTime', label:'Emulsifier dwell time', placeholder:'Method B / D — e.g. 1-2 mins', options:['15 secs','30 secs','45 secs','1 min','1-2 mins','2 mins','3 mins','5 mins'] },
+    { id:'emulTime', label:'Emulsifier dwell time', placeholder:'Method B / D — e.g. 1-2 mins (or Not applicable)', options:['Not applicable','15 secs','30 secs','45 secs','1 min','1-2 mins','2 mins','3 mins','5 mins'] },
     // Drying time between excess removal and developer application
     // (ISO 3452-1 §6.5 / ASME V Art. 6 T-676.4). Oven temperature
     // capped at 50°C (ISO) / 71°C (ASME). "Until dry" is a valid

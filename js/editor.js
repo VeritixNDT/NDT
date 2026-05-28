@@ -1066,7 +1066,13 @@ function cvResolveSmartLink(block, report){
     let rec = _cvEqRecord(report);
     if(!rec && typeof eqLoad === 'function'){
       try {
-        const eqAll = eqLoad() || [];
+        // Light meters (white-light / UV-A) have their own dedicated
+        // smart cards (light-status / uv-light-status). Exclude them
+        // from this card's fallback so a VT report whose register only
+        // contains a white-light meter doesn't render it here as the
+        // primary NDT equipment.
+        const isLightMeter = e => e && (e.type === 'white-light' || e.type === 'uv-light');
+        const eqAll = (eqLoad() || []).filter(e => !isLightMeter(e));
         rec = (reportMethod && eqAll.find(e => Array.isArray(e.methods) && e.methods.includes(reportMethod)))
           || eqAll.find(e => !Array.isArray(e.methods) || !e.methods.length)
           || null;

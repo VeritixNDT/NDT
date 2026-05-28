@@ -268,9 +268,17 @@ function _cvBuildCrossRefMap(report){
 // Column 3's data cells: material (top) + defectSize    (bottom)
 // Column 4:              defectPhoto rowspan 2
 var CV_DEFECT_COLS = [
-  { label:'Col 1 (Weld / Location)', width:160, topId:'subject',  topLabel:'Weld / object', botId:'defectLocation', botLabel:'Location' },
-  { label:'Col 2 (Drawing / Type)',  width:140, topId:'drawing',  topLabel:'Drawing no.',   botId:'defectType',     botLabel:'Defect type' },
-  { label:'Col 3 (Material / Size)', width:140, topId:'material', topLabel:'Material',      botId:'defectSize',     botLabel:'Size' },
+  { label:'Col 1 (Weld / Location)', width:140, topId:'subject',  topLabel:'Weld / object', botId:'defectLocation',    botLabel:'Location' },
+  { label:'Col 2 (Drawing / Type)',  width:120, topId:'drawing',  topLabel:'Drawing no.',   botId:'defectType',        botLabel:'Defect type' },
+  { label:'Col 3 (Material / Size)', width:110, topId:'material', topLabel:'Material',      botId:'defectSize',        botLabel:'Size' },
+  // Col 4 mirrors the standalone Defects log's Severity / Disposition
+  // pair so the same information that's captured on the log surfaces
+  // on the printed defect table. The new-report Defects section
+  // captures these per rejected item — see _ovDefectsSectionHtml in
+  // dashboard.js — and the cross-reference path in the defect-table
+  // renderer (case 'defect-table') maps log entries' severity /
+  // disposition into the same slots.
+  { label:'Col 4 (Severity / Action)', width:110, topId:'defectSeverity', topLabel:'Severity', botId:'defectDisposition', botLabel:'Action' },
   { label:'Photo (full height)',     width:60,  photoId:'defectPhoto' },
 ];
 
@@ -3280,7 +3288,48 @@ function cvRenderBlockContent(block, report, preview){
         // synthesise two placeholder rows so the inspector can see the
         // table shape while editing the template.
         const rejected = (liveItems || []).filter(it => it && it.verdict === 'Not acceptable');
-        let drawItems = rejected;
+        // Cross-reference manually-added defects from the standalone
+        // Defects log that point at this report (by report number) —
+        // they print alongside the rejected items so both views stay
+        // aligned: anything added in the log surfaces on the report's
+        // defect table, and anything captured on the report surfaces
+        // in the log. Standalone entries are mapped into the same item
+        // shape the table renderer expects.
+        let linkedFromLog = [];
+        if(report && report.reportNo){
+          try {
+            const _logAll = (typeof ls === 'function' && typeof KEYS !== 'undefined') ? (ls(KEYS.defects, []) || []) : [];
+            const _match  = String(report.reportNo).trim().toLowerCase();
+            linkedFromLog = _logAll.filter(d => {
+              if(!d || !d.report) return false;
+              // d.report may include " Rev XX" — strip for comparison.
+              const dr = String(d.report).replace(/\s+Rev\s+.*$/i, '').trim().toLowerCase();
+              return dr === _match;
+            }).map(d => {
+              // Concatenate dimensions for the defect-table size cell —
+              // standalone defects split depth / length / width, the
+              // report's items table carries a single defectSize string.
+              const dims = [d.length, d.width, d.depth]
+                .filter(v => v != null && String(v).trim() !== '')
+                .join(' × ');
+              const photo = (Array.isArray(d.photos) && d.photos.length)
+                ? d.photos[0] : '';
+              return {
+                subject:           d.component   || '',
+                drawing:           d.drawing     || '',
+                material:          '',
+                defectLocation:    d.location    || '',
+                defectType:        d.type        || '',
+                defectSize:        dims || (d.depth || ''),
+                defectSeverity:    d.severity    || '',
+                defectDisposition: d.disposition || '',
+                defectPhoto:       photo,
+                verdict:           'Not acceptable',
+              };
+            });
+          } catch(e){}
+        }
+        let drawItems = rejected.concat(linkedFromLog);
         if(!drawItems.length){
           if(preview){
             drawItems = []; // real report with no rejections — print empty body

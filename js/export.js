@@ -203,7 +203,25 @@ function cvBuildPrintHTML(report){
   // photo slots still skips when no images were uploaded.
   const _hasPhotos   = !!(report && Array.isArray(report.photos)   && report.photos.some(p => !!p));
   const _hasDrawings = !!(report && Array.isArray(report.drawings) && report.drawings.some(p => !!p));
-  const _hasDefects  = !!(report && Array.isArray(report.items)    && report.items.some(it => it && it.verdict === 'Not acceptable'));
+  // Defects on the report come from two places now: items marked
+  // verdict='Not acceptable' on the items table, AND standalone log
+  // entries (KEYS.defects) cross-referenced to this report by number.
+  // Either source should keep the defect-table sheet from being
+  // skipped at print time.
+  const _itemDefects = !!(report && Array.isArray(report.items) && report.items.some(it => it && it.verdict === 'Not acceptable'));
+  let _logDefects = false;
+  try {
+    if(report && report.reportNo && typeof ls === 'function' && typeof KEYS !== 'undefined'){
+      const _logAll = ls(KEYS.defects, []) || [];
+      const _matchRep = String(report.reportNo).trim().toLowerCase();
+      _logDefects = _logAll.some(d => {
+        if(!d || !d.report) return false;
+        const dr = String(d.report).replace(/\s+Rev\s+.*$/i, '').trim().toLowerCase();
+        return dr === _matchRep;
+      });
+    }
+  } catch(e){}
+  const _hasDefects = _itemDefects || _logDefects;
   // Decorative keys — blocks that decorate / identify a page but don't
   // justify keeping the page when the actual content is empty. Includes:
   //  - section-header / h-line / accent-bar / text-block — layout chrome

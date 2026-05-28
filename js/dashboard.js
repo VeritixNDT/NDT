@@ -1732,14 +1732,32 @@ function _ovDefectsSectionHtml(){
       Mark an item as <strong>Not acceptable</strong> in the examination details table above and it will appear here for defect details.
     </div>`;
   } else {
+    // Severity / disposition option lists — kept in sync with the
+    // standalone Defects log (HTML form on the Defects page) so a
+    // value selected here on a report can be filtered identically on
+    // the log, and a value typed on the log surfaces here unchanged
+    // on the report's defect-table place card. Mirrored verbatim from
+    // veritix-ndt-inspect-v3_44.html's def-sev / def-disp <select>.
+    const _sevOpts  = ['Critical','High','Medium','Low'];
+    const _dispOpts = ['Repair required','Grind and re-examine','Re-weld','Accept as-is','Monitor','Cut out and re-weld','Engineering review','Reject','For information'];
     body = rejected.map(({ idx, item }) => {
       const subj = (item.subject  || '').toString().trim() || `Item ${idx + 1}`;
       const dwg  = (item.drawing  || '').toString().trim() || '—';
       const mat  = (item.material || '').toString().trim() || '—';
-      const loc  = item.defectLocation || '';
-      const type = item.defectType  || '';
-      const size = item.defectSize  || '';
-      const ph   = item.defectPhoto || '';
+      const loc  = item.defectLocation     || '';
+      const type = item.defectType         || '';
+      const dep  = item.defectDepth        || '';
+      const len  = item.defectLength       || '';
+      const dbd  = item.defectDbDrop       || '';
+      const sev  = item.defectSeverity     || '';
+      const disp = item.defectDisposition  || '';
+      const ph   = item.defectPhoto        || '';
+      // dB drop is a UT-specific defect measurement (echo-amplitude
+      // reduction at the defect edge using a -6 dB / -12 dB / -20 dB
+      // technique per ISO 17640 / ASME V Art. 4). Surface the input
+      // only on UT reports; other methods don't capture it and would
+      // just see a confusing extra field.
+      const isUT = (_ovMethod === 'UT');
       const ctrlStyle = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font)';
       // Photo tile — rowspans both rows of the card so it sits at
       // double the height of the data cells, matching the printed
@@ -1757,12 +1775,18 @@ function _ovDefectsSectionHtml(){
             <span style="font-size:11px">Defect photo</span>
             <input type="file" accept="image/*" style="display:none" data-on-change="ovDefectsSetPhoto" data-pass-el="1" data-args="${idx}"/>
           </label>`;
-      // Card layout mirrors the printed defect-table: 4 grid columns,
-      // 2 grid rows, photo at column 4 rowspanning both rows.
+      // Card layout mirrors the printed defect-table: 4 data columns +
+      // photo, 2 grid rows. Top row of data columns: subject / drawing
+      // / material / severity. Bottom row: location / type / size /
+      // disposition. Photo rowspans both rows on the right. Severity
+      // and disposition use <select> dropdowns whose option lists
+      // mirror the standalone Defects log so values stay aligned.
       const lblStyle = 'font-size:10.5px;color:var(--t3);margin-bottom:3px';
       const valStyle = 'font-size:12.5px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
       const monoStyle = 'font-size:12.5px;color:var(--t1);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-      return `<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 160px;grid-template-rows:auto auto;gap:8px 12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)">
+      const _sevOptHtml  = '<option value="">— —</option>' + _sevOpts.map(o  => `<option${o===sev?' selected':''}>${o}</option>`).join('');
+      const _dispOptHtml = '<option value="">— —</option>' + _dispOpts.map(o => `<option${o===disp?' selected':''}>${o}</option>`).join('');
+      return `<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) 160px;grid-template-rows:auto auto;gap:8px 12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)">
         <div style="min-width:0">
           <div style="${lblStyle}">Weld / object</div>
           <div style="${valStyle}" title="${escapeHtml(subj)}">${escapeHtml(subj)}</div>
@@ -1775,7 +1799,12 @@ function _ovDefectsSectionHtml(){
           <div style="${lblStyle}">Material</div>
           <div style="${valStyle}" title="${escapeHtml(mat)}">${escapeHtml(mat)}</div>
         </div>
-        <div style="grid-column:4;grid-row:1 / span 2;display:flex;flex-direction:column">
+        <div style="min-width:0">
+          <div style="${lblStyle}">Severity</div>
+          <select data-on-change="ovDefectsCapture" data-args="${idx},'defectSeverity'" data-pass-el="1"
+            style="${ctrlStyle}">${_sevOptHtml}</select>
+        </div>
+        <div style="grid-column:5;grid-row:1 / span 2;display:flex;flex-direction:column">
           <div style="${lblStyle}">Photo</div>
           ${photoTile}
         </div>
@@ -1792,10 +1821,34 @@ function _ovDefectsSectionHtml(){
             style="${ctrlStyle}"/>
         </div>
         <div style="min-width:0">
-          <div style="${lblStyle}">Size</div>
-          <input type="text" value="${escapeHtml(size)}" placeholder="e.g. 12 mm × 0.5 mm"
-            data-on-input="ovDefectsCapture" data-args="${idx},'defectSize'" data-pass-el="1"
-            style="${ctrlStyle}"/>
+          <div style="${lblStyle}">Depth × Length${isUT ? ' × dB drop' : ''}</div>
+          <div style="display:flex;gap:6px">
+            <div style="display:flex;align-items:center;flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0 8px;height:32px;box-sizing:border-box">
+              <input type="text" value="${escapeHtml(dep)}" placeholder="Depth"
+                data-on-input="ovDefectsCapture" data-args="${idx},'defectDepth'" data-pass-el="1"
+                style="flex:1;min-width:0;border:none;background:transparent;color:var(--t1);font-family:var(--font);font-size:12px;outline:none;padding:0"/>
+              <span style="color:var(--t3);font-size:11px;font-family:var(--mono);margin-left:4px">mm</span>
+            </div>
+            <div style="display:flex;align-items:center;flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0 8px;height:32px;box-sizing:border-box">
+              <input type="text" value="${escapeHtml(len)}" placeholder="Length"
+                data-on-input="ovDefectsCapture" data-args="${idx},'defectLength'" data-pass-el="1"
+                style="flex:1;min-width:0;border:none;background:transparent;color:var(--t1);font-family:var(--font);font-size:12px;outline:none;padding:0"/>
+              <span style="color:var(--t3);font-size:11px;font-family:var(--mono);margin-left:4px">mm</span>
+            </div>
+            ${isUT ? `
+            <div style="display:flex;align-items:center;flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0 8px;height:32px;box-sizing:border-box">
+              <input type="text" value="${escapeHtml(dbd)}" placeholder="-6"
+                data-on-input="ovDefectsCapture" data-args="${idx},'defectDbDrop'" data-pass-el="1"
+                style="flex:1;min-width:0;border:none;background:transparent;color:var(--t1);font-family:var(--font);font-size:12px;outline:none;padding:0"/>
+              <span style="color:var(--t3);font-size:11px;font-family:var(--mono);margin-left:4px">dB</span>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+        <div style="min-width:0">
+          <div style="${lblStyle}">Action</div>
+          <select data-on-change="ovDefectsCapture" data-args="${idx},'defectDisposition'" data-pass-el="1"
+            style="${ctrlStyle}">${_dispOptHtml}</select>
         </div>
       </div>`;
     }).join('');
@@ -2360,11 +2413,38 @@ function ovSaveReport(mode) {
       // 'Acceptable' doesn't leave stale defect text against an accepted
       // item (and so the defect-table render branch's filter pulls in
       // exactly the rows the inspector intended).
+      //   defectSeverity / defectDisposition mirror the standalone
+      //   Defects log's Severity / Disposition selects, captured via the
+      //   new dropdowns in _ovDefectsSectionHtml.
+      //   defectDepth / defectLength replaced the single defectSize
+      //   text input — they're persisted directly so the Defects log
+      //   can read them, and a derived defectSize string is composed
+      //   here so the printed defect-table card keeps reading from
+      //   one field (item.defectSize) without changes.
       if(clean.verdict === 'Not acceptable'){
-        ['defectLocation','defectType','defectSize'].forEach(fid => {
+        ['defectLocation','defectType','defectDepth','defectLength','defectDbDrop','defectSeverity','defectDisposition'].forEach(fid => {
           const v = (row[fid] || '').toString().trim();
           if(v) clean[fid] = v;
         });
+        // Compose a display-ready defectSize from the split inputs.
+        // Convention: "Length × Depth mm · -6 dB" for UT (the dB drop
+        // joins the dimensions because echo-amplitude technique is
+        // part of the size measurement on a UT report); plain
+        // "Length × Depth mm" for the other methods. A legacy row
+        // that carried defectSize directly (older reports saved
+        // before this split) is preserved.
+        const _len = (row.defectLength || '').toString().trim();
+        const _dep = (row.defectDepth  || '').toString().trim();
+        const _db  = (row.defectDbDrop || '').toString().trim();
+        if(_len || _dep || _db){
+          const sizeBits = [_len, _dep].filter(Boolean).join(' × ');
+          const sizeWithUnit = sizeBits ? (sizeBits + ' mm') : '';
+          clean.defectSize = _db
+            ? (sizeWithUnit ? (sizeWithUnit + ' · ' + _db + ' dB') : (_db + ' dB'))
+            : sizeWithUnit;
+        } else if(row.defectSize){
+          clean.defectSize = String(row.defectSize).trim();
+        }
         // defectPhoto isn't trimmed (it's a dataURL, not a text field);
         // copy it across as-is when present so the defect-table render
         // branch can show it on the printed report.

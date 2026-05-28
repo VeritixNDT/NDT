@@ -61,9 +61,12 @@ function _defFromReports(){
       if(!it || it.verdict !== 'Not acceptable') return;
       // An item flagged Not acceptable but with no defect detail typed
       // yet isn't useful to surface — the report form is the place to
-      // capture it. Wait until at least one of type / location / size
-      // is filled before publishing to the log.
-      if(!it.defectType && !it.defectLocation && !it.defectSize) return;
+      // capture it. Wait until at least one of type / location / size /
+      // depth / length / dB drop (UT) / severity / disposition is
+      // filled before publishing to the log.
+      if(!it.defectType && !it.defectLocation && !it.defectSize
+         && !it.defectDepth && !it.defectLength && !it.defectDbDrop
+         && !it.defectSeverity && !it.defectDisposition) return;
       const subject = (it.subject || r.subject || '').toString();
       out.push({
         _source:     'report',
@@ -71,22 +74,27 @@ function _defFromReports(){
         _itemIdx:    ii,
         defectId:    (r.reportNo || '—') + ' #' + (ii + 1),
         type:        it.defectType     || '',
-        // severity / depth / length / width / disposition aren't
-        // captured on the report items table — left blank so they
-        // visibly invite the inspector to enrich the entry from the
-        // standalone Defect log if needed.
-        severity:    '',
+        // Severity / disposition now ride on the item itself —
+        // captured via the new dropdowns in the report's Defects
+        // section so both views (log + defect-table place card)
+        // stay aligned. Depth / length / width still live on the
+        // standalone log only (split numeric fields); the item
+        // defectSize text is folded into notes.
+        severity:    it.defectSeverity    || '',
         status:      'Open',
         method:      r.method          || '',
         location:    it.defectLocation || '',
-        depth:       '',
-        length:      '',
+        // Depth / length now ride on the item itself (the report's
+        // Defects section gained split inputs to mirror the log's
+        // depth + length fields). Width still log-only.
+        depth:       it.defectDepth      || '',
+        length:      it.defectLength     || '',
         width:       '',
         component:   subject || '',
         drawing:     it.drawing  || r.drawing || '',
         inspector:   r.inspector || '',
         report:      (r.reportNo || '') + (r.revision ? ' Rev ' + r.revision : ''),
-        disposition: '',
+        disposition: it.defectDisposition || '',
         notes:       it.defectSize ? ('Size: ' + it.defectSize) : '',
         photos:      it.defectPhoto ? [it.defectPhoto] : [],
         createdAt:   r.createdAt || '',

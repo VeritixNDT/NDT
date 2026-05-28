@@ -3423,12 +3423,28 @@ function cvRenderBlockContent(block, report, preview){
           : (report.methodData ? (report.methodData[mf] || '') : '');
     }
     let shown = val || (preview ? '—' : (mf ? (fdef && fdef.placeholder || '') : 'Pick a field in Properties'));
-    // Test suspension and contrast paint are consumables — append the
-    // batch number the inspector recorded so it prints on the same card.
-    if(val && (mf === 'susp' || mf === 'contrast') && report){
-      const batch = report['eq_' + mf + 'Batch']
-        || (report.methodData && report.methodData[mf + 'Batch']) || '';
-      if(batch) shown = val + ' · Batch ' + batch;
+    // Field-pair table — when a method-cell renders one of these fields,
+    // the paired field's value is appended after a small separator so
+    // the place card prints two related procedural pieces on one line.
+    //   MT: test suspension + batch, contrast paint + batch.
+    //   PT: penetrant + batch, developer + batch, pre-cleaner + drying
+    //       time (the material applied and how long the surface was
+    //       left to dry before the next step).
+    // The paired value lives on report.eq_<paired-field> when the
+    // inspector typed it on the form (or methodData[<paired-field>]
+    // for sample / preview data).
+    const _fieldPairs = {
+      susp:       { with:'suspBatch',     prefix:' · Batch ' },
+      contrast:   { with:'contrastBatch', prefix:' · Batch ' },
+      pen:        { with:'penBatch',      prefix:' · Batch ' },
+      dev:        { with:'devBatch',      prefix:' · Batch ' },
+      precleaner: { with:'dryTime',       prefix:' · Dry ' },
+    };
+    const _pair = _fieldPairs[mf];
+    if(val && _pair && report){
+      const paired = report['eq_' + _pair.with]
+        || (report.methodData && report.methodData[_pair.with]) || '';
+      if(paired) shown = val + _pair.prefix + paired;
     }
     const valColor = val ? '#000' : (preview ? '#999' : '#bbb');
     return `<div style="height:100%;padding:3px 7px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;text-align:${al}">

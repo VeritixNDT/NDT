@@ -159,11 +159,33 @@ var TPL_FIELDS = {
   VT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 5817:2014 Level B', options:['EN-ISO 5817:2014 Level B','EN-ISO 5817:2014 Level C','EN-ISO 5817:2014 Level D','EN-ISO 10042:2018 Level B','EN-ISO 10042:2018 Level C','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 341.3.2','ASME VIII Div. 1, UW-51 / UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.1','No cracks'] },
-    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 350', options:['350','500','1000'] },
+    // Examination technique per EN-ISO 17637:2016 §5.3 — distinguishes
+    // the three inspection modes the standard recognises.
+    { id:'examTechnique', label:'Examination technique', placeholder:'e.g. Direct visual',
+      options:['Direct visual','Remote visual (borescope / mirror)','Direct visual with aid (magnifier)'] },
+    // Eye-sight test confirmation per EN-ISO 17637:2016 §6 — the
+    // inspector's annual near-vision test (Jaeger J1 / Times Roman
+    // N4.5 at 300 mm) + colour vision check. Editable so an inspector
+    // can record the exact certificate date if their shop tracks it.
+    { id:'eyeTest', label:'Eye-sight test', placeholder:'e.g. Confirmed — current',
+      options:['Confirmed — current','Confirmed — expires within 1 month','Not applicable'], editable:true },
+    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 500', options:['< 350 lux','350','500','750','1000','1500'] },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch', options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
-    { id:'magn', label:'Magnification',            placeholder:'e.g. ×2', options:['×1','×2','×3','×5','×10'] },
+    // Viewing angle per EN-ISO 17637:2016 §5.3.1 — eye position must
+    // be ≥ 30° from the surface. Most inspections meet the minimum;
+    // higher angles or perpendicular for through-hole / port views.
+    { id:'viewAngle',  label:'Viewing angle',     placeholder:'e.g. ≥ 30°',
+      options:['≥ 30°','30°','45°','60°','90° (perpendicular)'] },
     { id:'dist', label:'Viewing distance',         placeholder:'e.g. 600 mm max', options:['300 mm max','600 mm max','Direct visual'] },
-    { id:'vtequip',label:'Equipment',              placeholder:'e.g. Welding gauge set', options:['Inspection kit','Universal cam gauge','Borescope','Welding gauge set','AWS bridge cam gauge'] },
+    { id:'magn', label:'Magnification',            placeholder:'e.g. ×2', options:['×1','×2','×3','×5','×7','×10'] },
+    // Equipment is editable so the inspector can list multiple tools
+    // used on the same examination (welding inspections routinely
+    // combine a cam gauge + borescope + magnifier). Typing accepts
+    // any comma-separated list; the datalist offers common picks for
+    // quick selection of a single tool.
+    { id:'vtequip',label:'Equipment',              placeholder:'e.g. Welding gauge set, Borescope, Magnifying loupe',
+      options:['Inspection kit','Universal cam gauge','Borescope','Welding gauge set','AWS bridge cam gauge','Magnifying loupe','Light meter (lux)','Endoscope','USB inspection camera','Mirror set','Crack-detection dye (visible)','Eye-sight test certificate'],
+      editable:true },
   ],
   PT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 3452-1:2021', options:['EN-ISO 3452-1:2021','ASME BPVC Sec. V, Art. 6 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part D)','EN 1090-2:2018+A1:2024','ISO 3452-1:2021 via NORSOK M-101 (Ed. 6, 2022)'] },

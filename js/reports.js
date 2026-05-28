@@ -164,6 +164,13 @@ var TPL_FIELDS = {
     // shop's record matches whichever standard the WPS cites.
     { id:'weldPos',  label:'Welding position',     placeholder:'e.g. PA (1G)',
       options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
+    // Stage of examination — where on the fabrication timeline this
+    // inspection sits (pre-weld fit-up, in-process root pass, final
+    // accept, post-PWHT re-check, etc.). VT-specific because VT is
+    // the method that runs at every stage; other methods typically
+    // run once at the final / post-PWHT stage.
+    { id:'stage',    label:'Stage of examination', placeholder:'e.g. Final',
+      options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
     // Time-after-welding hold per applicable code — covers delayed
     // (hydrogen-induced) cracking risk. AWS D1.1 §8.15.1 requires 48 h
     // for steels with yield ≥ 690 MPa; ASME B31.3 §341.3.2 calls for a
@@ -321,7 +328,6 @@ var RPT_FORM = {
     { id:'surfCond',   label:'Surface condition',    placeholder:'e.g. Ground, As-welded', options:['As welded','Machined','Blasted','Painted','Ground','As cast','As forged','Electropolished'] },
     { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
     { id:'heatTreat',  label:'Heat treatment',       placeholder:'e.g. PWHT, As-welded', options:['PWHT','APWHT','n.a.','Before','After'] },
-    { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', methodsOnly:['VT'], options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
     { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
   ],
   result: [

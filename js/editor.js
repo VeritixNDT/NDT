@@ -90,7 +90,7 @@ var CV_FIELD_DEFS = {
   // render (def.methodCell). The legacy 'method-cell' key is kept so
   // canvases saved before the rename keep resolving.
   'method-cell':  {label:'Method-specific field',          ph:'',                              get:r=>'',                           w:150,h:40, methodCell:true},
-  'stage':        {label:'Stage of examination',          ph:'Final',                         get:r=>r.stage||'—',                 w:140,h:38, mapTo:'stage'},
+  'stage':        {label:'Stage of examination',          ph:'Final',                         get:r=>r.eq_stage||r.stage||'—',     w:140,h:38, mapTo:'eq_stage / stage'},
   'result':       {label:'Result / Verdict',              ph:'ACCEPTABLE',                    get:r=>{const v=r.verdict||r.result||'—'; return v==='Acceptable'||v==='Pass'?'ACCEPTABLE':v==='Not acceptable'||v==='Fail'?'NOT ACCEPTABLE':v==='Monitor'?'MONITOR':v;}, w:240,h:48,result:true, mapTo:'verdict'},
   'indications':  {label:'Reportable indications',        ph:'No / Nee',                      get:r=>r.indications||((r.verdict==='Not acceptable'||r.result==='Fail')?'Yes':'No'), w:155,h:38, mapTo:'indications'},
   'remarks':      {label:'Remarks / observations',        ph:'No recordable indications detected.',get:r=>r.remarks||'—',          w:400,h:60,multi:true, mapTo:'remarks'},

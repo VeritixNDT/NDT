@@ -195,8 +195,14 @@ var TPL_FIELDS = {
     // can record the exact certificate date if their shop tracks it.
     { id:'eyeTest', label:'Eye-sight test', placeholder:'e.g. Confirmed — current',
       options:['Confirmed — current','Confirmed — expires within 1 month','Not applicable'], editable:true },
-    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 500', options:['< 350 lux','350','500','750','1000','1500'] },
+    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 500', options:['< 350 lux','350','500','750','1000','1500'], editable:true, numeric:true },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch', options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
+    // White-light meter pick — same register-backed dropdown MT and PT
+    // expose for their fluorescent / visible inspection regimes. VT is
+    // a daylight-or-white-light technique by default; the meter records
+    // the actual lux reading at the examination position (ISO 17637
+    // §5.3 — Minimum 350 lux, recommended 500+ lux on the surface).
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light' },
     // Viewing angle per EN-ISO 17637:2016 §5.3.1 — eye position must
     // be ≥ 30° from the surface. Most inspections meet the minimum;
     // higher angles or perpendicular for through-hole / port views.

@@ -138,6 +138,12 @@ var TPL_FIELDS = {
       gatedBy:'susptype', gatedByExclude:['Dry powder'], naMsg:'Not applicable — dry-particle method' },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
+    // Demagnetisation is recorded before the light-conditions block on
+    // the form so the procedural step (demag) sits beside the rest of
+    // the magnetisation block rather than landing at the very end after
+    // the examination-conditions readings.
+    { id:'demag',       label:'Demagnetised',           placeholder:'e.g. Yes',     options:['Yes','No','Not required'] },
+    { id:'demagMethod', label:'Demagnetisation method', placeholder:'e.g. AC decay', options:['AC decay','DC step-down','AC + DC reversal','Bulk demagnetiser','Heat above Curie point','Not applicable'] },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // Light / UV examination conditions. The white-light lux reading is
     // entered first and gates the meter pickers and the UV-A reading at
@@ -149,8 +155,6 @@ var TPL_FIELDS = {
     { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light',    gatedBy:'whitelight', gateMax:20 },
     { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:20 },
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
-    { id:'demag',       label:'Demagnetised',           placeholder:'e.g. Yes',     options:['Yes','No','Not required'] },
-    { id:'demagMethod', label:'Demagnetisation method', placeholder:'e.g. AC decay', options:['AC decay','DC step-down','AC + DC reversal','Bulk demagnetiser','Heat above Curie point','Not applicable'] },
   ],
   VT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
@@ -1212,8 +1216,28 @@ function rptRenderTable(list, allReports){
   }
   visibleIdxListLatest = visibleIdxList;
 
-  // Compute desired rows in display order (reversed = newest first)
-  const desired = list.slice().reverse();
+  // Compute desired rows in display order. Group every revision of the
+  // same report number together so Rev 00 / Rev 01 / Rev 02 of a single
+  // weld inspection sit beside each other instead of being scattered
+  // through the table by save date. Within each group the latest
+  // revision sits on top; between groups, the group whose latest
+  // revision was saved most recently sits on top so "newest first"
+  // still holds at the report-number level.
+  const _groups = new Map();
+  list.forEach(item => {
+    const rn = item.r.reportNo || ('__no_rn__' + item._origIdx);
+    if(!_groups.has(rn)) _groups.set(rn, []);
+    _groups.get(rn).push(item);
+  });
+  _groups.forEach(arr => arr.sort((a, b) =>
+    (parseInt(b.r.revision, 10) || 0) - (parseInt(a.r.revision, 10) || 0)
+  ));
+  const _sortedKeys = Array.from(_groups.keys()).sort((a, b) => {
+    const aLatest = (_groups.get(a)[0] && _groups.get(a)[0].r.createdAt) || '';
+    const bLatest = (_groups.get(b)[0] && _groups.get(b)[0].r.createdAt) || '';
+    return String(bLatest).localeCompare(String(aLatest));
+  });
+  const desired = _sortedKeys.reduce((out, k) => out.concat(_groups.get(k)), []);
 
   // Index existing rows by key so we can reuse their DOM nodes
   const existing = new Map();
@@ -1237,10 +1261,19 @@ function rptRenderTable(list, allReports){
       tr.className = _rptSelectedIdx.has(_origIdx) ? 'selected' : '';
       tr.dataset.sig = sig;
     } else {
-      // New row
+      // New row. The whole <tr> doubles as a click target for the
+      // selection toggle — click anywhere on the line and the row
+      // joins (or leaves) the bulk-action set, in addition to the
+      // explicit checkbox. The dispatcher uses target.closest() so a
+      // click on the checkbox still resolves to the checkbox's own
+      // data-action first, not the <tr>'s — so the row handler never
+      // fires twice for the same click.
       tr = document.createElement('tr');
       tr.dataset.key = key;
       tr.dataset.sig = sig;
+      tr.dataset.action = 'rptToggleSelect';
+      tr.dataset.args = String(_origIdx);
+      tr.style.cursor = 'pointer';
       tr.className = _rptSelectedIdx.has(_origIdx) ? 'selected' : '';
       tr.innerHTML = _rptRowInner(r, _origIdx);
     }

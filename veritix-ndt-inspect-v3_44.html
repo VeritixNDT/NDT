@@ -597,6 +597,7 @@
       <span style="flex:1"></span>
       <button class="btn btn-sm" data-action="rptBulkPdf">PDF</button>
       <button class="btn btn-sm" data-action="rptBulkView">Open</button>
+      <button class="btn btn-sm" data-action="rptBulkEmail" title="Email the selected reports — opens a draft pre-filled from your company template">✉ Email</button>
       <button class="btn btn-sm" data-action="rptBulkOpen">Revise report</button>
       <span style="width:1px;height:20px;background:var(--border2)"></span>
       <button class="btn btn-sm" data-action="rptBulkExportCsv" data-i18n="rpt.bulk.export_csv">Export CSV</button>
@@ -1142,6 +1143,45 @@
               <div class="fld form-row">
                 <label data-i18n="co.lbl.confidstmt">Confidentiality statement</label>
                 <textarea id="co-confidstmt" rows="3" placeholder="This report is confidential and intended solely for the named client. Reproduction, in part or whole, without written permission is prohibited." data-i18n-placeholder="co.ph.confidstmt"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── 8. DEFAULT EMAIL TEMPLATE ──
+               Subject + body templates pre-filled when the inspector
+               clicks "Email" on the Reports list. Backend send is not
+               wired yet — the Email modal opens the user's mail client
+               via mailto: as the interim transport, but the template
+               UI is in place so the company can author its message once
+               and have it auto-fill on every send.
+               Placeholders are substituted from the selected report:
+                 {reportNo} {revision} {method} {client} {project}
+                 {projectNo} {location} {inspector} {examDate}
+                 {verdict} {company} {companyEmail} {companyPhone}
+                 {reportList} (comma-separated list of all selected
+                              reports — useful for multi-report sends) -->
+          <div class="sc">
+            <div class="sc-head">
+              <span class="sc-title">Default email template</span>
+              <span style="font-size:11px;font-family:var(--mono);color:var(--t3)">Pre-fills the Email modal on the Reports list</span>
+            </div>
+            <div class="sc-body">
+              <div class="fld form-row">
+                <label>Default recipient <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">optional — leave blank to type per-send</span></label>
+                <input id="co-emailDefaultTo" type="email" placeholder="reports@client.com"/>
+              </div>
+              <div class="fld form-row">
+                <label>Subject template</label>
+                <input id="co-emailSubject" type="text" placeholder="{company} — {method} Inspection Report {reportNo} Rev {revision}"/>
+              </div>
+              <div class="fld form-row">
+                <label>Body template
+                  <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">supports placeholders — see field list above the editor</span>
+                </label>
+                <textarea id="co-emailBody" rows="10" placeholder="Dear {client},&#10;&#10;Please find attached the {method} Inspection Report {reportNo} Rev {revision} for project {project} ({projectNo}).&#10;&#10;Examination date: {examDate}&#10;Inspector: {inspector}&#10;Verdict: {verdict}&#10;&#10;Should you have any questions, please contact us.&#10;&#10;Kind regards,&#10;{company}"></textarea>
+              </div>
+              <div style="font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6">
+                Placeholders: <code>{reportNo}</code> <code>{revision}</code> <code>{method}</code> <code>{client}</code> <code>{project}</code> <code>{projectNo}</code> <code>{location}</code> <code>{inspector}</code> <code>{examDate}</code> <code>{verdict}</code> <code>{company}</code> <code>{companyEmail}</code> <code>{companyPhone}</code> <code>{reportList}</code>
               </div>
             </div>
           </div>

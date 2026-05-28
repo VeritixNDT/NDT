@@ -1050,6 +1050,170 @@ function rptBulkView(){
   if(typeof ovViewReport === 'function') ovViewReport(idxs[0]);
 }
 
+// ── Email the selected reports ─────────────────────────────────────────
+// Backend (SMTP / API) isn't wired yet. The Email modal pre-fills To /
+// Subject / Body from the company's default template (Settings →
+// Company → Default email template), runs placeholder substitution
+// against the first selected report, and then on Send hands off to the
+// user's mail client via mailto: as the interim transport. The same
+// modal can save edits back to the company template so the next send
+// starts from the new wording.
+//
+// Placeholders supported (see HTML company-settings panel for the
+// list shown to the user):
+//   {reportNo} {revision} {method} {client} {project} {projectNo}
+//   {location} {inspector} {examDate} {verdict} {company}
+//   {companyEmail} {companyPhone} {reportList}
+function _rptEmailTokens(report){
+  const r = report || {};
+  const co = (typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {};
+  const d = (typeof fmtDate === 'function') ? fmtDate(r.examDate || r.createdAt) : (r.examDate || r.createdAt || '');
+  return {
+    reportNo:     r.reportNo || '',
+    revision:     r.revision || '00',
+    method:       r.method   || '',
+    client:       r.client   || '',
+    project:      r.project  || '',
+    projectNo:    r.projectNo|| '',
+    location:     r.location || '',
+    inspector:    r.inspector|| '',
+    examDate:     d || '',
+    verdict:      r.verdict  || '',
+    company:      co.name    || '',
+    companyEmail: co.email   || '',
+    companyPhone: co.phone   || '',
+  };
+}
+function _rptEmailFill(tpl, tokens){
+  return String(tpl || '').replace(/\{(\w+)\}/g, (_, k) =>
+    (tokens && Object.prototype.hasOwnProperty.call(tokens, k)) ? tokens[k] : '{'+k+'}'
+  );
+}
+function rptBulkEmail(){
+  const idxs = Array.from(_rptSelectedIdx);
+  if(!idxs.length){ toast(t('toast.select_reports','Select one or more reports first.'), 'warn'); return; }
+  const all = (typeof ls === 'function') ? (ls(KEYS.reports, []) || []) : [];
+  const picked = idxs.map(i => all[i]).filter(Boolean);
+  if(!picked.length){ toast(t('toast.select_reports','Select one or more reports first.'), 'warn'); return; }
+
+  const co = ls(KEYS.company, {}) || {};
+  const tokens = _rptEmailTokens(picked[0]);
+  // {reportList} = "SV-MT-2026-00001 Rev 00, SV-MT-2026-00002 Rev 00 …"
+  tokens.reportList = picked.map(r => (r.reportNo || '—') + ' Rev ' + (r.revision || '00')).join(', ');
+
+  const defaultSubject = '{company} — {method} Inspection Report {reportNo} Rev {revision}';
+  const defaultBody = [
+    'Dear {client},',
+    '',
+    'Please find attached the {method} Inspection Report {reportNo} Rev {revision} for project {project} ({projectNo}).',
+    '',
+    'Examination date: {examDate}',
+    'Inspector: {inspector}',
+    'Verdict: {verdict}',
+    '',
+    'Should you have any questions or require further information, please contact us.',
+    '',
+    'Kind regards,',
+    '{company}',
+  ].join('\n');
+
+  const to       = co.emailDefaultTo || '';
+  const subject  = _rptEmailFill(co.emailSubject || defaultSubject, tokens);
+  const body     = _rptEmailFill(co.emailBody    || defaultBody,    tokens);
+
+  _rptEmailOpenModal({ to, subject, body, picked });
+}
+
+// Build and show the email composition modal. Self-contained — appended
+// to <body>, removed on close. Backend isn't wired yet: Send hands off
+// to the OS mail client via a mailto: URL. "Save as default" writes the
+// edited subject / body back to the company profile so the next send
+// starts from the new wording.
+function _rptEmailOpenModal(args){
+  const existing = document.getElementById('rpt-email-modal');
+  if(existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'rpt-email-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px';
+  const count = (args.picked && args.picked.length) || 0;
+  const countLbl = count === 1 ? '1 report' : (count + ' reports');
+  overlay.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;width:min(720px,100%);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)">
+        <span style="font-size:18px">✉</span>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600;color:var(--t1)">Email ${escapeHtml(countLbl)}</div>
+          <div style="font-size:11px;color:var(--t3);font-family:var(--mono)">Backend not yet wired — Send opens your OS mail client via mailto:</div>
+        </div>
+        <button class="btn btn-sm" data-action="_rptEmailClose" title="Close">✕</button>
+      </div>
+      <div style="padding:14px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+        <div class="fld">
+          <label style="font-size:11px;color:var(--t2);font-weight:500">To</label>
+          <input id="rpt-email-to" type="email" value="${escapeHtml(args.to || '')}" placeholder="recipient@example.com" style="width:100%;font-family:var(--mono);font-size:12px;padding:7px 9px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box"/>
+        </div>
+        <div class="fld">
+          <label style="font-size:11px;color:var(--t2);font-weight:500">Subject</label>
+          <input id="rpt-email-subject" type="text" value="${escapeHtml(args.subject || '')}" style="width:100%;font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box"/>
+        </div>
+        <div class="fld">
+          <label style="font-size:11px;color:var(--t2);font-weight:500">Body</label>
+          <textarea id="rpt-email-body" rows="14" style="width:100%;font-family:var(--font);font-size:13px;line-height:1.5;padding:10px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box;resize:vertical">${escapeHtml(args.body || '')}</textarea>
+        </div>
+        <div style="font-size:11px;color:var(--t3);line-height:1.5">
+          PDF attachments will be added once the backend send is wired. For now, attach the report PDFs to the message your mail client opens.
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--bg2)">
+        <button class="btn btn-sm" data-action="_rptEmailSaveTemplate" title="Save the current Subject + Body as the new company default">Save as default</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-sm" data-action="_rptEmailClose">Cancel</button>
+        <button class="btn btn-primary btn-sm" data-action="_rptEmailSend">Send</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => { const t = document.getElementById('rpt-email-to'); if(t) t.focus(); }, 30);
+}
+function _rptEmailClose(){
+  const m = document.getElementById('rpt-email-modal'); if(m) m.remove();
+}
+function _rptEmailReadDraft(){
+  return {
+    to:      (document.getElementById('rpt-email-to')?.value      || '').trim(),
+    subject: (document.getElementById('rpt-email-subject')?.value || '').trim(),
+    body:    (document.getElementById('rpt-email-body')?.value    || ''),
+  };
+}
+function _rptEmailSend(){
+  const d = _rptEmailReadDraft();
+  if(!d.to){ toast('Add a recipient before sending.', 'warn'); document.getElementById('rpt-email-to')?.focus(); return; }
+  // Interim transport: hand off to the OS mail client. The backend send
+  // (with PDF attachments, SMTP, send log) will replace this when wired.
+  const url = 'mailto:' + encodeURIComponent(d.to)
+    + '?subject=' + encodeURIComponent(d.subject)
+    + '&body='    + encodeURIComponent(d.body);
+  // mailto: URLs over ~2 KB are unreliable across mail clients; warn rather
+  // than truncate silently so the user knows to copy the body manually.
+  if(url.length > 2000){
+    toast('Body is long — your mail client may truncate it. Consider copy/pasting after the draft opens.', 'warn');
+  }
+  window.location.href = url;
+  _rptEmailClose();
+}
+function _rptEmailSaveTemplate(){
+  if(typeof vxRequireAdmin === 'function' && !vxRequireAdmin('save the email template')) return;
+  const d = _rptEmailReadDraft();
+  const co = ls(KEYS.company, {}) || {};
+  // Recipient is per-send by nature so only the templated parts are
+  // persisted — the inspector typically aims this at a different client
+  // each time.
+  co.emailSubject = d.subject;
+  co.emailBody    = d.body;
+  lss(KEYS.company, co);
+  toast('Email template saved.', 'success');
+}
+
 function rptBulkSetStage(stage){
   const idxs = Array.from(_rptSelectedIdx);
   const count = setReportStageBulk(idxs, stage);

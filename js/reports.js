@@ -103,18 +103,37 @@ var TPL_FIELDS = {
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17638:2016', options:['EN-ISO 17638:2016','EN 1090-2:2018+A1:2024','ASME BPVC Sec. V, Art. 7 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part F)','ISO 17638:2016 via NORSOK M-101 (Ed. 6, 2022)'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. ISO 23278:2015 Level 2', options:['ISO 23278:2015 Level 1','ISO 23278:2015 Level 2','ISO 23278:2015 Level 2X','ISO 23278:2015 Level 3','ISO 23278:2015 Level 3X','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.3 / 341.3.2','ASME B31.1-2024, para. 136.4.3','ASME VIII Div. 1, Mandatory App. 6 — 2025','ASME VIII Div. 2, Part 7 (Table 7.16) — 2025','No cracks'] },
     // Equipment & parameters order tracks ISO 17638:2016 Annex A
-    // (report content) — magnetisation technique first, then method
-    // type, current type / intensity, system-performance check, then
-    // particles / contrast, light conditions, with demagnetisation at
-    // the end of the procedure.
+    // (report content) — magnetising technique → field direction (j) →
+    // method type → continuous / residual (p) → current type / intensity
+    // → system-performance check (lifting power + reference indicator,
+    // ISO 9934-2/3) → particles + bath concentration (ISO 9934-2 §A.3)
+    // → contrast → light conditions → demagnetisation + how it was done.
     { id:'tech',       label:'Technique',          placeholder:'e.g. Yoke (AC)',        options:['Yoke (AC)','Yoke (DC)','Permanent magnet','Prods','Coil','Central conductor','Bench head shot','Flexible cable wrap'] },
+    { id:'magDir',     label:'Field direction',    placeholder:'e.g. Circumferential',  options:['Longitudinal (coil / cable wrap)','Circumferential (prods / head shot)','Multi-directional','Not applicable'] },
     { id:'mtmethod',   label:'Method',             placeholder:'e.g. Wet fluorescent',  options:['Wet fluorescent','Wet visible (colour contrast)','Dry visible','Dry fluorescent'] },
-    { id:'cur',        label:'Current',            placeholder:'e.g. AC',               options:['AC','HWDC','FWDC','DC','Permanent magnet'] },
-    { id:'curint',     label:'Current intensity',  placeholder:'e.g. 2-3 Ampere',       options:['2-3 Ampere','15 Ampere'] },
-    { id:'syscontrol', label:'System control',     placeholder:'e.g. > 4,5 kg + ASTM Pie', options:['> 4,5 kg + Dr. Berthold','> 4,5 kg + ASTM Pie','> 4,5 kg + Castrol strip','> 18 kg + Dr. Berthold','> 18 kg + ASTM Pie','> 18 kg + Castrol strip'] },
+    { id:'magMethod',  label:'Magnetisation method', placeholder:'Continuous or Residual', options:['Continuous','Residual'] },
+    { id:'cur',        label:'Current',            placeholder:'e.g. AC',               options:['AC','HWDC','FWDC','DC','Permanent magnet','Not applicable'] },
+    { id:'curint',     label:'Current intensity',  placeholder:'e.g. 2-3 Ampere',       options:['2-3 Ampere','15 Ampere','500 A','1000 A','1500 A','2000 A','3000 A','5 turns × 1000 A','Not applicable'] },
+    // System-performance check (ISO 9934-2 / 9934-3) is two things —
+    // the yoke lifting-test result and the reference indicator used to
+    // demonstrate adequate field strength. Captured as two fields here
+    // so the inspector can record them independently; the PDF editor
+    // pairs them onto a single place card via CV_METHOD_FIELD_PAIRS
+    // so the printed report shows "<lift> · <indicator>" on one line.
+    { id:'liftingPower', label:'Lifting power',    placeholder:'e.g. > 4,5 kg',         options:['> 4,5 kg','> 18 kg','Not applicable'] },
+    { id:'refIndicator', label:'Reference indicator', placeholder:'e.g. ASTM Pie A1',   options:['Dr. Berthold MTU','ASTM Pie A1','Castrol strip 1','Castrol strip 2','ASME E709 strip','Not applicable'] },
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'suspBatch',  label:'Test suspension batch no.', placeholder:'e.g. 24A-0815' },
     { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black water-based','Visible black oil-based','Visible red water-based','Visible red oil-based','Dry powder black','Dry powder red'] },
+    // Wet-bath particle concentration per ISO 9934-2 §A.3 (settling
+    // test in centrifuge tube, 30 min). Fluorescent suspensions
+    // settle to 0.1–0.4 mL/100 mL; visible suspensions settle to
+    // 1.4–2.4 mL/100 mL. "Not applicable" covers the dry-particle
+    // route. The field is editable so an inspector can type the exact
+    // reading observed (e.g. 0.25 mL/100 mL) instead of picking from
+    // the preset table.
+    { id:'bathConc',   label:'Bath concentration', placeholder:'e.g. 0.3 ml/100 ml (fluo) or 1.8 ml/100 ml (visible)',
+      options:['Not applicable','0.1 ml/100 ml','0.2 ml/100 ml','0.3 ml/100 ml','0.4 ml/100 ml','1.4 ml/100 ml','1.5 ml/100 ml','1.8 ml/100 ml','2.0 ml/100 ml','2.4 ml/100 ml'], editable:true },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
@@ -128,7 +147,8 @@ var TPL_FIELDS = {
     { id:'uvmeter',    label:'UV-A light meter',   useEquipmentRegister:true, eqType:'uv-light',    gatedBy:'whitelight', gateMax:20 },
     { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:20 },
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
-    { id:'demag',      label:'Demagnetised',       placeholder:'e.g. Yes',              options:['Yes','No','Not required'] },
+    { id:'demag',       label:'Demagnetised',           placeholder:'e.g. Yes',     options:['Yes','No','Not required'] },
+    { id:'demagMethod', label:'Demagnetisation method', placeholder:'e.g. AC decay', options:['AC decay','DC step-down','AC + DC reversal','Bulk demagnetiser','Heat above Curie point','Not applicable'] },
   ],
   VT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17637:2016', options:['EN-ISO 17637:2016','ASME BPVC Sec. V, Art. 9 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part C)','EN 1090-2:2018+A1:2024','ISO 17637:2016 via NORSOK M-101 (Ed. 6, 2022)'] },

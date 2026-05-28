@@ -278,19 +278,30 @@ var CV_DEFECT_COLS = [
 // is bound to one of these fields, the paired field's value is appended
 // after the separator so two related procedural pieces print on a
 // single line (e.g. "Magnaflux ZL4C · Batch 24P-0815").
-//   MT  susp + suspBatch, contrast + contrastBatch
-//   PT  pen + penBatch, dev + devBatch, precleaner + dryTime
+//   MT  susp + suspBatch, contrast + contrastBatch,
+//       susptype + bathConc (suspension classification joined with
+//       the centrifuge-settling concentration reading),
+//       cur + curint (current type joined with the intensity in A),
+//       liftingPower + refIndicator (system-performance check —
+//       lift-test result joined with the reference indicator used),
+//       demag + demagMethod (was demagnetisation achieved, and how).
+//   PT  pen + penBatch, dev + devBatch, precleaner + dryTime.
 // CV_METHOD_FIELD_HIDDEN is derived from this — the paired secondary
 // fields are hidden from the Properties panel's Method field picker,
 // because they're already rendered alongside their primary partner
-// (a standalone Penetrant batch / Developer batch / Drying time cell
-// would just repeat what's already on the consumable's card).
+// (a standalone Penetrant batch / Developer batch / Drying time /
+// Reference indicator / Demagnetisation method / Current intensity
+// cell would just repeat what's already on the primary card).
 var CV_METHOD_FIELD_PAIRS = {
-  susp:       { with:'suspBatch',     prefix:' · Batch ' },
-  contrast:   { with:'contrastBatch', prefix:' · Batch ' },
-  pen:        { with:'penBatch',      prefix:' · Batch ' },
-  dev:        { with:'devBatch',      prefix:' · Batch ' },
-  precleaner: { with:'dryTime',       prefix:' · Dry ' },
+  susp:         { with:'suspBatch',     prefix:' · Batch ' },
+  contrast:     { with:'contrastBatch', prefix:' · Batch ' },
+  pen:          { with:'penBatch',      prefix:' · Batch ' },
+  dev:          { with:'devBatch',      prefix:' · Batch ' },
+  precleaner:   { with:'dryTime',       prefix:' · Dry ' },
+  susptype:     { with:'bathConc',      prefix:' · ' },
+  cur:          { with:'curint',        prefix:' · ' },
+  liftingPower: { with:'refIndicator',  prefix:' · ' },
+  demag:        { with:'demagMethod',   prefix:' · ' },
 };
 var CV_METHOD_FIELD_HIDDEN = new Set(
   Object.values(CV_METHOD_FIELD_PAIRS).map(p => p.with)

@@ -1624,6 +1624,12 @@ function cvInitCanvas(){
   _cvSyncSnapButton();     // reflect persisted snap-to-grid state
   _cvSyncGridOverlay();    // hide the grid overlay when snap is off
   setTimeout(() => cvRefreshPreviewSource(), 50);   // V3: populate report dropdown
+  // Auto-adopt the most recent saved report for the active method as
+  // the preview source so the canvas opens with real values, not
+  // synthetic sample data. Honours an existing pick (e.g. one the user
+  // had set in a prior session and that gets restored) — only kicks in
+  // when no source is currently set.
+  setTimeout(() => { if(!cvPpvReportId) _cvAutoPickPreviewSource(cvPpvMethod); cvRenderCanvas(); }, 80);
   // V25: reflect saved alignment-guides toggle state on the button
   const alignBtn = document.getElementById('cv-align-toggle');
   if(alignBtn){
@@ -2382,7 +2388,14 @@ function cvRenderCanvas(){
   _cvUpsertZoneBand('footer', canvas);
 
   // ── Build report data once for this render pass ──
-  const report = cvPreview ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects) : null;
+  // Build whenever a preview source is set OR preview mode is on, so a
+  // template designer working in edit mode (and so still able to drag /
+  // resize blocks) sees the actual values that will land on their VT /
+  // UT / MT report — not synthetic sample placeholders. The smart-card
+  // path already had this behaviour; this lifts it to regular fields.
+  const report = (cvPreview || cvPpvReportId)
+    ? cvBuildReport(cvPpvMethod, cvPpvResult, cvPpvShowDefects)
+    : null;
   // AUDIT-FIX #1: use shared helper so editor preview shows the same page
   // labels the printed PDF will show. The old code hardcoded 'page 1' for
   // every defect, which lied to the user.
@@ -3553,7 +3566,7 @@ function cvRenderBlockContent(block, report, preview){
     // data). Without the eq_ lookup a real report's method cells would
     // only ever show the sample equipment values.
     let val = '';
-    if(preview && report && mf){
+    if(report && mf){
       const eqv = report['eq_' + mf];
       val = (eqv != null && eqv !== '') ? String(eqv)
           : (report.methodData ? (report.methodData[mf] || '') : '');
@@ -3703,7 +3716,7 @@ function cvRenderBlockContent(block, report, preview){
     </div>`;
   }
 
-  let value = preview && report ? (() => { try{ return def.get(report); }catch(e){ return '—'; } })() : def.ph||'';
+  let value = report ? (() => { try{ return def.get(report); }catch(e){ return def.ph||'—'; } })() : def.ph||'';
 
   // Items-table support — if this card maps to a per-item column (subject,
   // drawing, welders, …) and the report carries more than one inspected
@@ -3713,7 +3726,7 @@ function cvRenderBlockContent(block, report, preview){
   // working. Single-item reports fall through to the existing single-value
   // path and render exactly as before.
   let itemValues = null;
-  if(preview && report && Array.isArray(report.items) && report.items.length > 1
+  if(report && Array.isArray(report.items) && report.items.length > 1
      && def.mapTo && typeof RPT_ITEM_FIELD_IDS !== 'undefined'
      && RPT_ITEM_FIELD_IDS.indexOf(def.mapTo) >= 0
      && !def.sig && !def.multi){
@@ -3784,7 +3797,7 @@ function cvRenderBlockContent(block, report, preview){
     // The inspector-signature card auto-fills from the selected
     // inspector's registered signature image (Settings → Inspectors).
     let sigImg = '';
-    if(key === 'insp-sig' && preview && report && report.inspector){
+    if(key === 'insp-sig' && report && report.inspector){
       try {
         const _ins = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS) && INSPECTORS.length)
           ? INSPECTORS
@@ -5797,7 +5810,49 @@ function cvRenderMethodBtns(){
   const ppvMethods = (typeof getActiveMethods === 'function') ? getActiveMethods() : NDT_METHODS;
   container.innerHTML = ppvMethods.map(m=>`<button class="tbe" data-action="cvSetPpvMethod" data-args="'${m.id}'" style="font-size:11px;color:${m.color}">${m.id}</button>`).join('');
 }
-function cvSetPpvMethod(m){ cvPpvMethod=m; cvRenderCanvas(); }
+function cvSetPpvMethod(m){
+  // Method switch — re-pick a real saved report for the new method so
+  // the canvas keeps showing live data, not a stale pick from the old
+  // method. Sample data is left alone: a user who explicitly chose
+  // "Sample data" keeps it across method switches.
+  const hadRealSource = !!cvPpvReportId;
+  cvPpvMethod = m;
+  if(hadRealSource) _cvAutoPickPreviewSource(m);
+  cvRenderCanvas();
+}
+
+// Find the most recent saved report for `method` and adopt it as the
+// preview source, *without* flipping the editor into preview mode —
+// edit-mode rendering will pick it up too via the report-build path in
+// cvRenderCanvas. Quiet no-op when no matching report exists (clears
+// the source so the canvas falls back to synthetic sample data).
+function _cvAutoPickPreviewSource(method){
+  if(!method) return;
+  try {
+    const reports = (typeof ls === 'function' && typeof KEYS !== 'undefined')
+      ? (ls(KEYS.reports, []) || []) : [];
+    // Reports are stored append-only, so the last entry for a method
+    // is the most recent. Walking from the end is cheaper than sorting.
+    let recent = null;
+    for(let i = reports.length - 1; i >= 0; i--){
+      const r = reports[i];
+      if(r && r.method === method && (r.reportNo || r.id)){ recent = r; break; }
+    }
+    const sel   = document.getElementById('cv-ppv-source');
+    const badge = document.getElementById('cv-preview-badge');
+    if(recent){
+      cvPpvReportId = recent.reportNo || recent.id;
+      cvPpvResult = recent.verdict === 'Acceptable' ? 'Pass'
+                  : recent.verdict === 'Not acceptable' ? 'Fail' : 'Monitor';
+      if(sel)   sel.value = cvPpvReportId;
+      if(badge){ badge.style.display = 'inline-block'; badge.textContent = '⚡ Live: ' + cvPpvReportId; }
+    } else {
+      cvPpvReportId = null;
+      if(sel)   sel.value = '';
+      if(badge) badge.style.display = 'none';
+    }
+  } catch(e){ /* sample-data fallback is fine */ }
+}
 function cvSetPpvResult(r){ cvPpvResult=r; cvRenderCanvas(); }
 
 // ── Template config ──────────────────────────────────────────────────

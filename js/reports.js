@@ -657,14 +657,24 @@ function _rptGateUpdate(srcInput){
   if(!srcInput || !srcInput.id) return;
   const m = /^rf-([^-]+)-(.+)$/.exec(srcInput.id);
   if(!m) return;
-  const method = m[1], srcField = m[2];
+  // Form input ids are eq_-prefixed (rf-MT-eq_whitelight), but gatedBy
+  // values in TPL_FIELDS are raw ('whitelight'). Strip the prefix so
+  // the target lookup against gatedBy matches — the runtime gate
+  // update was a no-op for every TPL_FIELDS-sourced source field
+  // until this was fixed.
+  const method = m[1], srcField = m[2].replace(/^eq_/, '');
   const allFields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[method]) ? TPL_FIELDS[method] : [];
   const targets = allFields.filter(f => f && f.gatedBy === srcField);
   if(!targets.length) return;
   const srcRaw = String((srcInput.value !== undefined ? srcInput.value : '') || '').trim();
   const srcNum = srcRaw !== '' ? parseFloat(srcRaw) : NaN;
   targets.forEach(tf => {
-    const targetInput = document.getElementById('rf-' + method + '-' + tf.id);
+    // Same eq_ prefix story for the target lookup — the form input id
+    // is the eq_-prefixed form, but tf.id (from TPL_FIELDS) is raw.
+    // Try the prefixed id first; fall back to the unprefixed form
+    // so RPT_FORM-sourced targets (no eq_ prefix on save) still work.
+    const targetInput = document.getElementById('rf-' + method + '-eq_' + tf.id)
+                     || document.getElementById('rf-' + method + '-' + tf.id);
     if(!targetInput) return;
     // String-exclusion gate (susptype → bathConc) wins when defined;
     // otherwise fall through to numeric (gateMin / gateMax) for the

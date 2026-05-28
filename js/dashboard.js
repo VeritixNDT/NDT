@@ -1391,7 +1391,7 @@ function ovNewReport(methodId, btn, sourceReport) {
   // pre-filled into `merged` here.
   const methodFields = TPL_FIELDS[methodId] || [];
   const _renameMethod = f => {
-    const field = {...f, id:'eq_'+f.id, label:f.label.replace('Default ','')};
+    const field = {...f, id:'eq_'+f.id};
     if(!merged['eq_'+f.id] && tpl[f.id]) merged['eq_'+f.id] = tpl[f.id];
     return field;
   };
@@ -1443,17 +1443,10 @@ function ovNewReport(methodId, btn, sourceReport) {
   if(typeof autofillBindClientField === 'function'){
     setTimeout(() => autofillBindClientField(methodId), 30);
   }
-  // Auto-pick the procedure when the specification / acceptance criteria
-  // are chosen — matched against Settings → NDT procedures by method.
-  setTimeout(() => {
-    const specEl = el(`rf-${methodId}-eq_spec`);
-    const accEl  = el(`rf-${methodId}-eq_acc`);
-    if(specEl) specEl.addEventListener('change', () => ovAutoPickProcedure(methodId));
-    if(accEl)  accEl.addEventListener('change', () => ovAutoPickProcedure(methodId));
-    // Fill from any spec already pre-filled on a fresh report — but never
-    // overwrite a procedure carried in on a revision.
-    ovAutoPickProcedure(methodId, true);
-  }, 40);
+  // (Procedure auto-pick removed — the `proc` field no longer lives on
+  // the report form. The procedure-link smart card now resolves the
+  // active procedure for this report's method at print time via
+  // cvResolveSmartLink, so there's nothing for the form to pre-fill.)
   // Non-admin inspectors sign their own reports. Verify the logged-in
   // user holds a valid certification for this report's method — if not,
   // pop up a notice and block the save (admins are exempt; they pick a
@@ -1489,42 +1482,6 @@ function ovNewReport(methodId, btn, sourceReport) {
   _ovDraftIndicator('idle');
   _ovDraftStartTick();
   _ovDraftMaybeShowRestoreBanner();
-}
-
-// Auto-pick the Procedure field from Settings → NDT procedures, matching
-// the chosen specification (and acceptance criteria when both line up)
-// against registered procedures for this method. Spec / acceptance are
-// compared on the year/prefix-agnostic key (_cvSpecKey, from editor.js);
-// an Active revision wins. `onlyIfEmpty` skips the change when the
-// Procedure field already carries a value (used on form open so a
-// revision's saved procedure is never clobbered).
-function ovAutoPickProcedure(methodId, onlyIfEmpty){
-  const procEl = el(`rf-${methodId}-eq_proc`);
-  if(!procEl) return;
-  if(onlyIfEmpty && String(procEl.value || '').trim()) return;
-  const specEl = el(`rf-${methodId}-eq_spec`);
-  const accEl  = el(`rf-${methodId}-eq_acc`);
-  const spec = specEl ? String(specEl.value || '').trim() : '';
-  const acc  = accEl  ? String(accEl.value  || '').trim() : '';
-  if(!spec) return;
-  const key  = s => (typeof _cvSpecKey === 'function') ? _cvSpecKey(s) : String(s || '').trim().toLowerCase();
-  const procs = (typeof ls === 'function') ? (ls(KEYS.procedures, []) || []) : [];
-  const cands = procs.filter(p => p.method === methodId && p.standard && key(p.standard) === key(spec));
-  if(!cands.length) return;
-  const isActive = p => /^active$/i.test(String(p.status || '').trim());
-  const accMatch = acc ? cands.filter(p => p.acceptance && key(p.acceptance) === key(acc)) : [];
-  const pool = accMatch.length ? accMatch : cands;
-  const pick = pool.find(isActive) || pool[0];
-  const procNo = pick.procNo || pick.procedureNo || pick.no || '';
-  if(!procNo) return;
-  // The Procedure field is a fixed-option <select>; add the matched
-  // number as an option if it isn't listed, then select it.
-  if(procEl.tagName === 'SELECT' && !Array.from(procEl.options).some(o => o.value === procNo)){
-    const opt = document.createElement('option');
-    opt.value = procNo; opt.textContent = procNo;
-    procEl.appendChild(opt);
-  }
-  procEl.value = procNo;
 }
 
 function ovFormSection(title, fields, methodId, data, m) {

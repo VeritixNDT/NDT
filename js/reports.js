@@ -427,14 +427,14 @@ function tplRenderForm(methodId, m) {
   // Equipment & parameters — method-specific TPL_FIELDS minus spec/acc.
   const equipFromMethod = methodFields
     .filter(s => !TPL_CRITERIA_FIELD_IDS.has(s.id))
-    .map(s => ({...s, id:'eq_'+s.id, label:s.label.replace('Default ','')}));
+    .map(s => ({...s, id:'eq_'+s.id}));
   if(equipFromMethod.length) html += tplFormSection(`${m.id} — Equipment & parameters`, equipFromMethod, methodId, f);
 
   // Examination criteria — RPT_FORM.exam plus method-specific spec /
   // acceptance criteria (eq_-prefixed) lifted from TPL_FIELDS[methodId].
   const criteriaFromMethod = methodFields
     .filter(s => TPL_CRITERIA_FIELD_IDS.has(s.id))
-    .map(s => ({...s, id:'eq_'+s.id, label:s.label.replace('Default ','')}));
+    .map(s => ({...s, id:'eq_'+s.id}));
   html += tplFormSection('Examination criteria', [...RPT_FORM.exam, ...criteriaFromMethod], methodId, f);
 
   html += tplFormSection('Result',   RPT_FORM.result,  methodId, f);

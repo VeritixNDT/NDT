@@ -592,15 +592,26 @@ async function cvLoadDefaultLayout(){
   y+=36;
   add('thickness',false,M,y,col4,36); add('surf-cond',false,M+col4+1,y,col4,36); add('temperature',false,M+col4*2+2,y,col4-5,36); add('weld-pos',false,M+col4*3-1,y,col4+8,36);
   y+=36;
-  add('part-exam',false,M,y,W,36); y+=36;
+  // 'part-exam' row dropped — that card had no form-side data source
+  // and only showed sample data; the items-table covers per-row
+  // examination extent already.
   add('section-header',true,M,y,W,22,{text:'Examination criteria',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
   add('exam-type',false,M,y,col4+20,36); add('extent',false,M+col4+21,y,col4-10,36); add('spec',false,M+col4*2+12,y,col4+5,36); add('acc-crit',false,M+col4*3+18,y,col4-15,36);
   y+=36;
-  add('procedure',false,M,y,col2,36); add('proc-rev',false,M+col2+1,y,90,36); add('stage',false,M+col2+95,y,col2-90,36);
-  y+=36;
+  // procedure-link (smart card) replaces the legacy 'procedure' field
+  // card — it resolves the active procedure for the report's method
+  // from Settings → NDT procedures at print time, so the printed
+  // procedure number tracks the procedure register without the
+  // report having to carry its own eq_proc value.
+  add('procedure-link',false,M,y,col2,46); add('proc-rev',false,M+col2+1,y,90,46); add('stage',false,M+col2+95,y,col2-90,46);
+  y+=46;
   add('section-header',true,M,y,W,22,{text:'Equipment',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
-  add('equipment',false,M,y,col3*2-5,36); add('sv-id',false,M+col3*2-4,y,col3-3,36); add('cal-date',false,M+col3*3-5,y,col3+12,36);
-  y+=36;
+  // calib-status (smart card) replaces the legacy 'equipment' +
+  // 'sv-id' + 'cal-date' trio — it resolves the live equipment
+  // record from Settings → Equipment (by report eq_id) and prints
+  // name + SV-ID + calibration date together with an in-cal /
+  // out-of-cal flag.
+  add('calib-status',false,M,y,W,46); y+=46;
   add('method-block',true,M,y,W,88,{showBorder:false}); y+=88;
   add('section-header',true,M,y,W,22,{text:'Result / Verdict',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
   add('remarks',false,M,y,W,56); y+=56;

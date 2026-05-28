@@ -124,16 +124,18 @@ var TPL_FIELDS = {
     { id:'refIndicator', label:'Reference indicator', placeholder:'e.g. ASTM Pie A1',   options:['Dr. Berthold MTU','ASTM Pie A1','Castrol strip 1','Castrol strip 2','ASME E709 strip','Not applicable'] },
     { id:'susp',       label:'Test suspension',    placeholder:'e.g. Magnaflux 7HF',    options:['Magnaflux 7HF','Magnaflux 14HF','MR Chemie MR 76 S','MR Chemie MR 230','Tiede fluorescent','Ardrox 800/3'] },
     { id:'suspBatch',  label:'Test suspension batch no.', placeholder:'e.g. 24A-0815' },
-    { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black water-based','Visible black oil-based','Visible red water-based','Visible red oil-based','Dry powder black','Dry powder red'] },
+    { id:'susptype',   label:'Suspension type',    placeholder:'e.g. Fluorescent water-based', options:['Fluorescent water-based','Fluorescent oil-based','Visible black water-based','Visible black oil-based','Visible red water-based','Visible red oil-based','Dry powder black','Dry powder red'], gates:'bathConc' },
     // Wet-bath particle concentration per ISO 9934-2 §A.3 (settling
     // test in centrifuge tube, 30 min). Fluorescent suspensions
     // settle to 0.1–0.4 mL/100 mL; visible suspensions settle to
-    // 1.4–2.4 mL/100 mL. "Not applicable" covers the dry-particle
-    // route. The field is editable so an inspector can type the exact
-    // reading observed (e.g. 0.25 mL/100 mL) instead of picking from
-    // the preset table.
+    // 1.4–2.4 mL/100 mL. Gated by the suspension type — a Dry-powder
+    // suspension hides the field (concentration check only applies
+    // to wet-particle routes). The field is editable so an inspector
+    // can type the exact reading observed (e.g. 0.25 mL/100 mL)
+    // instead of picking from the preset table.
     { id:'bathConc',   label:'Bath concentration', placeholder:'e.g. 0.3 ml/100 ml (fluo) or 1.8 ml/100 ml (visible)',
-      options:['Not applicable','0.1 ml/100 ml','0.2 ml/100 ml','0.3 ml/100 ml','0.4 ml/100 ml','1.4 ml/100 ml','1.5 ml/100 ml','1.8 ml/100 ml','2.0 ml/100 ml','2.4 ml/100 ml'], editable:true },
+      options:['0.1 ml/100 ml','0.2 ml/100 ml','0.3 ml/100 ml','0.4 ml/100 ml','1.4 ml/100 ml','1.5 ml/100 ml','1.8 ml/100 ml','2.0 ml/100 ml','2.4 ml/100 ml'], editable:true,
+      gatedBy:'susptype', gatedByExclude:['Dry powder'], naMsg:'Not applicable — dry-particle method' },
     { id:'contrast',   label:'Contrast paint',     placeholder:'e.g. WCP-2',            options:['Magnaflux WCP-2','MR Chemie MR 72','Tiede contrast paint','Ardrox 8901W'] },
     { id:'contrastBatch',label:'Contrast paint batch no.', placeholder:'e.g. 24C-1102' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch',  options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
@@ -510,17 +512,29 @@ function rptFieldHtml(methodId, f, data) {
     // Numeric fields (UV-A, white-light) restrict input to numbers and
     // raise a decimal keypad on tablets; non-numeric fields stay free text.
     const numAttrs = f.numeric ? ' type="number" min="0" step="any" inputmode="decimal"' : ' type="text"';
-    // Gate target — a field that reads "Not applicable" until its gating
-    // field qualifies it (UV-A applies only when white light ≤ gateMax).
+    // Gate target — a field that reads "Not applicable" until its
+    // gating field qualifies it. Two gate flavours:
+    //   numeric — gv ≤ gateMax (UV-A applies only when white light ≤
+    //              20 lux)
+    //   string  — !gatedByExclude.some(sub => srcRaw.includes(sub))
+    //              (bathConc hides when susptype contains "Dry powder")
     const gateMax = f.gateMax != null ? f.gateMax : 20;
     let gateApplies = true;
     if(f.gatedBy) {
-      const gv = parseFloat((data['eq_'+f.gatedBy] != null ? data['eq_'+f.gatedBy] : data[f.gatedBy]) || '');
-      gateApplies = !isNaN(gv) && gv <= gateMax;
+      const gvRaw = String((data['eq_'+f.gatedBy] != null ? data['eq_'+f.gatedBy] : data[f.gatedBy]) || '').trim();
+      if(Array.isArray(f.gatedByExclude) && f.gatedByExclude.length){
+        gateApplies = !f.gatedByExclude.some(ex => gvRaw.toLowerCase().includes(String(ex).toLowerCase()));
+      } else {
+        const gv = parseFloat(gvRaw);
+        gateApplies = !isNaN(gv) && gv <= gateMax;
+      }
     }
-    // Gate source — drives a target field's applicability (white light
-    // gates UV-A). _rptLightGate keeps the target live as the user types.
-    const gateAttrs = f.gates ? ' data-on-input="_rptLightGate" data-on-change="_rptLightGate" data-pass-el="1"' : '';
+    // Gate source — drives a target field's applicability. _rptGateUpdate
+    // is a generic router that finds every target with gatedBy === this
+    // source and re-evaluates them; the legacy _rptLightGate name is
+    // aliased to the same function so existing data-on-input wiring on
+    // the whitelight field still resolves.
+    const gateAttrs = f.gates ? ' data-on-input="_rptGateUpdate" data-on-change="_rptGateUpdate" data-pass-el="1"' : '';
     const gateData  = f.gatedBy ? ` data-gatemax="${gateMax}"` : '';
     // Range flag — fields with a minWarn threshold show an amber warning
     // when the entered reading falls below it (e.g. UV-A < 1000 µW/cm²).
@@ -532,8 +546,9 @@ function rptFieldHtml(methodId, f, data) {
     const warnHtml = f.minWarn != null
       ? `<div class="rpt-range-warn" style="display:${low&&gateApplies?'':'none'};font-size:11px;color:var(--amber);margin-top:3px">⚠ ${escapeHtml(f.minWarnMsg || ('Below the recommended minimum of ' + f.minWarn))}</div>`
       : '';
+    const naMsg = f.naMsg || ('Not applicable — fluorescent inspection only (≤' + gateMax + ' lux)');
     const naHtml = f.gatedBy
-      ? `<div class="rpt-na" style="display:${gateApplies?'none':'block'};font-size:13px;color:var(--t3);font-style:italic;padding:7px 2px">Not applicable — fluorescent inspection only (≤${gateMax} lux)</div>`
+      ? `<div class="rpt-na" style="display:${gateApplies?'none':'block'};font-size:13px;color:var(--t3);font-style:italic;padding:7px 2px">${escapeHtml(naMsg)}</div>`
       : '';
     const inpStyle = (low?'border-color:var(--amber);':'') + (f.gatedBy && !gateApplies ? 'display:none' : '');
     return `<div class="fld"><label>${f.label}</label>
@@ -543,15 +558,19 @@ function rptFieldHtml(methodId, f, data) {
   // Dropdown fields on the new-report form are read-only with respect to
   // their option list — inspectors pick from the values defined under
   // Settings → Report templates, and cannot add or remove options here.
+  // A select that gates another field (f.gates) wires through to
+  // _rptGateUpdate so the gated target hides / shows live as the
+  // inspector changes the source.
+  const selGateAttrs = f.gates ? ' data-on-change="_rptGateUpdate" data-pass-el="1"' : '';
   if(f.type==='select') {
     return `<div class="fld"><label>${f.label}</label>
-      <select id="${fid}">${fieldOpts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>
+      <select id="${fid}"${selGateAttrs}>${fieldOpts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>
     </div>`;
   }
   if(fieldOpts.length) {
     const opts = fieldOpts.map(o => `<option${o===val?' selected':''}>${o}</option>`).join('');
     return `<div class="fld"><label>${f.label}</label>
-      <select id="${fid}"><option value="">— Select —</option>${opts}</select>
+      <select id="${fid}"${selGateAttrs}><option value="">— Select —</option>${opts}</select>
     </div>`;
   }
   return `<div class="fld"><label>${f.label}</label><input id="${fid}" type="${f.type||'text'}" value="${val}" placeholder="${f.placeholder||''}" ${f.readonly?'readonly style="color:var(--t3);font-style:italic"':''}/></div>`;
@@ -572,50 +591,65 @@ function _rptRangeCheck(inp){
   inp.style.borderColor = low ? 'var(--amber)' : '';
 }
 
-// Light-mode gate. White light above the threshold (20 lux) means a
-// visible white-light inspection, so the UV-A field doesn't apply; at or
-// below it the exam is fluorescent and UV-A is captured. Shows the UV-A
-// input or its "Not applicable" readout live as the white-light field is
-// edited, and clears the UV-A value while N/A so a visible inspection
-// never carries a stray UV reading. Wired via data-on-input on the
-// white-light field by rptFieldHtml.
-function _rptLightGate(wlInput){
-  if(!wlInput) return;
-  const wlRaw = (wlInput.value || '').trim();
-  const wl    = parseFloat(wlRaw);
-  const wlNum = (wlRaw !== '' && !isNaN(wl)) ? wl : null;
-  // UV-A irradiance reading — shown only for a fluorescent inspection.
-  const uvInput = document.getElementById(wlInput.id.replace('whitelight','uvirr'));
-  if(uvInput){
-    const fld  = uvInput.closest('.fld');
+// Generic gate router. The source field carries `gates:'<targetId>'` (one
+// or many — TPL_FIELDS is scanned to find every target whose `gatedBy`
+// names this source). Each target is re-evaluated against its own rule:
+//   numeric — parseFloat(srcVal) ≤ target.gateMax (white-light → UV-A)
+//   numeric range — gateMin < srcVal ≤ gateMax (UV-A / white-light
+//                   meter pickers per regime)
+//   string  — target.gatedByExclude — if the source value contains any
+//                   substring in the exclude list, the gate does NOT
+//                   apply (susptype "Dry powder ..." hides bathConc)
+// useEquipmentRegister targets are greyed out via opacity; everything
+// else is hidden via display:none with the .rpt-na placeholder showing.
+// _rptLightGate is kept as an alias so existing data-on-input wiring
+// on the white-light field still resolves.
+function _rptGateUpdate(srcInput){
+  if(!srcInput || !srcInput.id) return;
+  const m = /^rf-([^-]+)-(.+)$/.exec(srcInput.id);
+  if(!m) return;
+  const method = m[1], srcField = m[2];
+  const allFields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[method]) ? TPL_FIELDS[method] : [];
+  const targets = allFields.filter(f => f && f.gatedBy === srcField);
+  if(!targets.length) return;
+  const srcRaw = String((srcInput.value !== undefined ? srcInput.value : '') || '').trim();
+  const srcNum = srcRaw !== '' ? parseFloat(srcRaw) : NaN;
+  targets.forEach(tf => {
+    const targetInput = document.getElementById('rf-' + method + '-' + tf.id);
+    if(!targetInput) return;
+    // String-exclusion gate (susptype → bathConc) wins when defined;
+    // otherwise fall through to numeric (gateMin / gateMax) for the
+    // legacy white-light → UV-A / meter-picker path.
+    let applies;
+    if(Array.isArray(tf.gatedByExclude) && tf.gatedByExclude.length){
+      applies = srcRaw !== '' && !tf.gatedByExclude.some(ex => srcRaw.toLowerCase().includes(String(ex).toLowerCase()));
+    } else {
+      const max = (tf.gateMax != null) ? tf.gateMax : 20;
+      const min = (tf.gateMin != null) ? tf.gateMin : null;
+      applies = !isNaN(srcNum)
+        && (min == null || srcNum > min)
+        && srcNum <= max;
+    }
+    if(tf.useEquipmentRegister){
+      _rptSetGateState(targetInput, applies);
+      return;
+    }
+    const fld  = targetInput.closest('.fld');
     const na   = fld && fld.querySelector('.rpt-na');
     const warn = fld && fld.querySelector('.rpt-range-warn');
-    const max  = parseFloat(uvInput.dataset.gatemax);
-    const lim  = isNaN(max) ? 20 : max;
-    const applies = wlNum != null && wlNum <= lim;
-    uvInput.style.display = applies ? '' : 'none';
+    targetInput.style.display = applies ? '' : 'none';
     if(na) na.style.display = applies ? 'none' : 'block';
     if(applies){
-      if(typeof _rptRangeCheck === 'function') _rptRangeCheck(uvInput);
+      if(typeof _rptRangeCheck === 'function') _rptRangeCheck(targetInput);
     } else {
-      uvInput.value = '';
+      targetInput.value = '';
       if(warn) warn.style.display = 'none';
     }
-  }
-  // Light-meter pickers — enable only the meter whose regime the lux
-  // value selects (≤ gatemax → UV-A meter, ≥ gatemin → white-light
-  // meter); the other is greyed out.
-  ['uvmeter','lightmeter'].forEach(key => {
-    const sel = document.getElementById(wlInput.id.replace('whitelight', key));
-    if(!sel) return;
-    const min = parseFloat(sel.dataset.gatemin);
-    const max = parseFloat(sel.dataset.gatemax);
-    const applies = wlNum != null
-      && (isNaN(min) || wlNum > min)
-      && (isNaN(max) || wlNum <= max);
-    _rptSetGateState(sel, applies);
   });
 }
+// Legacy alias — older callsites / saved templates may still emit
+// data-on-input="_rptLightGate" on the white-light field.
+function _rptLightGate(srcInput){ _rptGateUpdate(srcInput); }
 // Toggle a gated equipment <select> between active and greyed-out.
 function _rptSetGateState(sel, applies){
   sel.disabled = !applies;

@@ -281,6 +281,8 @@ var CV_DEFECT_COLS = [
 //   MT  susp + suspBatch, contrast + contrastBatch,
 //       susptype + bathConc (suspension classification joined with
 //       the centrifuge-settling concentration reading),
+//       tech + magDir (magnetising technique joined with field
+//       direction — Yoke (AC) · Longitudinal etc.),
 //       cur + curint (current type joined with the intensity in A),
 //       liftingPower + refIndicator (system-performance check —
 //       lift-test result joined with the reference indicator used),
@@ -299,6 +301,7 @@ var CV_METHOD_FIELD_PAIRS = {
   dev:          { with:'devBatch',      prefix:' · Batch ' },
   precleaner:   { with:'dryTime',       prefix:' · Dry ' },
   susptype:     { with:'bathConc',      prefix:' · ' },
+  tech:         { with:'magDir',        prefix:' · ' },
   cur:          { with:'curint',        prefix:' · ' },
   liftingPower: { with:'refIndicator',  prefix:' · ' },
   demag:        { with:'demagMethod',   prefix:' · ' },
@@ -332,10 +335,16 @@ var CV_PALETTE_GROUPS = [
   {id:'identity',  label:'Identity',      fields:['report-no','revision','method','exam-date']},
   {id:'client',    label:'Client info',   fields:['client','project','project-no','location','sv-order','order-no','req-no','ref-client']},
   {id:'subject',   label:'Subject',       fields:['subject','drawing-no','subject-no','material','thickness','weld-prep','weld-process','welders']},
-  {id:'criteria',  label:'Criteria',      fields:['exam-type','surf-cond','temperature','heat-treat','extent','spec','acc-crit','procedure','proc-rev','stage','weld-pos']},
-  {id:'equipment', label:'Equipment',     fields:['equipment','sv-id','cal-date','light-source','method-cell']},
+  // Stale picks dropped from the palette (definitions kept in
+  // CV_FIELD_DEFS so legacy templates referencing them still render):
+  //   • procedure          — replaced by procedure-link smart card
+  //   • equipment / sv-id / cal-date — replaced by calib-status smart card
+  //   • insp-level / cert-auth       — replaced by cert-status smart card
+  // The Smart / linked group is the place to grab their working equivalents.
+  {id:'criteria',  label:'Criteria',      fields:['exam-type','surf-cond','temperature','heat-treat','extent','spec','acc-crit','proc-rev','stage','weld-pos']},
+  {id:'equipment', label:'Equipment',     fields:['light-source','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
-  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-level','cert-auth','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
+  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
   {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','calib-status','light-status','uv-light-status','light-conditions','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},

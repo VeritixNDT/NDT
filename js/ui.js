@@ -635,6 +635,7 @@ function _wLogoLoadFromInput(el) { logoLoadFile(el.files[0]); el.value = ''; }
 function _wPmPhotoLoadFromInput(el) { pmPhotoLoad(el.files[0]); el.value = ''; }
 function _wPmSigLoadFromInput(el)   { pmSigLoad(el.files[0]);   el.value = ''; }
 function _wSigLoadFromInput(el)     { sigLoadUpload(el.files[0]); el.value = ''; }
+function _wEyeLoadFromInput(el)     { eyeUploadLoad(el.files[0]);  el.value = ''; }
 
 // Custom keydown handlers (replace `onkeydown="if(key==='Enter')…"`)
 function _wKbInspAddCustomMethod(el, e) {
@@ -879,6 +880,10 @@ function _wDropPmSig(el, e) {
 function _wDropSigUpload(el, e) {
   e.preventDefault(); el.classList.remove('drag-over');
   sigLoadUpload(e.dataTransfer.files[0]);
+}
+function _wDropEyeUpload(el, e) {
+  e.preventDefault(); el.classList.remove('drag-over');
+  eyeUploadLoad(e.dataTransfer.files[0]);
 }
 function _wDropProcFiles(el, e) {
   e.preventDefault();

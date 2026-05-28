@@ -1407,6 +1407,38 @@
                       </div>
                 </div>
                 <div class="fld form-row">
+                  <label>Eye-sight test certificate</label>
+                  <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Annual near-vision (Jaeger J1 / Times Roman N4.5 at 300 mm) + colour vision per EN-ISO 17637:2016 §6. Upload the certificate so it auto-resolves on every VT report this inspector signs.</div>
+                  <div class="fg form-row" style="margin-bottom:8px">
+                    <div class="fld"><label>Certificate no.</label><input id="if-eye-certno" placeholder="e.g. OPT-2025-04812" autocomplete="off"/></div>
+                    <div class="fld"><label>Authority / clinic</label><input id="if-eye-authority" placeholder="e.g. Specsavers, Antwerp" autocomplete="off"/></div>
+                  </div>
+                  <div class="fg form-row" style="margin-bottom:8px">
+                    <div class="fld"><label>Test date</label><input id="if-eye-testdate" type="date"/></div>
+                    <div class="fld"><label>Expiry</label><input id="if-eye-expiry" type="date"/></div>
+                  </div>
+                  <div class="sig-upload-zone" id="eye-upload-zone"
+                       data-action="_wClickInput" data-args="'eye-file-inp'"
+                       data-on-dragover="_wDragoverHighlight" data-pass-event="1" data-pass-el="1"
+                       data-on-dragleave="_wDragleaveUnhighlight" data-pass-el="1"
+                       data-on-drop="_wDropEyeUpload" data-pass-event="1" data-pass-el="1">
+                    <img id="eye-upload-preview" src="" alt="" style="display:none;max-height:80px;max-width:100%;object-fit:contain;border-radius:3px"/>
+                    <div id="eye-upload-pdfbadge" style="display:none;font-size:12px;color:var(--t2);padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px">
+                      <span style="font-size:18px">📕</span>&nbsp;<span id="eye-upload-pdfname" style="font-family:var(--mono);font-size:11px"></span>
+                    </div>
+                    <div id="eye-upload-hint">
+                      <div style="font-size:20px;opacity:.35;margin-bottom:4px">👁</div>
+                      <div style="font-size:12px;color:var(--t2)">Click or drag eye-sight certificate</div>
+                      <div style="font-size:10px;color:var(--t3);margin-top:2px">PDF, PNG, JPG · max 5 MB</div>
+                    </div>
+                  </div>
+                  <input type="file" id="eye-file-inp" accept="application/pdf,image/*" style="display:none" data-on-change="_wEyeLoadFromInput" data-pass-el="1"/>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:5px">
+                    <button type="button" id="eye-upload-view" data-action="eyeUploadView" style="display:none;font-size:11px;color:var(--cyan2);background:transparent;border:none;cursor:pointer">↗ View</button>
+                    <button type="button" class="sig-clear" id="eye-upload-clear" data-action="eyeUploadClear" style="display:none">✕ Remove</button>
+                  </div>
+                </div>
+                <div class="fld form-row">
                   <label data-i18n="insp.lbl.notes">Notes</label>
                   <textarea id="if-notes" rows="2" placeholder="Additional qualifications, remarks…" data-i18n-placeholder="insp.ph.notes"></textarea>
                 </div>

@@ -1452,6 +1452,14 @@ var _inspCustomMethods = [];
 var _sigLastX          = 0;
 var _sigLastY          = 0;
 
+// Eye-sight test cert upload — staged on the in-progress inspector form
+// until Save. Stores the file as a dataURL alongside its filename and
+// MIME type so the same payload can be persisted on the inspector
+// record and re-rendered (PDF badge vs <img>) without re-reading.
+var _eyeUploadData = null;
+var _eyeUploadName = '';
+var _eyeUploadType = '';
+
 function loadInspectors() { INSPECTORS = ls(INSP_KEY, []); }
 function saveInspectors() { lss(INSP_KEY, INSPECTORS); }
 function inspIsAdmin()    { return typeof vxIsAdmin === 'function' ? vxIsAdmin() : CURRENT_USER?.role === 'Admin'; }
@@ -1511,6 +1519,13 @@ function _inspWorstCertStatus(ins) {
     const s = certStatus(c && c.expiry);
     if(order[s] > order[worst]) worst = s;
   });
+  // Eye-sight cert flows into the same status — an inspector with a
+  // valid method cert but an expired eye-test still flags amber/red,
+  // because they can't lawfully sign a VT report either way.
+  if(ins && ins.eyeTest && ins.eyeTest.expiry) {
+    const es = certStatus(ins.eyeTest.expiry);
+    if(order[es] > order[worst]) worst = es;
+  }
   return worst;
 }
 function certBadge(dateStr) {
@@ -1608,6 +1623,19 @@ function inspRender() {
       const sigHtml = ins.signature
         ? `<img src="${ins.signature}" alt="Sig" style="height:36px;max-width:120px;object-fit:contain;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:3px 6px;vertical-align:middle"/>`
         : '';
+      // Eye-sight test row — sits below the method-cert rows in the same
+      // chip style so the roster shows VT eligibility at a glance. Only
+      // rendered when the inspector has any eye-test data on file.
+      const et = ins.eyeTest;
+      const eyeRow = (et && (et.certNo || et.authority || et.expiry || et.fileData))
+        ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
+            <span style="font-size:10px;font-weight:700;color:var(--cyan2);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:2px 7px;border-radius:4px;min-width:34px;text-align:center">👁 EYE</span>
+            ${et.authority ? `<span style="color:var(--t3)">${escapeHtml(et.authority)}</span>` : ''}
+            ${et.certNo ? `<span style="font-family:var(--mono);color:var(--t3)">${escapeHtml(et.certNo)}</span>` : ''}
+            ${certBadge(et.expiry)}
+            ${et.fileData ? `<button class="btn btn-sm btn-ghost" style="font-size:10px;padding:1px 6px" data-action="eyeCertView" data-args="${i}" title="View certificate">↗ ${escapeHtml(et.fileType==='application/pdf'?'PDF':'File')}</button>` : ''}
+          </div>`
+        : '';
       return `<div class="sc" style="margin-bottom:10px">
         <div class="sc-body" style="padding:14px 16px">
           <div style="display:flex;align-items:flex-start;gap:14px">
@@ -1616,8 +1644,8 @@ function inspRender() {
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
                 <span style="font-weight:600;font-size:14px;color:var(--t1)">${escapeHtml(ins.name)}</span>
               </div>
-              ${certRows
-                ? `<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">${certRows}</div>`
+              ${certRows || eyeRow
+                ? `<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">${certRows}${eyeRow}</div>`
                 : `<div style="font-size:11px;color:var(--t3);font-style:italic;margin-bottom:8px">No method certifications on file</div>`}
               <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
                 ${ins.email ? `<span style="font-size:11px;font-family:var(--mono);color:var(--t3)">✉ ${escapeHtml(ins.email)}</span>` : ''}
@@ -1829,6 +1857,112 @@ function sigReset(existingDataURL) {
   }
 }
 
+// ── Eye-sight test certificate upload ──
+// Accepts PDF or image up to 5 MB (matches procedures register). PDF
+// can't be previewed inline so a filename badge stands in for the
+// thumbnail; images render in the same preview slot the signature
+// uses. The dataURL is held in module state until inspSave persists it.
+function eyeUploadLoad(file) {
+  if(!file) return;
+  const okType = file.type === 'application/pdf' || file.type.startsWith('image/');
+  if(!okType) { toast('Please choose a PDF or image file.', 'error'); return; }
+  if(file.size > 5 * 1024 * 1024) { toast('Eye-sight certificate must be under 5 MB.', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    _eyeUploadData = e.target.result;
+    _eyeUploadName = file.name || '';
+    _eyeUploadType = file.type || '';
+    _eyeUploadRefreshUI();
+  };
+  reader.readAsDataURL(file);
+}
+
+function eyeUploadClear() {
+  _eyeUploadData = null;
+  _eyeUploadName = '';
+  _eyeUploadType = '';
+  _eyeUploadRefreshUI();
+}
+
+// Open the eye-test cert for a stored inspector (from the roster row).
+// Separate from eyeUploadView (which reads the in-flight form state)
+// so the View button on a card works whether the form is open or not.
+function eyeCertView(idx) {
+  const ins = INSPECTORS[idx]; if(!ins || !ins.eyeTest || !ins.eyeTest.fileData) return;
+  _eyeOpenCertWindow(ins.eyeTest.fileData, ins.eyeTest.fileType, ins.eyeTest.fileName);
+}
+
+function _eyeOpenCertWindow(dataURL, type, name) {
+  const w = window.open();
+  if(!w) { toast('Pop-up blocked — allow pop-ups to view the certificate.', 'warn'); return; }
+  const safeName = escapeHtml(name || 'Eye-sight certificate');
+  if(type === 'application/pdf') {
+    w.document.write(`<title>${safeName}</title>
+      <body style="margin:0"><embed src="${dataURL}" type="application/pdf" style="width:100vw;height:100vh"/></body>`);
+  } else {
+    w.document.write(`<title>${safeName}</title>
+      <body style="margin:0;background:#222;display:flex;align-items:center;justify-content:center">
+      <img src="${dataURL}" style="max-width:100vw;max-height:100vh;object-fit:contain"/></body>`);
+  }
+}
+
+function eyeUploadView() {
+  if(!_eyeUploadData) return;
+  _eyeOpenCertWindow(_eyeUploadData, _eyeUploadType, _eyeUploadName);
+}
+
+function eyeUploadGet() {
+  return _eyeUploadData ? { fileData: _eyeUploadData, fileName: _eyeUploadName, fileType: _eyeUploadType } : null;
+}
+
+function eyeUploadReset(eyeTest) {
+  _eyeUploadData = (eyeTest && eyeTest.fileData) || null;
+  _eyeUploadName = (eyeTest && eyeTest.fileName) || '';
+  _eyeUploadType = (eyeTest && eyeTest.fileType) || '';
+  _eyeUploadRefreshUI();
+}
+
+// Sync the form's upload zone to current module state. Splits the
+// preview into three shapes: empty (hint), image (thumbnail), PDF
+// (filename badge) — and shows the View/Remove buttons only when a
+// file is staged.
+function _eyeUploadRefreshUI() {
+  const preview = el('eye-upload-preview');
+  const hint    = el('eye-upload-hint');
+  const pdfBadge = el('eye-upload-pdfbadge');
+  const pdfName = el('eye-upload-pdfname');
+  const zone    = el('eye-upload-zone');
+  const viewBtn = el('eye-upload-view');
+  const clearBtn = el('eye-upload-clear');
+  const has = !!_eyeUploadData;
+  const isPdf = has && _eyeUploadType === 'application/pdf';
+  if(preview) {
+    if(has && !isPdf) { preview.src = _eyeUploadData; preview.style.display = 'block'; }
+    else { preview.src = ''; preview.style.display = 'none'; }
+  }
+  if(pdfBadge) pdfBadge.style.display = isPdf ? 'inline-block' : 'none';
+  if(pdfName)  pdfName.textContent = _eyeUploadName || '';
+  if(hint)     hint.style.display = has ? 'none' : '';
+  if(zone)     zone.classList.toggle('has-sig', has);
+  if(viewBtn)  viewBtn.style.display = has ? '' : 'none';
+  if(clearBtn) clearBtn.style.display = has ? '' : 'none';
+}
+
+// Read the eye-test cert fields from the inspector form. Returns null
+// when no field has any value — keeps the record clean of empty
+// eyeTest:{} blobs.
+function _inspCollectEyeTest() {
+  const certNo    = (el('if-eye-certno')?.value    || '').trim();
+  const authority = (el('if-eye-authority')?.value || '').trim();
+  const testDate  = (el('if-eye-testdate')?.value  || '').trim();
+  const expiry    = (el('if-eye-expiry')?.value    || '').trim();
+  const file = eyeUploadGet();
+  if(!certNo && !authority && !testDate && !expiry && !file) return null;
+  const out = { certNo, authority, testDate: testDate || null, expiry: expiry || null };
+  if(file) { out.fileData = file.fileData; out.fileName = file.fileName; out.fileType = file.fileType; }
+  return out;
+}
+
 // ── CRUD ──
 function inspOpenForm(idx) {
   if(!inspIsAdmin()) { toast(t('toast.admin_required','Admin access required.'), 'error'); return; }
@@ -1838,12 +1972,18 @@ function inspOpenForm(idx) {
   el('if-name').value  = ins.name  || '';
   el('if-email').value = ins.email || '';
   el('if-notes').value = ins.notes || '';
+  const et = ins.eyeTest || {};
+  el('if-eye-certno').value    = et.certNo    || '';
+  el('if-eye-authority').value = et.authority || '';
+  el('if-eye-testdate').value  = et.testDate  || '';
+  el('if-eye-expiry').value    = et.expiry    || '';
   inspBuildMethodCerts();
   el('insp-form-title').textContent = idx !== null ? 'Edit inspector' : 'Add inspector';
   const wrap = el('insp-form-wrap');
   wrap.style.display = 'block';
   wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   sigReset(ins.signature || null);
+  eyeUploadReset(et);
   el('if-name').focus();
 }
 
@@ -1857,6 +1997,7 @@ function inspSave() {
   const name = el('if-name').value.trim();
   if(!name) { toast(t('toast.name_required', 'Name is required.'), 'error'); return; }
   const methodCerts = _inspCollectMethodCerts();
+  const eyeTest = _inspCollectEyeTest();
   const record = {
     id:          (_inspEditIdx !== null && INSPECTORS[_inspEditIdx]?.id) || ('insp_' + Date.now()),
     name,
@@ -1867,6 +2008,9 @@ function inspSave() {
     // cards) has a flat list to read without knowing the cert shape.
     methodCerts,
     methods:     Object.keys(methodCerts),
+    // Eye-sight test cert (EN-ISO 17637:2016 §6). Auto-resolves on every
+    // VT report this inspector signs — see the eye-cert smart card.
+    eyeTest,
     signature:   sigGetData() || (_inspEditIdx !== null ? INSPECTORS[_inspEditIdx]?.signature : null),
     updatedAt:   new Date().toISOString(),
   };

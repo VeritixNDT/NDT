@@ -190,14 +190,14 @@ var TPL_FIELDS = {
       options:['≥ 30°','30°','45°','60°','90° (perpendicular)'] },
     { id:'dist', label:'Viewing distance',         placeholder:'e.g. 600 mm max', options:['300 mm max','600 mm max','Direct visual'] },
     { id:'magn', label:'Magnification',            placeholder:'e.g. ×2', options:['×1','×2','×3','×5','×7','×10'] },
-    // Equipment is editable so the inspector can list multiple tools
-    // used on the same examination (welding inspections routinely
-    // combine a cam gauge + borescope + magnifier). Typing accepts
-    // any comma-separated list; the datalist offers common picks for
-    // quick selection of a single tool.
-    { id:'vtequip',label:'Equipment',              placeholder:'e.g. Welding gauge set, Borescope, Magnifying loupe',
-      options:['Inspection kit','Universal cam gauge','Borescope','Welding gauge set','AWS bridge cam gauge','Magnifying loupe','Light meter (lux)','Endoscope','USB inspection camera','Mirror set','Crack-detection dye (visible)','Eye-sight test certificate'],
-      editable:true },
+    // Equipment is sourced from Settings → Equipment — same pattern as
+    // the UV / white-light meter pickers and the (smart-card-resolved)
+    // main NDT equipment on UT / MT / RT. Items registered against
+    // VT (or not method-tagged at all) appear in the dropdown; out-of-
+    // cal items are shown disabled so the inspector can't pick gear
+    // that's past its calibration date. Falls back to a free-text input
+    // when the register is empty so the form still works on day one.
+    { id:'vtequip',label:'Equipment',              useEquipmentRegister:true },
   ],
   PT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 3452-1:2021', options:['EN-ISO 3452-1:2021','ASME BPVC Sec. V, Art. 6 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part D)','EN 1090-2:2018+A1:2024','ISO 3452-1:2021 via NORSOK M-101 (Ed. 6, 2022)'] },

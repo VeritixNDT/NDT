@@ -810,8 +810,43 @@ function inspectorSelectHtml(methodId, f, val, fid) {
     return `<option value="${escapeHtml(ins.name)}"${ins.name===val?' selected':''}${disabled && ins.name!==val?' disabled':''}>${escapeHtml((ins.name||'—') + suffix)}</option>`;
   }).join('');
   return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· must hold a valid ${escapeHtml(methodId||'')} certification</span></label>
-    <select id="${fid}" class="rf-inspector" data-method="${escapeHtml(methodId)}"><option value="">— Select —</option>${opts}</select>
+    <select id="${fid}" class="rf-inspector" data-method="${escapeHtml(methodId)}" data-on-change="_rptInspectorChange" data-pass-el="1"><option value="">— Select —</option>${opts}</select>
   </div>`;
+}
+
+// Inspector-pick router. Triggered when the signoff inspector changes —
+// fans out to any field that depends on the inspector identity. Today
+// that's the eye-sight test field on a VT report; the same hook is the
+// natural place to extend with future inspector-derived fields.
+function _rptInspectorChange(sel) {
+  if(!sel) return;
+  const name = sel.value;
+  // Locate any eye-test field on the open form. Method-agnostic by
+  // design — a non-VT method won't have one, so the function quietly
+  // no-ops there. Skipped when the field already carries a manual
+  // override (a free-typed value not in the preset list).
+  const eyeInp = document.querySelector('[id^="rf-"][id$="-eyeTest"]');
+  if(!eyeInp) return;
+  const list = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS) && INSPECTORS.length)
+    ? INSPECTORS
+    : ((typeof ls === 'function') ? ls('vx-inspectors-v1', []) : []);
+  const insp = name ? list.find(i => i.name === name) : null;
+  const et = insp && insp.eyeTest;
+  if(!et || !et.expiry) {
+    // Clear only auto-derived values (anything the previous inspector
+    // pick injected). A truly hand-typed value stays put.
+    if(eyeInp.dataset.autofill === '1') { eyeInp.value = ''; delete eyeInp.dataset.autofill; }
+    return;
+  }
+  const d = (typeof daysUntil === 'function') ? daysUntil(et.expiry) : null;
+  const fmtExp = (typeof fmtDate === 'function') ? fmtDate(et.expiry) : et.expiry;
+  let label;
+  if(d == null)      label = 'Confirmed — current';
+  else if(d < 0)     label = 'EXPIRED — ' + fmtExp;
+  else if(d <= 30)   label = 'Confirmed — expires ' + fmtExp + ' (' + d + 'd)';
+  else               label = 'Confirmed — expires ' + fmtExp;
+  eyeInp.value = label;
+  eyeInp.dataset.autofill = '1';
 }
 
 function rptFormSave(methodId) {

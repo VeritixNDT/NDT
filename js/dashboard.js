@@ -1443,6 +1443,17 @@ function ovNewReport(methodId, btn, sourceReport) {
   if(typeof autofillBindClientField === 'function'){
     setTimeout(() => autofillBindClientField(methodId), 30);
   }
+  // Eye-sight test auto-fill — pre-populate the VT eye-test field from
+  // the inspector picked at form-init (covers the non-admin "sign as
+  // yourself" path where the inspector input is readonly and never
+  // fires a change event, plus re-edits of saved drafts that already
+  // carry an inspector).
+  if(typeof _rptInspectorChange === 'function'){
+    setTimeout(() => {
+      const inspInp = document.getElementById('rf-signoff-inspector');
+      if(inspInp) _rptInspectorChange(inspInp);
+    }, 30);
+  }
   // (Procedure auto-pick removed — the `proc` field no longer lives on
   // the report form. The procedure-link smart card now resolves the
   // active procedure for this report's method at print time via
@@ -2389,6 +2400,31 @@ function ovSaveReport(mode) {
       }
     });
   } catch(e) { console.warn('equipment snapshot failed', e); }
+  // Inspector eye-sight cert snapshot — VT (and any other field that
+  // pulls from the inspector's annual near-vision cert) gets a frozen
+  // copy of the signoff inspector's eyeTest at save time. Same
+  // motivation as the equipment snapshot: the report stays historically
+  // consistent even if the inspector record is later edited or the
+  // cert is renewed. Stored as report.inspectorEyeTest so the PDF
+  // smart card can resolve it without round-tripping through the
+  // live INSPECTORS list.
+  try {
+    const list = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS) && INSPECTORS.length)
+      ? INSPECTORS
+      : ((typeof ls === 'function') ? ls('vx-inspectors-v1', []) : []);
+    const insp = list.find(i => i.name === report.inspector);
+    if(insp && insp.eyeTest) {
+      report.inspectorEyeTest = {
+        certNo:    insp.eyeTest.certNo    || '',
+        authority: insp.eyeTest.authority || '',
+        testDate:  insp.eyeTest.testDate  || null,
+        expiry:    insp.eyeTest.expiry    || null,
+        fileData:  insp.eyeTest.fileData  || null,
+        fileName:  insp.eyeTest.fileName  || '',
+        fileType:  insp.eyeTest.fileType  || '',
+      };
+    }
+  } catch(e) { console.warn('eye-test snapshot failed', e); }
   // Inspected-items table — capture every row, then mirror row 0 to the
   // top-level report fields so existing PDF place cards, list filters, and
   // CSV exports keep reading r.subject / r.drawing / r.welders / … as

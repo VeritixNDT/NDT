@@ -24,8 +24,99 @@ function defInit(){
 function defGetAll(){ return ls(KEYS.defects, []); }
 function defSaveAll(list){ lss(KEYS.defects, list); }
 
+// Surface defects that live ON saved reports as well — every items-table
+// row marked verdict='Not acceptable' on the new-report form can carry
+// defectType / defectLocation / defectSize / defectPhoto. The Defects
+// log used to only show manually-added entries from KEYS.defects, so a
+// report could record a critical defect and the dashboard wouldn't know.
+// Now each rejected item with any defect detail surfaces here too, with
+// _source='report' so it reads as read-only — the inspector edits these
+// by opening the linked report (the form is the source of truth).
+//
+// Revisions are collapsed: a report with several revisions (Rev 00 ->
+// Rev 01 -> Rev 02) only contributes defects from its highest revision,
+// so the log doesn't duplicate the same defect across every revision.
+// "Open report" lands on that latest-revision record so the inspector
+// edits the current state of the report. Repair history is still
+// visible by browsing the prior revisions in the Reports list.
+function _defFromReports(){
+  const reports = (typeof ls === 'function') ? (ls(KEYS.reports, []) || []) : [];
+  // Pick the highest-revision report for each reportNo. Reports with
+  // no reportNo (rare — usually unsaved scaffolding) fall through with
+  // a synthetic key so they aren't bucketed together.
+  const latestByReportNo = new Map();
+  reports.forEach((r, ri) => {
+    if(!r) return;
+    const rn = r.reportNo || ('__no_rn__' + ri);
+    const rv = parseInt(r.revision, 10) || 0;
+    const cur = latestByReportNo.get(rn);
+    if(!cur || (parseInt(cur.r.revision, 10) || 0) < rv){
+      latestByReportNo.set(rn, { r, ri });
+    }
+  });
+  const out = [];
+  latestByReportNo.forEach(({ r, ri }) => {
+    if(!Array.isArray(r.items)) return;
+    r.items.forEach((it, ii) => {
+      if(!it || it.verdict !== 'Not acceptable') return;
+      // An item flagged Not acceptable but with no defect detail typed
+      // yet isn't useful to surface — the report form is the place to
+      // capture it. Wait until at least one of type / location / size
+      // is filled before publishing to the log.
+      if(!it.defectType && !it.defectLocation && !it.defectSize) return;
+      const subject = (it.subject || r.subject || '').toString();
+      out.push({
+        _source:     'report',
+        _reportIdx:  ri,
+        _itemIdx:    ii,
+        defectId:    (r.reportNo || '—') + ' #' + (ii + 1),
+        type:        it.defectType     || '',
+        // severity / depth / length / width / disposition aren't
+        // captured on the report items table — left blank so they
+        // visibly invite the inspector to enrich the entry from the
+        // standalone Defect log if needed.
+        severity:    '',
+        status:      'Open',
+        method:      r.method          || '',
+        location:    it.defectLocation || '',
+        depth:       '',
+        length:      '',
+        width:       '',
+        component:   subject || '',
+        drawing:     it.drawing  || r.drawing || '',
+        inspector:   r.inspector || '',
+        report:      (r.reportNo || '') + (r.revision ? ' Rev ' + r.revision : ''),
+        disposition: '',
+        notes:       it.defectSize ? ('Size: ' + it.defectSize) : '',
+        photos:      it.defectPhoto ? [it.defectPhoto] : [],
+        createdAt:   r.createdAt || '',
+      });
+    });
+  });
+  return out;
+}
+
+// Combined log = report-derived first (newest report ID at top after
+// the .reverse() in the render), then manually-entered standalone
+// defects from KEYS.defects. Both flows render through the same table.
+function _defCombined(){
+  return _defFromReports().concat(defGetAll());
+}
+
+// "Open report" action wired to report-derived rows in the table —
+// reuses ovViewReport so the inspector lands in the same PDF preview
+// the Reports list opens. _reportIdx points at the report's position
+// in KEYS.reports captured at _defFromReports time.
+function _defOpenReport(reportIdx){
+  if(typeof ovViewReport === 'function') ovViewReport(reportIdx);
+  else toast('Report viewer not available in this build.', 'error');
+}
+
 function defRender(){
-  let list = defGetAll();
+  // Pull from both sources: standalone defects (KEYS.defects) and
+  // report-derived defects (rejected items on saved reports). See
+  // _defCombined / _defFromReports above.
+  let list = _defCombined();
   const search = (el('def-search')?.value||'').toLowerCase().trim();
   const fSev = el('def-f-sev')?.value||'';
   const fStatus = el('def-f-status')?.value||'';
@@ -62,12 +153,24 @@ function defRender(){
 
   if(list.length){
     const rows = list.slice().reverse().map(d=>{
-      const idx = allDefs.indexOf(d);
+      const fromReport = d._source === 'report';
+      // Standalone defects index by their position in the manual store;
+      // report-derived entries have no position there and can't be
+      // edited / deleted from the log (the report form is the source
+      // of truth). defEdit / defDelete are wired to the standalone idx.
+      const idx = fromReport ? -1 : allDefs.indexOf(d);
       const sevColor = {Critical:'red',High:'amber',Medium:'blue',Low:'green'}[d.severity]||'muted';
       const statusColor = {Open:'red','In Progress':'amber',Repaired:'blue',Verified:'green',Closed:'muted'}[d.status]||'muted';
       const md = NDT_METHODS.find(m=>m.id===d.method);
+      const srcBadge = fromReport
+        ? ` <span title="Pulled from a saved report — edit by opening the linked report" style="background:rgba(0,212,255,.12);color:var(--cyan);font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:3px;letter-spacing:.04em;margin-left:6px">REPORT</span>`
+        : '';
+      const actions = fromReport
+        ? `<button class="btn btn-sm" data-action="_defOpenReport" data-args="${d._reportIdx}" title="Open the linked report" style="font-size:10px;padding:3px 8px">Open report</button>`
+        : `<button class="btn btn-sm" data-action="defEdit" data-args="${idx}" style="font-size:10px;padding:3px 8px">Edit</button>
+           <button class="btn btn-sm btn-danger" data-action="defDelete" data-args="${idx}" style="font-size:10px;padding:3px 8px">Del</button>`;
       return `<tr>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--t2)">${d.defectId||'—'}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--t2)">${d.defectId||'—'}${srcBadge}</td>
         <td>${d.type||'—'}</td>
         <td><span class="badge badge-${sevColor}" style="font-size:10px">${d.severity ? tSeverity(d.severity) : '—'}</span></td>
         <td><span class="badge badge-${statusColor}" style="font-size:10px">${d.status ? tStatus(d.status) : '—'}</span></td>
@@ -80,10 +183,7 @@ function defRender(){
         <td>${d.disposition||'—'}</td>
         <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(d.createdAt)}</td>
         <td>
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-sm" data-action="defEdit" data-args="${idx}" style="font-size:10px;padding:3px 8px">Edit</button>
-            <button class="btn btn-sm btn-danger" data-action="defDelete" data-args="${idx}" style="font-size:10px;padding:3px 8px">Del</button>
-          </div>
+          <div style="display:flex;gap:4px">${actions}</div>
         </td>
       </tr>`;
     }).join('');
@@ -102,7 +202,10 @@ function defRender(){
 }
 
 function defRenderMetrics(filtered){
-  const all = defGetAll();
+  // Use the combined log (standalone + report-derived) so the tile
+  // counts reflect every defect on file, not just the manually-added
+  // entries.
+  const all = _defCombined();
   const metricsEl = el('def-metrics'); if(!metricsEl) return;
 
   const total = all.length;
@@ -286,15 +389,19 @@ function defClearFilters(){
 }
 
 function defExportCsv(){
-  const all = defGetAll();
+  // Export the combined log so the CSV covers every defect — manually-
+  // added and report-derived alike. The Source column flags which
+  // entries came from a report so an analyst can filter / pivot.
+  const all = _defCombined();
   if(!all.length){ toast(t('toast.no_defects', 'No defects to export'),'error'); return; }
   const u = unitLabel();
-  const headers = ['ID','Type','Severity','Status','Method','Location',`Depth (${u})`,`Length (${u})`,`Width (${u})`,'Report','Component','Drawing','Inspector','Disposition','Notes','Date','Created By'];
+  const headers = ['ID','Type','Severity','Status','Method','Location',`Depth (${u})`,`Length (${u})`,`Width (${u})`,'Report','Component','Drawing','Inspector','Disposition','Notes','Date','Created By','Source'];
   const rows = all.map(d=>[
     d.defectId, d.type, d.severity, d.status, d.method, d.location,
     mmToDisplayValue(d.depth, 3), mmToDisplayValue(d.length, 3), mmToDisplayValue(d.width, 3),
     d.report, d.component, d.drawing, d.inspector, d.disposition, d.notes,
-    d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '', d.createdBy||''
+    d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '', d.createdBy||'',
+    d._source === 'report' ? 'report' : 'manual',
   ].map(v=>'"'+(v||'').replace(/"/g,'""')+'"'));
   const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
   const blob = new Blob([csv], {type:'text/csv'});

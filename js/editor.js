@@ -271,7 +271,7 @@ var CV_DEFECT_COLS = [
   { label:'Col 1 (Weld / Location)', width:160, topId:'subject',  topLabel:'Weld / object', botId:'defectLocation', botLabel:'Location' },
   { label:'Col 2 (Drawing / Type)',  width:140, topId:'drawing',  topLabel:'Drawing no.',   botId:'defectType',     botLabel:'Defect type' },
   { label:'Col 3 (Material / Size)', width:140, topId:'material', topLabel:'Material',      botId:'defectSize',     botLabel:'Size' },
-  { label:'Photo (full height)',     width:120, photoId:'defectPhoto' },
+  { label:'Photo (full height)',     width:60,  photoId:'defectPhoto' },
 ];
 
 var CV_LAYOUT_ITEMS = [
@@ -881,37 +881,23 @@ function cvResolveSmartLink(block, report){
   const k = block.key;
   if(k === 'procedure-link'){
     const procs = (typeof ls === 'function') ? ls(KEYS.procedures, []) : [];
-    const spec       = (report?.eq_spec || report?.spec || report?.specification || '').trim();
-    const procNo     = (report?.eq_proc || report?.proc || report?.procedure || '').trim();
-    const reportRev  = report?.procRev || '';
     const reportMeth = report?.method || '';
-    // Resolve against Settings → NDT procedures. Primary link: the
-    // report's specification → a procedure's `standard` field, compared on
-    // the year-/prefix-agnostic key (see _cvSpecKey). When several
-    // procedures share a standard, prefer the report's own method and an
-    // Active revision. Falls back to a direct procedure-number match for
-    // older reports that carry an explicit number.
-    let match = null;
-    if(spec){
-      const specKey = _cvSpecKey(spec);
-      if(specKey){
-        const bySpec   = procs.filter(p => _cvSpecKey(p.standard) === specKey);
-        const isActive = p => /^active$/i.test(String(p.status || '').trim());
-        match = bySpec.find(p => p.method === reportMeth && isActive(p))
-             || bySpec.find(p => p.method === reportMeth)
-             || bySpec.find(isActive)
-             || bySpec[0] || null;
-      }
-    }
-    if(!match && procNo && procNo !== '—'){
-      match = procs.find(p => p.procNo === procNo || p.procedureNo === procNo || p.no === procNo);
-    }
+    const reportRev  = report?.procRev || '';
+    // Match against Settings → NDT procedures by NDT method + status —
+    // the upload form no longer carries spec / acceptance dropdowns
+    // (the uploaded PDF is the source of truth) so the smart card
+    // picks the Active procedure registered for this report's method,
+    // falling back to the most recent registered procedure for the
+    // method when none is currently flagged Active.
+    const isActive = p => /^active$/i.test(String(p.status || '').trim());
+    const byMethod = procs.filter(p => p.method === reportMeth);
+    let match = byMethod.find(isActive) || byMethod[0] || null;
     if(match){
       // Revision is pulled from the linked procedure record on file (its
       // authoritative current revision), falling back to the revision
       // recorded on the report if the record carries none.
       const rev = match.revision || match.rev || reportRev;
-      const shownNo = match.procNo || match.procedureNo || match.no || procNo || '—';
+      const shownNo = match.procNo || match.procedureNo || match.no || '—';
       // Review date carried on the linked procedure record (Settings →
       // NDT procedures). A procedure past its review date flags the card
       // into the not-valid (red) state — the same treatment the cert /
@@ -927,11 +913,11 @@ function cvResolveSmartLink(block, report){
         [match.title || match.standard || match.specification || 'Procedure on file'],
         reviewLine);
     }
-    const missDesc = spec ? 'No procedure on file for this specification'
-                          : 'No procedure on file matching this number';
     return _cvSmartCardHtml('⚠ MISSING',
-      [(spec || procNo || '—') + (reportRev ? ' Rev ' + reportRev : '')],
-      [missDesc]);
+      [reportMeth ? (reportMeth + ' procedure') : '—'],
+      [reportMeth
+        ? ('No ' + reportMeth + ' procedure on file — upload one in Settings → NDT procedures')
+        : 'No procedure on file']);
   }
   if(k === 'cert-status'){
     const insp = report?.inspector || '—';
@@ -3019,32 +3005,38 @@ function cvRenderBlockContent(block, report, preview){
         //   3. the most recent saved report carrying items[] (design mode
         //      or sample-data preview)
         //   4. an empty placeholder row
+        // Items source — when a real `report` is being rendered, use its
+        // own items list and stop there. The form-state / latest-saved
+        // fallbacks are design-mode only so a report with an empty
+        // items list never silently borrows from another report.
         let liveItems = null;
         if(report && Array.isArray(report.items) && report.items.length){
           liveItems = report.items;
         }
-        if(!liveItems && typeof _ovItems !== 'undefined' && Array.isArray(_ovItems)){
-          const live = _ovItems
-            .map(r => {
-              const o = {}; if(!r) return o;
-              Object.keys(r).forEach(k => { if(r[k] && String(r[k]).trim()) o[k] = String(r[k]).trim(); });
-              return o;
-            })
-            .filter(r => Object.keys(r).length);
-          if(live.length) liveItems = live;
-        }
-        if(!liveItems){
-          try {
-            if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
-              const reports = ls(KEYS.reports, []) || [];
-              for(let i = reports.length - 1; i >= 0; i--){
-                if(reports[i] && Array.isArray(reports[i].items) && reports[i].items.length){
-                  liveItems = reports[i].items;
-                  break;
+        if(!liveItems && !report){
+          if(typeof _ovItems !== 'undefined' && Array.isArray(_ovItems)){
+            const live = _ovItems
+              .map(r => {
+                const o = {}; if(!r) return o;
+                Object.keys(r).forEach(k => { if(r[k] && String(r[k]).trim()) o[k] = String(r[k]).trim(); });
+                return o;
+              })
+              .filter(r => Object.keys(r).length);
+            if(live.length) liveItems = live;
+          }
+          if(!liveItems){
+            try {
+              if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
+                const reports = ls(KEYS.reports, []) || [];
+                for(let i = reports.length - 1; i >= 0; i--){
+                  if(reports[i] && Array.isArray(reports[i].items) && reports[i].items.length){
+                    liveItems = reports[i].items;
+                    break;
+                  }
                 }
               }
-            }
-          } catch(e){}
+            } catch(e){}
+          }
         }
         let items = liveItems
           ? liveItems
@@ -3107,26 +3099,31 @@ function cvRenderBlockContent(block, report, preview){
         const tplSectionColor = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
         const barColor = _safeColor(block.barColor, tplSectionColor);
         const title = _h((block.text || 'Examination details')).toUpperCase();
-        // Examination remarks — sourced same way as items (preview report
-        // → live _ovItems form value → latest saved report). Renders into
-        // the wrapper's flex:1 zone below the table, filling whatever
-        // empty space the block has under the rows.
+        // Examination remarks. When a real `report` is being rendered
+        // (preview / PDF / print) use its own remarks and nothing else —
+        // a blank field means the inspector chose to leave it blank,
+        // not "borrow another report's remarks". The cross-report
+        // fallback was leaking the latest saved report's remarks
+        // (e.g. an MT report's remarks showing on a PT report that
+        // had the field left empty). The form / saved-report fallback
+        // chain is kept for design mode only, so the editor canvas
+        // still previews with realistic copy.
         let liveRemarks = (report && report.examRemarks) ? String(report.examRemarks) : '';
-        if(!liveRemarks){
+        if(!liveRemarks && !report){
           try {
             const liveTa = document.getElementById('ov-exam-remarks');
             if(liveTa && liveTa.value && liveTa.value.trim()) liveRemarks = liveTa.value.trim();
           } catch(e){}
-        }
-        if(!liveRemarks){
-          try {
-            if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
-              const reports = ls(KEYS.reports, []) || [];
-              for(let i = reports.length - 1; i >= 0; i--){
-                if(reports[i] && reports[i].examRemarks){ liveRemarks = String(reports[i].examRemarks); break; }
+          if(!liveRemarks){
+            try {
+              if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
+                const reports = ls(KEYS.reports, []) || [];
+                for(let i = reports.length - 1; i >= 0; i--){
+                  if(reports[i] && reports[i].examRemarks){ liveRemarks = String(reports[i].examRemarks); break; }
+                }
               }
-            }
-          } catch(e){}
+            } catch(e){}
+          }
         }
         const remarksFs = _safeFs(block.fontSize, '8.5px');
         const remarksHtml = liveRemarks
@@ -3160,11 +3157,15 @@ function cvRenderBlockContent(block, report, preview){
         // report has multiple inspected items). No coloured bar, no
         // table chrome — just the data, formatted to read at a glance.
         const lblTxt = _h(block.text || 'Revision history');
-        // Same fallback as the items-table card — prefer the active
-        // report's revisions, then the latest saved report carrying any
-        // revisions, else show "no revisions logged".
+        // Prefer the active report's revisions. When a real `report` is
+        // being rendered (preview / PDF / print), don't fall through to
+        // any other report's history — a brand-new report at rev 00
+        // genuinely has no revisions, and borrowing another report's
+        // list leaks history across methods (e.g. PT rev 0 was showing
+        // rv 3 / rv 4 entries from the latest MT report). Latest-saved
+        // fallback only fires in design mode for editor-canvas previews.
         let revs = (report && Array.isArray(report.revisions)) ? report.revisions : null;
-        if(!revs || !revs.length){
+        if((!revs || !revs.length) && !report){
           try {
             if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
               const reports = ls(KEYS.reports, []) || [];
@@ -3200,35 +3201,38 @@ function cvRenderBlockContent(block, report, preview){
         //   • Defect type     typed per item in the Defects form section
         //   • Size            typed per item in the Defects form section
         //
-        // Source items in the same fallback order as items-table — active
-        // report → live _ovItems (form being typed right now) → last saved
-        // report → sample row. Then filter by verdict.
+        // Source items — when a real `report` is being rendered, use only
+        // its items list. The form-state / latest-saved fallbacks are
+        // design-mode only so a saved report's defects are never
+        // borrowed from another (cross-method) report.
         let liveItems = null;
         if(report && Array.isArray(report.items) && report.items.length){
           liveItems = report.items;
         }
-        if(!liveItems && typeof _ovItems !== 'undefined' && Array.isArray(_ovItems)){
-          const live = _ovItems
-            .map(r => {
-              const o = {}; if(!r) return o;
-              Object.keys(r).forEach(k => { if(r[k] && String(r[k]).trim()) o[k] = String(r[k]).trim(); });
-              return o;
-            })
-            .filter(r => Object.keys(r).length);
-          if(live.length) liveItems = live;
-        }
-        if(!liveItems){
-          try {
-            if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
-              const reports = ls(KEYS.reports, []) || [];
-              for(let i = reports.length - 1; i >= 0; i--){
-                if(reports[i] && Array.isArray(reports[i].items) && reports[i].items.length){
-                  liveItems = reports[i].items;
-                  break;
+        if(!liveItems && !report){
+          if(typeof _ovItems !== 'undefined' && Array.isArray(_ovItems)){
+            const live = _ovItems
+              .map(r => {
+                const o = {}; if(!r) return o;
+                Object.keys(r).forEach(k => { if(r[k] && String(r[k]).trim()) o[k] = String(r[k]).trim(); });
+                return o;
+              })
+              .filter(r => Object.keys(r).length);
+            if(live.length) liveItems = live;
+          }
+          if(!liveItems){
+            try {
+              if(typeof ls === 'function' && typeof KEYS !== 'undefined'){
+                const reports = ls(KEYS.reports, []) || [];
+                for(let i = reports.length - 1; i >= 0; i--){
+                  if(reports[i] && Array.isArray(reports[i].items) && reports[i].items.length){
+                    liveItems = reports[i].items;
+                    break;
+                  }
                 }
               }
-            }
-          } catch(e){}
+            } catch(e){}
+          }
         }
         // Filter to rejected items. In design mode (no real / live items)
         // synthesise two placeholder rows so the inspector can see the
@@ -3250,8 +3254,18 @@ function cvRenderBlockContent(block, report, preview){
         // colWidths overrides the defaults when the inspector has dragged
         // any column (same mechanism as items-table).
         const defectCols = CV_DEFECT_COLS;
+        // Photo-column width is now driven entirely from CV_DEFECT_COLS
+        // (60 px); the saved per-block override is ignored for the
+        // photo cell so the smaller photo applies to every existing
+        // template without the inspector having to reset the column.
+        // Data-column overrides on the three text columns are still
+        // honoured — only the photo cell is clamped.
         const widthsArr = (Array.isArray(block.colWidths) && block.colWidths.length === defectCols.length)
-          ? block.colWidths.map(w => (typeof w === 'number' && w > 0) ? w : 130)
+          ? block.colWidths.map((w, i) => {
+              const newDefault = defectCols[i].width || 130;
+              if(defectCols[i].photoId) return newDefault;
+              return (typeof w === 'number' && w > 0) ? w : newDefault;
+            })
           : defectCols.map(c => c.width || 130);
         const totalW = widthsArr.reduce((s, w) => s + w, 0);
         const pcts = widthsArr.map(w => +((w / totalW) * 100).toFixed(4));

@@ -1573,7 +1573,7 @@ function ovRenderItemsTable(methodId, items, remarks) {
       <span class="sc-title">Examination details</span>
       <button class="btn btn-sm" data-action="ovItemsAddRow" style="font-size:11px;padding:4px 10px">+ Add row</button>
     </div>
-    <div class="sc-body" style="padding:8px 10px 12px">
+    <div class="sc-body" style="padding:14px 18px 18px">
       <table style="width:100%;border-collapse:collapse;table-layout:fixed">
         ${colgroup}
         <thead><tr style="border-bottom:1px solid var(--border)">${head}<th></th></tr></thead>

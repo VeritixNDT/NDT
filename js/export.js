@@ -192,17 +192,59 @@ function cvBuildPrintHTML(report){
     // page (it exists only to receive overflow rows).
     cvPages.forEach((p, i) => { if(i !== _contIdx) _plan.push({ page: p, slice: null }); });
   }
-  // Photo page / drawing page are opt-in per report — skip any page
-  // whose only body block is one of those when the corresponding array
-  // on the report is empty.
+  // Photo page / drawing page / standalone defect-table pages are
+  // opt-in per report — skip a page when its substantive content is
+  // empty so the inspector doesn't get a stray "Photos" / "Drawings" /
+  // "Defects" sheet with nothing on it. The check looks past decorative
+  // companions (section headers, accent bars, page numbers, etc.) and
+  // past blocks that the block-level visibility filter will drop at
+  // render time (orphan single-photo / single-drawing / photo-details),
+  // so e.g. a "Photos" page with a section-header strip and 3 single-
+  // photo slots still skips when no images were uploaded.
   const _hasPhotos   = !!(report && Array.isArray(report.photos)   && report.photos.some(p => !!p));
   const _hasDrawings = !!(report && Array.isArray(report.drawings) && report.drawings.some(p => !!p));
-  const _planFinal = _plan.filter(entry => {
+  const _hasDefects  = !!(report && Array.isArray(report.items)    && report.items.some(it => it && it.verdict === 'Not acceptable'));
+  // Decorative keys — blocks that decorate / identify a page but don't
+  // justify keeping the page when the actual content is empty. Includes:
+  //  - section-header / h-line / accent-bar / text-block — layout chrome
+  //  - today-date / page-num / date-blank — date / page-number stamps
+  //  - co-* / logo-co — company-info / logo strips repeated per page
+  //  - qr-code / revision / report-no / method / exam-date / tpl-number /
+  //    proc-rev — page-identifier fields the inspector typically places
+  //    on every page as a header strip so each printed sheet traces back
+  //    to the report. They're identification, not content, so a page
+  //    that carries only these + an empty primary block (photo-page /
+  //    drawing-page / defect-table) is skipped.
+  const _DECORATIVE_KEYS = new Set([
+    'section-header','h-line','accent-bar','text-block','today-date',
+    'page-num','date-blank','logo-co','co-block','co-name-smart',
+    'co-address-smart','co-phone-smart','co-email-smart','co-website-smart',
+    'co-vat-smart','co-logo-smart','co-footer-smart','co-confidstmt-smart',
+    'qr-code','revision','report-no','method','exam-date','tpl-number','proc-rev',
+  ]);
+  const _hasSingle = (id) => !!(report && report.singlePhotos && id && report.singlePhotos[id]);
+  const _isBlockEmpty = (b) => {
+    if(b.key === 'photo-page')     return !_hasPhotos;
+    if(b.key === 'drawing-page')   return !_hasDrawings;
+    if(b.key === 'defect-table')   return !_hasDefects;
+    if(b.key === 'single-photo')   return !_hasSingle(b.id);
+    if(b.key === 'single-drawing') return !_hasSingle(b.id);
+    if(b.key === 'photo-details' && b.linkedPhotoId) return !_hasSingle(b.linkedPhotoId);
+    // items-table on a non-page-1 page is only meaningful when item
+    // overflow demands a continuation page — without overflow it just
+    // paints an empty header band, so treat it as empty and let the
+    // page skip if that's all the page carries.
+    if(b.key === 'items-table') return !_overflow;
+    return false; // any other primary block is treated as content-bearing
+  };
+  // First page in the plan is always the main report — never skip it
+  // even if the inspector somehow stripped it of primary blocks.
+  const _planFinal = _plan.filter((entry, idx) => {
+    if(idx === 0) return true;
     const _body = (entry.page.blocks || []).filter(b => b.zone !== 'header' && b.zone !== 'footer');
-    if(_body.length === 1){
-      if(_body[0].key === 'photo-page'   && !_hasPhotos)   return false;
-      if(_body[0].key === 'drawing-page' && !_hasDrawings) return false;
-    }
+    const _primary = _body.filter(b => !_DECORATIVE_KEYS.has(b.key));
+    if(_primary.length === 0) return false;             // only decorative — skip
+    if(_primary.every(_isBlockEmpty)) return false;     // every primary block has no content — skip
     return true;
   });
   _cvPrintTotal = _planFinal.length;

@@ -2057,13 +2057,15 @@
                     <div class="fld"><label>Revision</label><input id="proc-rev" placeholder="e.g. 02"/></div>
                     <div class="fld"><label>Review date</label><input id="proc-review" type="date"/></div>
                   </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
                     <div class="fld"><label>NDT method</label><select id="proc-method"></select></div>
-                    <div class="fld"><label>Specification</label><select id="proc-standard"></select></div>
-                    <div class="fld"><label data-i18n="lbl.acceptance">Acceptance criteria</label><select id="proc-acceptance"></select></div>
                     <div class="fld"><label>Status</label>
                       <select id="proc-status"><option>Active</option><option>Draft</option><option>Superseded</option><option>Withdrawn</option></select>
                     </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+                    <div class="fld"><label>Specification</label><input id="proc-standard" placeholder="e.g. EN-ISO 17638:2016"/></div>
+                    <div class="fld"><label data-i18n="lbl.acceptance">Acceptance criteria</label><input id="proc-acceptance" placeholder="e.g. ISO 23278:2015 Level 2"/></div>
                   </div>
                   <div style="display:flex;gap:8px;justify-content:flex-end">
                     <button class="btn btn-sm" data-action="procHideUpload">Cancel</button>

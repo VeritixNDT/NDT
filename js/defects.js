@@ -600,11 +600,13 @@ function procShowUpload(editIdx){
   if(mSel) mSel.innerHTML = getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
   if(extractBanner) extractBanner.style.display = 'none';
 
-  // Spec / acceptance lists are now defined per NDT method, so they
-  // shift when the user picks a different method on this form. The
-  // change listener below re-runs the same lookup against the newly
-  // selected method, keeping any previously-typed value as a one-off
-  // if it falls outside the new list.
+  // Specification / Acceptance are free-text inputs (not dropdowns) on
+  // the upload form so the inspector can type or paste whatever the
+  // procedure document actually cites — including standards not in any
+  // preset list. The procedure register still matches by NDT method +
+  // Active status (see cvResolveSmartLink in editor.js); the spec /
+  // acceptance text is kept on the record for the list / export
+  // columns and for legacy data continuity.
   if(_procEditIdx >= 0){
     const all = procGetAll();
     const p = all[_procEditIdx]; if(!p) return;
@@ -616,7 +618,8 @@ function procShowUpload(editIdx){
     el('proc-review').value = p.reviewDate||'';
     el('proc-status').value = p.status||'Active';
     if(mSel) mSel.value = p.method||'UT';
-    procRefreshSpecAcc(p.standard || '', p.acceptance || '');
+    if(el('proc-standard'))   el('proc-standard').value   = p.standard   || '';
+    if(el('proc-acceptance')) el('proc-acceptance').value = p.acceptance || '';
     if(p.fileName && queueEl){
       const fIcon = p.fileType?(p.fileType.includes('pdf')?'📕':p.fileType.includes('image')?'🖼':'📘'):'📄';
       queueEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel2);border-radius:6px;font-size:12px;color:var(--t2)">${fIcon} ${escapeHtml(p.fileName)} <span style="color:var(--t3);font-size:10px">(current file — upload new to replace)</span></div>`;
@@ -624,35 +627,13 @@ function procShowUpload(editIdx){
   } else {
     if(titleEl) titleEl.textContent = 'Upload procedure';
     if(saveBtn) saveBtn.textContent = 'Save procedure';
-    ['proc-no','proc-title','proc-rev','proc-review'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
+    ['proc-no','proc-title','proc-rev','proc-review','proc-standard','proc-acceptance'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
     el('proc-status').value = 'Active';
     if(mSel) mSel.selectedIndex = 0;
-    procRefreshSpecAcc('', '');
     if(queueEl) queueEl.innerHTML = '';
   }
-  // Re-render spec/acc whenever the method changes — the lists belong
-  // to the selected method (TPL_FIELDS[methodId]) and the curated
-  // overrides live under the same scope.
-  if(mSel) mSel.onchange = () => procRefreshSpecAcc(el('proc-standard')?.value || '', el('proc-acceptance')?.value || '');
   wrap.style.display = 'block';
   wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
-}
-
-// Look up the spec / acceptance lists for the currently-selected method
-// and (re-)populate the procedure form's two dropdowns. Preserves the
-// value passed in as the selection — useful when restoring an edited
-// procedure or when the user has already chosen a value before
-// switching methods.
-function procRefreshSpecAcc(curSpec, curAcc){
-  const mSel = el('proc-method');
-  const methodId = (mSel && mSel.value) || 'UT';
-  const fields = (typeof TPL_FIELDS !== 'undefined' && TPL_FIELDS[methodId]) || [];
-  const _specF = fields.find(f => f.id === 'spec');
-  const _accF  = fields.find(f => f.id === 'acc');
-  const specOpts = (typeof tplEffectiveOptions === 'function' && _specF) ? tplEffectiveOptions(methodId, _specF) : ((_specF && _specF.options) || []);
-  const accOpts  = (typeof tplEffectiveOptions === 'function' && _accF)  ? tplEffectiveOptions(methodId, _accF)  : ((_accF  && _accF.options)  || []);
-  _procFillSelect('proc-standard',  specOpts, curSpec || '');
-  _procFillSelect('proc-acceptance', accOpts, curAcc  || '');
 }
 
 function procHideUpload(){
@@ -949,6 +930,9 @@ async function procSave(){
   const revision = el('proc-rev')?.value?.trim()||'';
   const status = el('proc-status')?.value||'Active';
   const method = el('proc-method')?.value||'UT';
+  // Specification / Acceptance are free-text inputs on the upload form
+  // (no preset dropdown): the inspector types or edits the standard
+  // exactly as the procedure document spells it out.
   const standard = el('proc-standard')?.value?.trim()||'';
   const acceptance = el('proc-acceptance')?.value?.trim()||'';
   const reviewDate = el('proc-review')?.value||'';

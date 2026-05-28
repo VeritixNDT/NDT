@@ -109,6 +109,13 @@ var TPL_FIELDS = {
     // ISO 9934-2/3) → particles + bath concentration (ISO 9934-2 §A.3)
     // → contrast → light conditions → demagnetisation + how it was done.
     { id:'tech',       label:'Technique',          placeholder:'e.g. Yoke (AC)',        options:['Yoke (AC)','Yoke (DC)','Permanent magnet','Prods','Coil','Central conductor','Bench head shot','Flexible cable wrap'] },
+    // Primary MT equipment — sourced from Settings → Equipment, same
+    // pattern as VT's vtequip and the (smart-card-resolved) NDT
+    // equipment on UT / RT. Picking an item snapshots eq_id / eq_svid
+    // / eq_caldate onto the saved report so the equipment + calib-
+    // status smart cards on the PDF resolve correctly. Falls back to
+    // a free-text input when no MT-tagged equipment is registered.
+    { id:'mtequip',    label:'Equipment',          useEquipmentRegister:true },
     { id:'magDir',     label:'Field direction',    placeholder:'e.g. Circumferential',  options:['Longitudinal (coil / cable wrap)','Circumferential (prods / head shot)','Multi-directional','Not applicable'] },
     { id:'mtmethod',   label:'Method',             placeholder:'e.g. Wet fluorescent',  options:['Wet fluorescent','Wet visible (colour contrast)','Dry visible','Dry fluorescent'] },
     { id:'magMethod',  label:'Magnetisation method', placeholder:'Continuous or Residual', options:['Continuous','Residual'] },

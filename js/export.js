@@ -97,7 +97,17 @@ function cvBuildPrintHTML(report){
       `z-index:${Number.isFinite(+block.zIndex) ? +block.zIndex : 1}`,
     ].filter(Boolean).join(';');
     try {
-      return `<div style="${styles}">${cvRenderBlockContent(block, report, true)}</div>`;
+      let inner = cvRenderBlockContent(block, report, true);
+      // Smart-card hyperlink — when an annex page will be appended for
+      // this card's linked cert file, wrap the inner content in an
+      // anchor that targets the annex row. Print-to-PDF preserves
+      // intra-document `#id` links in every major browser, so the
+      // smart card becomes a clickable jump to the cert image.
+      const anchorId = _cvSmartCardAnnexAnchor(block, report);
+      if(anchorId){
+        inner = `<a href="#${anchorId}" style="display:block;height:100%;color:inherit;text-decoration:none">${inner}</a>`;
+      }
+      return `<div style="${styles}">${inner}</div>`;
     } catch(e) {
       console.warn('Render error for block', block.id, e);
       // AUDIT-FIX #11: surface render failures visibly. Previously returned
@@ -321,6 +331,15 @@ function cvBuildPrintHTML(report){
   _cvItemsSlice   = null;
   _cvPrintPageNum = 0;
 
+  // Cert annex — appended after the report's last page when any linked
+  // cert file has been uploaded. The smart cards on the main report
+  // hyperlink to rows on this page. Build now (after pagesHtml is
+  // settled) so the annex sees the same `report` and so the anchor
+  // helper (used inside renderBlock above) and the annex page agree
+  // on the same id namespace.
+  const annexHtml = _cvBuildCertAnnexHtml(report);
+  if(annexHtml) pagesHtml += annexHtml;
+
   // Filename surfaced to the browser's print-to-PDF dialog via <title>.
   // Format: "<ReportNo> — <TemplateNo>" so the inspector can tell at a glance
   // which method template generated the file. Template number prefers the
@@ -396,6 +415,120 @@ function cvBuildPrintHTML(report){
 ${pagesHtml}
 </body>
 </html>`;
+}
+
+// ── Certificate annex ─────────────────────────────────────────────────
+// Generic mechanism: enumerate every annex-eligible cert linked to the
+// report, render an annex page at the back of the PDF, and provide
+// hyperlink anchors that the matching smart cards on the main report
+// can target. Designed for extension — adding inspector method-cert
+// uploads or equipment cal-cert uploads in future is a one-liner in
+// _cvAnnexEntries.
+
+/** All certs that should appear on the annex page, in order. Each
+ *  entry: { id, anchor, title, subtitle, certNo, expiry, fileData,
+ *  fileName, fileType }. Returns [] when no annexable file is linked
+ *  on the report. */
+function _cvAnnexEntries(report){
+  const out = [];
+  // Eye-sight test cert (frozen on the report at save time by
+  // ovSaveReport; falls back to the live inspector record so the
+  // annex still appears in design-mode preview).
+  let et = report && report.inspectorEyeTest;
+  if(!et){
+    try {
+      const list = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS)) ? INSPECTORS : (typeof ls==='function' ? ls('vx-inspectors-v1',[]) : []);
+      const match = list.find(i => i.name === (report && report.inspector));
+      et = match && match.eyeTest;
+    } catch(e){ et = null; }
+  }
+  if(et && et.fileData){
+    out.push({
+      id: 'eye',
+      anchor: 'vx-cert-annex-eye',
+      title: 'Eye-sight test certificate',
+      subtitle: 'EN-ISO 17637:2016 §6 · annual near-vision + colour',
+      inspector: (report && report.inspector) || '',
+      authority: et.authority || '',
+      certNo:    et.certNo    || '',
+      testDate:  et.testDate  || '',
+      expiry:    et.expiry    || '',
+      fileData:  et.fileData,
+      fileName:  et.fileName || '',
+      fileType:  et.fileType || '',
+    });
+  }
+  return out;
+}
+
+/** Hyperlink target id for a smart-card block whose linked cert is in
+ *  the annex. Returns '' when there is no annex entry for this block
+ *  (so renderBlock skips the anchor wrap). */
+function _cvSmartCardAnnexAnchor(block, report){
+  if(!block || !report) return '';
+  const entries = _cvAnnexEntries(report);
+  if(!entries.length) return '';
+  if(block.key === 'eye-cert-status'){
+    const e = entries.find(x => x.id === 'eye');
+    return e ? e.anchor : '';
+  }
+  return '';
+}
+
+/** Build the annex page HTML (one <div class="vx-print-page">). Returns
+ *  '' when no annexable cert exists. */
+function _cvBuildCertAnnexHtml(report){
+  const entries = _cvAnnexEntries(report);
+  if(!entries.length) return '';
+  const pageW = (typeof CV_PAGE_WIDTH_PX  !== 'undefined') ? CV_PAGE_WIDTH_PX  : 794;
+  const pageH = (typeof CV_PAGE_HEIGHT_PX !== 'undefined') ? CV_PAGE_HEIGHT_PX : 1123;
+  // Compose the cert cards. Image files get a true thumbnail (object-
+  // contained inside a fixed frame); PDFs get a styled file-badge with
+  // the filename and metadata — embedding PDF inside print HTML doesn't
+  // survive Save-as-PDF reliably, so the badge is the auditable
+  // surface and the original file remains on the inspector record.
+  const cardsHtml = entries.map((e, idx) => {
+    const isImg = e.fileType && e.fileType.startsWith('image/');
+    const isPdf = e.fileType === 'application/pdf';
+    const thumb = isImg
+      ? `<img src="${e.fileData}" alt="Certificate ${idx+1}" style="max-width:100%;max-height:100%;object-fit:contain"/>`
+      : isPdf
+        ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#666;font-size:11px">
+            <div style="font-size:48px">📕</div>
+            <div style="font-family:monospace;font-size:10px;text-align:center;padding:0 8px;word-break:break-all">${escapeHtml(e.fileName||'certificate.pdf')}</div>
+            <div style="font-size:9px;font-style:italic;color:#999">PDF attached — full file in Settings → Inspectors</div>
+          </div>`
+        : `<div style="display:flex;align-items:center;justify-content:center;color:#999;font-size:11px;font-style:italic">No preview available</div>`;
+    const fmtD = v => (v && typeof fmtDate === 'function') ? fmtDate(v) : (v || '—');
+    const ordinal = 'A' + (idx + 1);
+    return `<div id="${escapeHtml(e.anchor)}" style="display:grid;grid-template-columns:240px 1fr;gap:18px;padding:16px;border:1px solid #d4d4d8;border-radius:6px;margin-bottom:18px;background:#fff;page-break-inside:avoid;break-inside:avoid">
+      <div style="width:100%;height:300px;background:#fafafa;border:1px solid #e4e4e7;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        ${thumb}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:11px;color:#222">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.5px;color:#666;text-transform:uppercase">Annex ${ordinal}</div>
+        <div style="font-size:14px;font-weight:700;color:#111">${escapeHtml(e.title)}</div>
+        <div style="font-size:11px;color:#666">${escapeHtml(e.subtitle)}</div>
+        <div style="height:1px;background:#e4e4e7;margin:4px 0"></div>
+        ${e.inspector ? `<div><span style="display:inline-block;width:90px;color:#666">Inspector</span><strong>${escapeHtml(e.inspector)}</strong></div>` : ''}
+        ${e.certNo    ? `<div><span style="display:inline-block;width:90px;color:#666">Cert no.</span><span style="font-family:monospace">${escapeHtml(e.certNo)}</span></div>` : ''}
+        ${e.authority ? `<div><span style="display:inline-block;width:90px;color:#666">Authority</span>${escapeHtml(e.authority)}</div>` : ''}
+        ${e.testDate  ? `<div><span style="display:inline-block;width:90px;color:#666">Test date</span>${escapeHtml(fmtD(e.testDate))}</div>` : ''}
+        ${e.expiry    ? `<div><span style="display:inline-block;width:90px;color:#666">Expires</span><strong>${escapeHtml(fmtD(e.expiry))}</strong></div>` : ''}
+        ${e.fileName  ? `<div><span style="display:inline-block;width:90px;color:#666">File</span><span style="font-family:monospace;font-size:10px">${escapeHtml(e.fileName)}</span></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="vx-print-page" data-annex="1">
+    <div class="vx-print-inner" style="padding:40px 48px">
+      <div style="border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:24px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:#666;text-transform:uppercase">Annex A</div>
+        <div style="font-size:22px;font-weight:700;color:#111;margin-top:2px">Certificates</div>
+        <div style="font-size:11px;color:#666;margin-top:4px">Linked certificates supporting this report. Each entry corresponds to a smart card on the main report; click any smart card to jump to its annex row.</div>
+      </div>
+      ${cardsHtml}
+    </div>
+  </div>`;
 }
 
 /**

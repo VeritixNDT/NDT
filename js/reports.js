@@ -317,7 +317,7 @@ var RPT_FORM = {
     { id:'surfTemp',   label:'Surface temperature',  placeholder:'e.g. 22°C' },
     { id:'heatTreat',  label:'Heat treatment',       placeholder:'e.g. PWHT, As-welded', options:['PWHT','APWHT','n.a.','Before','After'] },
     { id:'stage',      label:'Stage of examination', placeholder:'e.g. Final', methodsOnly:['VT'], options:['Final','In-process','Pre-weld','Post-PWHT','Re-examination'] },
-    { id:'weldPos',    label:'Welding position',     placeholder:'e.g. PA (1G)', methodsOnly:['VT'], options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
+    { id:'weldPos',    label:'Welding position',     placeholder:'e.g. PA (1G)', options:['PA (1G)','PB (2F)','PC (2G)','PD (4F)','PE (4G)','PF (3G up)','PG (3G down)','PH (5G up)','PJ (5G down)','H-V','Overhead'] },
     { id:'procRev',    label:'Procedure revision',   placeholder:'e.g. 01', options:['00','01','02','03','04','05'] },
   ],
   result: [
@@ -426,7 +426,13 @@ function tplRenderDefaults(methodId, m) {
   const tpl = _tplData[methodId] || {};
   const common = TPL_FIELDS._common;
   const specific = TPL_FIELDS[methodId] || [];
-  const allFields = [...common, ...specific];
+  // Spec / acceptance criteria are set in the Blank report form tab's
+  // Examination criteria section (where they sit alongside surface
+  // condition, weld position, heat treatment) — drop them from this
+  // flat defaults list so the admin isn't shown the same two dropdowns
+  // twice. Values save into the same _tplData[methodId] bucket either
+  // way, so neither tab loses anything.
+  const allFields = [...common, ...specific].filter(f => !TPL_CRITERIA_FIELD_IDS.has(f.id));
   const isAdmin = (typeof vxIsAdmin === 'function') ? vxIsAdmin() : true;
   let html = `<div style="border-left:3px solid ${m.color};padding-left:14px;margin-bottom:16px">
     <div style="font-size:15px;font-weight:600;color:${m.color};margin-bottom:2px">${m.id} — ${escapeHtml(m.name)}</div>

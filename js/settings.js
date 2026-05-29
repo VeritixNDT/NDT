@@ -2856,29 +2856,31 @@ function eqRender() {
       </label>`
     ).join('');
   }
-  // Equipment list table
+  // Equipment list — grouped into sections so the inspector can find
+  // gear by the inspection it belongs to: a Light-meters section for
+  // white-light / UV-A meters, one section per active NDT method for
+  // items tagged with that method, and an Untagged section for items
+  // with no method tag (general-purpose / not yet classified).
+  // Light meters always go to the Light-meters section only — they
+  // have dedicated smart cards (light-status / uv-light-status) so
+  // listing them under MT and PT too would duplicate without value.
+  // Multi-method non-light items appear in every section they're
+  // tagged for, mirroring how the equipment dropdowns on the new-
+  // report form treat them.
   const wrap = el('eq-list-wrap'); if(!wrap) return;
   const list = eqLoad();
   if(!list.length) {
     wrap.innerHTML = `<div class="sc"><div class="sc-body" style="text-align:center;color:var(--t3);font-size:13px;padding:30px">No equipment in the register yet. Click <strong>+ Add equipment</strong> above to add the first item.</div></div>`;
     return;
   }
-  let html = `<div class="sc"><div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
-    <thead><tr>
-      <th scope="col">Name</th><th scope="col">SV-ID</th><th scope="col">Type</th>
-      <th scope="col">Methods</th>
-      <th scope="col">Last cal.</th><th scope="col">Due</th>
-      <th scope="col" style="width:90px">Status</th>
-      <th scope="col" style="width:120px"></th>
-    </tr></thead><tbody>`;
-  list.forEach(rec => {
+  const eqRow = (rec) => {
     const days = eqDaysToExpiry(rec);
     let status, statusBg, statusFg;
     if(days == null)        { status = 'No date';    statusBg = 'rgba(154,170,191,.18)'; statusFg = 'var(--t3)'; }
     else if(days < 0)       { status = 'OUT OF CAL'; statusBg = 'rgba(242,92,92,.18)';   statusFg = 'var(--red)'; }
     else if(days <= 30)     { status = days + 'd left'; statusBg = 'rgba(245,166,35,.18)'; statusFg = 'var(--amber)'; }
     else                    { status = 'In cal';     statusBg = 'rgba(62,207,142,.18)';  statusFg = 'var(--green)'; }
-    html += `<tr>
+    return `<tr>
       <td style="font-weight:600">${escapeHtml(rec.name||'—')}</td>
       <td style="font-family:var(--mono);font-size:12px">${escapeHtml(rec.svId||'—')}</td>
       <td style="font-size:12px;color:var(--t2)">${escapeHtml(eqTypeLabel(rec.type))}</td>
@@ -2894,8 +2896,54 @@ function eqRender() {
         <button class="btn btn-sm btn-danger" data-action="eqDelete" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px">Del</button>
       </td>
     </tr>`;
+  };
+  const eqSection = (title, color, items) => {
+    if(!items.length) return '';
+    const accent = color || 'var(--t2)';
+    return `<div class="sc" style="margin-bottom:14px">
+      <div class="sc-head" style="display:flex;align-items:center;gap:8px">
+        <span style="display:inline-block;width:8px;height:8px;background:${accent};border-radius:50%;flex-shrink:0"></span>
+        <span class="sc-title" style="color:${accent}">${escapeHtml(title)}</span>
+        <span style="font-size:11px;color:var(--t3);font-family:var(--mono)">(${items.length})</span>
+      </div>
+      <div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
+        <thead><tr>
+          <th scope="col">Name</th><th scope="col">SV-ID</th><th scope="col">Type</th>
+          <th scope="col">Methods</th>
+          <th scope="col">Last cal.</th><th scope="col">Due</th>
+          <th scope="col" style="width:90px">Status</th>
+          <th scope="col" style="width:120px"></th>
+        </tr></thead><tbody>${items.map(eqRow).join('')}</tbody>
+      </table></div>
+    </div>`;
+  };
+
+  const isLightMeter = r => r && (r.type === 'white-light' || r.type === 'uv-light');
+  const lightItems   = list.filter(isLightMeter);
+  const nonLight     = list.filter(r => !isLightMeter(r));
+
+  let html = '';
+  // Per-NDT-method sections in the user's preferred method order.
+  // Each non-light item appears in every method it's tagged for —
+  // mirrors how the new-report-form equipment dropdowns work.
+  getActiveMethods().forEach(m => {
+    const items = nonLight.filter(r => Array.isArray(r.methods) && r.methods.includes(m.id));
+    html += eqSection(`${m.id} — ${m.name}`, m.color, items);
   });
-  html += '</tbody></table></div></div>';
+  // Light meters get their own section regardless of method tagging,
+  // since their smart cards (light-status / uv-light-status) resolve
+  // them by Type, not by method.
+  html += eqSection('Light meters (white-light / UV-A)', 'var(--cyan2)', lightItems);
+  // Untagged / general — non-light items with no method tag at all.
+  // These still surface in the new-report-form Equipment dropdowns
+  // (untagged items are treated as "approved for any method"), so
+  // group them last so the admin can audit what's awaiting tags.
+  const untagged = nonLight.filter(r => !Array.isArray(r.methods) || !r.methods.length);
+  html += eqSection('Untagged / general (any method)', 'var(--t3)', untagged);
+
+  if(!html){
+    html = `<div class="sc"><div class="sc-body" style="text-align:center;color:var(--t3);font-size:13px;padding:30px">No equipment in any section.</div></div>`;
+  }
   wrap.innerHTML = html;
 }
 

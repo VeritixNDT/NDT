@@ -2389,10 +2389,18 @@ function ovSaveReport(mode) {
         // belongs to the main NDT equipment.
         if(!rec) report[f.id] = '';
       } else if(rec) {
-        report.eq_id = rec.id;
+        // Primary NDT-equipment snapshot — only the first useEquipment\
+        // Register field without eqType (and not flagged secondary)
+        // claims eq_id / eq_svid / eq_caldate. A secondary field
+        // (VT's "Additional equipment", for inspections that combine
+        // a cam gauge + borescope) stores its picked name on the
+        // field itself but leaves the primary snapshot untouched.
+        if(!f.secondary && !report.eq_id) {
+          report.eq_id = rec.id;
+          if(rec.svId)      report.eq_svid    = rec.svId;
+          if(rec.calLastAt) report.eq_caldate = rec.calLastAt;
+        }
         report[f.id] = rec.name || '';
-        if(rec.svId)      report.eq_svid    = rec.svId;
-        if(rec.calLastAt) report.eq_caldate = rec.calLastAt;
       } else {
         // Picked id no longer exists (equipment was deleted between
         // render and save). Don't carry a dead reference forward.

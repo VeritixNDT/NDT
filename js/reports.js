@@ -195,16 +195,17 @@ var TPL_FIELDS = {
     // can record the exact certificate date if their shop tracks it.
     { id:'eyeTest', label:'Eye-sight test', placeholder:'e.g. Confirmed — current',
       options:['Confirmed — current','Confirmed — expires within 1 month','Not applicable'], editable:true },
-    { id:'lux',  label:'Min. illumination (lux)', placeholder:'e.g. 500', options:['< 350 lux','350','500','750','1000','1500'], editable:true, numeric:true, gates:'lightmeter' },
+    // White-light reading — same field id ('whitelight') as MT and PT so
+    // the smart cards on the PDF resolve uniformly across all three
+    // methods. ISO 17637 §5.3 expects ≥350 lux on the surface for
+    // direct visual; 500+ lux is the recommended working level.
+    { id:'whitelight', label:'White light (lux)', placeholder:'e.g. 500', options:['350','500','750','1000','1500','2000'], editable:true, numeric:true, gates:'lightmeter' },
     { id:'lightsource',label:'Light source',       placeholder:'e.g. Daylight, Torch', options:['Daylight','Torch','Workshop lighting','Halogen lamp','LED lamp','UV-A lamp','White-light lamp'] },
     // White-light meter pick — same register-backed dropdown MT and PT
-    // expose for their fluorescent / visible inspection regimes. VT is
-    // a daylight-or-white-light technique by default; the meter records
-    // the actual lux reading at the examination position (ISO 17637
-    // §5.3 — Minimum 350 lux, recommended 500+ lux on the surface).
-    // Gated by lux > 0 so the picker lights up as soon as the inspector
-    // records any reading; until then it sits greyed with a hint.
-    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'lux', gateMin:0 },
+    // expose. Gated by whitelight > 0 so the picker lights up as soon
+    // as the inspector records any reading; until then it sits greyed
+    // with a hint.
+    { id:'lightmeter', label:'White light meter',  useEquipmentRegister:true, eqType:'white-light', gatedBy:'whitelight', gateMin:0 },
     // Viewing angle per EN-ISO 17637:2016 §5.3.1 — eye position must
     // be ≥ 30° from the surface. Most inspections meet the minimum;
     // higher angles or perpendicular for through-hole / port views.
@@ -219,7 +220,16 @@ var TPL_FIELDS = {
     // cal items are shown disabled so the inspector can't pick gear
     // that's past its calibration date. Falls back to a free-text input
     // when the register is empty so the form still works on day one.
-    { id:'vtequip',label:'Equipment',              useEquipmentRegister:true },
+    //
+    // VT welding inspections routinely combine multiple tools (cam
+    // gauge + borescope + magnifier). Two register-backed picks let
+    // the inspector record the primary + secondary equipment without
+    // free-typing a comma list. `secondary:true` on the second slot
+    // stops it claiming eq_id / eq_svid / eq_caldate at save time —
+    // those snapshots belong to the primary pick so the calib-status
+    // smart card on the PDF stays anchored to the main instrument.
+    { id:'vtequip',  label:'Equipment',            useEquipmentRegister:true },
+    { id:'vtequip2', label:'Additional equipment', useEquipmentRegister:true, secondary:true },
   ],
   PT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 3452-1:2021', options:['EN-ISO 3452-1:2021','ASME BPVC Sec. V, Art. 6 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part D)','EN 1090-2:2018+A1:2024','ISO 3452-1:2021 via NORSOK M-101 (Ed. 6, 2022)'] },

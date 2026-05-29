@@ -139,8 +139,9 @@ var CV_FIELD_DEFS = {
   // Combined examination light & UV conditions — renders the white-light
   // and UV-A readings captured on a VT / MT / PT report. White light gates
   // UV-A: ≤20 lux is fluorescent (UV-A shown), above 20 lux is a visible
-  // inspection (UV-A "Not applicable"). MT / PT use eq_whitelight /
-  // eq_uvirr; VT's white light is eq_lux.
+  // inspection (UV-A "Not applicable"). All three methods now record the
+  // reading as eq_whitelight; the legacy eq_lux fallback in the resolver
+  // keeps pre-unification VT reports rendering correctly.
   'light-conditions':{label:'Light & UV conditions', ph:'White light · UV-A', get:r=>'',w:240,h:46, smartLink:'lightcond'},
   'accept-eval':     {label:'Acceptance evaluation', ph:'7 mm vs ≤ 8 mm (ISO 11666 L2) — ACCEPTABLE', get:r=>'',w:380,h:46, smartLink:'accept'},
 
@@ -1157,7 +1158,8 @@ function cvResolveSmartLink(block, report){
   if(k === 'light-conditions'){
     // Combined examination light & UV conditions — the white-light, UV-A
     // and background-light readings captured on a VT / MT / PT report.
-    // VT records white light as eq_lux; MT / PT as eq_whitelight.
+    // VT / MT / PT all record white light as eq_whitelight now; the
+    // legacy eq_lux fallback keeps older VT reports rendering.
     const wl = report?.eq_whitelight || report?.whitelight || report?.eq_lux || report?.lux || '';
     const uv = report?.eq_uvirr || report?.uvirr || '';
     // White light gates UV-A: at or below 20 lux the exam is fluorescent

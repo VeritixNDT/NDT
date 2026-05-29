@@ -2393,12 +2393,18 @@ function ovSaveReport(mode) {
         // Register field without eqType (and not flagged secondary)
         // claims eq_id / eq_svid / eq_caldate. A secondary field
         // (VT's "Additional equipment", for inspections that combine
-        // a cam gauge + borescope) stores its picked name on the
-        // field itself but leaves the primary snapshot untouched.
+        // a cam gauge + borescope) snapshots into a parallel
+        // eq_id_secondary / eq_svid_secondary / eq_caldate_secondary
+        // slot so the secondary-equipment smart card on the PDF can
+        // resolve its own record without trampling the primary card.
         if(!f.secondary && !report.eq_id) {
           report.eq_id = rec.id;
           if(rec.svId)      report.eq_svid    = rec.svId;
           if(rec.calLastAt) report.eq_caldate = rec.calLastAt;
+        } else if(f.secondary && !report.eq_id_secondary) {
+          report.eq_id_secondary = rec.id;
+          if(rec.svId)      report.eq_svid_secondary    = rec.svId;
+          if(rec.calLastAt) report.eq_caldate_secondary = rec.calLastAt;
         }
         report[f.id] = rec.name || '';
       } else {

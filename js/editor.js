@@ -130,6 +130,12 @@ var CV_FIELD_DEFS = {
   // Annex A when an uploaded file is on file.
   'eye-cert-status': {label:'Eye-sight test cert',    ph:'Eye-sight · valid',   get:r=>'',w:240,h:46, smartLink:'eyecert'},
   'calib-status':    {label:'Equipment calibration', ph:'Cal valid until Q3 2025', get:r=>'',w:240,h:46, smartLink:'calib'},
+  // Secondary equipment card — for inspections that combine two
+  // pieces of gear on one report (VT's cam gauge + borescope, etc.).
+  // Resolves from report.eq_id_secondary (set by ovSaveReport when a
+  // useEquipmentRegister field is flagged secondary:true). Same card
+  // shape as calib-status; the resolver branches on smartLink:'calib2'.
+  'calib-status-2':  {label:'Equipment calibration (2nd)', ph:'Additional gear · in cal', get:r=>'',w:240,h:46, smartLink:'calib2'},
   // Light-equipment calibration cards — same shape and status logic as
   // calib-status. They resolve a register record (Settings → Equipment)
   // by its Type field — White-light meter for the light card, UV-A lamp
@@ -360,7 +366,7 @@ var CV_PALETTE_GROUPS = [
   {id:'equipment', label:'Equipment',     fields:['light-source','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
   {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
-  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','eye-cert-status','calib-status','light-status','uv-light-status','light-conditions','accept-eval']},
+  {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','eye-cert-status','calib-status','calib-status-2','light-status','uv-light-status','light-conditions','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},
   {id:'components',label:'⬢ My components', isComponents:true},
@@ -1128,6 +1134,59 @@ function cvResolveSmartLink(block, report){
       }
     }
     return _cvSmartCardHtml(lbl, [equip], detail);
+  }
+  if(k === 'calib-status-2'){
+    // Secondary equipment card — resolves from report.eq_id_secondary
+    // (set by ovSaveReport for any useEquipmentRegister field flagged
+    // secondary:true). Mirrors calib-status structure so designers
+    // can mix and match the two cards on the PDF.
+    const now = new Date();
+    const reportMethod = report?.method || '';
+    let rec = null;
+    if(report && report.eq_id_secondary && typeof eqLoad === 'function'){
+      try { rec = (eqLoad() || []).find(e => e.id === report.eq_id_secondary) || null; } catch(e){}
+    }
+    if(!rec && typeof eqLoad === 'function'){
+      // Design-mode fallback — pick a representative secondary item so
+      // the card renders meaningfully in the editor before a real
+      // report is selected. Excludes light meters (they have their
+      // own cards) AND the primary eq_id record so the two cards
+      // don't resolve to the same gear in preview.
+      try {
+        const isLightMeter = e => e && (e.type === 'white-light' || e.type === 'uv-light');
+        const primaryId = report && report.eq_id;
+        const eqAll = (eqLoad() || []).filter(e => !isLightMeter(e) && (!primaryId || e.id !== primaryId));
+        rec = (reportMethod && eqAll.find(e => Array.isArray(e.methods) && e.methods.includes(reportMethod)))
+          || eqAll.find(e => !Array.isArray(e.methods) || !e.methods.length)
+          || null;
+      } catch(e){ rec = null; }
+    }
+    if(rec){
+      const calDue = rec.calDueAt ? new Date(rec.calDueAt) : null;
+      const expired = (typeof eqIsExpired === 'function')
+        ? eqIsExpired(rec)
+        : (calDue && !isNaN(calDue) && now > calDue);
+      const approvedForMethod = !reportMethod
+        || !Array.isArray(rec.methods) || !rec.methods.length
+        || rec.methods.includes(reportMethod);
+      let lbl, detail;
+      if(expired){
+        lbl = '⚠ OUT OF CAL';
+        detail = ['Calibration expired ' + fmtDate(calDue)];
+      } else if(!approvedForMethod){
+        lbl = '⚠ NOT APPROVED';
+        detail = ['Not approved for ' + reportMethod, 'approved: ' + ((rec.methods||[]).join(', ') || 'none')];
+      } else {
+        lbl = '✓ VALID';
+        detail = [
+          (calDue && !isNaN(calDue)) ? 'In cal to ' + fmtDate(calDue) : 'No calibration-due date set',
+          reportMethod ? 'approved for ' + reportMethod : '',
+        ];
+      }
+      return _cvSmartCardHtml(lbl, [rec.name || '—', rec.svId || ''], detail);
+    }
+    return _cvSmartCardHtml('— NONE',
+      ['No 2nd equipment'], ['Pick an Additional equipment in the report form']);
   }
   if(k === 'light-status' || k === 'uv-light-status'){
     // White-light / UV-A light equipment calibration card. Resolves a
@@ -3662,6 +3721,7 @@ function cvRenderBlockContent(block, report, preview){
     // NDT procedures) against the sample or preview-selected report, the
     // way the company smart fields do.
     const liveSmart = def.smartLink === 'cert' || def.smartLink === 'calib'
+      || def.smartLink === 'calib2'
       || def.smartLink === 'light' || def.smartLink === 'uvlight'
       || def.smartLink === 'lightcond' || def.smartLink === 'procedure'
       || def.smartLink === 'eyecert';
@@ -4039,10 +4099,11 @@ function cvRenderProps(id){
         ${row('Standard / source', input('standard', block.standard||''))}
       </div>`;
   }
-  if(def && (def.smartLink === 'procedure' || def.smartLink === 'cert' || def.smartLink === 'calib' || def.smartLink === 'eyecert')){
+  if(def && (def.smartLink === 'procedure' || def.smartLink === 'cert' || def.smartLink === 'calib' || def.smartLink === 'calib2' || def.smartLink === 'eyecert')){
     const _slSrc = def.smartLink === 'procedure' ? 'procedures store'
       : def.smartLink === 'cert'   ? 'inspector directory'
       : def.smartLink === 'eyecert' ? 'inspector eye-sight certificate'
+      : def.smartLink === 'calib2' ? 'secondary equipment register pick'
       : 'equipment calibration data';
     smartLinkUI = `<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:4px;padding:7px 8px;margin-bottom:9px;font-size:10px;color:#a78bfa">
       ⚡ <strong>Smart link</strong> — auto-resolves from ${_slSrc} at preview/export

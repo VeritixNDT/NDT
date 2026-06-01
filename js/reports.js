@@ -1137,6 +1137,19 @@ function rptToggleSelect(idx, evt){
   rptUpdateBulkBar();
   rptRender();
 }
+// Bare-row click — single-select. Clears any previous selection and
+// makes this row the only one selected. Use the checkbox for the
+// additive multi-select path (rptToggleSelect). Skipped when the
+// click landed on an interactive element inside the row (the
+// checkbox, buttons in the actions column, links) — those have their
+// own data-action and run first via the dispatcher's target.closest.
+function rptRowSelect(idx, evt){
+  if(evt && evt.target && evt.target.closest('input, button, a, label, select')) return;
+  _rptSelectedIdx.clear();
+  _rptSelectedIdx.add(idx);
+  rptUpdateBulkBar();
+  rptRender();
+}
 function rptToggleAll(visibleIdxList){
   const allSelected = visibleIdxList.every(i => _rptSelectedIdx.has(i));
   if(allSelected) visibleIdxList.forEach(i => _rptSelectedIdx.delete(i));
@@ -1554,18 +1567,19 @@ function rptRenderTable(list, allReports){
       tr.className = _rptSelectedIdx.has(_origIdx) ? 'selected' : '';
       tr.dataset.sig = sig;
     } else {
-      // New row. The whole <tr> doubles as a click target for the
-      // selection toggle — click anywhere on the line and the row
-      // joins (or leaves) the bulk-action set, in addition to the
-      // explicit checkbox. The dispatcher uses target.closest() so a
-      // click on the checkbox still resolves to the checkbox's own
-      // data-action first, not the <tr>'s — so the row handler never
-      // fires twice for the same click.
+      // New row. The whole <tr> doubles as a click target for SINGLE
+      // selection — clicking a bare row clears any previous selection
+      // and makes that row the only one picked. Multi-select is the
+      // checkbox's job (rptToggleSelect, additive). The dispatcher
+      // resolves target.closest first so a click on the checkbox or
+      // an action button still runs its own handler, and rptRowSelect
+      // bails on interactive targets either way.
       tr = document.createElement('tr');
       tr.dataset.key = key;
       tr.dataset.sig = sig;
-      tr.dataset.action = 'rptToggleSelect';
+      tr.dataset.action = 'rptRowSelect';
       tr.dataset.args = String(_origIdx);
+      tr.dataset.passEvent = '1';
       tr.style.cursor = 'pointer';
       tr.className = _rptSelectedIdx.has(_origIdx) ? 'selected' : '';
       tr.innerHTML = _rptRowInner(r, _origIdx);

@@ -6443,3 +6443,131 @@ h1, h2, h3 { letter-spacing: -.015em; }
 @keyframes vx-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ══════════════════════════════════════════════
+   POLISH LAYER 4 — TABS, AVATARS, TOPBAR, MICRO-DETAILS
+══════════════════════════════════════════════ */
+
+/* ── Topbar — subtle backdrop saturation so any colour underneath
+   (avatars, gradients passing under via the sidebar) reads slightly
+   warmer, and refined depth via a hairline highlight on the top edge. */
+.topbar {
+  backdrop-filter: saturate(140%);
+  -webkit-backdrop-filter: saturate(140%);
+  transition: background 200ms var(--ease-out);
+}
+.topbar::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.04) 50%, transparent);
+  pointer-events: none;
+}
+
+/* ── Tab nav (.tn) — sliding underline that animates between tabs.
+   The accent grows from the centre on activation rather than just
+   appearing flat. Hover surfaces a faint underline so users get a
+   "you can click this" preview. */
+.tn {
+  position: relative;
+  overflow: visible;
+}
+.tn::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan2), var(--cyan));
+  border-radius: 1px;
+  transform: translateX(-50%);
+  transition: width 220ms var(--ease-spring), opacity 180ms var(--ease-out);
+  opacity: 0;
+  box-shadow: 0 0 8px rgba(0,212,255,.5);
+}
+.tn:hover::after {
+  width: 30%;
+  opacity: .5;
+}
+.tn.active::after {
+  width: 65%;
+  opacity: 1;
+}
+
+/* ── Avatars — refined hover ring + smooth scale ── */
+.avatar-btn,
+.lb-avatar,
+[class*="avatar"] {
+  transition: transform 200ms var(--ease-spring), box-shadow 200ms var(--ease-out);
+}
+.avatar-btn:hover {
+  transform: scale(1.06);
+  box-shadow:
+    0 0 0 3px rgba(0,212,255,.32),
+    0 6px 16px rgba(0,0,0,.4);
+}
+
+/* ── Inspector / equipment / procedure card hover —
+   the .sc cards in scroll lists get a faint cyan border-tint on hover
+   so the eye can track the row. Subtle, not aggressive. */
+#insp-list-wrap .sc:hover,
+#eq-list-wrap .sc:hover,
+#proc-list-wrap .sc:hover {
+  border-color: rgba(0,212,255,.18);
+}
+
+/* ── Section header dividers (sc-head) — gentle gradient underline
+   for a more considered separation between header and body. */
+.sc-head {
+  border-bottom: 1px solid transparent;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box,
+              linear-gradient(90deg, var(--border) 0%, var(--border3) 50%, var(--border) 100%) border-box;
+}
+
+/* ── Inputs — gentle inset shadow on dark theme for tactile depth ── */
+.fld input,
+.fld textarea {
+  box-shadow: inset 0 1px 0 rgba(0,0,0,.15);
+}
+.fld input:focus,
+.fld textarea:focus {
+  box-shadow:
+    inset 0 1px 0 rgba(0,0,0,.18),
+    0 0 0 3px rgba(0,153,204,.22);
+}
+
+/* ── Stage / health badges — subtle inner highlight + smoother colour
+   transitions when the stage badge swaps colour. */
+[class*="badge-"] {
+  transition: background 240ms var(--ease-out), color 240ms var(--ease-out), box-shadow 240ms var(--ease-out);
+}
+
+/* ── Custom select / date popovers — slightly heavier shadow so
+   floating panels read more clearly above table data. */
+.vxsel-popover,
+.vxdate-pop {
+  box-shadow:
+    0 16px 40px rgba(0,0,0,.65),
+    0 0 0 1px rgba(255,255,255,.04) inset;
+}
+
+/* ── Checkbox label affordance — when a checkbox sits inside a
+   label, hovering the label nudges the box with a faint glow.
+   Lets the whole row act as the hit target without us writing a
+   wrapper class. */
+label:has(input[type="checkbox"]:not(.no-vxcheck)):hover input[type="checkbox"]:not(.no-vxcheck) {
+  border-color: var(--cyan2);
+  box-shadow: 0 0 0 4px rgba(0,153,204,.08);
+}
+
+/* ── Reduce visual noise on disabled controls everywhere ── */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+.btn:disabled {
+  cursor: not-allowed;
+  filter: saturate(.6);
+}

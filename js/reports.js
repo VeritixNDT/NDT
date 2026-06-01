@@ -91,6 +91,11 @@ var TPL_FIELDS = {
   UT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17640:2018', options:['EN-ISO 17640:2018','EN-ISO 22825:2017','EN-ISO 16809:2019','ASME BPVC Sec. V, Art. 4 — 2025 Edition','ASME BPVC Sec. V, Art. 5 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part E)','ISO 17640:2018 via NORSOK M-101 (Ed. 6, 2022)'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 11666:2018 Level 2', options:['EN-ISO 11666:2018 Level 1','EN-ISO 11666:2018 Level 2','EN-ISO 11666:2018 Level 3','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.6 / 341.3.2','ASME VIII Div. 1, Mandatory App. 12 — 2025','AWS D1.1/D1.1M:2025 Table 8.2','AWS D1.1/D1.1M:2025 Table 8.3','No cracks'] },
+    // Primary UT flaw detector — sourced from Settings → Equipment so
+    // the PDF's equipment / calib-status smart cards resolve to the
+    // picked instrument with its SV-ID and calibration status. Mirrors
+    // VT's vtequip and MT's mtequip.
+    { id:'utequip',label:'Equipment',          useEquipmentRegister:true },
     { id:'coup',  label:'Couplant',     placeholder:'e.g. Ultragel II', options:['Waterbased','Oil','Ultragel II','Sono 600','Sonagel W','Glycerin'] },
     { id:'freq',  label:'Frequency (MHz)',       placeholder:'e.g. 5', options:['1','1.5','2','2.25','3.5','4','5','7.5','10','15'] },
     { id:'range', label:'Calibration range',     placeholder:'e.g. 0-100mm', options:['0-50mm','0-100mm','0-200mm','0-300mm','0-500mm','25-100mm','50-250mm','100-400mm'] },
@@ -289,19 +294,31 @@ var TPL_FIELDS = {
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. Material grade match', options:['Material grade match','Client specification','Project material list','API RP 578 PMI requirements','ASME Sec. II / project ITP','No deviation from WPS material'] },
     { id:'ctrl',label:'System control',placeholder:'e.g. 316L Reference block',options:['316L Reference block','304 Reference block','Duplex reference block','Carbon steel reference block']},
     { id:'mode',label:'Analysis mode',placeholder:'e.g. Alloy ID',options:['Alloy ID','Grade ID','Residuals','Full quantitative']},
-    { id:'pmiequip',label:'Equipment',placeholder:'e.g. X-MET 8000',options:['X-MET 8000','Olympus Vanta','Bruker S1 TITAN','Niton XL3t']},
+    // Primary PMI analyser — register-backed pick so the PDF resolves
+    // the picked unit (X-MET / Vanta / TITAN / Niton XL3t etc.) with
+    // its calibration status. Replaces the legacy plain dropdown so
+    // there's one source of truth for the analyser asset.
+    { id:'pmiequip',label:'Equipment',useEquipmentRegister:true},
   ],
   HT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 6507-1:2018', options:['EN-ISO 6507-1:2018 (Vickers)','EN-ISO 6506-1:2014 (Brinell)','EN-ISO 6508-1:2016 (Rockwell)','EN-ISO 16859-1:2015 (Leeb)','ASTM E384-22','ASTM E92-23','ASTM E110-22'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. NACE MR0175 / ISO 15156-2', options:['NACE MR0175 / ISO 15156-2','ASME B31.3-2024, para. 331','ASME VIII Div. 1, UW-39 — 2025','AWS D1.1/D1.1M:2025 Clause 6.10','Client specification','Project ITP / WPS'] },
     { id:'scale',label:'Hardness scale',placeholder:'e.g. HV10, HRC',options:['HV10','HV5','HRC','HB','HRB','HL (Leeb)']},
     { id:'method',label:'Test method',placeholder:'e.g. UCI, Rebound',options:['UCI','Rebound (Leeb)','Vickers','Rockwell','Brinell']},
-    { id:'htequip',label:'Equipment',placeholder:'e.g. Mic 10',options:['Mic 10','Sonodur 3','Dynamic','Proceq Equotip 550','TH170']},
+    // Primary hardness tester — register-backed so the PDF resolves
+    // the picked instrument (Mic 10 / Equotip 550 / etc.) with its
+    // calibration record. Same pattern as VT / MT / UT / PMI.
+    { id:'htequip',label:'Equipment',useEquipmentRegister:true},
   ],
   RT: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17636-1:2022', options:['EN-ISO 17636-1:2022','EN-ISO 17636-2:2022','ASME BPVC Sec. V, Art. 2 — 2025 Edition','AWS D1.1/D1.1M:2025, Clause 8 (Part B)','EN 1090-2:2018+A1:2024'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 10675-1:2016', options:['EN-ISO 10675-1:2016','EN-ISO 10675-2:2017','EXC 1','EXC 2','EXC 3','EXC 4','ASME B31.3-2024, para. 344.5','ASME VIII Div. 1, UW-51 — 2025','ASME VIII Div. 1, UW-52 — 2025','AWS D1.1/D1.1M:2025 Table 8.2','AWS D1.1/D1.1M:2025 Table 8.3','No cracks'] },
     { id:'source',label:'Radiation source',placeholder:'e.g. Ir-192',options:['Ir-192','Se-75','Co-60','X-ray 160kV','X-ray 200kV','X-ray 300kV']},
+    // Primary RT projector / X-ray generator — distinct from the source
+    // TYPE above (Ir-192 vs the specific Sentinel 880 projector unit).
+    // Register-backed so the PDF carries the unit's SV-ID + calibration
+    // status alongside its source-type setting.
+    { id:'rtequip',label:'Equipment',useEquipmentRegister:true},
     { id:'film',label:'Film/detector',placeholder:'e.g. D7',options:['D4 / Kodak MX','D5 / Kodak T200','D7 / Kodak AA400','DR panel','CR plate']},
     { id:'iqitype',label:'IQI type',placeholder:'e.g. Wire EN 462-1',options:['Wire type EN 462-1','Step-hole EN 462-2','ASTM wire penetrameter','ASTM hole penetrameter']},
     { id:'sfd',label:'Source-film distance',placeholder:'e.g. 700 mm',options:['350 mm','500 mm','700 mm','1000 mm']},
@@ -309,6 +326,10 @@ var TPL_FIELDS = {
   ET: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. EN-ISO 17643:2015', options:['EN-ISO 17643:2015','EN-ISO 15549:2019','ASME BPVC Sec. V, Art. 8 — 2025 Edition','ASTM E309-22','ASTM E215-22'] },
     { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. EN-ISO 17643:2015 (acceptance)', options:['EN-ISO 17643:2015 (acceptance)','ASME B31.3-2024, para. 344.7','ASME VIII Div. 1 — 2025','EXC 1','EXC 2','EXC 3','EXC 4','Client specification','No cracks'] },
+    // Primary ET flaw detector — register-backed (Nortec 600D / OmniScan
+    // ECA / etc.). Picks up the unit's SV-ID + cal status on the PDF
+    // via the standard equipment / calib-status smart cards.
+    { id:'etequip',label:'Equipment',useEquipmentRegister:true},
     { id:'freq',label:'Test frequency (kHz)',placeholder:'e.g. 100',options:['10','50','100','200','500','1000']},
     { id:'coil',label:'Coil/probe type',placeholder:'e.g. Absolute pencil',options:['Absolute pencil probe','Differential probe','Encircling coil','Sector probe']},
     { id:'ref',label:'Reference standard',placeholder:'e.g. 1.0mm EDM notch',options:['0.5mm EDM notch','1.0mm EDM notch','1.5mm EDM notch','Through-hole 1.0mm']},

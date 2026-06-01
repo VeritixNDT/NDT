@@ -6299,3 +6299,147 @@ button:focus-visible,
   scrollbar-width: thin;
   scrollbar-color: var(--border2) transparent;
 }
+
+/* ══════════════════════════════════════════════
+   POLISH LAYER 3 — CARDS, UPLOADS, SEARCH, TYPOGRAPHY
+══════════════════════════════════════════════ */
+
+/* ── Cards (.sc) — premium "lifted" treatment with a hairline accent
+   along the top edge that catches the eye. The accent is a 1px
+   gradient running cyan → transparent → cyan-ish, mostly invisible
+   in the centre but giving the edges definition. Hover slightly
+   brightens the surface. */
+.sc {
+  position: relative;
+  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out);
+}
+.sc::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0,212,255,.18) 25%,
+    rgba(0,212,255,.32) 50%,
+    rgba(0,212,255,.18) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+  opacity: .5;
+}
+.sc-head {
+  letter-spacing: -.005em;
+}
+
+/* ── Upload zones — refined dashed border + smooth drag-over state ── */
+.sig-upload-zone {
+  transition:
+    border-color 220ms var(--ease-out),
+    background 220ms var(--ease-out),
+    transform 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out);
+  position: relative;
+}
+.sig-upload-zone:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.3);
+}
+.sig-upload-zone.drag-over {
+  border-color: var(--cyan2) !important;
+  background: rgba(0,153,204,.06) !important;
+  transform: scale(1.01);
+  box-shadow: 0 0 0 4px rgba(0,153,204,.08), 0 8px 24px rgba(0,153,204,.18);
+}
+
+/* ── Topbar search — refined focus state ── */
+.topbar-search {
+  transition: background 200ms var(--ease-out), border-color 200ms var(--ease-out);
+}
+.topbar-search input {
+  transition: background 200ms var(--ease-out);
+}
+.topbar-search input:focus {
+  background: var(--bg);
+}
+
+/* ── Search wrappers anywhere — smooth focus glow ── */
+.search-wrap input,
+.filter-bar input,
+.filter-bar select {
+  transition:
+    border-color 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out),
+    background 180ms var(--ease-out);
+}
+.search-wrap input:focus,
+.filter-bar input:focus {
+  outline: none;
+  border-color: var(--cyan2);
+  box-shadow: 0 0 0 3px rgba(0,153,204,.18);
+}
+
+/* ── Section header titles in the app body — refined typographic
+   weight + tracking. Restraint over decoration. */
+h1, h2, h3 { letter-spacing: -.015em; }
+
+/* ── Inline action buttons (.tbe, .icon-btn) — smoother hover ── */
+.tbe {
+  transition:
+    background 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    transform 100ms var(--ease-out);
+}
+.tbe:hover { transform: translateY(-1px); }
+.tbe:active { transform: translateY(0) scale(.96); }
+
+/* ── Login screen accents — already great, this just smooths the
+   tab transitions. */
+.login-tab {
+  transition: color 200ms var(--ease-out), border-color 200ms var(--ease-out);
+}
+
+/* ── Drag visual — a card / row being dragged gets a subtle tilt + lift ── */
+.dragging,
+[draggable="true"]:active {
+  cursor: grabbing;
+}
+.kb-card.dragging {
+  transform: rotate(1.5deg) scale(1.02);
+  box-shadow: 0 24px 48px rgba(0,0,0,.55);
+  opacity: .92;
+  z-index: 100;
+}
+
+/* ── Empty-state polish — restrained, considered placeholder pattern ── */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--t3);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.empty-state-icon {
+  display: block;
+  margin: 0 auto 14px;
+  width: 48px;
+  height: 48px;
+  opacity: .4;
+}
+
+/* ── Loader / spinner — subtle conic-gradient ring ── */
+.vx-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: conic-gradient(from 90deg, var(--cyan2), transparent 80%);
+  -webkit-mask: radial-gradient(transparent 55%, #000 56%);
+          mask: radial-gradient(transparent 55%, #000 56%);
+  animation: vx-spin 800ms linear infinite;
+}
+@keyframes vx-spin {
+  to { transform: rotate(360deg); }
+}

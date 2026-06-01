@@ -5589,3 +5589,114 @@ html[data-sidebar-pos="right"] .snav-item.active::before { left: auto; right: 0;
 /* The native <select> underneath gets display:none from JS, but
    guard against any browser still showing it (focus outline etc.) */
 .vxsel-wrap > select { display: none !important; }
+
+/* ══════════════════════════════════════════════
+   CUSTOM CHECKBOXES (vxCheck)
+   appearance:none + a hand-built check animation. The .no-vxcheck
+   class opts a checkbox out (e.g. inside the editor canvas where
+   block-edit controls have their own visual language).
+══════════════════════════════════════════════ */
+:root { accent-color: var(--cyan2); }
+
+input[type="checkbox"]:not(.no-vxcheck) {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border3);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.06)),
+    var(--bg2);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  vertical-align: middle;
+  margin: 0;
+  display: inline-block;
+  transition:
+    border-color 180ms cubic-bezier(.4,0,.2,1),
+    background 180ms cubic-bezier(.4,0,.2,1),
+    box-shadow 180ms cubic-bezier(.4,0,.2,1),
+    transform 120ms cubic-bezier(.4,0,.2,1);
+}
+input[type="checkbox"]:not(.no-vxcheck):hover {
+  border-color: var(--cyan2);
+  box-shadow: 0 0 0 4px rgba(0,153,204,.08);
+}
+input[type="checkbox"]:not(.no-vxcheck):active {
+  transform: scale(.92);
+}
+input[type="checkbox"]:not(.no-vxcheck):focus-visible {
+  outline: none;
+  border-color: var(--cyan2);
+  box-shadow: 0 0 0 3px rgba(0,153,204,.28);
+}
+input[type="checkbox"]:not(.no-vxcheck):checked {
+  background:
+    linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+  border-color: #0891b2;
+  box-shadow:
+    0 1px 2px rgba(8,145,178,.4),
+    inset 0 1px 0 rgba(255,255,255,.18);
+}
+input[type="checkbox"]:not(.no-vxcheck):checked:hover {
+  box-shadow:
+    0 1px 2px rgba(8,145,178,.5),
+    0 0 0 4px rgba(0,153,204,.12),
+    inset 0 1px 0 rgba(255,255,255,.18);
+}
+input[type="checkbox"]:not(.no-vxcheck):checked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3.5,8.5 6.5,11.5 12.5,5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 14px 14px;
+  animation: vxcheck-in 240ms cubic-bezier(.34,1.56,.64,1);
+}
+input[type="checkbox"]:not(.no-vxcheck):indeterminate {
+  background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+  border-color: #0891b2;
+}
+input[type="checkbox"]:not(.no-vxcheck):indeterminate::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 25%; right: 25%;
+  height: 2px;
+  margin-top: -1px;
+  background: #fff;
+  border-radius: 1px;
+  animation: vxcheck-in 200ms ease-out;
+}
+input[type="checkbox"]:not(.no-vxcheck):disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+input[type="checkbox"]:not(.no-vxcheck):disabled:hover {
+  border-color: var(--border3);
+  box-shadow: none;
+}
+@keyframes vxcheck-in {
+  from { opacity: 0; transform: scale(.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ══════════════════════════════════════════════
+   NUMBER INPUTS — hide native spinners globally
+   The native up/down spinner arrows clash with the dark theme
+   (they're an opaque grey block in most browsers). Hiding them
+   gives the input the same clean shell as text inputs; the
+   browser still parses numeric input.
+══════════════════════════════════════════════ */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

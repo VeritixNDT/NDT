@@ -6571,3 +6571,216 @@ textarea:disabled,
   cursor: not-allowed;
   filter: saturate(.6);
 }
+
+/* ══════════════════════════════════════════════
+   POLISH LAYER 5 — LOGIN, LOADING, NOTIFICATIONS, IMAGES
+══════════════════════════════════════════════ */
+
+/* ── Login screen — gentle entrance + sliding tab indicator ────────
+   First impression matters. The panel slides up + fades in on
+   mount; tabs get a sliding pill background that animates between
+   sign-in / register so the toggle feels alive. */
+.login-panel {
+  animation: vx-login-in 480ms var(--ease-spring) both;
+}
+@keyframes vx-login-in {
+  from { opacity: 0; transform: translateY(18px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.login-tabs {
+  position: relative;
+}
+.login-tab {
+  position: relative;
+  z-index: 1;
+  transition: color 220ms var(--ease-out);
+}
+.login-tab.active {
+  background: transparent;
+  box-shadow: none;
+}
+/* The sliding pill — positioned absolutely behind the active tab.
+   When .login-tabs has data-active="register" we shift the pill to
+   the right; data-active="signin" pins it left. Without the data
+   attribute (default state) the pill sits behind whatever tab has
+   .active — which the rule below handles via :has(). */
+.login-tabs::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: calc(50% - 3px);
+  left: 3px;
+  background: var(--panel2);
+  border-radius: 5px;
+  box-shadow: var(--sh-sm), var(--sh-inset-top);
+  transition: left 280ms var(--ease-spring), transform 280ms var(--ease-spring);
+  z-index: 0;
+}
+.login-tabs:has(.login-tab:nth-child(2).active)::before {
+  left: calc(50% + 0px);
+}
+
+/* ── Shimmer / skeleton — utility class for placeholder content ──── */
+.vx-skel {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,.04) 0%,
+    rgba(255,255,255,.10) 50%,
+    rgba(255,255,255,.04) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: vx-shimmer 1.4s linear infinite;
+  color: transparent;
+  user-select: none;
+}
+@keyframes vx-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ── Notification dot — pulsing indicator for new / unread items ──── */
+.vx-pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cyan);
+  position: relative;
+  box-shadow: 0 0 0 0 rgba(0,212,255,.55);
+  animation: vx-pulse 1.6s cubic-bezier(.4, 0, .6, 1) infinite;
+}
+.vx-pulse-dot.is-red    { background: var(--red);    animation: vx-pulse-red 1.6s infinite; }
+.vx-pulse-dot.is-amber  { background: var(--amber);  animation: vx-pulse-amber 1.6s infinite; }
+.vx-pulse-dot.is-green  { background: var(--green);  animation: vx-pulse-green 1.6s infinite; }
+@keyframes vx-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(0,212,255,.55); }
+  70%  { box-shadow: 0 0 0 8px rgba(0,212,255,0);   }
+  100% { box-shadow: 0 0 0 0   rgba(0,212,255,0);   }
+}
+@keyframes vx-pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(242,92,92,.55); }
+  70% { box-shadow: 0 0 0 8px rgba(242,92,92,0); }
+  100% { box-shadow: 0 0 0 0 rgba(242,92,92,0); }
+}
+@keyframes vx-pulse-amber {
+  0% { box-shadow: 0 0 0 0 rgba(245,166,35,.55); }
+  70% { box-shadow: 0 0 0 8px rgba(245,166,35,0); }
+  100% { box-shadow: 0 0 0 0 rgba(245,166,35,0); }
+}
+@keyframes vx-pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(62,207,142,.55); }
+  70% { box-shadow: 0 0 0 8px rgba(62,207,142,0); }
+  100% { box-shadow: 0 0 0 0 rgba(62,207,142,0); }
+}
+
+/* ── Photo / drawing thumbnails — refined zoom-on-hover ──────────── */
+img.vx-thumb,
+.photo-thumb img,
+.drawing-thumb img,
+[class*="-thumb"] > img {
+  transition: transform 280ms var(--ease-out), filter 280ms var(--ease-out);
+}
+img.vx-thumb:hover,
+.photo-thumb:hover img,
+.drawing-thumb:hover img,
+[class*="-thumb"]:hover > img {
+  transform: scale(1.04);
+  filter: brightness(1.06);
+}
+.photo-thumb,
+.drawing-thumb,
+[class*="-thumb"] {
+  overflow: hidden;
+  border-radius: var(--r, 6px);
+}
+
+/* ── Keyboard hint chips (kbd) — refined typographic treatment ───── */
+kbd,
+.vx-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t2);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(0,0,0,.18) inset;
+}
+
+/* ── Stagger reveal — when an element gets .vx-stagger and its
+   children get .vx-stagger-item, the children cascade in with
+   incremental delays. Cap at 12 to keep total animation length
+   bounded for long lists. */
+.vx-stagger > .vx-stagger-item {
+  animation: vx-reveal-in 380ms var(--ease-out) both;
+}
+.vx-stagger > .vx-stagger-item:nth-child(1)  { animation-delay: 20ms; }
+.vx-stagger > .vx-stagger-item:nth-child(2)  { animation-delay: 50ms; }
+.vx-stagger > .vx-stagger-item:nth-child(3)  { animation-delay: 80ms; }
+.vx-stagger > .vx-stagger-item:nth-child(4)  { animation-delay: 110ms; }
+.vx-stagger > .vx-stagger-item:nth-child(5)  { animation-delay: 140ms; }
+.vx-stagger > .vx-stagger-item:nth-child(6)  { animation-delay: 170ms; }
+.vx-stagger > .vx-stagger-item:nth-child(7)  { animation-delay: 200ms; }
+.vx-stagger > .vx-stagger-item:nth-child(8)  { animation-delay: 230ms; }
+.vx-stagger > .vx-stagger-item:nth-child(9)  { animation-delay: 260ms; }
+.vx-stagger > .vx-stagger-item:nth-child(10) { animation-delay: 290ms; }
+.vx-stagger > .vx-stagger-item:nth-child(11) { animation-delay: 320ms; }
+.vx-stagger > .vx-stagger-item:nth-child(n+12) { animation-delay: 350ms; }
+
+/* ── Dashboard widgets — subtle hover lift on stat cards ─────────── */
+.stat-card,
+[class*="kpi-"],
+[class*="-tile"] {
+  transition:
+    transform 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    border-color 220ms var(--ease-out);
+}
+.stat-card:hover,
+[class*="kpi-"]:hover,
+[class*="-tile"]:hover {
+  transform: translateY(-2px);
+  border-color: var(--border3);
+  box-shadow: 0 12px 32px rgba(0,0,0,.4);
+}
+
+/* ── Inline edit triggers — when a value can be clicked to edit,
+   a faint underline appears on hover. */
+.vx-editable {
+  cursor: text;
+  border-bottom: 1px dashed transparent;
+  transition: border-bottom-color 180ms var(--ease-out), background 180ms var(--ease-out);
+  padding: 0 2px;
+  margin: 0 -2px;
+  border-radius: 3px;
+}
+.vx-editable:hover {
+  border-bottom-color: var(--border3);
+  background: rgba(255,255,255,.025);
+}
+
+/* ── Subtle ambient glow under the active sidebar item — adds the
+   faintest depth ring that makes the active item feel "lit". */
+.snav-item.active {
+  background:
+    linear-gradient(90deg, rgba(0,212,255,.10) 0%, rgba(0,212,255,.02) 100%),
+    radial-gradient(circle at 0% 50%, rgba(0,212,255,.06), transparent 70%);
+}
+
+/* ── Subtle separator (hr) refinement — gradient hairline ───────── */
+hr,
+.vx-hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+  margin: 16px 0;
+}

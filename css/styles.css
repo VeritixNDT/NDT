@@ -6784,3 +6784,177 @@ hr,
   background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
   margin: 16px 0;
 }
+
+/* ══════════════════════════════════════════════
+   POLISH LAYER 6 — FOCUS-WITHIN, VALIDATION, GRAIN, FINE DETAILS
+══════════════════════════════════════════════ */
+
+/* ── Subtle grain texture — very low-opacity noise layered on top of
+   gradients reduces banding and gives the dark UI a touch of depth.
+   Body-level so it covers everywhere; pointer-events:none so it
+   can't intercept clicks. The SVG fragment is a small fractal-noise
+   filter — small file, no extra HTTP request. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: .025;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='5'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+/* Strip in light theme — grain reads as dust on a white page. */
+[data-theme="light"] body::before { display: none; }
+
+/* ── :focus-within accent on form rows — when any input inside an
+   .fld (or its parent .fg) is focused, the parent gets a faint left
+   accent so the eye can find the active row quickly. Restraint: 2px
+   bar, low opacity, no movement. */
+.fg:focus-within {
+  position: relative;
+}
+.fg:focus-within::before {
+  content: '';
+  position: absolute;
+  top: 4px; bottom: 4px;
+  left: -10px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--cyan2), var(--cyan));
+  border-radius: 1px;
+  opacity: .6;
+  box-shadow: 0 0 6px rgba(0,212,255,.35);
+  animation: vx-reveal-in 220ms var(--ease-out);
+  pointer-events: none;
+}
+
+/* ── Form validation feedback — red glow on invalid, green on valid
+   after a user-triggered validation. Browsers set :invalid early
+   (an empty required field is "invalid" on mount), so we gate by
+   :user-invalid where supported (Firefox, Safari, Chrome 119+)
+   to avoid flashing red on every blank form. */
+.fld input:user-invalid,
+.fld textarea:user-invalid {
+  border-color: rgba(242,92,92,.55);
+  box-shadow:
+    inset 0 1px 0 rgba(0,0,0,.18),
+    0 0 0 3px rgba(242,92,92,.18);
+}
+.fld input:user-valid,
+.fld textarea:user-valid {
+  border-color: rgba(62,207,142,.4);
+}
+
+/* ── Resize handles in the editor — refined visual treatment. The
+   editor handles are tiny squares; this just gives them a subtle
+   highlight ring when hovered so they're easier to grab. */
+[class*="resize-handle"],
+[class*="cv-handle"] {
+  transition: background 160ms var(--ease-out), transform 100ms var(--ease-out), box-shadow 160ms var(--ease-out);
+}
+[class*="resize-handle"]:hover,
+[class*="cv-handle"]:hover {
+  background: var(--cyan2);
+  box-shadow: 0 0 0 3px rgba(0,212,255,.25);
+  transform: scale(1.15);
+}
+
+/* ── Tags / chips — subtle elevation on hover for inline tag rows
+   (method method-tag chips in the equipment register, etc.). The
+   tag chips are inline-block spans; raise + tighten on hover. */
+[class*="method-tag"],
+.tag-chip,
+.chip {
+  transition: background 180ms var(--ease-out), color 180ms var(--ease-out), transform 100ms var(--ease-out), border-color 180ms var(--ease-out);
+}
+[class*="method-tag"]:hover,
+.tag-chip:hover,
+.chip:hover {
+  transform: translateY(-1px);
+}
+
+/* ── Subtle gradient text utility — for hero numbers / stats so a
+   "27 reports this week" stat reads as elevated, not flat. */
+.vx-gradient-text {
+  background: linear-gradient(135deg, var(--cyan), var(--cyan2));
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+          color: transparent;
+}
+
+/* ── Subtle hover-only +/− adornments on number inputs. The native
+   spinner was hidden in Layer 1; this surfaces a custom one on
+   hover without JS: two small chevrons in a stacked column on the
+   right of the input. They're decorative only (can't be clicked
+   without wiring), but visually communicate "this is a number". */
+.fld:has(input[type="number"]) {
+  position: relative;
+}
+.fld:has(input[type="number"])::after {
+  content: '▴\A▾';
+  position: absolute;
+  right: 10px;
+  top: calc(50% + 8px); /* offset for the label above */
+  transform: translateY(-50%);
+  white-space: pre;
+  text-align: center;
+  font-size: 8px;
+  line-height: .9;
+  color: var(--t3);
+  opacity: 0;
+  transition: opacity 160ms var(--ease-out);
+  pointer-events: none;
+  font-family: var(--mono);
+  letter-spacing: -.04em;
+}
+.fld:has(input[type="number"]:hover)::after,
+.fld:has(input[type="number"]:focus)::after {
+  opacity: .55;
+}
+.fld:has(input[type="number"]) input[type="number"] {
+  padding-right: 24px;
+}
+
+/* ── Toast container — subtle drop shadow on the area itself so the
+   stack reads as a discrete corner pile, not floating individual
+   bubbles. */
+#toast-container {
+  filter: drop-shadow(0 12px 28px rgba(0,0,0,.5));
+}
+#toast-container .toast {
+  /* Each toast keeps its own border, but the stack-level shadow above
+     adds the depth — remove the per-toast hard shadow to avoid the
+     stacking-double effect. */
+  box-shadow: 0 0 0 1px rgba(255,255,255,.03) inset;
+}
+
+/* ── Refined hover for the search input clear-button (×) — when
+   present in search-wrap spans. */
+.search-wrap .clear-search {
+  opacity: .5;
+  transition: opacity 160ms var(--ease-out), transform 100ms var(--ease-out);
+}
+.search-wrap .clear-search:hover { opacity: 1; transform: scale(1.1); }
+
+/* ── Method colour utilities — set via JS or data attribute on a
+   container so child accents can read the right colour. Default to
+   cyan if no method context is in effect. */
+[data-method-color] {
+  --method-accent: attr(data-method-color color, var(--cyan2));
+}
+.method-accent {
+  color: var(--method-accent, var(--cyan2));
+}
+
+/* ── Final touch — body fade-in once the app is mounted. Combined
+   with the page-in fade from Layer 2, the whole first-load reads
+   as a considered, deliberate reveal rather than a flash. */
+body {
+  animation: vx-body-in 320ms var(--ease-out);
+}
+@keyframes vx-body-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

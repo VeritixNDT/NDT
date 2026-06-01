@@ -5956,3 +5956,188 @@ input[type="number"]::-webkit-outer-spin-button {
   border-top: 1px solid var(--border2);
   border-left: 1px solid var(--border2);
 }
+
+/* ══════════════════════════════════════════════
+   HIGH-END POLISH LAYER
+   Adds the micro-interactions that take a clean dark UI to a
+   considered, premium feel — refined easings, layered shadows,
+   tactile press states, glassy overlays. Sits at the bottom of the
+   stylesheet so every selector wins by source order without needing
+   !important.
+══════════════════════════════════════════════ */
+
+/* Smooth scrolling everywhere, including nested scroll containers.
+   Honour reduced-motion users — they get instant scroll. */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* Cubic easing token used across polished motion */
+:root {
+  --ease-out: cubic-bezier(.4, 0, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* ── Buttons — tighter motion, tactile press, subtle top-edge highlight ── */
+.btn, .btn-primary, .btn-danger, .btn-ghost, .btn-sm, .btn-xs {
+  transition:
+    background 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    color 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+.btn:hover, .btn-sm:hover, .btn-xs:hover {
+  transform: translateY(-1px);
+}
+.btn:active, .btn-sm:active, .btn-xs:active,
+.btn-primary:active, .btn-danger:active, .btn-ghost:active {
+  transform: translateY(0) scale(.985);
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,.25),
+    0 0 0 0 transparent;
+  transition-duration: 80ms;
+}
+
+/* Primary button — a touch of brand glow + a slow shine on hover that
+   reads as "alive" without animating constantly. */
+.btn-primary { position: relative; overflow: hidden; isolation: isolate; }
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255,255,255,.18) 50%,
+    transparent 65%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-position: -120% 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
+}
+.btn-primary:hover::after {
+  opacity: 1;
+  animation: vx-shine 900ms var(--ease-out) forwards;
+}
+@keyframes vx-shine {
+  to { background-position: 120% 0; }
+}
+
+/* Slimmer, more refined focus ring — same accent, lighter footprint. */
+.btn:focus-visible,
+.btn-primary:focus-visible,
+.btn-danger:focus-visible,
+.btn-ghost:focus-visible,
+.btn-sm:focus-visible,
+.btn-xs:focus-visible {
+  outline: none;
+  box-shadow:
+    var(--sh-inset-top, none),
+    0 0 0 3px rgba(0,212,255,.32);
+}
+
+/* ── Form inputs — gentler focus glow ── */
+.fld input:focus,
+.fld textarea:focus,
+.fld select:focus {
+  box-shadow: 0 0 0 3px rgba(0,153,204,.22);
+}
+
+/* ── Modal — backdrop blur + a touch of bounce on entry ── */
+.modal-overlay {
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  transition: opacity 200ms var(--ease-out);
+}
+.modal {
+  border-radius: 14px;
+  box-shadow:
+    0 24px 60px rgba(0,0,0,.55),
+    0 0 0 1px rgba(255,255,255,.04) inset;
+  transition: transform 220ms var(--ease-spring), opacity 200ms var(--ease-out);
+}
+.modal-overlay.show .modal { transform: translateY(0) scale(1); }
+
+/* ── Toast — glassy bubble, spring-in, subtle accent shadow ── */
+.toast {
+  background: rgba(20, 28, 36, .88);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.06);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.55),
+    0 0 0 1px rgba(255,255,255,.03) inset;
+  animation: vx-toast-in 280ms var(--ease-spring);
+}
+.toast.out { animation: vx-toast-out 200ms var(--ease-out) forwards; }
+@keyframes vx-toast-in {
+  from { opacity: 0; transform: translateX(28px) scale(.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes vx-toast-out {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(28px) scale(.95); }
+}
+.toast.success { border-color: rgba(62,207,142,.28); }
+.toast.error   { border-color: rgba(242,92,92,.32); }
+.toast.warn    { border-color: rgba(245,166,35,.32); }
+.toast.info    { border-color: rgba(79,142,247,.32); }
+
+/* ── Cards (.sc) — subtle hover lift on cards inside scrollable lists
+   (the equipment / inspector roster, etc.). Skipped on settings
+   surface cards where hover-lift would be noisy. */
+.sc.sc-interactive {
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out), border-color 180ms var(--ease-out);
+  cursor: pointer;
+}
+.sc.sc-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--border3);
+  box-shadow: 0 10px 28px rgba(0,0,0,.4);
+}
+
+/* ── Universal :focus-visible — give every interactive element the
+   same restrained cyan ring (excludes elements we already styled). */
+button:focus-visible,
+[role="button"]:focus-visible,
+[role="option"]:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: none;
+}
+.vxsel-trigger:focus-visible,
+.vxdate-trigger:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0,153,204,.32);
+}
+
+/* ── Lift on icon-only buttons — small but punchy ── */
+.icon-btn {
+  transition:
+    background 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    transform 100ms var(--ease-out);
+}
+.icon-btn:hover { transform: translateY(-1px) scale(1.04); }
+.icon-btn:active { transform: translateY(0) scale(.96); }
+
+/* ── Tooltips — keep arrow border colour consistent with the bubble's
+   themed border (gets occasionally lost behind backdrop-filter elements
+   higher in the stack). */
+.vxtt { z-index: 10001; }
+
+/* ── Selection — a touch of brand colour ── */
+::selection {
+  background: rgba(0,212,255,.32);
+  color: #fff;
+}

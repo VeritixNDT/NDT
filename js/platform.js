@@ -33,6 +33,8 @@ var VX_ENTITY_KEYS = new Set([
   'vx-method-tpl-UT', 'vx-method-tpl-MT', 'vx-method-tpl-VT',
   'vx-method-tpl-PT', 'vx-method-tpl-RT', 'vx-method-tpl-ET',
   'vx-method-tpl-PMI', 'vx-method-tpl-HT', 'vx-method-tpl-RFT',
+  // Billing document templates (Phase 2 — quote/invoice canvas layouts).
+  'vx-method-tpl-INVOICE', 'vx-method-tpl-QUOTE',
 ]);
 // Auth-sensitive keys handled specially (never naively synced — derive from token instead)
 var VX_AUTH_KEYS = new Set(['vx-session-v1']);

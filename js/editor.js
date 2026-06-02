@@ -182,6 +182,80 @@ var CV_FIELD_DEFS = {
   'co-confidstmt-smart':{label:'Confidentiality statement', ph:'This report is confidential and intended solely for the named client.', get:r=>'', w:520,h:30, smartLink:'company', companyField:'confidstmt', isCompanyConfidStmt:true, noLabel:true},
 };
 
+// ══════════════════════════════════════════════════════════════════════════
+// BILLING DOCUMENT TYPES (Phase 2 — quote / invoice canvas templates)
+// ══════════════════════════════════════════════════════════════════════════
+// The canvas editor edits one of several "document types". 'report' is the
+// classic NDT report (keyed by cvPpvMethod). 'invoice' / 'quote' render a
+// billing document instead — same block/render machinery, but the record
+// passed to the resolvers is a billing doc (from js/billing.js) and the
+// palette + sample switch accordingly.
+var cvDocType = 'report';   // 'report' | 'invoice' | 'quote'
+
+// Columns of the repeating line-items table (mirrors RPT_FORM.items for the
+// report items-table). `amount` is computed (qty × unitPrice).
+var BILL_LINE_COLS = [
+  { id:'description', label:'Description', width:360, align:'left'  },
+  { id:'qty',         label:'Qty',        width:70,  align:'right' },
+  { id:'unitPrice',   label:'Unit price', width:120, align:'right' },
+  { id:'amount',      label:'Amount',     width:120, align:'right' },
+];
+
+// Sample billing doc — drives the editor preview when designing an
+// invoice/quote template (parallel to CV_SAMPLE for reports).
+var CV_BILL_SAMPLE = {
+  type:'invoice', number:'INV-2026-001', status:'Sent', currency:'EUR', vatRate:21,
+  issueDate:'2026-06-02', dueDate:'2026-07-02',
+  _custName:'ACME Pipelines Ltd', _custAddr:'12 Dock Road\nRotterdam 3011 AA\nNetherlands\nVAT NL812345678B01',
+  lineItems:[
+    { description:'UT of girth welds (ASME V)', qty:10, unitPrice:150 },
+    { description:'Mobilisation', qty:1, unitPrice:500 },
+  ],
+  notes:'Payment due within 30 days. Bank: NL00 BANK 0123 4567 89.',
+};
+
+// Money/total helpers — prefer the canonical ones from js/billing.js, with
+// safe fallbacks so the editor still renders if billing.js failed to load.
+function _cvBillCur(rec){ return (rec && rec.currency) || (typeof billDefaultCurrency==='function' ? billDefaultCurrency() : 'EUR'); }
+function _cvBillMoney(n, cur){ return (typeof billFmtMoney==='function') ? billFmtMoney(n, cur) : ((Number(n)||0).toFixed(2)); }
+function _cvBillCalc(rec){
+  if(typeof billCalc==='function') return billCalc(rec);
+  const items=(rec&&rec.lineItems)||[]; const sub=items.reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.unitPrice)||0),0);
+  const vat=sub*((parseFloat(rec&&rec.vatRate)||0)/100); return {subtotal:sub,vat:vat,total:sub+vat};
+}
+// Resolve a billing doc's customer to {name, lines[]} — from the sample's
+// inline snapshot, or a live lookup against the customer register.
+function _cvBillCustomer(rec){
+  if(!rec) return { name:'', lines:[] };
+  if(rec._custName) return { name:rec._custName, lines:(rec._custAddr?String(rec._custAddr).split('\n'):[]) };
+  if(rec.customerId && typeof custLoad==='function'){
+    const c=custLoad().find(x=>x.id===rec.customerId);
+    if(c){ const lines=[]; if(c.billingAddress) String(c.billingAddress).split('\n').forEach(l=>lines.push(l)); if(c.vatNo) lines.push('VAT '+c.vatNo); return { name:c.name||'', lines }; }
+  }
+  return { name:'', lines:[] };
+}
+
+// Billing fields — added to CV_FIELD_DEFS so the shared render path resolves
+// them. Resolvers receive the billing doc record.
+Object.assign(CV_FIELD_DEFS, {
+  'doc-title':      {label:'Document title',  ph:'INVOICE',       get:r=> (r && r.type==='quote') ? 'QUOTE' : 'INVOICE', w:220,h:44, noLabel:true, billing:true},
+  'doc-number':     {label:'Document number', ph:'INV-2026-001',  get:r=> (r&&r.number)||'—',    w:220,h:34, noLabel:true, billing:true},
+  'doc-issue-date': {label:'Issue date',      ph:'02 Jun 2026',   get:r=> (r&&r.issueDate)?fmtDate(r.issueDate):'—', w:170,h:32, billing:true},
+  'doc-due-date':   {label:'Due / valid date',ph:'02 Jul 2026',   get:r=> (r&&r.dueDate)?fmtDate(r.dueDate):'—',     w:170,h:32, billing:true},
+  'doc-status':     {label:'Status',          ph:'Sent',          get:r=> (r&&r.status)||'—',     w:120,h:32, billing:true},
+  'doc-notes':      {label:'Notes / terms',   ph:'Payment within 30 days', get:r=> (r&&r.notes)||'', w:380,h:60, multi:true, noLabel:true, billing:true},
+});
+
+// Palette groups shown when editing an invoice/quote template (parallel to
+// CV_PALETTE_GROUPS). line-items-table / bill-totals / bill-to live in the
+// Layout group (they're CV_LAYOUT_ITEMS entries).
+var CV_BILLING_PALETTE_GROUPS = [
+  {id:'company',  label:'🏢 Company (live)', fields:['co-logo-smart','co-name-smart','co-address-smart','co-phone-smart','co-email-smart','co-vat-smart','co-block','co-footer-smart']},
+  {id:'document', label:'Document',          fields:['doc-title','doc-number','doc-issue-date','doc-due-date','doc-status','doc-notes']},
+  {id:'computed', label:'∑ Computed',        fields:['today-date','page-num']},
+  {id:'layout',   label:'Layout elements',   isLayout:true},
+];
+
 // V29 — Company profile live-read helpers.
 // _cvCompany()                — read the company profile fresh each call
 // _cvFormatCompanyAddress()   — compose a multi-line postal address
@@ -348,6 +422,10 @@ var CV_LAYOUT_ITEMS = [
   {key:'revision-history',label:'Revision history',           w:260,h:64},
   {key:'method-block',   label:'Method-specific data block', w:754,h:90},
   {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
+  // Billing (invoice/quote) layout blocks.
+  {key:'bill-to',          label:'Bill to (customer)',        w:320,h:90},
+  {key:'line-items-table', label:'Line items (quote/invoice)',w:754,h:240},
+  {key:'bill-totals',      label:'Totals (subtotal/VAT/total)',w:280,h:110},
 ];
 
 var CV_PALETTE_GROUPS = [
@@ -678,6 +756,11 @@ var CV_SAMPLE = {
 };
 
 function cvBuildReport(method, result, showDefects){
+  // Billing document types preview against the billing sample (or, later,
+  // a live doc) instead of synthesising an NDT report.
+  if(cvDocType === 'invoice' || cvDocType === 'quote'){
+    return Object.assign({}, CV_BILL_SAMPLE, { type: cvDocType });
+  }
   // V3: If a real report ID is selected, use that report's actual data
   if(cvPpvReportId){
     const reports = ls(KEYS.reports, []);
@@ -2930,6 +3013,51 @@ function cvRenderBlockContent(block, report, preview){
     switch(key){
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;
+      case 'bill-to':{
+        const cust = _cvBillCustomer(report || (preview ? CV_BILL_SAMPLE : null));
+        const label = block.text || 'Bill to';
+        const body = (cust.name || cust.lines.length)
+          ? `<div style="font-weight:700">${_h(cust.name||'—')}</div>${cust.lines.map(l=>`<div>${_h(l)}</div>`).join('')}`
+          : `<div style="color:#bbb">[Customer]</div>`;
+        return `<div style="height:100%;font-size:${fs};color:${fc};text-align:${al}"><div style="font-size:7px;text-transform:uppercase;letter-spacing:.05em;color:#999;margin-bottom:2px">${_h(label)}</div>${body}</div>`;
+      }
+      case 'line-items-table':{
+        const cols = BILL_LINE_COLS;
+        const widthsArr = (Array.isArray(block.colWidths) && block.colWidths.length===cols.length)
+          ? block.colWidths.map(w=>(typeof w==='number'&&w>0)?w:120) : cols.map(c=>c.width);
+        const totalW = widthsArr.reduce((s,w)=>s+w,0);
+        const pcts = widthsArr.map(w=>+((w/totalW)*100).toFixed(4));
+        pcts[pcts.length-1] = +(100 - pcts.slice(0,-1).reduce((s,p)=>s+p,0)).toFixed(4);
+        const colgroup = `<colgroup>${pcts.map(p=>`<col style="width:${p}%"/>`).join('')}</colgroup>`;
+        const rec = report || (preview ? CV_BILL_SAMPLE : null);
+        const cur = _cvBillCur(rec);
+        let items = (rec && Array.isArray(rec.lineItems) && rec.lineItems.length)
+          ? rec.lineItems
+          : (preview ? CV_BILL_SAMPLE.lineItems : [{description:'[Description]',qty:'',unitPrice:''}]);
+        if(_cvItemsSlice && Array.isArray(items)) items = items.slice(_cvItemsSlice.start, _cvItemsSlice.start + _cvItemsSlice.count);
+        const barColor = _safeColor(block.barColor, '#404040');
+        const head = cols.map(c=>`<th style="padding:4px 6px;text-align:${c.align};font-size:7.5px;font-weight:600;color:#fff;letter-spacing:.02em">${_h(c.label)}</th>`).join('');
+        const rows = items.map(it=>{
+          const q=parseFloat(it.qty)||0, p=parseFloat(it.unitPrice)||0, amt=q*p;
+          return '<tr>'+cols.map(c=>{
+            let v;
+            if(c.id==='amount') v=_cvBillMoney(amt,cur);
+            else if(c.id==='unitPrice') v=(it.unitPrice!=null && it.unitPrice!=='')?_cvBillMoney(p,cur):'';
+            else v=(it[c.id]!=null)?it[c.id]:'';
+            return `<td style="padding:4px 6px;border-bottom:0.5px solid #e0e0e0;text-align:${c.align};font-size:${fs};color:${fc}">${_h(v)}</td>`;
+          }).join('')+'</tr>';
+        }).join('');
+        return `<div style="height:100%;overflow:hidden"><table style="width:100%;border-collapse:collapse;table-layout:fixed">${colgroup}<thead><tr style="background:${barColor}">${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      }
+      case 'bill-totals':{
+        const rec = report || (preview ? CV_BILL_SAMPLE : null);
+        const cur = _cvBillCur(rec);
+        const calc = _cvBillCalc(rec || {});
+        const rate = (rec && rec.vatRate!=null) ? rec.vatRate : 0;
+        const accent = _safeColor(block.color, cvGetCompanyColor());
+        const line = (lbl,val,strong)=>`<div style="display:flex;justify-content:space-between;padding:2px 6px;font-size:${strong?'12px':fs};${strong?`font-weight:700;border-top:2px solid ${accent};color:${accent};margin-top:3px;padding-top:6px`:'color:#555'}"><span>${_h(lbl)}</span><span style="font-family:monospace">${_h(val)}</span></div>`;
+        return `<div style="height:100%">${line('Subtotal',_cvBillMoney(calc.subtotal,cur))}${line('VAT ('+_h(rate)+'%)',_cvBillMoney(calc.vat,cur))}${line('Total',_cvBillMoney(calc.total,cur),true)}</div>`;
+      }
       case 'h-line':
         return `<div style="height:100%;display:flex;align-items:center"><div style="width:100%;border-top:0.5px solid ${bc}"></div></div>`;
       case 'section-header':
@@ -5687,6 +5815,41 @@ function _cvRefreshUndoRedoUI(){
 // V22: now uses ls/lss → IndexedDB. Per-method templates can be heavy
 // (a single template can include dozens of blocks with inline signatures
 // and logos) so localStorage quota was a real risk.
+// Build (and persist) a sensible default invoice/quote template so billing
+// documents render through the canvas pipeline out of the box. Returns the
+// saved template object { pages, nextId, savedAt }. type is 'invoice'|'quote'.
+function cvSeedBillingTemplate(type){
+  const t2 = (type === 'quote') ? 'quote' : 'invoice';
+  const accent = (typeof cvGetCompanyColor === 'function') ? cvGetCompanyColor() : '#185FA5';
+  const nid = () => (typeof _cvBlockId === 'function') ? _cvBlockId() : ('blk-' + Math.random().toString(36).slice(2,10));
+  const B = (o) => Object.assign({ id:nid(), x:0,y:0,w:160,h:32, fontSize:'9px', align:'left', color:'#000', bgColor:'transparent' }, o);
+  const blocks = [
+    // Header band
+    B({ key:'co-logo-smart', x:20,  y:20,  w:150, h:60 }),
+    B({ key:'co-block',      x:20,  y:84,  w:300, h:90, fontSize:'9px' }),
+    B({ key:'doc-title',     x:474, y:20,  w:300, h:46, align:'right', bold:true, fontSize:'30px', color:accent }),
+    B({ key:'doc-number',    x:474, y:72,  w:300, h:26, align:'right', fontSize:'13px', color:'#333' }),
+    B({ key:'accent-bar',    x:20,  y:184, w:754, h:4,  bgColor:accent, isLayout:true }),
+    // Bill-to + dates
+    B({ key:'bill-to',        x:20,  y:204, w:340, h:96, isLayout:true, text:(t2==='invoice'?'Bill to':'Quote for') }),
+    B({ key:'doc-issue-date', x:560, y:204, w:214, h:30, align:'right' }),
+    B({ key:'doc-due-date',   x:560, y:236, w:214, h:30, align:'right' }),
+    // Line items + totals
+    B({ key:'line-items-table', x:20,  y:320, w:754, h:300, isLayout:true, barColor:accent }),
+    B({ key:'bill-totals',      x:494, y:640, w:280, h:110, isLayout:true, color:accent }),
+    // Notes + footer
+    B({ key:'doc-notes',      x:20,  y:780, w:520, h:90, fontSize:'9px' }),
+    B({ key:'co-footer-smart',x:20,  y:1040,w:754, h:24, zone:'footer', align:'center', fontSize:'8px', color:'#888' }),
+  ];
+  // Layout-keyed blocks must carry isLayout so the renderer takes the layout
+  // path; field blocks (doc-*, co-*) must NOT.
+  const LAYOUT = new Set(['accent-bar','bill-to','line-items-table','bill-totals']);
+  blocks.forEach(b => { if(LAYOUT.has(b.key)) b.isLayout = true; });
+  const data = { pages:[{ label:'Page 1', blocks }], nextId: blocks.length+1, savedAt:new Date().toISOString() };
+  try { lss(CV_METHOD_TPL_PREFIX + t2.toUpperCase(), data); } catch(e){ console.warn('seed billing tpl failed', e); }
+  return data;
+}
+
 function cvSaveMethodTpl(method){
   if(!method){ toast(t('toast.no_method', 'No method selected')); return; }
   const data = { pages: cvPages, nextId: cvNextId, savedAt: new Date().toISOString() };

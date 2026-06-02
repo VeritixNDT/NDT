@@ -516,10 +516,44 @@ function billBuildDocHtml(type, doc) {
   </body></html>`;
 }
 
+// Render a billing doc through the canvas template (the editable WYSIWYG
+// layout, mirroring how reports use a saved per-method template via
+// ovBuildReportSnapshot). Falls back to the built-in fixed layout
+// (billBuildDocHtml) when the canvas pipeline or a template isn't available.
+function _billCanvasHtml(type, doc) {
+  if(typeof cvBuildPrintHTML !== 'function') return '';
+  var tplKey = (typeof CV_METHOD_TPL_PREFIX !== 'undefined' ? CV_METHOD_TPL_PREFIX : 'vx-method-tpl-')
+             + (type === 'invoice' ? 'INVOICE' : 'QUOTE');
+  var tpl = ls(tplKey, null);
+  // No saved template yet → seed a sensible default so it works out of the box.
+  if((!tpl || !Array.isArray(tpl.pages) || !tpl.pages.length) && typeof cvSeedBillingTemplate === 'function') {
+    tpl = cvSeedBillingTemplate(type);
+  }
+  if(!tpl || !Array.isArray(tpl.pages) || !tpl.pages.length) return '';
+  // Swap the template + doc-type onto the editor globals cvBuildPrintHTML
+  // reads, build, then restore — so printing never disturbs the canvas.
+  var _pages = (typeof cvPages !== 'undefined') ? cvPages : null;
+  var _page  = (typeof cvCurrentPage !== 'undefined') ? cvCurrentPage : 0;
+  var _dt    = (typeof cvDocType !== 'undefined') ? cvDocType : 'report';
+  var html = '';
+  try {
+    cvPages = tpl.pages; cvCurrentPage = 0; cvDocType = type;
+    if(typeof cvSync === 'function') cvSync();
+    html = cvBuildPrintHTML(Object.assign({}, doc, { type: type }));
+  } catch(e) { console.warn('bill canvas render failed', e); html = ''; }
+  finally {
+    if(_pages) cvPages = _pages;
+    cvCurrentPage = _page; cvDocType = _dt;
+    if(typeof cvSync === 'function') cvSync();
+  }
+  return html;
+}
+
 function billPrintDoc(type, id) {
   const doc = billGet(type, id);
   if(!doc) { toast('Document not found.', 'error'); return; }
-  const html = billBuildDocHtml(type, doc);
+  let html = _billCanvasHtml(type, doc);
+  if(!html) html = billBuildDocHtml(type, doc);   // fallback to the fixed layout
   if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
   else { const w = window.open('', '_blank'); if(w) { w.document.write(html); w.document.close(); } }
 }

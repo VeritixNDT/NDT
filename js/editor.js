@@ -170,7 +170,7 @@ var CV_FIELD_DEFS = {
   'co-phone-smart':   {label:'Company phone (live)',   ph:'+32 3 123 45 67',          get:r=>_cvCompany().phone||'—',        w:160,h:32, smartLink:'company', companyField:'phone'},
   'co-email-smart':   {label:'Company email (live)',   ph:'info@company.com',         get:r=>_cvCompany().email||'—',        w:200,h:32, smartLink:'company', companyField:'email'},
   'co-website-smart': {label:'Company website (live)', ph:'https://company.com',      get:r=>_cvCompany().web||'—',          w:200,h:32, smartLink:'company', companyField:'web'},
-  'co-vat-smart':     {label:'Company VAT/reg (live)', ph:'BE 0123.456.789',          get:r=>_cvCompany().reg||'—',          w:160,h:32, smartLink:'company', companyField:'reg'},
+  'co-vat-smart':     {label:'Company VAT no. (live)', ph:'BE 0123.456.789',          get:r=>_cvCompany().vat||_cvCompany().reg||'—', w:160,h:32, smartLink:'company', companyField:'vat'},
   'co-logo-smart':    {label:'Company logo (live)',    ph:'',                          get:r=>'',                             w:140,h:56, smartLink:'company', companyField:'logo', isLogo:true},
   'co-block':         {label:'Company info block',     ph:'Acme Inspection Ltd.\n1 NDT Street\n+32 3 123 45 67', get:r=>'',  w:280,h:90, smartLink:'company', companyField:'block', isCompanyBlock:true},
   // Live company-text smart fields. Render the corresponding Settings →
@@ -3838,6 +3838,7 @@ function cvRenderBlockContent(block, report, preview){
           co2.phone,
           co2.email,
           co2.web,
+          (co2.vat || co2.reg) ? ('VAT ' + (co2.vat || co2.reg)) : '',
         ].filter(s => s && s.trim());
         const content = lines.length
           ? lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')

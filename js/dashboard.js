@@ -1407,6 +1407,9 @@ function ovNewReport(methodId, btn, sourceReport) {
   //   details) → Defects → Result → Sign-off → Photos.
   if(identityShared.length) html += ovFormSection('Identity', identityShared, methodId, merged, m);
   if(clientShared.length)   html += ovFormSection('Client information', clientShared, methodId, merged, m);
+  // Job link — which job this report is filed under. Sits right after the
+  // client block: pick the client, then the job for that client.
+  html += ovJobPickerHtml(merged.jobId);
   // Equipment & parameters — method-specific fields excluding spec/acc.
   if(equipFromMethod.length) html += ovFormSection(`${m.id} — Equipment & parameters`, equipFromMethod, methodId, merged, m);
   // Examination criteria — RPT_FORM.exam plus the method's spec / acc
@@ -1508,6 +1511,38 @@ function ovFormSection(title, fields, methodId, data, m) {
   }
   html += `</div></div>`;
   return html;
+}
+
+// Job picker section for the new-report form. Lets the inspector file the
+// report under a job (or leave it Unassigned). Open jobs sort first; a
+// closed or since-deleted job that the report already points at is kept
+// selectable so revising never silently drops the link.
+function ovJobPickerHtml(selectedJobId) {
+  const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
+  const custName = (id) => (typeof jobCustomerName === 'function') ? jobCustomerName(id) : '—';
+  const sorted = jobs.slice().sort((a, b) => {
+    const oa = (a.status === 'Closed') ? 1 : 0, ob = (b.status === 'Closed') ? 1 : 0;
+    if(oa !== ob) return oa - ob;
+    return (a.title || '').localeCompare(b.title || '');
+  });
+  let hasSelected = false;
+  let opts = '<option value="">— Unassigned —</option>';
+  opts += sorted.map(j => {
+    const sel = (j.id === selectedJobId);
+    if(sel) hasSelected = true;
+    const label = (j.title || '(untitled)') + ' — ' + custName(j.customerId) + (j.status === 'Closed' ? ' (closed)' : '');
+    return `<option value="${escapeHtml(j.id)}"${sel ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('');
+  if(selectedJobId && !hasSelected) {
+    opts += `<option value="${escapeHtml(selectedJobId)}" selected>(deleted job)</option>`;
+  }
+  const hint = jobs.length ? '' : ' — create jobs under the Jobs tab';
+  return `<div class="sc" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">Job</span></div><div class="sc-body" style="padding:14px 16px">
+    <div class="fld">
+      <label>Job this report belongs to${hint}</label>
+      <select id="ov-job-picker" style="width:100%;font-family:var(--font);font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box">${opts}</select>
+    </div>
+  </div>`;
 }
 
 // Inspected-items table. One row per weld/object inspected under the same
@@ -2569,6 +2604,22 @@ function ovSaveReport(mode) {
   const remarksEl = document.getElementById('ov-exam-remarks');
   const examRemarks = remarksEl ? remarksEl.value.trim() : '';
   if(examRemarks) report.examRemarks = examRemarks;
+  // Job link — file the report under the picked job (or leave it
+  // unassigned). Captured before the revision no-op check below so that
+  // changing only the job on a revision still counts as a change.
+  // jobTitle is snapshotted so report lists can show the job without a
+  // lookup, and it survives the job later being renamed / deleted.
+  const jobSel = document.getElementById('ov-job-picker');
+  if(jobSel){
+    const jid = jobSel.value || '';
+    if(jid){
+      report.jobId = jid;
+      if(typeof jobLoad === 'function'){
+        const job = jobLoad().find(j => j.id === jid);
+        if(job) report.jobTitle = job.title || '';
+      }
+    }
+  }
   // Revising an existing report: do nothing if no editable content
   // changed (a no-op open/save creates no revision), keep the original
   // report number, and seed report.revisions with the source's history

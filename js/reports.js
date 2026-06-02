@@ -1042,6 +1042,19 @@ function rptInit() {
   fm.innerHTML = '<option value="">All methods</option>' +
     getActiveMethods().map(m => `<option value="${m.id}">${m.id}</option>`).join('');
   fm.value = cur;
+  // Populate job filter — all jobs plus an "Unassigned" bucket for legacy /
+  // job-less reports. Rebuilt each init so newly-created jobs appear.
+  const fj = el('rpt-fj');
+  if(fj) {
+    const curJob = fj.value;
+    const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
+    const custName = (id) => (typeof jobCustomerName === 'function') ? jobCustomerName(id) : '';
+    const sorted = jobs.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    fj.innerHTML = '<option value="">All jobs</option>'
+      + '<option value="__none__">Unassigned</option>'
+      + sorted.map(j => `<option value="${escapeHtml(j.id)}">${escapeHtml((j.title || '(untitled)') + ' — ' + custName(j.customerId))}</option>`).join('');
+    fj.value = curJob;
+  }
   // V6: restore saved view preference
   try {
     const saved = localStorage.getItem(RPT_VIEW_PREF_KEY);
@@ -1080,6 +1093,7 @@ function rptCollectFilters(){
   return {
     search:   el('rpt-search')?.value || '',
     method:   el('rpt-fm')?.value || '',
+    job:      el('rpt-fj')?.value || '',
     status:   _rptStatusFilter || '',
     dateFrom: el('rpt-f-datefrom')?.value || '',
     dateTo:   el('rpt-f-dateto')?.value || '',
@@ -1089,6 +1103,7 @@ function rptCollectFilters(){
 function rptApplyFilters(filters){
   if(el('rpt-search'))     el('rpt-search').value     = filters.search    || '';
   if(el('rpt-fm'))         el('rpt-fm').value         = filters.method    || '';
+  if(el('rpt-fj'))         el('rpt-fj').value         = filters.job       || '';
   _rptStatusFilter = filters.status || '';
   if(el('rpt-f-datefrom')) el('rpt-f-datefrom').value = filters.dateFrom  || '';
   if(el('rpt-f-dateto'))   el('rpt-f-dateto').value   = filters.dateTo    || '';
@@ -1425,12 +1440,18 @@ function rptRender() {
   const allReports = list.slice(); // keep original index reference for selection
   const search = (el('rpt-search')?.value || '').toLowerCase().trim();
   const fm = el('rpt-fm')?.value || '';
+  const fj = el('rpt-fj')?.value || '';
   const fDateFrom = el('rpt-f-datefrom')?.value || '';
   const fDateTo = el('rpt-f-dateto')?.value || '';
 
   // Build filtered list while preserving the original index in `_origIdx`
   list = list.map((r, i) => ({ r, _origIdx: i })).filter(({r}) => {
     if(fm && r.method !== fm) return false;
+    // Job filter — '__none__' = unassigned reports only, else exact jobId.
+    if(fj){
+      if(fj === '__none__'){ if(r.jobId) return false; }
+      else if(r.jobId !== fj) return false;
+    }
     // Status tiles — 'review' = Submitted stage, 'approved' = Approved.
     if(_rptStatusFilter === 'review'   && getReportStage(r) !== 'Submitted') return false;
     if(_rptStatusFilter === 'approved' && getReportStage(r) !== 'Approved')  return false;
@@ -1447,7 +1468,7 @@ function rptRender() {
     return true;
   });
 
-  const activeFilters = [fm, search, _rptStatusFilter, fDateFrom, fDateTo].filter(Boolean).length;
+  const activeFilters = [fm, fj, search, _rptStatusFilter, fDateFrom, fDateTo].filter(Boolean).length;
   // V31: translated subtitle. Plural-aware report count + "N filter(s) active"
   // when filters are in play. The {n} interpolation handles localization of
   // grammatical number for English / Dutch / German / French / Spanish.
@@ -1836,6 +1857,7 @@ function rptDelete(idx) {
 function rptClearFilters() {
   ['rpt-search','rpt-f-datefrom','rpt-f-dateto'].forEach(id => { const e=el(id); if(e) e.value=''; });
   const fm = el('rpt-fm'); if(fm) fm.value = '';
+  const fj = el('rpt-fj'); if(fj) fj.value = '';
   _rptStatusFilter = '';
   rptRender();
 }

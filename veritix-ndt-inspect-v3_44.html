@@ -651,6 +651,7 @@
       <div style="display:flex;gap:10px;align-items:flex-end">
         <div class="fld" style="flex:1;gap:3px"><label data-i18n="rpt.search_label">Search</label><input id="rpt-search" placeholder="Search report no, client, project, drawing, weld / object, inspector…" data-on-input="rptRenderDebounced" style="font-size:13px"/></div>
         <div class="fld" style="flex:0 0 150px;gap:3px"><label data-i18n="col.method">Method</label><select id="rpt-fm" data-on-change="rptRender" style="font-size:13px"><option value="" data-i18n="filter.all_methods">All methods</option></select></div>
+        <div class="fld" style="flex:0 0 170px;gap:3px"><label>Job</label><select id="rpt-fj" data-on-change="rptRender" style="font-size:13px"><option value="">All jobs</option></select></div>
         <div class="fld" style="flex:0 0 140px;gap:3px"><label data-i18n="col.date_from">Date from</label><input type="date" id="rpt-f-datefrom" data-on-change="rptRender" style="font-size:13px"/></div>
         <div class="fld" style="flex:0 0 140px;gap:3px"><label data-i18n="col.date_to">Date to</label><input type="date" id="rpt-f-dateto" data-on-change="rptRender" style="font-size:13px"/></div>
         <button class="btn btn-sm" data-action="rptClearFilters" style="padding:8px 14px;font-size:12px;margin-bottom:1px;white-space:nowrap" data-i18n="rpt.btn.clear">Clear</button>

@@ -2166,8 +2166,19 @@
 
           </div><!-- end toolbar -->
 
+          <!-- ═══ DOCUMENT-TYPE SWITCHER ═══ -->
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:6px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;flex-wrap:wrap">
+            <span style="font-size:9px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-right:2px">Document</span>
+            <button class="tbe" id="cv-doctype-report"  data-action="cvSetDocType" data-args="'report'"  style="font-size:11px">📄 NDT report</button>
+            <button class="tbe" id="cv-doctype-invoice" data-action="cvSetDocType" data-args="'invoice'" style="font-size:11px">🧾 Invoice</button>
+            <button class="tbe" id="cv-doctype-quote"   data-action="cvSetDocType" data-args="'quote'"   style="font-size:11px">📑 Quote</button>
+            <span id="cv-doctype-hint" style="font-size:10px;color:var(--t3);margin-left:6px"></span>
+            <span style="flex:1"></span>
+            <button class="tbe" id="cv-billing-reset" data-action="cvResetBillingTemplate" style="display:none;font-size:11px;color:var(--amber)">↺ Reset to default</button>
+          </div>
+
           <!-- ═══ 3-PANEL CANVAS EDITOR ═══ -->
-          <div id="cv-editor-frame" style="display:flex;height:calc(100vh - 310px);min-height:520px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;background:var(--bg);margin-top:4px">
+          <div id="cv-editor-frame" style="display:flex;height:calc(100vh - 350px);min-height:520px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;background:var(--bg);margin-top:4px">
 
             <!-- V26: backdrop shown when a drawer is open (mobile/tablet only) -->
             <div id="cv-drawer-backdrop" data-action="cvCloseAllDrawers"></div>

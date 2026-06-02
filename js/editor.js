@@ -1761,6 +1761,7 @@ function cvInitCanvas(){
   cvRenderCanvas();
   cvFitToView();
   cvRenderMethodBtns();
+  cvRenderDocTypeSwitcher();
   cvUpdateStatusBar();
   cvUpdateLogoThumb();  // reflect persisted tplLogo in the ribbon thumb
   cvRenderLogoLib();    // populate the saved-logo library
@@ -1850,6 +1851,12 @@ function _cvFieldBadge(def){
   return                    { badge:'f', badgeStyle:'background:rgba(79,142,247,.15);color:var(--blue)' };
 }
 
+// Palette groups for the active document type — billing docs show the
+// invoice/quote field set, reports show the full NDT field set.
+function _cvActivePaletteGroups(){
+  return (cvDocType === 'invoice' || cvDocType === 'quote') ? CV_BILLING_PALETTE_GROUPS : CV_PALETTE_GROUPS;
+}
+
 function cvRenderPalette(filter){
   const body = document.getElementById('cv-palette-body');
   if(!body) return;
@@ -1892,7 +1899,7 @@ function cvRenderPalette(filter){
     }
   }
 
-  CV_PALETTE_GROUPS.forEach(grp => {
+  _cvActivePaletteGroups().forEach(grp => {
     let items;
     if(grp.isLayout){
       items = _cvAllLayoutItems().filter(it => !q || _cvLayoutLabel(it).toLowerCase().includes(q) || it.key.includes(q));
@@ -5705,11 +5712,21 @@ function cvUpdateStatusBar(){
 var _cvLastSaveTime = 0;
 var _cvSavePendingFlash = 0;
 
+// The live working-layout storage key depends on the active document type.
+// Reports edit the classic working layout (CV_KEY) and save named per-method
+// snapshots separately; invoice/quote edit their single template directly, so
+// the working layout IS the template (vx-method-tpl-INVOICE / -QUOTE).
+function _cvLayoutKey(){
+  if(cvDocType === 'invoice') return CV_METHOD_TPL_PREFIX + 'INVOICE';
+  if(cvDocType === 'quote')   return CV_METHOD_TPL_PREFIX + 'QUOTE';
+  return CV_KEY;
+}
+
 function cvSaveLayout(){
   try {
     _cvSavePendingFlash = Date.now();
     _cvRefreshSaveIndicator();   // immediate "Saving…" feedback
-    lss(CV_KEY, { pages: cvPages, currentPage: cvCurrentPage, nextId: cvNextId });
+    lss(_cvLayoutKey(), { pages: cvPages, currentPage: cvCurrentPage, nextId: cvNextId, savedAt: new Date().toISOString() });
     _cvLastSaveTime = Date.now();
     setTimeout(_cvRefreshSaveIndicator, 350);   // settle to "Saved · just now"
   } catch(e) { console.warn('cvSaveLayout failed', e); }
@@ -5744,7 +5761,7 @@ function _cvRefreshSaveIndicator(){
 setInterval(_cvRefreshSaveIndicator, 5000);
 function cvLoadLayout(){
   try {
-    const d = ls(CV_KEY, null);
+    const d = ls(_cvLayoutKey(), null);
     if(d){
       if(Array.isArray(d.pages) && d.pages.length){
         cvPages = d.pages;
@@ -6080,6 +6097,79 @@ function _cvAutoPickPreviewSource(method){
   } catch(e){ /* sample-data fallback is fine */ }
 }
 function cvSetPpvResult(r){ cvPpvResult=r; cvRenderCanvas(); }
+
+// ── Document-type switcher (report / invoice / quote) ─────────────────
+// Switches what the canvas edits. The live working layout is keyed by doc
+// type (_cvLayoutKey), so each type's template is edited and auto-saved
+// independently. Reports keep their working-layout + per-method-snapshot
+// model; invoice/quote edit their single template directly.
+function cvSetDocType(dt){
+  dt = (dt === 'invoice' || dt === 'quote') ? dt : 'report';
+  if(dt === cvDocType){ return; }
+  // Persist the layout we're leaving to its own key before switching.
+  try { cvSaveLayout(); } catch(e){}
+  cvDocType = dt;
+  // Billing types: make sure a template exists (seed a default on first use).
+  if(dt === 'invoice' || dt === 'quote'){
+    const key = _cvLayoutKey();
+    const existing = ls(key, null);
+    if((!existing || !Array.isArray(existing.pages) || !existing.pages.length) && typeof cvSeedBillingTemplate === 'function'){
+      cvSeedBillingTemplate(dt);
+    }
+  }
+  // Load the new type's layout into the editor and re-render everything.
+  cvSelectedId = null; cvSelectedIds = [];
+  cvLoadLayout();
+  if(typeof cvSync === 'function') cvSync();
+  cvRenderDocTypeSwitcher();
+  cvRenderPalette(document.getElementById('cv-palette-search') ? (document.getElementById('cv-palette-search').value || '') : '');
+  if(typeof cvRenderPageTabs === 'function') cvRenderPageTabs();
+  cvRenderCanvas();
+  if(typeof cvRenderProps === 'function') cvRenderProps(null);
+}
+
+// Reflect the active doc type in the switcher buttons + hint, and hide the
+// report-only preview-method buttons when editing a billing template.
+function cvRenderDocTypeSwitcher(){
+  ['report','invoice','quote'].forEach(dt => {
+    const b = document.getElementById('cv-doctype-' + dt);
+    if(!b) return;
+    const on = (cvDocType === dt);
+    b.style.background = on ? 'var(--accent)' : '';
+    b.style.color = on ? '#fff' : '';
+    b.style.fontWeight = on ? '700' : '';
+  });
+  const hint = document.getElementById('cv-doctype-hint');
+  if(hint){
+    hint.textContent = (cvDocType === 'invoice')
+      ? 'Editing the Invoice template — changes auto-save and apply to all invoice PDFs.'
+      : (cvDocType === 'quote')
+        ? 'Editing the Quote template — changes auto-save and apply to all quote PDFs.'
+        : '';
+  }
+  const reset = document.getElementById('cv-billing-reset');
+  if(reset) reset.style.display = (cvDocType === 'report') ? 'none' : '';
+  // The preview-method buttons + report template cards are report-only.
+  const mb = document.getElementById('cv-ppv-method-btns');
+  if(mb) mb.style.display = (cvDocType === 'report') ? '' : 'none';
+}
+
+async function cvResetBillingTemplate(){
+  if(cvDocType !== 'invoice' && cvDocType !== 'quote') return;
+  const label = cvDocType === 'invoice' ? 'invoice' : 'quote';
+  if(typeof vxConfirm === 'function' && !(await vxConfirm({ message: 'Reset the ' + label + ' template to the default layout? Your current ' + label + ' layout will be replaced.', okLabel: 'Reset', danger: true }))) return;
+  if(typeof cvSeedBillingTemplate !== 'function') return;
+  cvPushUndo();
+  const data = cvSeedBillingTemplate(cvDocType);
+  cvPages = data.pages; cvCurrentPage = 0;
+  cvNextId = data.nextId || (cvPages.reduce((s,p)=>s+p.blocks.length,0)+1);
+  cvSelectedId = null; cvSelectedIds = [];
+  if(typeof cvSync === 'function') cvSync();
+  if(typeof cvRenderPageTabs === 'function') cvRenderPageTabs();
+  cvRenderCanvas();
+  if(typeof cvRenderProps === 'function') cvRenderProps(null);
+  toast(label.charAt(0).toUpperCase()+label.slice(1) + ' template reset to default.');
+}
 
 // ── Template config ──────────────────────────────────────────────────
 function _cvPersistTplCfg(){

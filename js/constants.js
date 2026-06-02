@@ -147,6 +147,11 @@ var KEYS = {
   // disabled) and feeds the equipment / sv-id / cal-date place cards
   // via the snapshot fields ovSaveReport writes onto the report.
   equipment:'vx-equipment-v1',
+  // Customer register (Phase 1) — each entry is { id, name, vatNo,
+  // billingAddress, contacts:[{name,role,email,phone}], sites:[{label,
+  // address}], notes, createdAt, updatedAt }. The CRM layer the rest of
+  // Phase 1 builds on: Jobs reference a customer, reports nest under jobs.
+  customers:'vx-customers-v1',
   // Per-method draft of the in-progress new-report form. Persisted on
   // every field change (debounced) so the user can see a "Saved Xs ago"
   // indicator and resume on reopen. Cleared on successful save / cancel.

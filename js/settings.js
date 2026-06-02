@@ -3008,3 +3008,166 @@ async function eqDelete(id) {
   toast('Equipment deleted.');
   eqRender();
 }
+
+// ══════════════════════════════════════════════════════════════════
+// CUSTOMER REGISTER (Phase 1 — CRM foundation)
+// ══════════════════════════════════════════════════════════════════
+// The clients you inspect for. Jobs (next Phase 1 chunk) are filed
+// against a customer, and reports nest under jobs. Each record carries
+// repeatable contacts[] and sites[] so a single client with several
+// site offices / contacts is one customer, not many. Follows the same
+// load/render/form/save/delete shape as the equipment register above.
+// ══════════════════════════════════════════════════════════════════
+
+var _custEditId = null;   // null when adding, otherwise the customer id being edited
+
+function custLoad()        { return ls(KEYS.customers, []) || []; }
+function custSaveAll(list) { lss(KEYS.customers, list); }
+
+// ── Repeatable sub-rows (contacts / sites) ────────────────────────
+// Both are appended into their host container. Callable two ways:
+//   • from the "+ Add" buttons via data-action with data-args="null"
+//   • from custOpenForm, passed an existing record to pre-fill
+// forEach passes (item, index, array) — only the first arg is used.
+function custAddContactRow(data) {
+  const host = el('custf-contacts'); if(!host) return;
+  const d = (data && typeof data === 'object') ? data : {};
+  const row = document.createElement('div');
+  row.className = 'cust-crow';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+  row.innerHTML =
+      `<input class="cust-c-name"  placeholder="Name"  value="${escapeHtml(d.name||'')}"  style="flex:1 1 130px"/>`
+    + `<input class="cust-c-role"  placeholder="Role"  value="${escapeHtml(d.role||'')}"  style="flex:1 1 100px"/>`
+    + `<input class="cust-c-email" type="email" placeholder="Email" value="${escapeHtml(d.email||'')}" style="flex:1 1 150px"/>`
+    + `<input class="cust-c-phone" placeholder="Phone" value="${escapeHtml(d.phone||'')}" style="flex:1 1 120px"/>`
+    + `<button type="button" class="btn btn-sm btn-danger" data-action="custRemoveRow" data-pass-el="1" title="Remove contact" style="font-size:11px;flex:0 0 auto">✕</button>`;
+  host.appendChild(row);
+}
+
+function custAddSiteRow(data) {
+  const host = el('custf-sites'); if(!host) return;
+  const d = (data && typeof data === 'object') ? data : {};
+  const row = document.createElement('div');
+  row.className = 'cust-srow';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+  row.innerHTML =
+      `<input class="cust-s-label"   placeholder="Label (e.g. North yard)" value="${escapeHtml(d.label||'')}" style="flex:1 1 150px"/>`
+    + `<input class="cust-s-address" placeholder="Address" value="${escapeHtml(d.address||'')}" style="flex:2 1 220px"/>`
+    + `<button type="button" class="btn btn-sm btn-danger" data-action="custRemoveRow" data-pass-el="1" title="Remove site" style="font-size:11px;flex:0 0 auto">✕</button>`;
+  host.appendChild(row);
+}
+
+// Remove the contact/site row whose ✕ was clicked (dispatcher passes el).
+function custRemoveRow(btn) {
+  const row = btn && btn.closest('.cust-crow, .cust-srow');
+  if(row) row.remove();
+}
+
+// Read the dynamic rows back out of the DOM, dropping fully-empty ones.
+function custCollectContacts() {
+  return Array.from(document.querySelectorAll('#custf-contacts .cust-crow')).map(row => ({
+    name:  (row.querySelector('.cust-c-name')  || {}).value?.trim() || '',
+    role:  (row.querySelector('.cust-c-role')  || {}).value?.trim() || '',
+    email: (row.querySelector('.cust-c-email') || {}).value?.trim() || '',
+    phone: (row.querySelector('.cust-c-phone') || {}).value?.trim() || '',
+  })).filter(c => c.name || c.role || c.email || c.phone);
+}
+function custCollectSites() {
+  return Array.from(document.querySelectorAll('#custf-sites .cust-srow')).map(row => ({
+    label:   (row.querySelector('.cust-s-label')   || {}).value?.trim() || '',
+    address: (row.querySelector('.cust-s-address') || {}).value?.trim() || '',
+  })).filter(s => s.label || s.address);
+}
+
+function custRender() {
+  const wrap = el('cust-list-wrap'); if(!wrap) return;
+  const list = custLoad();
+  if(!list.length) {
+    wrap.innerHTML = `<div class="sc"><div class="sc-body" style="text-align:center;color:var(--t3);font-size:13px;padding:30px">No customers yet. Click <strong>+ Add customer</strong> above to add your first client.</div></div>`;
+    return;
+  }
+  const custRow = (rec) => {
+    const contacts = rec.contacts || [];
+    const primary  = contacts[0];
+    const contactCell = primary
+      ? escapeHtml(primary.name || primary.email || '—') + (contacts.length > 1 ? ` <span style="color:var(--t3)">+${contacts.length - 1}</span>` : '')
+      : '<span style="color:var(--t3);font-style:italic">—</span>';
+    const sites = (rec.sites || []).length;
+    return `<tr>
+      <td style="font-weight:600">${escapeHtml(rec.name||'—')}</td>
+      <td style="font-family:var(--mono);font-size:12px">${escapeHtml(rec.vatNo||'—')}</td>
+      <td style="font-size:12px">${contactCell}</td>
+      <td style="font-family:var(--mono);font-size:12px;text-align:center">${sites || '—'}</td>
+      <td style="text-align:right">
+        <button class="btn btn-sm" data-action="custOpenForm" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px">Edit</button>
+        <button class="btn btn-sm btn-danger" data-action="custDelete" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px">Del</button>
+      </td>
+    </tr>`;
+  };
+  const rows = list.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(custRow).join('');
+  wrap.innerHTML = `<div class="sc"><div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
+    <thead><tr>
+      <th scope="col">Name</th><th scope="col">VAT / reg.</th><th scope="col">Primary contact</th>
+      <th scope="col" style="width:70px">Sites</th><th scope="col" style="width:120px"></th>
+    </tr></thead><tbody>${rows}</tbody>
+  </table></div></div>`;
+}
+
+function custOpenForm(id) {
+  _custEditId = id || null;
+  const wrap = el('cust-form-wrap'); if(!wrap) return;
+  const title = el('cust-form-title'); if(title) title.textContent = id ? 'Edit customer' : 'Add customer';
+  const rec = id ? custLoad().find(r => r.id === id) : null;
+  el('custf-name').value    = rec ? (rec.name||'')           : '';
+  el('custf-vat').value     = rec ? (rec.vatNo||'')          : '';
+  el('custf-billing').value = rec ? (rec.billingAddress||'') : '';
+  el('custf-notes').value   = rec ? (rec.notes||'')          : '';
+  // Rebuild the dynamic rows fresh — at least one empty row of each so
+  // the form never looks blank.
+  el('custf-contacts').innerHTML = '';
+  el('custf-sites').innerHTML    = '';
+  const contacts = (rec && rec.contacts) || [];
+  const sites    = (rec && rec.sites)    || [];
+  if(contacts.length) contacts.forEach(custAddContactRow); else custAddContactRow(null);
+  if(sites.length)    sites.forEach(custAddSiteRow);       else custAddSiteRow(null);
+  wrap.style.display = '';
+  el('custf-name').focus();
+}
+
+function custCloseForm() {
+  _custEditId = null;
+  const wrap = el('cust-form-wrap'); if(wrap) wrap.style.display = 'none';
+}
+
+function custSave() {
+  const name = (el('custf-name').value || '').trim();
+  if(!name) { toast('Customer needs a name.', 'error'); el('custf-name').focus(); return; }
+  const now = new Date().toISOString();
+  const rec = {
+    id: _custEditId || ('cust-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7)),
+    name,
+    vatNo:          (el('custf-vat').value     || '').trim(),
+    billingAddress: (el('custf-billing').value || '').trim(),
+    contacts:       custCollectContacts(),
+    sites:          custCollectSites(),
+    notes:          (el('custf-notes').value   || '').trim(),
+    updatedAt:      now,
+  };
+  const list = custLoad();
+  const i = list.findIndex(r => r.id === rec.id);
+  if(i >= 0) list[i] = { ...list[i], ...rec };
+  else       { rec.createdAt = now; list.push(rec); }
+  custSaveAll(list);
+  toast(_custEditId ? 'Customer updated.' : 'Customer added.');
+  custCloseForm();
+  custRender();
+}
+
+async function custDelete(id) {
+  const rec = custLoad().find(r => r.id === id);
+  const label = rec && rec.name ? '"' + escapeHtml(rec.name) + '"' : 'this customer';
+  if(!await vxConfirm({ message: 'Delete ' + label + '? This cannot be undone.', okLabel: 'Delete', danger: true })) return;
+  custSaveAll(custLoad().filter(r => r.id !== id));
+  toast('Customer deleted.');
+  custRender();
+}

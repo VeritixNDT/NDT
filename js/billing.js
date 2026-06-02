@@ -512,7 +512,7 @@ function billBuildDocHtml(type, doc, companyOverride) {
       <div class="grand"><span>Total</span><span>${billFmtMoney(t.total, doc.currency)}</span></div>
     </div>
     ${doc.notes ? `<div class="notes">${esc(doc.notes)}</div>` : ''}
-    ${c.footer ? `<div class="foot">${esc(c.footer)}</div>` : ''}
+    ${(() => { const ft = (isInv ? c.invoiceFooter : c.quoteFooter) || ''; return ft.trim() ? `<div class="foot">${esc(ft)}</div>` : ''; })()}
   </body></html>`;
 }
 

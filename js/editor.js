@@ -3814,9 +3814,18 @@ function cvRenderBlockContent(block, report, preview){
       // source text; word-break:break-word handles long unbroken tokens
       // (URLs, hyphenated reg numbers).
       if(def.isCompanyFooter){
-        const txt = (co2.footer && String(co2.footer).trim()) || '';
+        // Billing templates use the per-doc-type billing footer (Settings →
+        // Company → Billing defaults); reports use the standard footer. Each
+        // is independent — blank prints nothing.
+        var _ftSrc = cvDocType === 'invoice' ? co2.invoiceFooter
+                   : cvDocType === 'quote'   ? co2.quoteFooter
+                   : co2.footer;
+        const txt = (_ftSrc && String(_ftSrc).trim()) || '';
         if(txt) return `<div style="height:100%;display:flex;align-items:center;justify-content:${jc};padding:3px 7px;font-size:${fs};font-weight:${fw};font-style:${fi};color:${fc};text-align:${al};line-height:1.35;white-space:pre-wrap;word-break:break-word;overflow:hidden">${escapeHtml(txt)}</div>`;
-        return `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#bbb;font-style:italic;text-align:center;padding:0 8px">Standard footer text — fill in Settings → Company</div>`;
+        var _ftHint = cvDocType === 'invoice' ? 'Invoice footer — fill in Settings → Company → Billing'
+                    : cvDocType === 'quote'   ? 'Quote footer — fill in Settings → Company → Billing'
+                    : 'Standard footer text — fill in Settings → Company';
+        return `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#bbb;font-style:italic;text-align:center;padding:0 8px">${_ftHint}</div>`;
       }
       // Confidentiality statement — multi-line render of co.confidstmt.
       // Uses pre-wrap so paragraph breaks in the source text survive.

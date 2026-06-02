@@ -11,7 +11,7 @@ function loadSettings() {
     'accstd','accbody','accnum','accissued','accexpiry','accscope',
     'qmname','qmemail','sigsname','sigsrole',
     'doclang','docsize','footer','confidstmt',
-    'vatRate','currency',
+    'vatRate','currency','quoteFooter','invoiceFooter',
     'emailDefaultTo','emailSubject','emailBody',
   ];
   fields.forEach(f => { const e=el('co-'+f); if(e) e.value=c[f]||''; });
@@ -710,8 +710,10 @@ function saveCompany() {
     // Document defaults
     'doclang','docsize','footer','confidstmt',
     // Billing defaults (Phase 2) — org VAT rate (%) and currency code,
-    // snapshotted onto each quote/invoice at creation time.
-    'vatRate','currency',
+    // snapshotted onto each quote/invoice at creation time. quoteFooter /
+    // invoiceFooter are the per-doc-type footers (separate from the report
+    // 'footer' above); blank = no footer printed on that document.
+    'vatRate','currency','quoteFooter','invoiceFooter',
     // Default email template — used by the Reports list's Email modal
     // to pre-fill the draft. Placeholders ({reportNo}, {client}, etc.)
     // are substituted at send time from the selected report.

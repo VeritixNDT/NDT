@@ -1279,6 +1279,17 @@
                   </select>
                 </div>
               </div>
+              <!-- Billing-document footers — separate from the report footer
+                   above. Printed at the foot of quotes / invoices (fixed layout
+                   and canvas templates). Left blank = no footer on that doc. -->
+              <div class="fld form-row">
+                <label data-i18n="co.lbl.quoteFooter">Quote footer</label>
+                <textarea id="co-quoteFooter" rows="2" placeholder="This quote is valid for 30 days from the issue date. Prices exclude VAT unless stated." data-i18n-placeholder="co.ph.quoteFooter"></textarea>
+              </div>
+              <div class="fld form-row">
+                <label data-i18n="co.lbl.invoiceFooter">Invoice footer</label>
+                <textarea id="co-invoiceFooter" rows="2" placeholder="Payment due within 30 days. Bank: Acme NV — IBAN BE00 0000 0000 0000 — BIC XXXXXXXX." data-i18n-placeholder="co.ph.invoiceFooter"></textarea>
+              </div>
             </div>
           </div>
 

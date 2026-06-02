@@ -62,13 +62,14 @@ The hardest 60% is already built (Phase 1 shipped 2026-05-17):
 
 _Remaining polish (deferred): job/customer i18n (English-only for now, matching the equipment register), a Job column on the reports table, and a customer/job picker that auto-narrows jobs to the chosen client._
 
-### Phase 2 — Quotes + Invoicing (Week 7–10)
-- `quotes` and `invoices` entity types — line items, totals, status, sent / paid dates
-- **UI:** Quote / Invoice builder per job (line items, VAT rate from Company settings, totals auto-calc)
-- **PDF output:** reuse the canvas editor pipeline — new templates for Quote / Invoice with smart-card placeholders (company logo, customer addr, line-items loop, totals)
-- **Send via the real email backend** — Quote / Invoice PDF as attachment, body from Company → email template
-- **Payment status:** manual "Mark as paid" for MVP. Stripe checkout deferred to v2 (PCI overhead).
-- Optional: Xero / QuickBooks CSV export so accountants can ingest
+### Phase 2 — Quotes + Invoicing (Week 7–10) — ✅ built (browser-verified; email needs backend deploy)
+- ✅ `quotes` and `invoices` entity types — line items, derived totals, status, sent/paid dates
+- ✅ **UI:** Quote / Invoice builder (line items, VAT rate + currency from Company → Billing defaults, live auto-calc totals); per-job sections on the Job detail **and** a top-level Billing page with Outstanding/Paid totals + filters
+- ✅ **PDF output:** print-ready quote/invoice document (company header+logo, customer address, line-items, totals, terms) via the shared `_vxPrintHtml` pipeline
+- ✅ **Send via the email backend** — `send-email` gained quote/invoice templates; client `billEmailDoc` sends the document inline and marks it Sent. _Soft-fails until the backend is deployed (Resend); PDF-as-attachment deferred (no client PDF-bytes path yet — sends a rendered HTML email instead)._
+- ✅ **Payment status:** manual "Mark as paid" / sent / accepted / declined; Overdue derived from due date. Stripe deferred to v2.
+- ✅ **Quote → Invoice convert** (copies line items, links `sourceQuoteId`).
+- ⏳ Optional Xero / QuickBooks CSV export — not done (deferred).
 
 ### Phase 3 — Approval workflow (Week 11–12)
 - Report status state machine: `Draft → Submitted → Approved → Final → Sent` (replaces today's free-form `verdict`)

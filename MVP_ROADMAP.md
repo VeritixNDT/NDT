@@ -49,16 +49,18 @@ The hardest 60% is already built (Phase 1 shipped 2026-05-17):
 - Audit & remove test scaffolding (`ovClearAllReports`, the bulk-delete button per memory).
 - **Staging deploy** to Cloudflare Pages / Netlify so every change goes live continuously from this point.
 
-### Phase 1 — Customers + Jobs (Week 3–6)
-- New entity types stored in the existing `entities` jsonb table — no schema migration needed:
-  - `customers` — name, billing addr, contacts (array), sites (array), notes
-  - `jobs` — `customer_id`, title, status (Pending / Active / Closed), scope, dates, lead inspector
+### Phase 1 — Customers + Jobs (Week 3–6) — ✅ built (not yet browser-tested)
+- ✅ New entity types stored in the existing `entities` jsonb store (KEYS + VX_ENTITY_KEYS, no schema migration):
+  - ✅ `customers` — name, VAT/reg no., billing addr, contacts[] (array), sites[] (array), notes
+  - ✅ `jobs` — `customerId`, title, status (Pending / Active / Closed), scope, start/end dates, lead inspector, notes
 - **UI:**
-  - Settings → Customers (CRUD)
-  - New top-level page "Jobs" between Dashboard and Reports
-  - Job detail page: client info, scope, child reports, status timeline
-- **Reports get a `jobId` field** — one-line change; the new-report form gains a Job picker; the Reports page can filter by job.
-- Migration: legacy reports stay job-less ("Unassigned" pseudo-folder).
+  - ✅ Settings → Customers (CRUD, repeatable contacts/sites)
+  - ✅ New top-level page "Jobs" between Inbox and Reports
+  - ✅ Job detail page: client info, scope, child reports, inline status switch
+- ✅ **Reports get a `jobId` field** — new-report form gains a Job picker (after Client info); the Reports page filters by job.
+- ✅ Migration: legacy reports stay job-less and surface under the "Unassigned" filter bucket; deleting a job detaches its reports rather than losing them.
+
+_Remaining polish (deferred): job/customer i18n (English-only for now, matching the equipment register), a Job column on the reports table, and a customer/job picker that auto-narrows jobs to the chosen client._
 
 ### Phase 2 — Quotes + Invoicing (Week 7–10)
 - `quotes` and `invoices` entity types — line items, totals, status, sent / paid dates

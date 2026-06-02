@@ -27,13 +27,21 @@ can't turn the endpoint into a spam relay.
 (supabase-js does this automatically via `functions.invoke`).
 
 ```jsonc
-// invite
+// invite (admin-gated against org_members)
 { "type": "invite", "to": "new.user@example.com", "role": "inspector", "orgId": "<uuid>" }
+
+// quote / invoice (JWT-gated only; rendered entirely from the payload)
+{ "type": "invoice", "to": "client@example.com", "number": "INV-2026-001",
+  "customerName": "ACME Ltd", "companyName": "Smart Veritas BV", "currency": "EUR",
+  "subtotal": 2000, "vat": 420, "vatRate": 21, "total": 2420, "dueDate": "2026-07-01",
+  "lineItems": [{ "description": "UT of welds", "qty": 10, "unitPrice": 150 }], "notes": "" }
 ```
 
 Responses: `{ "ok": true, "id": "<resend-id>" }` on success; `{ "error": "..." }`
 with a 4xx/5xx status otherwise. `invite` requires the caller be an **admin**
 of `orgId` (verified server-side against `org_members` under the service role).
+`quote`/`invoice` only require a valid session — the client computes the totals
+and the template just formats them.
 
 ## Required secrets
 

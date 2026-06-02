@@ -125,6 +125,95 @@ function renderInvite(d: InviteData): RenderedEmail {
   return { subject, html, text };
 }
 
+// ── quote / invoice ──────────────────────────────────────────────────────────
+interface LineItem { description?: string; qty?: string | number; unitPrice?: string | number; }
+interface DocData {
+  number: string;
+  customerName?: string;
+  companyName?: string;
+  currency?: string;
+  total?: number;
+  subtotal?: number;
+  vat?: number;
+  vatRate?: number;
+  dueDate?: string;
+  issueDate?: string;
+  lineItems?: LineItem[];
+  notes?: string;
+}
+
+const CUR_SYMBOLS: Record<string, string> = {
+  EUR: "€", GBP: "£", USD: "$", CHF: "CHF ", SEK: "kr ", NOK: "kr ", DKK: "kr ",
+};
+function money(n: number | undefined, currency?: string): string {
+  const sym = CUR_SYMBOLS[currency || "EUR"] ?? ((currency || "") + " ");
+  return sym + (Number(n) || 0).toFixed(2);
+}
+
+function renderDoc(kind: "quote" | "invoice", d: DocData): RenderedEmail {
+  const noun = kind === "invoice" ? "invoice" : "quote";
+  const Noun = kind === "invoice" ? "Invoice" : "Quote";
+  const company = d.companyName || "us";
+  const subject = `${Noun} ${d.number} from ${company}`;
+  const dateLbl = kind === "invoice" ? "Due date" : "Valid until";
+
+  const rowsHtml = (d.lineItems || []).map((it) => {
+    const qty = Number(it.qty) || 0;
+    const price = Number(it.unitPrice) || 0;
+    return `<tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #e6e9f0;font-size:13px;">${esc(it.description || "")}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e6e9f0;font-size:13px;text-align:right;">${esc(String(it.qty ?? ""))}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e6e9f0;font-size:13px;text-align:right;">${esc(money(price, d.currency))}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e6e9f0;font-size:13px;text-align:right;">${esc(money(qty * price, d.currency))}</td>
+    </tr>`;
+  }).join("");
+
+  const html = wrap(
+    `<p style="font-size:15px;line-height:1.6;margin:0 0 4px;">Dear ${esc(d.customerName || "customer")},</p>
+     <p style="font-size:14px;line-height:1.65;color:#3a4660;margin:0 0 16px;">
+       Please find ${kind === "invoice" ? "your invoice" : "our quote"}
+       <strong style="color:#0b1220;">${esc(d.number)}</strong> below${d.dueDate ? ` — ${dateLbl.toLowerCase()} <strong>${esc(d.dueDate)}</strong>` : ""}.
+     </p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0 4px;">
+       <tr>
+         <th align="left"  style="padding:6px 8px;background:#0b1220;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Description</th>
+         <th align="right" style="padding:6px 8px;background:#0b1220;color:#fff;font-size:11px;">Qty</th>
+         <th align="right" style="padding:6px 8px;background:#0b1220;color:#fff;font-size:11px;">Unit</th>
+         <th align="right" style="padding:6px 8px;background:#0b1220;color:#fff;font-size:11px;">Amount</th>
+       </tr>
+       ${rowsHtml}
+     </table>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+       <tr><td></td><td style="width:220px;">
+         <div style="display:flex;justify-content:space-between;font-size:13px;color:#3a4660;padding:2px 8px;"><span>Subtotal</span><span>${esc(money(d.subtotal, d.currency))}</span></div>
+         <div style="display:flex;justify-content:space-between;font-size:13px;color:#3a4660;padding:2px 8px;"><span>VAT (${esc(String(d.vatRate ?? 0))}%)</span><span>${esc(money(d.vat, d.currency))}</span></div>
+         <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:#0b1220;padding:8px 8px 2px;border-top:2px solid #2563eb;margin-top:4px;"><span>Total</span><span>${esc(money(d.total, d.currency))}</span></div>
+       </td></tr>
+     </table>
+     ${d.notes ? `<p style="font-size:12px;line-height:1.6;color:#3a4660;margin:18px 0 0;white-space:pre-line;border-top:1px solid #e6e9f0;padding-top:10px;">${esc(d.notes)}</p>` : ""}
+     <p style="font-size:13px;line-height:1.6;color:#3a4660;margin:20px 0 0;">Thank you,<br>${esc(d.companyName || "")}</p>`,
+    `${Noun} ${d.number} — total ${money(d.total, d.currency)}.`,
+  );
+
+  const text = [
+    `Dear ${d.customerName || "customer"},`,
+    ``,
+    `Please find ${kind === "invoice" ? "your invoice" : "our quote"} ${d.number} below.`,
+    ...(d.lineItems || []).map((it) => `  - ${it.description || ""}  ${it.qty || ""} x ${money(Number(it.unitPrice), d.currency)} = ${money((Number(it.qty)||0)*(Number(it.unitPrice)||0), d.currency)}`),
+    ``,
+    `Subtotal: ${money(d.subtotal, d.currency)}`,
+    `VAT (${d.vatRate ?? 0}%): ${money(d.vat, d.currency)}`,
+    `Total: ${money(d.total, d.currency)}`,
+    ...(d.dueDate ? [``, `${dateLbl}: ${d.dueDate}`] : []),
+    ...(d.notes ? [``, d.notes] : []),
+    ``,
+    `Thank you,`,
+    d.companyName || "",
+  ].join("\n");
+
+  return { subject, html, text };
+}
+
 // ── dispatch ────────────────────────────────────────────────────────────────
 export function renderTemplate(
   type: string,
@@ -133,7 +222,11 @@ export function renderTemplate(
   switch (type) {
     case "invite":
       return renderInvite(data as unknown as InviteData);
-    // Future phases (see roadmap): "quote", "invoice", "portal-link".
+    case "quote":
+      return renderDoc("quote", data as unknown as DocData);
+    case "invoice":
+      return renderDoc("invoice", data as unknown as DocData);
+    // Future phase (see roadmap): "portal-link".
     default:
       throw new Error(`unknown template type: ${type}`);
   }

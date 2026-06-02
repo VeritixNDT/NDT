@@ -214,6 +214,36 @@ function renderDoc(kind: "quote" | "invoice", d: DocData): RenderedEmail {
   return { subject, html, text };
 }
 
+// ── portal-link ──────────────────────────────────────────────────────────────
+interface PortalLinkData { url: string; companyName?: string; customerName?: string; }
+function renderPortalLink(d: PortalLinkData): RenderedEmail {
+  const company = d.companyName || "your inspection provider";
+  const subject = `Your ${company} customer portal`;
+  const html = wrap(
+    `<p style="font-size:15px;line-height:1.6;margin:0 0 4px;">Dear ${esc(d.customerName || "customer")},</p>
+     <p style="font-size:14px;line-height:1.65;color:#3a4660;margin:0 0 8px;">
+       ${esc(company)} has given you secure, read-only access to your jobs,
+       inspection reports, and invoices. Click below to open your portal.
+     </p>
+     ${button(d.url, "Open my portal")}
+     <p style="font-size:12px;line-height:1.6;color:#9aa5bd;margin:0;">
+       This link is private to you and expires in 24 hours — request a new one
+       any time. Or paste it into your browser:<br>
+       <a href="${esc(d.url)}" style="color:#2563eb;word-break:break-all;">${esc(d.url)}</a>
+     </p>`,
+    `Your ${company} customer portal — view jobs, reports, and invoices.`,
+  );
+  const text = [
+    `Dear ${d.customerName || "customer"},`,
+    ``,
+    `${company} has given you read-only access to your jobs, reports, and invoices.`,
+    `Open your portal (link expires in 24 hours):`,
+    ``,
+    d.url,
+  ].join("\n");
+  return { subject, html, text };
+}
+
 // ── dispatch ────────────────────────────────────────────────────────────────
 export function renderTemplate(
   type: string,
@@ -226,7 +256,8 @@ export function renderTemplate(
       return renderDoc("quote", data as unknown as DocData);
     case "invoice":
       return renderDoc("invoice", data as unknown as DocData);
-    // Future phase (see roadmap): "portal-link".
+    case "portal-link":
+      return renderPortalLink(data as unknown as PortalLinkData);
     default:
       throw new Error(`unknown template type: ${type}`);
   }

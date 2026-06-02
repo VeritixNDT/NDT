@@ -33,7 +33,7 @@ import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { renderTemplate } from "./templates.ts";
 
 // Template types this function will render at all.
-const ALLOWED_TYPES = new Set(["invite", "quote", "invoice"]);
+const ALLOWED_TYPES = new Set(["invite", "quote", "invoice", "portal-link"]);
 // Subset that require the caller be an admin of `orgId`.
 const ADMIN_ONLY_TYPES = new Set(["invite"]);
 
@@ -149,10 +149,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         inviterName,
         signupUrl: envOrThrow("APP_URL"),
       });
-    } else if (type === "quote" || type === "invoice") {
-      // Document emails (quote/invoice) render entirely from the structured
-      // payload the client sends — no DB lookup, JWT-gated only. The client
-      // is trusted to compute totals; the template just formats them.
+    } else if (type === "quote" || type === "invoice" || type === "portal-link") {
+      // Document / link emails render entirely from the structured payload the
+      // client sends — no DB lookup, JWT-gated only.
       rendered = renderTemplate(type, payload as unknown as Record<string, unknown>);
     } else {
       // ALLOWED_TYPES guards this, but keep the compiler + future-self honest.

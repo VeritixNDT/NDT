@@ -2198,7 +2198,14 @@ async function uaSubmitInvite() {
   try {
     const r = await vxApi.inviteMember(email, role);
     if(r.ok){
-      toast('Invite recorded for ' + email + '. They auto-join as ' + role + ' on signup.','success');
+      if(r.emailSent){
+        toast('Invite sent to ' + email + '. They auto-join as ' + role + ' on signup.','success');
+      } else {
+        // Invite was recorded but the email didn't go out (mail backend not
+        // configured, or a send error). The invite still works if the admin
+        // shares the signup URL manually, so surface a soft warning.
+        toast('Invite recorded for ' + email + ' (email not sent: ' + (r.emailError || 'mail backend unavailable') + '). Share the signup link directly.','warn');
+      }
       if(el('ua-invite-email')) el('ua-invite-email').value = '';
       uaRenderPendingInvites();
     } else if(r.error === 'already invited'){

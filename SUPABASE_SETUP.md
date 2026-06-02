@@ -20,6 +20,8 @@ end-to-end:
   Realtime postgres_changes.
 - Member invite flow via `pending_invites` (migration 0002) — admin
   records an invite by email, invitee auto-joins the org on signup.
+- Real invite emails via the `send-email` Edge Function + Resend
+  (Phase 0 of the MVP roadmap). See section 7 below to deploy it.
 - Photo upload to the private `photos` bucket with org-scoped storage
   policies.
 - Role-based UI gating (admin / senior / inspector / observer) on both
@@ -29,9 +31,6 @@ end-to-end:
 
 - Normalised tables: `reports`, `defects`, `inspectors` get proper
   columns instead of being smushed into the `entities` jsonb bag.
-- Email delivery for invites — currently the admin shares the signup
-  URL out-of-band. Phase 2 wires `pending_invites` to a Supabase Edge
-  Function that sends a real invite email.
 - Members listing UI (currently only pending invites are shown).
 - The following client surfaces still hit stub endpoints that soft-fail:
   - `/account/plan` — plan refresh
@@ -140,6 +139,75 @@ and `js/`. Drop it on any static host:
 No build step. No server. Once the HTML is live, sign-ups, sync, photo
 uploads, and cross-device realtime all work end-to-end.
 
+## 7. Set up transactional email (invites)
+
+This wires the **`send-email` Edge Function** so member invites — and, in
+later phases, quotes / invoices / portal links — go out as real branded
+email. We use [Resend](https://resend.com) as the provider: it's the
+lowest-friction way to get a DKIM/SPF-verified sending domain. **Do not roll
+your own SMTP** — your mail will land in spam.
+
+Skip this section to keep invites working browser-only: the invite row is
+still recorded and the invitee auto-joins on signup, but no email is sent —
+the admin just shares the app URL with them directly.
+
+### 7.1 Verify a sending domain in Resend
+
+1. Sign up at <https://resend.com> and open **Domains → Add Domain**.
+2. Use a **subdomain** for sending, e.g. `mail.smartveritas.com` — keeps the
+   apex domain's reputation separate from transactional mail.
+3. Resend shows a set of DNS records. Add **all** of them at your DNS host:
+   - **SPF** — a `TXT` record on the sending subdomain authorising Resend's
+     servers (`v=spf1 include:...`).
+   - **DKIM** — one or more `CNAME` (or `TXT`) records that publish the
+     signing key, so receivers can verify the mail wasn't forged.
+   - **DMARC** (recommended) — a `TXT` record at `_dmarc.<domain>` such as
+     `v=DMARC1; p=none; rua=mailto:dmarc@smartveritas.com` to start
+     collecting reports; tighten `p=` to `quarantine`/`reject` later.
+4. Back in Resend, click **Verify**. DNS can take minutes to hours to
+   propagate. The domain must read **Verified** before any mail will send.
+5. Create an **API key** under **API Keys** (`re_...`). Treat it as a secret.
+
+### 7.2 Install the Supabase CLI + link the project
+
+```bash
+npm i -g supabase          # or: brew install supabase/tap/supabase
+supabase login
+supabase link --project-ref mmgdqsilgwusehsqgyyj
+```
+
+(The project ref is the subdomain of your Project URL.)
+
+### 7.3 Set the function secrets
+
+```bash
+supabase secrets set RESEND_API_KEY="re_your_key_here"
+supabase secrets set EMAIL_FROM="Veritix <noreply@mail.smartveritas.com>"
+supabase secrets set APP_URL="https://your-deployed-app-url"
+```
+
+- `EMAIL_FROM` **must** be on the domain you verified in step 7.1.
+- `APP_URL` is the live URL of the app from section 6 — it's used to build
+  the signup link in invite emails. It's read only from this secret, never
+  from the browser, so invite links can't be spoofed.
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are
+  injected by the runtime automatically — don't set them.
+
+### 7.4 Deploy the function
+
+```bash
+supabase functions deploy send-email
+```
+
+That's it. Now **Settings → Users & access → Invite user** records the invite
+*and* emails the invitee a branded "Accept invitation" link. If email ever
+fails (bad key, unverified domain, outage) the invite is still recorded and
+the UI shows a soft warning — the invitee can join by signing up with the
+invited address regardless.
+
+See `supabase/functions/send-email/README.md` for the function's contract,
+local-testing commands, and how to add new templates in later phases.
+
 ## Troubleshooting
 
 - **Signup error: "Database error saving new user"** — usually means the
@@ -161,6 +229,15 @@ uploads, and cross-device realtime all work end-to-end.
 - **App says "Trial mode" even after pasting the meta tags** — hard-
   refresh (Cmd-Shift-R / Ctrl-F5). The browser may have cached the
   empty version of the HTML.
+- **Invite says "email not sent"** — the `send-email` function isn't
+  deployed or a secret is missing/wrong. Check `supabase functions list`,
+  re-run the `supabase secrets set` commands from section 7.3, and confirm
+  the Resend domain reads **Verified**. The invite itself still works — the
+  invitee can sign up with the invited address regardless.
+- **Invite emails land in spam** — your sending domain's DKIM/SPF isn't
+  verified, or `EMAIL_FROM` is on a different domain than the verified one.
+  Re-check the DNS records in Resend (section 7.1) and that the domain shows
+  **Verified**. Adding a DMARC record helps deliverability.
 
 ## What lives where
 
@@ -178,7 +255,7 @@ uploads, and cross-device realtime all work end-to-end.
 ## What's not in Phase 1
 
 See the "What's shipped vs deferred" section at the top for the full
-Phase 2 / Phase 3 list. The short version: real email delivery,
-normalised tables, members listing UI, plan / billing surfaces, and
-production hardening (email-confirm, real Site URLs, SRI, deploy
-pipeline) are deferred.
+Phase 2 / Phase 3 list. The short version: normalised tables, members
+listing UI, plan / billing surfaces, and production hardening (email-
+confirm, real Site URLs, SRI, deploy pipeline) are deferred. Real email
+delivery now ships via the `send-email` Edge Function (section 7).

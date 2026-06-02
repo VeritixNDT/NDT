@@ -44,8 +44,8 @@ The hardest 60% is already built (Phase 1 shipped 2026-05-17):
 ## Phase plan
 
 ### Phase 0 — Foundations (Week 1–2)
-- **Real email backend** via Supabase Edge Function + Resend (or SendGrid). Required for everything downstream; already a known Phase 2 task.
-- **DKIM / SPF** set up properly on the sending domain — don't roll your own SMTP.
+- ✅ **Real email backend** — `send-email` Edge Function + Resend, JWT-gated with a server-side template whitelist (invite shipped; quote / invoice / portal-link slot in later). Client `vxApi.sendEmail()` + invite emails wired. Deploy steps in `SUPABASE_SETUP.md` §7.
+- **DKIM / SPF** set up properly on the sending domain — don't roll your own SMTP. _(documented in `SUPABASE_SETUP.md` §7.1; needs DNS records added at deploy time.)_
 - Audit & remove test scaffolding (`ovClearAllReports`, the bulk-delete button per memory).
 - **Staging deploy** to Cloudflare Pages / Netlify so every change goes live continuously from this point.
 

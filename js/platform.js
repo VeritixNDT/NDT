@@ -2413,9 +2413,42 @@ var vxApi = {
     } catch(e){ return { ok: false, error: String(e.message || e) }; }
   },
 
-  // Record a pending invite. The invitee receives no email — they sign
-  // up at the app's URL with this email and the handle_pending_invites_on_signup
-  // trigger (migration 0002) auto-joins them to the org with this role.
+  // Invoke the send-email Edge Function with a server-side template.
+  // The function (supabase/functions/send-email) renders the HTML itself
+  // from a whitelist of template types — the client only names the type
+  // and passes structured data, never raw HTML. Returns {ok, id?, error?}.
+  // Best-effort by design: callers treat a failure here as non-fatal so a
+  // mail outage never blocks the underlying action (e.g. recording an
+  // invite). Soft-fails to {ok:false} when Supabase isn't configured.
+  async sendEmail(type, to, data){
+    if(!vxIsAuthenticated()) return { ok: false, error: 'not signed in' };
+    var sb = _vxSupabase();
+    if(!sb || !sb.functions) return { ok: false, error: 'email backend unavailable' };
+    try {
+      var body = Object.assign({ type: type, to: to }, data || {});
+      var r = await sb.functions.invoke('send-email', { body: body });
+      if(r.error){
+        // The SDK wraps non-2xx as a FunctionsHttpError whose .context is
+        // the raw Response — dig out the function's JSON {error} if present.
+        var detail = r.error.message || 'send failed';
+        try {
+          if(r.error.context && typeof r.error.context.json === 'function'){
+            var j = await r.error.context.json();
+            if(j && j.error) detail = j.error;
+          }
+        } catch(_){}
+        return { ok: false, error: detail };
+      }
+      return { ok: true, id: (r.data && r.data.id) || null };
+    } catch(e){ return { ok: false, error: String(e.message || e) }; }
+  },
+
+  // Record a pending invite, then send the invite email (best-effort).
+  // The invitee signs up at the app's URL with this email and the
+  // handle_pending_invites_on_signup trigger (migration 0002) auto-joins
+  // them to the org with this role. Returns {ok, emailSent, emailError?}:
+  // a failed email never fails the invite — the row is recorded either way
+  // and the admin can re-send or share the URL manually.
   async inviteMember(email, role){
     if(!vxIsAuthenticated()) return { ok: false, error: 'not signed in' };
     var sb = _vxSupabase();
@@ -2443,7 +2476,12 @@ var vxApi = {
         }
         return { ok: false, error: r.error.message };
       }
-      return { ok: true };
+      // Invite recorded. Fire the email — non-fatal if it fails.
+      var mail = await this.sendEmail('invite', normEmail, {
+        orgId: cfg.orgId,
+        role:  normRole,
+      });
+      return { ok: true, emailSent: mail.ok, emailError: mail.ok ? null : mail.error };
     } catch(e){ return { ok: false, error: String(e.message || e) }; }
   },
 

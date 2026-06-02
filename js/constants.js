@@ -157,6 +157,12 @@ var KEYS = {
   // endDate, notes, createdAt, updatedAt }. A job belongs to a customer;
   // reports carry a jobId so they nest under the job they were run for.
   jobs:'vx-jobs-v1',
+  // Quotes & invoices (Phase 2). Each entry is { id, number, jobId,
+  // customerId, status, issueDate, dueDate/validUntil, lineItems:[{desc,
+  // qty, unitPrice}], vatRate, currency, notes, sentAt, paidAt/acceptedAt,
+  // sourceQuoteId, createdAt, updatedAt }. Totals are derived, never stored.
+  quotes:'vx-quotes-v1',
+  invoices:'vx-invoices-v1',
   // Per-method draft of the in-progress new-report form. Persisted on
   // every field change (debounced) so the user can see a "Saved Xs ago"
   // indicator and resume on reopen. Cleared on successful save / cancel.

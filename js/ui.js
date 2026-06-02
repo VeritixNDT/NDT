@@ -1717,6 +1717,7 @@ function showPage(id, btn) {
   if(id === 'overview') ovInit();
   if(id === 'reports') rptInit();
   if(id === 'jobs') { if(typeof jobsInit === 'function') jobsInit(); }
+  if(id === 'billing') { if(typeof billingInit === 'function') billingInit(); }
   if(id === 'defects') defInit();
   if(id === 'inbox') inboxRender();
   // V12: re-wire any newly-rendered labels on this page

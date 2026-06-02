@@ -315,10 +315,12 @@ function jobOpenDetail(id) {
     ${job.scope ? `<div class="sc" style="margin-bottom:14px"><div class="sc-head"><span class="sc-title">Scope of work</span></div><div class="sc-body" style="font-size:13px;color:var(--t2);white-space:pre-line">${escapeHtml(job.scope)}</div></div>` : ''}
     ${job.notes ? `<div class="sc" style="margin-bottom:14px"><div class="sc-head"><span class="sc-title">Notes</span></div><div class="sc-body" style="font-size:13px;color:var(--t2);white-space:pre-line">${escapeHtml(job.notes)}</div></div>` : ''}
 
-    <div class="sc"><div class="sc-head" style="display:flex;align-items:center;gap:8px">
+    <div class="sc" style="margin-bottom:14px"><div class="sc-head" style="display:flex;align-items:center;gap:8px">
       <span class="sc-title">Reports</span>
       <span style="font-size:11px;color:var(--t3);font-family:var(--mono)">(${children.length})</span>
     </div>${reportsBlock}</div>
+
+    ${typeof billJobSectionsHtml === 'function' ? billJobSectionsHtml(job) : ''}
   `;
 
   main.style.display = 'none';

@@ -45,6 +45,7 @@ var STRINGS = {
     // Navigation
     'nav.home':            'Home',
     'nav.inbox':           'Inbox',
+    'nav.jobs':            'Jobs',
     'nav.reports':         'Reports',
     'nav.defects':         'Defects',
     'nav.settings':        'Settings',
@@ -1513,6 +1514,7 @@ var STRINGS = {
   'nl-NL': {
     'nav.home':            'Start',
     'nav.inbox':           'Inbox',
+    'nav.jobs':            'Opdrachten',
     'nav.reports':         'Rapporten',
     'nav.defects':         'Defecten',
     'nav.settings':        'Instellingen',
@@ -2947,6 +2949,7 @@ var STRINGS = {
   'de-DE': {
     'nav.home':            'Start',
     'nav.inbox':           'Posteingang',
+    'nav.jobs':            'Aufträge',
     'nav.reports':         'Berichte',
     'nav.defects':         'Mängel',
     'nav.settings':        'Einstellungen',
@@ -4381,6 +4384,7 @@ var STRINGS = {
   'fr-FR': {
     'nav.home':            'Accueil',
     'nav.inbox':           'Boîte de réception',
+    'nav.jobs':            'Missions',
     'nav.reports':         'Rapports',
     'nav.defects':         'Défauts',
     'nav.settings':        'Paramètres',
@@ -5815,6 +5819,7 @@ var STRINGS = {
   'es-ES': {
     'nav.home':            'Inicio',
     'nav.inbox':           'Bandeja de entrada',
+    'nav.jobs':            'Trabajos',
     'nav.reports':         'Informes',
     'nav.defects':         'Defectos',
     'nav.settings':        'Ajustes',

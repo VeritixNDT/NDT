@@ -80,16 +80,14 @@ _Remaining polish (deferred): job/customer i18n (English-only for now, matching 
 - ✅ Audit trail extended (`auditLog`: created / submitted / approved & sealed / stage changes / sent).
 - ✅ **Extra (Carl):** per-inspector `canSelfApprove` checkbox (admin-set) lets chosen inspectors approve & seal their own reports without separate review.
 
-### Phase 4 — Customer portal (Week 13–14)
-- Magic-link email auth for customers — lighter than full Supabase Auth accounts:
-  - Customer record carries one or more `portalEmails`
-  - "Generate portal link" button sends a signed token via email
-  - Token unlocks a read-only view of that customer's jobs / reports / invoices
-- Routes:
-  - `/portal/jobs` — all your jobs with status badges
-  - `/portal/jobs/:id` — job detail with downloadable reports
-  - `/portal/invoices/:id` — pay or download
-- White-label: company logo + colours from Settings → Company already populate via smart cards
+### Phase 4 — Customer portal (Week 13–14) — ✅ built (portal-data/-token need backend deploy)
+- ✅ Magic-link auth for customers (no customer accounts): HMAC-signed token `{orgId, customerId, exp}` (24h), minted by the `portal-token` Edge Function, validated by the public `portal-data` function. `_shared/portal.ts` signs/verifies.
+  - ✅ Customer record carries `portalEmails`.
+  - ✅ "Portal link" action mints a signed link (or a local preview link in trial); `send-email` `portal-link` template ready to email it.
+  - ✅ Token unlocks a read-only view of that customer's jobs / approved-sealed reports / quotes / invoices (drafts never exposed — filtered server-side).
+- ✅ Route `#/portal/<token>` (single white-labelled page with Jobs+reports, Invoices, Quotes sections; sealed-report + invoice/quote PDF downloads). _(The roadmap's separate /portal/jobs/:id, /portal/invoices/:id routes collapsed into one portal page for MVP.)_
+- ✅ White-label: company logo + colour drive the portal header/accent.
+- ⏳ Deploy needed: `PORTAL_SECRET` secret + `supabase functions deploy portal-token portal-data` (and the email backend) for real cross-device access; works via local preview link until then.
 
 ### Phase 5 — Ship (Week 15–16)
 - End-to-end test the full journey on staging with a real customer dataset

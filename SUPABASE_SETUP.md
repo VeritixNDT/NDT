@@ -184,6 +184,9 @@ supabase link --project-ref mmgdqsilgwusehsqgyyj
 supabase secrets set RESEND_API_KEY="re_your_key_here"
 supabase secrets set EMAIL_FROM="Veritix <noreply@mail.smartveritas.com>"
 supabase secrets set APP_URL="https://your-deployed-app-url"
+# Phase 4 customer portal — a long random secret that signs portal magic-link
+# tokens. Generate one, e.g.:  openssl rand -base64 48
+supabase secrets set PORTAL_SECRET="<long-random-string>"
 ```
 
 - `EMAIL_FROM` **must** be on the domain you verified in step 7.1.
@@ -193,11 +196,21 @@ supabase secrets set APP_URL="https://your-deployed-app-url"
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are
   injected by the runtime automatically — don't set them.
 
-### 7.4 Deploy the function
+### 7.4 Deploy the functions
 
 ```bash
 supabase functions deploy send-email
+# Phase 4 customer portal:
+supabase functions deploy portal-token
+supabase functions deploy portal-data
 ```
+
+`portal-data` is intentionally **public** (no JWT) — the signed magic-link
+token is the credential, validated server-side with `PORTAL_SECRET`. It only
+ever returns a single customer's jobs, approved/sent reports, quotes, and
+invoices. `portal-token` is admin-gated. Until these are deployed, the
+"Portal link" button produces a local preview link that only works in the
+admin's own browser.
 
 That's it. Now **Settings → Users & access → Invite user** records the invite
 *and* emails the invitee a branded "Accept invitation" link. If email ever

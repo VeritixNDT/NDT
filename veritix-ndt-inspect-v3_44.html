@@ -1290,6 +1290,16 @@
                 <label data-i18n="co.lbl.invoiceFooter">Invoice footer</label>
                 <textarea id="co-invoiceFooter" rows="2" placeholder="Payment due within 30 days. Bank: Acme NV — IBAN BE00 0000 0000 0000 — BIC XXXXXXXX." data-i18n-placeholder="co.ph.invoiceFooter"></textarea>
               </div>
+              <!-- Default notes / terms — pre-fill the Notes box on each new
+                   quote / invoice. Editable per document; blank = empty box. -->
+              <div class="fld form-row">
+                <label data-i18n="co.lbl.quoteNotes">Quote default notes / terms</label>
+                <textarea id="co-quoteNotes" rows="2" placeholder="Lead time, exclusions, acceptance terms…" data-i18n-placeholder="co.ph.quoteNotes"></textarea>
+              </div>
+              <div class="fld form-row">
+                <label data-i18n="co.lbl.invoiceNotes">Invoice default notes / terms</label>
+                <textarea id="co-invoiceNotes" rows="2" placeholder="Payment instructions, PO reference, late-payment terms…" data-i18n-placeholder="co.ph.invoiceNotes"></textarea>
+              </div>
             </div>
           </div>
 

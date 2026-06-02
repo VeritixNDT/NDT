@@ -37,6 +37,13 @@ function billGet(type, id)     { return billLoad(type).find(d => d.id === id) ||
 function _billCompany()        { return (typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {}; }
 function billDefaultCurrency() { return _billCompany().currency || 'EUR'; }
 function billDefaultVat()      { const v = parseFloat(_billCompany().vatRate); return isNaN(v) ? 0 : v; }
+// Per-doc-type default notes/terms from the company profile (Settings →
+// Billing defaults). Pre-fills the Notes box on a brand-new quote/invoice;
+// editable per document and never overwrites an existing doc's notes.
+function billDefaultNotes(type) {
+  const c = _billCompany();
+  return ((type === 'invoice' ? c.invoiceNotes : c.quoteNotes) || '').trim();
+}
 
 // ── Money ───────────────────────────────────────────────────────────────
 function billCurSym(code) {
@@ -161,7 +168,7 @@ function billOpenBuilder(type, jobId, docId) {
               <div style="display:flex;justify-content:space-between;padding:7px 0;margin-top:3px;border-top:1px solid var(--border);font-weight:700;color:var(--t1)"><span>Total</span><span id="bill-sum-total" style="font-family:var(--mono)"></span></div>
             </div>
           </div>
-          <div class="fld form-row" style="margin-top:8px"><label>Notes / terms</label><textarea id="bill-notes" rows="2" placeholder="Payment terms, bank details, scope notes…">${escapeHtml((doc && doc.notes) || '')}</textarea></div>
+          <div class="fld form-row" style="margin-top:8px"><label>Notes / terms</label><textarea id="bill-notes" rows="2" placeholder="Payment terms, bank details, scope notes…">${escapeHtml(doc ? (doc.notes || '') : billDefaultNotes(_billType))}</textarea></div>
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
             <button class="btn btn-sm" data-action="billCloseBuilder">Cancel</button>
             <button class="btn btn-primary btn-sm" data-action="billSaveDoc">Save ${isInv ? 'invoice' : 'quote'}</button>

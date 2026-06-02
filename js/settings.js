@@ -11,7 +11,7 @@ function loadSettings() {
     'accstd','accbody','accnum','accissued','accexpiry','accscope',
     'qmname','qmemail','sigsname','sigsrole',
     'doclang','docsize','footer','confidstmt',
-    'vatRate','currency','quoteFooter','invoiceFooter',
+    'vatRate','currency','quoteFooter','invoiceFooter','quoteNotes','invoiceNotes',
     'emailDefaultTo','emailSubject','emailBody',
   ];
   fields.forEach(f => { const e=el('co-'+f); if(e) e.value=c[f]||''; });
@@ -713,7 +713,8 @@ function saveCompany() {
     // snapshotted onto each quote/invoice at creation time. quoteFooter /
     // invoiceFooter are the per-doc-type footers (separate from the report
     // 'footer' above); blank = no footer printed on that document.
-    'vatRate','currency','quoteFooter','invoiceFooter',
+    // quoteNotes / invoiceNotes pre-fill the per-doc Notes box on new docs.
+    'vatRate','currency','quoteFooter','invoiceFooter','quoteNotes','invoiceNotes',
     // Default email template — used by the Reports list's Email modal
     // to pre-fill the draft. Placeholders ({reportNo}, {client}, etc.)
     // are substituted at send time from the selected report.

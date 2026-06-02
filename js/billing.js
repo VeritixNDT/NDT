@@ -343,8 +343,9 @@ function _billDocRow(type, doc) {
   const actions = [
     `<button class="btn btn-sm" data-action="billOpenBuilder" data-args="'${type}','${escapeHtml(doc.jobId||'')}','${escapeHtml(doc.id)}'" style="font-size:11px">Edit</button>`,
     `<button class="btn btn-sm" data-action="billPrintDoc" data-args="'${type}','${escapeHtml(doc.id)}'" style="font-size:11px">PDF</button>`,
-    `<button class="btn btn-sm" data-action="billEmailDoc" data-args="'${type}','${escapeHtml(doc.id)}'" style="font-size:11px">✉</button>`,
+    `<button class="btn btn-sm" data-action="billEmailDoc" data-args="'${type}','${escapeHtml(doc.id)}'" style="font-size:11px" title="Email this ${type}">✉</button>`,
   ];
+  if(type === 'invoice' && doc.status !== 'Paid' && doc.status !== 'Draft') actions.push(`<button class="btn btn-sm" data-action="billEmailRemind" data-args="'${escapeHtml(doc.id)}'" style="font-size:11px" title="Email a payment reminder">⏰ Remind</button>`);
   if(type === 'quote' && doc.status !== 'Declined') actions.push(`<button class="btn btn-sm" data-action="billConvertToInvoice" data-args="'${escapeHtml(doc.id)}'" style="font-size:11px" title="Create an invoice from this quote">→ Invoice</button>`);
   actions.push(`<button class="btn btn-sm btn-danger" data-action="billDelete" data-args="'${type}','${escapeHtml(doc.id)}'" style="font-size:11px">Del</button>`);
   // Status quick-actions
@@ -566,32 +567,51 @@ function billPrintDoc(type, id) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// EMAIL — send via the send-email Edge Function (soft-fails offline)
+// EMAIL — open the shared compose modal (reports.js) pre-filled from the
+// quote / invoice / reminder template (Settings → Email templates). Interim
+// transport is mailto:; the backend send-email Edge Function lands later.
 // ══════════════════════════════════════════════════════════════════════════
-async function billEmailDoc(type, id) {
+// Placeholders available to billing email templates:
+//   {number} {customerName} {company} {companyEmail} {companyPhone}
+//   {currency} {total} {subtotal} {vat} {vatRate} {dueDate} {issueDate}
+function _billEmailTokens(doc) {
+  const cust = (typeof custLoad === 'function' ? custLoad() : []).find(x => x.id === doc.customerId) || {};
+  const c   = _billCompany();
+  const t   = billCalc(doc);
+  const cur = doc.currency || billDefaultCurrency();
+  const fd  = (d) => d ? ((typeof fmtDate === 'function') ? fmtDate(d) : d) : '—';
+  return {
+    number:       doc.number || '',
+    customerName: cust.name || 'customer',
+    company:      c.name  || '',
+    companyEmail: c.email || '',
+    companyPhone: c.phone || '',
+    currency:     cur,
+    total:        billFmtMoney(t.total, cur),
+    subtotal:     billFmtMoney(t.subtotal, cur),
+    vat:          billFmtMoney(t.vat, cur),
+    vatRate:      String(doc.vatRate || 0),
+    dueDate:      fd(doc.dueDate),
+    issueDate:    fd(doc.issueDate),
+  };
+}
+
+function billEmailDoc(type, id) {
   const doc = billGet(type, id);
   if(!doc) { toast('Document not found.', 'error'); return; }
+  if(typeof vxEmailCompose !== 'function') { toast('Email composer unavailable.', 'error'); return; }
   const cust = (typeof custLoad === 'function' ? custLoad() : []).find(x => x.id === doc.customerId) || {};
   const to = ((cust.contacts || [])[0] || {}).email || '';
-  if(!to) { toast('No customer contact email on file — add one under Settings → Customers.', 'error'); return; }
-  if(typeof vxApi === 'undefined' || !vxApi.sendEmail) { toast('Email backend unavailable.', 'error'); return; }
-  if(!await vxConfirm({ message: 'Email ' + (doc.number || ('this ' + type)) + ' to ' + to + '?', okLabel: 'Send' })) return;
-  const t = billCalc(doc);
-  const c = _billCompany();
-  const r = await vxApi.sendEmail(type, to, {
-    number:       doc.number,
-    customerName: cust.name || '',
-    companyName:  c.name || '',
-    currency:     doc.currency || billDefaultCurrency(),
-    total:        t.total,
-    subtotal:     t.subtotal,
-    vat:          t.vat,
-    vatRate:      doc.vatRate || 0,
-    dueDate:      doc.dueDate || '',
-    issueDate:    doc.issueDate || '',
-    lineItems:    doc.lineItems || [],
-    notes:        doc.notes || '',
-  });
-  if(r.ok) { billSetStatus(type, id, 'Sent'); toast((type === 'invoice' ? 'Invoice' : 'Quote') + ' emailed to ' + to + '.', 'success'); }
-  else     { toast('Email not sent: ' + (r.error || 'unknown') + '. Status unchanged.', 'warn'); }
+  const noun = (type === 'invoice') ? 'invoice' : 'quote';
+  vxEmailCompose({ type: noun, tokens: _billEmailTokens(doc), to, heading: 'Email ' + noun + ' ' + (doc.number || '') });
+}
+
+// Payment-reminder email for an unpaid invoice (reminder template).
+function billEmailRemind(id) {
+  const doc = billGet('invoice', id);
+  if(!doc) { toast('Invoice not found.', 'error'); return; }
+  if(typeof vxEmailCompose !== 'function') { toast('Email composer unavailable.', 'error'); return; }
+  const cust = (typeof custLoad === 'function' ? custLoad() : []).find(x => x.id === doc.customerId) || {};
+  const to = ((cust.contacts || [])[0] || {}).email || '';
+  vxEmailCompose({ type: 'reminder', tokens: _billEmailTokens(doc), to, heading: 'Payment reminder — ' + (doc.number || '') });
 }

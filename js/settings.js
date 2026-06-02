@@ -13,6 +13,10 @@ function loadSettings() {
     'doclang','docsize','footer','confidstmt',
     'vatRate','currency','quoteFooter','invoiceFooter','quoteNotes','invoiceNotes',
     'emailDefaultTo','emailSubject','emailBody',
+    'quoteEmailTo','quoteEmailSubject','quoteEmailBody',
+    'invoiceEmailTo','invoiceEmailSubject','invoiceEmailBody',
+    'portalEmailTo','portalEmailSubject','portalEmailBody',
+    'reminderEmailTo','reminderEmailSubject','reminderEmailBody',
   ];
   fields.forEach(f => { const e=el('co-'+f); if(e) e.value=c[f]||''; });
 
@@ -715,10 +719,15 @@ function saveCompany() {
     // 'footer' above); blank = no footer printed on that document.
     // quoteNotes / invoiceNotes pre-fill the per-doc Notes box on new docs.
     'vatRate','currency','quoteFooter','invoiceFooter','quoteNotes','invoiceNotes',
-    // Default email template — used by the Reports list's Email modal
-    // to pre-fill the draft. Placeholders ({reportNo}, {client}, etc.)
-    // are substituted at send time from the selected report.
+    // Email templates — per document type (Settings → Email templates).
+    // 'email*' is the report template (kept for back-compat); the rest are
+    // quote / invoice / portal-invite / reminder. Each has To + Subject +
+    // Body; placeholders are substituted at send time from the document.
     'emailDefaultTo','emailSubject','emailBody',
+    'quoteEmailTo','quoteEmailSubject','quoteEmailBody',
+    'invoiceEmailTo','invoiceEmailSubject','invoiceEmailBody',
+    'portalEmailTo','portalEmailSubject','portalEmailBody',
+    'reminderEmailTo','reminderEmailSubject','reminderEmailBody',
   ];
   FIELDS.forEach(f => {
     const e = el('co-' + f);
@@ -738,6 +747,15 @@ function saveCompany() {
 
   lss(KEYS.company, c);
   toast(t('toast.profile_saved','Company profile saved.'));
+}
+
+// Settings → Email templates: switch the visible per-type template pane.
+function etplTab(type, btn){
+  document.querySelectorAll('.etpl-pane').forEach(p => {
+    p.style.display = (p.getAttribute('data-etpl') === type) ? '' : 'none';
+  });
+  document.querySelectorAll('.etpl-tab').forEach(b => b.classList.remove('btn-primary'));
+  if(btn) btn.classList.add('btn-primary');
 }
 
 // ══════════════════════════════════════════════
@@ -3210,5 +3228,29 @@ async function custPortalLink(id){
   const note = viaServer
     ? 'Signed portal link (24h). Copied to your clipboard — share it with the customer.'
     : 'Preview link copied. NOTE: this local link only works in this browser. Deploy the backend for real, emailable signed links.';
-  await vxConfirm({ title: 'Customer portal link', message: note + '<br><br><code style="word-break:break-all;font-size:11px">' + escapeHtml(link) + '</code>', okLabel: 'Done', cancelLabel: 'Close' });
+  // Offer to draft the portal-invite email (portal template) pre-filled with
+  // the link, or just close. Compose modal lives in reports.js.
+  const canEmail = (typeof vxEmailCompose === 'function');
+  const wantEmail = await vxConfirm({
+    title: 'Customer portal link',
+    message: note + '<br><br><code style="word-break:break-all;font-size:11px">' + escapeHtml(link) + '</code>',
+    okLabel: canEmail ? 'Email to customer…' : 'Done',
+    cancelLabel: 'Close',
+  });
+  if(wantEmail && canEmail){
+    const co = ls(KEYS.company, {}) || {};
+    const to = (rec.portalEmails && rec.portalEmails[0]) || ((rec.contacts || [])[0] || {}).email || '';
+    vxEmailCompose({
+      type: 'portal',
+      to,
+      heading: 'Email portal link — ' + (rec.name || 'customer'),
+      tokens: {
+        customerName: rec.name || 'customer',
+        company:      co.name  || '',
+        companyEmail: co.email || '',
+        companyPhone: co.phone || '',
+        portalLink:   link,
+      },
+    });
+  }
 }

@@ -1335,41 +1335,69 @@
             </div>
           </div>
 
-          <!-- ── 8. DEFAULT EMAIL TEMPLATE ──
-               Subject + body templates pre-filled when the inspector
-               clicks "Email" on the Reports list. Backend send is not
-               wired yet — the Email modal opens the user's mail client
-               via mailto: as the interim transport, but the template
-               UI is in place so the company can author its message once
-               and have it auto-fill on every send.
-               Placeholders are substituted from the selected report:
-                 {reportNo} {revision} {method} {client} {project}
-                 {projectNo} {location} {inspector} {examDate}
-                 {verdict} {company} {companyEmail} {companyPhone}
-                 {reportList} (comma-separated list of all selected
-                              reports — useful for multi-report sends) -->
+          <!-- ── 8. EMAIL TEMPLATES (per document type) ──
+               One editable Subject + Body per type. Pre-fill the shared
+               compose modal when emailing from the Reports list (report),
+               the Billing list (quote / invoice / reminder) or a customer
+               Portal link (portal). Backend send isn't wired yet — the modal
+               opens the OS mail client via mailto: as the interim transport.
+               Placeholders are substituted at send time from the document. -->
           <div class="sc">
             <div class="sc-head">
-              <span class="sc-title">Default email template</span>
-              <span style="font-size:11px;font-family:var(--mono);color:var(--t3)">Pre-fills the Email modal on the Reports list</span>
+              <span class="sc-title">Email templates</span>
+              <span style="font-size:11px;font-family:var(--mono);color:var(--t3)">One per document type — pre-fills the compose modal</span>
             </div>
             <div class="sc-body">
-              <div class="fld form-row">
-                <label>Default recipient <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">optional — leave blank to type per-send</span></label>
-                <input id="co-emailDefaultTo" type="email" placeholder="reports@client.com"/>
+              <!-- Type tabs -->
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+                <button class="btn btn-sm btn-primary etpl-tab" data-action="etplTab" data-args="'report'"   data-pass-el="1">Reports</button>
+                <button class="btn btn-sm etpl-tab"             data-action="etplTab" data-args="'quote'"    data-pass-el="1">Quotes</button>
+                <button class="btn btn-sm etpl-tab"             data-action="etplTab" data-args="'invoice'"  data-pass-el="1">Invoices</button>
+                <button class="btn btn-sm etpl-tab"             data-action="etplTab" data-args="'portal'"   data-pass-el="1">Portal invite</button>
+                <button class="btn btn-sm etpl-tab"             data-action="etplTab" data-args="'reminder'" data-pass-el="1">Reminder</button>
               </div>
-              <div class="fld form-row">
-                <label>Subject template</label>
-                <input id="co-emailSubject" type="text" placeholder="{company} — {method} Inspection Report {reportNo} Rev {revision}"/>
+
+              <!-- Report -->
+              <div class="etpl-pane" data-etpl="report">
+                <div class="fld form-row">
+                  <label>Default recipient <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">optional — leave blank to type per-send</span></label>
+                  <input id="co-emailDefaultTo" type="email" placeholder="reports@client.com"/>
+                </div>
+                <div class="fld form-row"><label>Subject</label><input id="co-emailSubject" type="text" placeholder="{company} — {method} Inspection Report {reportNo} Rev {revision}"/></div>
+                <div class="fld form-row"><label>Body</label><textarea id="co-emailBody" rows="9" placeholder="Dear {client},&#10;&#10;Please find attached the {method} Inspection Report {reportNo} Rev {revision} for project {project} ({projectNo}).&#10;&#10;Examination date: {examDate}&#10;Inspector: {inspector}&#10;Verdict: {verdict}&#10;&#10;Kind regards,&#10;{company}"></textarea></div>
+                <div style="font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6">Placeholders: <code>{reportNo}</code> <code>{revision}</code> <code>{method}</code> <code>{client}</code> <code>{project}</code> <code>{projectNo}</code> <code>{location}</code> <code>{inspector}</code> <code>{examDate}</code> <code>{verdict}</code> <code>{company}</code> <code>{companyEmail}</code> <code>{companyPhone}</code> <code>{reportList}</code></div>
               </div>
-              <div class="fld form-row">
-                <label>Body template
-                  <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">supports placeholders — see field list above the editor</span>
-                </label>
-                <textarea id="co-emailBody" rows="10" placeholder="Dear {client},&#10;&#10;Please find attached the {method} Inspection Report {reportNo} Rev {revision} for project {project} ({projectNo}).&#10;&#10;Examination date: {examDate}&#10;Inspector: {inspector}&#10;Verdict: {verdict}&#10;&#10;Should you have any questions, please contact us.&#10;&#10;Kind regards,&#10;{company}"></textarea>
+
+              <!-- Quote -->
+              <div class="etpl-pane" data-etpl="quote" style="display:none">
+                <div class="fld form-row"><label>Default recipient <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">optional — falls back to the customer's contact email</span></label><input id="co-quoteEmailTo" type="email" placeholder="optional"/></div>
+                <div class="fld form-row"><label>Subject</label><input id="co-quoteEmailSubject" type="text" placeholder="Quote {number} from {company}"/></div>
+                <div class="fld form-row"><label>Body</label><textarea id="co-quoteEmailBody" rows="9" placeholder="Dear {customerName},&#10;&#10;Please find our quote {number} for your consideration. The total is {total}, valid until {dueDate}.&#10;&#10;Should you have any questions, please contact us.&#10;&#10;Kind regards,&#10;{company}"></textarea></div>
+                <div style="font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6">Placeholders: <code>{number}</code> <code>{customerName}</code> <code>{company}</code> <code>{companyEmail}</code> <code>{companyPhone}</code> <code>{currency}</code> <code>{total}</code> <code>{subtotal}</code> <code>{vat}</code> <code>{vatRate}</code> <code>{dueDate}</code> <code>{issueDate}</code></div>
               </div>
-              <div style="font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6">
-                Placeholders: <code>{reportNo}</code> <code>{revision}</code> <code>{method}</code> <code>{client}</code> <code>{project}</code> <code>{projectNo}</code> <code>{location}</code> <code>{inspector}</code> <code>{examDate}</code> <code>{verdict}</code> <code>{company}</code> <code>{companyEmail}</code> <code>{companyPhone}</code> <code>{reportList}</code>
+
+              <!-- Invoice -->
+              <div class="etpl-pane" data-etpl="invoice" style="display:none">
+                <div class="fld form-row"><label>Default recipient <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">optional — falls back to the customer's contact email</span></label><input id="co-invoiceEmailTo" type="email" placeholder="optional"/></div>
+                <div class="fld form-row"><label>Subject</label><input id="co-invoiceEmailSubject" type="text" placeholder="Invoice {number} from {company}"/></div>
+                <div class="fld form-row"><label>Body</label><textarea id="co-invoiceEmailBody" rows="9" placeholder="Dear {customerName},&#10;&#10;Please find invoice {number}. The total due is {total}, payable by {dueDate}.&#10;&#10;Thank you for your business.&#10;&#10;Kind regards,&#10;{company}"></textarea></div>
+                <div style="font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6">Placeholders: <code>{number}</code> <code>{customerName}</code> <code>{company}</code> <code>{companyEmail}</code> <code>{companyPhone}</code> <code>{currency}</code> <code>{total}</code> <code>{subtotal}</code> <code>{vat}</code> <code>{vatRate}</code> <code>{dueDate}</code> <code>{issueDate}</code></div>
+              </div>
+
+              <!-- Portal invite -->
+              <div class="etpl-pane" data-etpl="portal" style="display:none">
+                <div class="fld form-row"><label>Default recipient <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">optional — falls back to the customer's portal email</span></label><input id="co-portalEmailTo" type="email" placeholder="optional"/></div>
+                <div class="fld form-row"><label>Subject</label><input id="co-portalEmailSubject" type="text" placeholder="Your {company} customer portal"/></div>
+                <div class="fld form-row"><label>Body</label><textarea id="co-portalEmailBody" rows="9" placeholder="Dear {customerName},&#10;&#10;You now have secure, read-only access to your jobs, inspection reports, and invoices via your customer portal:&#10;&#10;{portalLink}&#10;&#10;This link is private to you — please don't share it.&#10;&#10;Kind regards,&#10;{company}"></textarea></div>
+                <div style="font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6">Placeholders: <code>{customerName}</code> <code>{company}</code> <code>{companyEmail}</code> <code>{companyPhone}</code> <code>{portalLink}</code></div>
+              </div>
+
+              <!-- Reminder -->
+              <div class="etpl-pane" data-etpl="reminder" style="display:none">
+                <div class="fld form-row"><label>Default recipient <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">optional — falls back to the customer's contact email</span></label><input id="co-reminderEmailTo" type="email" placeholder="optional"/></div>
+                <div class="fld form-row"><label>Subject</label><input id="co-reminderEmailSubject" type="text" placeholder="Reminder: invoice {number} from {company}"/></div>
+                <div class="fld form-row"><label>Body</label><textarea id="co-reminderEmailBody" rows="9" placeholder="Dear {customerName},&#10;&#10;A friendly reminder that invoice {number}, total {total}, was due on {dueDate}.&#10;&#10;If you have already arranged payment, please disregard this message.&#10;&#10;Kind regards,&#10;{company}"></textarea></div>
+                <div style="font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6">Placeholders: <code>{number}</code> <code>{customerName}</code> <code>{company}</code> <code>{companyEmail}</code> <code>{companyPhone}</code> <code>{currency}</code> <code>{total}</code> <code>{subtotal}</code> <code>{vat}</code> <code>{vatRate}</code> <code>{dueDate}</code> <code>{issueDate}</code></div>
               </div>
             </div>
           </div>

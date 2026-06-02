@@ -1267,6 +1267,98 @@ function _rptEmailFill(tpl, tokens){
     (tokens && Object.prototype.hasOwnProperty.call(tokens, k)) ? tokens[k] : '{'+k+'}'
   );
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// SHARED EMAIL TEMPLATES — Report / Quote / Invoice / Portal / Reminder
+// ══════════════════════════════════════════════════════════════════════════
+// Each type stores an editable subject + body on the company profile under the
+// keys below (Settings → Email templates). The compose modal further down is
+// shared by every send path (reports list, billing, portal link); "Save as
+// default" writes back to the active type's keys.
+var VX_EMAIL_TPLS = {
+  report:   { to:'emailDefaultTo',  sub:'emailSubject',         body:'emailBody',         noun:'report' },
+  quote:    { to:'quoteEmailTo',    sub:'quoteEmailSubject',    body:'quoteEmailBody',    noun:'quote' },
+  invoice:  { to:'invoiceEmailTo',  sub:'invoiceEmailSubject',  body:'invoiceEmailBody',  noun:'invoice' },
+  portal:   { to:'portalEmailTo',   sub:'portalEmailSubject',   body:'portalEmailBody',   noun:'portal invite' },
+  reminder: { to:'reminderEmailTo', sub:'reminderEmailSubject', body:'reminderEmailBody', noun:'reminder' },
+};
+var VX_EMAIL_DEFAULTS = {
+  report: {
+    subject: '{company} — {method} Inspection Report {reportNo} Rev {revision}',
+    body: [
+      'Dear {client},', '',
+      'Please find attached the {method} Inspection Report {reportNo} Rev {revision} for project {project} ({projectNo}).', '',
+      'Examination date: {examDate}', 'Inspector: {inspector}', 'Verdict: {verdict}', '',
+      'Should you have any questions or require further information, please contact us.', '',
+      'Kind regards,', '{company}',
+    ].join('\n'),
+  },
+  quote: {
+    subject: 'Quote {number} from {company}',
+    body: [
+      'Dear {customerName},', '',
+      'Please find our quote {number} for your consideration. The total is {total}, valid until {dueDate}.', '',
+      'Should you have any questions, please contact us.', '',
+      'Kind regards,', '{company}',
+    ].join('\n'),
+  },
+  invoice: {
+    subject: 'Invoice {number} from {company}',
+    body: [
+      'Dear {customerName},', '',
+      'Please find invoice {number}. The total due is {total}, payable by {dueDate}.', '',
+      'Thank you for your business.', '',
+      'Kind regards,', '{company}',
+    ].join('\n'),
+  },
+  portal: {
+    subject: 'Your {company} customer portal',
+    body: [
+      'Dear {customerName},', '',
+      'You now have secure, read-only access to your jobs, inspection reports, and invoices via your customer portal:', '',
+      '{portalLink}', '',
+      'This link is private to you — please don\'t share it.', '',
+      'Kind regards,', '{company}',
+    ].join('\n'),
+  },
+  reminder: {
+    subject: 'Reminder: invoice {number} from {company}',
+    body: [
+      'Dear {customerName},', '',
+      'A friendly reminder that invoice {number}, total {total}, was due on {dueDate}.', '',
+      'If you have already arranged payment, please disregard this message. Otherwise we would appreciate settlement at your earliest convenience.', '',
+      'Kind regards,', '{company}',
+    ].join('\n'),
+  },
+};
+// Effective template for a type (company override falls back to the default).
+function vxEmailTpl(type){
+  const meta = VX_EMAIL_TPLS[type] || VX_EMAIL_TPLS.report;
+  const def  = VX_EMAIL_DEFAULTS[type] || VX_EMAIL_DEFAULTS.report;
+  const co   = (typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {};
+  return {
+    to:      (co[meta.to]   || '').trim(),
+    subject: (co[meta.sub]  || '').trim() || def.subject,
+    body:    (co[meta.body] != null && String(co[meta.body]).trim()) ? co[meta.body] : def.body,
+  };
+}
+// Open the shared compose modal for a given type with its tokens.
+// opts: { type, tokens, to?, heading? }
+function vxEmailCompose(opts){
+  opts = opts || {};
+  const type   = opts.type || 'report';
+  const tpl    = vxEmailTpl(type);
+  const tokens = opts.tokens || {};
+  _rptEmailOpenModal({
+    tplType: type,
+    heading: opts.heading || '',
+    to:      opts.to || tpl.to || '',
+    subject: _rptEmailFill(tpl.subject, tokens),
+    body:    _rptEmailFill(tpl.body, tokens),
+  });
+}
+// Which template type the open modal is editing (for "Save as default").
+var _vxEmailTplType = 'report';
 function rptBulkEmail(){
   const idxs = Array.from(_rptSelectedIdx);
   if(!idxs.length){ toast(t('toast.select_reports','Select one or more reports first.'), 'warn'); return; }
@@ -1274,32 +1366,11 @@ function rptBulkEmail(){
   const picked = idxs.map(i => all[i]).filter(Boolean);
   if(!picked.length){ toast(t('toast.select_reports','Select one or more reports first.'), 'warn'); return; }
 
-  const co = ls(KEYS.company, {}) || {};
   const tokens = _rptEmailTokens(picked[0]);
   // {reportList} = "SV-MT-2026-00001 Rev 00, SV-MT-2026-00002 Rev 00 …"
   tokens.reportList = picked.map(r => (r.reportNo || '—') + ' Rev ' + (r.revision || '00')).join(', ');
-
-  const defaultSubject = '{company} — {method} Inspection Report {reportNo} Rev {revision}';
-  const defaultBody = [
-    'Dear {client},',
-    '',
-    'Please find attached the {method} Inspection Report {reportNo} Rev {revision} for project {project} ({projectNo}).',
-    '',
-    'Examination date: {examDate}',
-    'Inspector: {inspector}',
-    'Verdict: {verdict}',
-    '',
-    'Should you have any questions or require further information, please contact us.',
-    '',
-    'Kind regards,',
-    '{company}',
-  ].join('\n');
-
-  const to       = co.emailDefaultTo || '';
-  const subject  = _rptEmailFill(co.emailSubject || defaultSubject, tokens);
-  const body     = _rptEmailFill(co.emailBody    || defaultBody,    tokens);
-
-  _rptEmailOpenModal({ to, subject, body, picked });
+  const countLbl = picked.length === 1 ? '1 report' : (picked.length + ' reports');
+  vxEmailCompose({ type:'report', tokens, heading:'Email ' + countLbl });
 }
 
 // Build and show the email composition modal. Self-contained — appended
@@ -1308,19 +1379,20 @@ function rptBulkEmail(){
 // edited subject / body back to the company profile so the next send
 // starts from the new wording.
 function _rptEmailOpenModal(args){
+  _vxEmailTplType = args.tplType || 'report';
   const existing = document.getElementById('rpt-email-modal');
   if(existing) existing.remove();
   const overlay = document.createElement('div');
   overlay.id = 'rpt-email-modal';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px';
   const count = (args.picked && args.picked.length) || 0;
-  const countLbl = count === 1 ? '1 report' : (count + ' reports');
+  const heading = args.heading || (count ? ('Email ' + (count === 1 ? '1 report' : count + ' reports')) : 'Compose email');
   overlay.innerHTML = `
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;width:min(720px,100%);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.4)">
       <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)">
         <span style="font-size:18px">✉</span>
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:600;color:var(--t1)">Email ${escapeHtml(countLbl)}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--t1)">${escapeHtml(heading)}</div>
           <div style="font-size:11px;color:var(--t3);font-family:var(--mono)">Backend not yet wired — Send opens your OS mail client via mailto:</div>
         </div>
         <button class="btn btn-sm" data-action="_rptEmailClose" title="Close">✕</button>
@@ -1339,7 +1411,7 @@ function _rptEmailOpenModal(args){
           <textarea id="rpt-email-body" rows="14" style="width:100%;font-family:var(--font);font-size:13px;line-height:1.5;padding:10px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box;resize:vertical">${escapeHtml(args.body || '')}</textarea>
         </div>
         <div style="font-size:11px;color:var(--t3);line-height:1.5">
-          PDF attachments will be added once the backend send is wired. For now, attach the report PDFs to the message your mail client opens.
+          PDF attachments will be added once the backend send is wired. For now, attach the document PDF(s) to the message your mail client opens.
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--bg2)">
@@ -1382,12 +1454,13 @@ function _rptEmailSend(){
 function _rptEmailSaveTemplate(){
   if(typeof vxRequireAdmin === 'function' && !vxRequireAdmin('save the email template')) return;
   const d = _rptEmailReadDraft();
+  const meta = VX_EMAIL_TPLS[_vxEmailTplType] || VX_EMAIL_TPLS.report;
   const co = ls(KEYS.company, {}) || {};
   // Recipient is per-send by nature so only the templated parts are
   // persisted — the inspector typically aims this at a different client
-  // each time.
-  co.emailSubject = d.subject;
-  co.emailBody    = d.body;
+  // each time. Writes back to the active type's keys (report/quote/…).
+  co[meta.sub]  = d.subject;
+  co[meta.body] = d.body;
   lss(KEYS.company, co);
   toast('Email template saved.', 'success');
 }

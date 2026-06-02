@@ -446,8 +446,8 @@ function billingRender() {
 // ══════════════════════════════════════════════════════════════════════════
 // PDF — print-ready document via the shared _vxPrintHtml pipeline
 // ══════════════════════════════════════════════════════════════════════════
-function billBuildDocHtml(type, doc) {
-  const c = _billCompany();
+function billBuildDocHtml(type, doc, companyOverride) {
+  const c = companyOverride || _billCompany();
   const cust = (typeof custLoad === 'function' ? custLoad() : []).find(x => x.id === doc.customerId) || {};
   const t = billCalc(doc);
   const isInv = type === 'invoice';

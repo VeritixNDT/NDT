@@ -106,6 +106,17 @@ function bootApp() {
     }
   } catch(e) { console.warn('vx: hydrate failed, continuing with localStorage', e); }
 
+  // Phase 4: Customer portal. If the URL is a portal magic link
+  // (#/portal/<token>), render the read-only customer portal instead of the
+  // app/login and stop here — the customer is authenticated by the token,
+  // not a session. (localStorage is already hydrated above so the local
+  // preview token path can read the org's data.)
+  try {
+    if(typeof vxPortalActive === 'function' && vxPortalActive()){
+      if(typeof vxPortalBoot === 'function'){ await vxPortalBoot(); return; }
+    }
+  } catch(e){ console.warn('vx: portal boot failed', e); }
+
   // V44: Supabase bootstrap.
   // If the meta tags are populated AND there's a persisted session in
   // localStorage (the SDK restores it automatically on createClient), copy

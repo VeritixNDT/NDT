@@ -1715,6 +1715,11 @@
                   <label>Notes</label>
                   <textarea id="custf-notes" rows="2" placeholder="Payment terms, account manager, anything worth noting…"></textarea>
                 </div>
+                <div class="fld form-row">
+                  <label>Portal access emails</label>
+                  <input id="custf-portal-emails" placeholder="jan@acme.example, accounts@acme.example"/>
+                  <div style="font-size:11px;color:var(--t3);margin-top:2px">Comma-separated. These addresses may open this customer's read-only portal (jobs, approved reports, invoices) via a magic link.</div>
+                </div>
                 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
                   <button class="btn btn-sm" data-action="custCloseForm">Cancel</button>
                   <button class="btn btn-primary btn-sm" data-action="custSave">Save customer</button>
@@ -3741,6 +3746,7 @@
 <script defer src="js/dashboard.js"></script>
 <script defer src="js/jobs.js"></script>
 <script defer src="js/billing.js"></script>
+<script defer src="js/portal.js"></script>
 <script defer src="js/help.js"></script>
 <script defer src="js/defects.js"></script>
 <script defer src="js/editor.js"></script>

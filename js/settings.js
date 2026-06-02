@@ -3107,6 +3107,7 @@ function custRender() {
       <td style="font-size:12px">${contactCell}</td>
       <td style="font-family:var(--mono);font-size:12px;text-align:center">${sites || '—'}</td>
       <td style="text-align:right">
+        <button class="btn btn-sm" data-action="custPortalLink" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px" title="Generate a customer portal magic link">Portal link</button>
         <button class="btn btn-sm" data-action="custOpenForm" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px">Edit</button>
         <button class="btn btn-sm btn-danger" data-action="custDelete" data-args="'${escapeHtml(rec.id)}'" style="font-size:11px">Del</button>
       </td>
@@ -3130,6 +3131,7 @@ function custOpenForm(id) {
   el('custf-vat').value     = rec ? (rec.vatNo||'')          : '';
   el('custf-billing').value = rec ? (rec.billingAddress||'') : '';
   el('custf-notes').value   = rec ? (rec.notes||'')          : '';
+  if(el('custf-portal-emails')) el('custf-portal-emails').value = rec ? ((rec.portalEmails||[]).join(', ')) : '';
   // Rebuild the dynamic rows fresh — at least one empty row of each so
   // the form never looks blank.
   el('custf-contacts').innerHTML = '';
@@ -3159,6 +3161,8 @@ function custSave() {
     contacts:       custCollectContacts(),
     sites:          custCollectSites(),
     notes:          (el('custf-notes').value   || '').trim(),
+    // Phase 4: emails allowed to access this customer's portal (magic link).
+    portalEmails:   (el('custf-portal-emails') ? el('custf-portal-emails').value : '').split(/[,;\s]+/).map(s=>s.trim().toLowerCase()).filter(Boolean),
     updatedAt:      now,
   };
   const list = custLoad();
@@ -3178,4 +3182,30 @@ async function custDelete(id) {
   custSaveAll(custLoad().filter(r => r.id !== id));
   toast('Customer deleted.');
   custRender();
+}
+
+// Generate a customer-portal magic link. With the backend deployed this
+// mints a signed token (portal-token Edge Function) and can email it to the
+// customer's portal addresses; in trial/local mode it builds a preview link
+// that only works on this device. Either way the link is copied + shown.
+async function custPortalLink(id){
+  const rec = custLoad().find(r => r.id === id);
+  if(!rec){ toast('Customer not found.','error'); return; }
+  let link = '';
+  let viaServer = false;
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(sb && sb.functions && typeof vxIsAuthenticated === 'function' && vxIsAuthenticated()){
+    try {
+      const orgId = (typeof vxPlatformConfig === 'function') ? (vxPlatformConfig().orgId || '') : '';
+      const r = await sb.functions.invoke('portal-token', { body: { orgId, customerId: id } });
+      if(!r.error && r.data && r.data.url){ link = r.data.url; viaServer = true; }
+    } catch(e){ /* fall back to local link */ }
+  }
+  if(!link && typeof vxPortalLocalLink === 'function') link = vxPortalLocalLink(id);
+  if(!link){ toast('Could not generate a portal link.','error'); return; }
+  try { await navigator.clipboard.writeText(link); } catch(e){}
+  const note = viaServer
+    ? 'Signed portal link (24h). Copied to your clipboard — share it with the customer.'
+    : 'Preview link copied. NOTE: this local link only works in this browser. Deploy the backend for real, emailable signed links.';
+  await vxConfirm({ title: 'Customer portal link', message: note + '<br><br><code style="word-break:break-all;font-size:11px">' + escapeHtml(link) + '</code>', okLabel: 'Done', cancelLabel: 'Close' });
 }

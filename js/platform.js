@@ -488,7 +488,8 @@ function vxIsSeniorOrAdmin(){
 // this list provides defense-in-depth at the sub-section level in case
 // any future code path routes a non-admin into the settings shell.
 var VX_ADMIN_ONLY_SECTIONS = new Set([
-  'company','inspectors','equipment','customers','users','methods','numbering','templates',
+  'company','inspectors','equipment','customers','billing','emailtemplates',
+  'users','methods','numbering','templates',
   'pdfeditor','procedures','appearance','subscription','database',
   'notifications','system'
 ]);

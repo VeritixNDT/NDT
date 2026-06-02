@@ -896,6 +896,12 @@
           <button class="snav-item" id="sni-customers" data-action="showSS" data-pass-el="1" data-args="'customers'">
             <span class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9h.01"/><path d="M9 13h.01"/><path d="M9 17h.01"/></svg></span>Customers
           </button>
+          <button class="snav-item" id="sni-billing" data-action="showSS" data-pass-el="1" data-args="'billing'">
+            <span class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg></span><span data-i18n="side.billing">Billing</span>
+          </button>
+          <button class="snav-item" id="sni-emailtemplates" data-action="showSS" data-pass-el="1" data-args="'emailtemplates'">
+            <span class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></span><span data-i18n="side.email_templates">Email templates</span>
+          </button>
           <button class="snav-item" id="sni-users" data-action="showSS" data-pass-el="1" data-args="'users'">
             <span class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span data-i18n="side.users_access">Users &amp; access</span>
           </button>
@@ -1253,6 +1259,19 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- ════ BILLING — own settings section (moved out of Company profile) ════ -->
+        <div class="ss" id="ss-billing">
+          <div class="sh">
+            <div class="sh-left">
+              <div class="sh-title" data-i18n="sh.billing">Billing</div>
+              <div class="sh-desc" data-i18n="sh.billing_desc">Defaults, footers and notes applied to new quotes &amp; invoices.</div>
+            </div>
+            <div class="sh-actions">
+              <button class="btn btn-primary btn-sm" data-action="saveCompany" data-i18n="co.btn.save">Save changes</button>
+            </div>
+          </div>
 
           <!-- ── 7b. BILLING DEFAULTS ── -->
           <div class="sc">
@@ -1300,6 +1319,19 @@
                 <label data-i18n="co.lbl.invoiceNotes">Invoice default notes / terms</label>
                 <textarea id="co-invoiceNotes" rows="2" placeholder="Payment instructions, PO reference, late-payment terms…" data-i18n-placeholder="co.ph.invoiceNotes"></textarea>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ EMAIL TEMPLATES — own settings section (moved out of Company profile) ════ -->
+        <div class="ss" id="ss-emailtemplates">
+          <div class="sh">
+            <div class="sh-left">
+              <div class="sh-title" data-i18n="sh.email_templates">Email templates</div>
+              <div class="sh-desc" data-i18n="sh.email_templates_desc">Default subject and body that pre-fill the Email modal on the Reports list.</div>
+            </div>
+            <div class="sh-actions">
+              <button class="btn btn-primary btn-sm" data-action="saveCompany" data-i18n="co.btn.save">Save changes</button>
             </div>
           </div>
 

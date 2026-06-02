@@ -19,7 +19,7 @@ var VX_PLAN_KEY        = 'vx-plan-v1';          // current subscription tier + l
 var VX_ENTITY_KEYS = new Set([
   'vx-users-v1', 'vx-company-v1', 'vx-settings-v1', 'vx-numbering-v1',
   'vx-reports-v1', 'vx-defects-v1', 'vx-procedures-v1', 'vx-inspectors-v1',
-  'vx-equipment-v1', 'vx-customers-v1',
+  'vx-equipment-v1', 'vx-customers-v1', 'vx-jobs-v1',
   'vx-templates-v1', 'vx-method-order-v1',
   // V22 — PDF editor layout & per-method templates. These are heavy
   // user data (multiple pages × many blocks × potentially inline base64

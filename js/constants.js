@@ -152,6 +152,11 @@ var KEYS = {
   // address}], notes, createdAt, updatedAt }. The CRM layer the rest of
   // Phase 1 builds on: Jobs reference a customer, reports nest under jobs.
   customers:'vx-customers-v1',
+  // Jobs register (Phase 1) — each entry is { id, customerId, title,
+  // status:'Pending'|'Active'|'Closed', scope, leadInspector, startDate,
+  // endDate, notes, createdAt, updatedAt }. A job belongs to a customer;
+  // reports carry a jobId so they nest under the job they were run for.
+  jobs:'vx-jobs-v1',
   // Per-method draft of the in-progress new-report form. Persisted on
   // every field change (debounced) so the user can see a "Saved Xs ago"
   // indicator and resume on reopen. Cleared on successful save / cancel.

@@ -1716,6 +1716,7 @@ function showPage(id, btn) {
   if(btn) { btn.classList.add('active'); btn.setAttribute('aria-current', 'page'); }
   if(id === 'overview') ovInit();
   if(id === 'reports') rptInit();
+  if(id === 'jobs') { if(typeof jobsInit === 'function') jobsInit(); }
   if(id === 'defects') defInit();
   if(id === 'inbox') inboxRender();
   // V12: re-wire any newly-rendered labels on this page

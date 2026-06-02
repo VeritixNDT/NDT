@@ -248,6 +248,10 @@
       <span data-i18n="nav.inbox">Inbox</span>
       <span id="inbox-count-pill" style="display:none;font-family:var(--mono);font-size:9px;background:var(--cyan);color:#001;border-radius:9px;padding:1px 6px;font-weight:700;margin-left:2px" aria-label="pending items"></span>
     </button>
+    <button class="tn" data-action="showPage" data-pass-el="1" data-args="'jobs'" aria-label="Jobs">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      <span data-i18n="nav.jobs">Jobs</span>
+    </button>
     <button class="tn" data-action="showPage" data-pass-el="1" data-args="'reports'" aria-label="All reports">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
       <span data-i18n="nav.reports">Reports</span>
@@ -570,6 +574,71 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Jobs page -->
+  <div class="page" id="page-jobs" style="flex-direction:column;overflow:hidden">
+    <!-- LIST + FORM VIEW -->
+    <div id="jobs-main-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <!-- Filter bar pinned at top -->
+      <div style="padding:14px 24px 10px;flex-shrink:0;background:var(--panel);border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-end">
+        <div class="fld" style="flex:1;gap:3px"><label>Search</label><input id="jobs-search" placeholder="Search title, customer, scope, lead…" data-on-input="jobsRender" style="font-size:13px"/></div>
+        <div class="fld" style="flex:0 0 160px;gap:3px"><label>Status</label>
+          <select id="jobs-filter-status" data-on-change="jobsRender" style="font-size:13px">
+            <option value="">All statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Active">Active</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="jobOpenForm" data-args="null" style="padding:8px 14px;font-size:12px;margin-bottom:1px;white-space:nowrap">+ New job</button>
+      </div>
+      <!-- Scrollable content -->
+      <div style="flex:1;overflow-y:auto;padding:20px 24px 28px">
+        <div style="margin-bottom:14px">
+          <div class="sh-title" style="font-size:18px;margin-bottom:2px">Jobs</div>
+          <div class="sh-desc" id="jobs-sub">0 jobs</div>
+        </div>
+        <!-- Create / edit form (inline panel) -->
+        <div id="jobs-form-wrap" style="display:none;margin-bottom:16px">
+          <div class="sc">
+            <div class="sc-head" style="display:flex;align-items:center;justify-content:space-between">
+              <span class="sc-title" id="job-form-title">New job</span>
+              <button class="btn btn-sm" data-action="jobCloseForm">✕ Cancel</button>
+            </div>
+            <div class="sc-body">
+              <div class="fg form-row">
+                <div class="fld"><label>Job title *</label><input id="jobf-title" placeholder="e.g. ACME Pipeline Phase 2"/></div>
+                <div class="fld"><label>Customer *</label><select id="jobf-customer"></select></div>
+              </div>
+              <div class="fg form-row">
+                <div class="fld"><label>Status</label>
+                  <select id="jobf-status">
+                    <option value="Pending">Pending</option>
+                    <option value="Active">Active</option>
+                    <option value="Closed">Closed</option>
+                  </select>
+                </div>
+                <div class="fld"><label>Lead inspector</label><input id="jobf-lead" placeholder="Name"/></div>
+              </div>
+              <div class="fg form-row">
+                <div class="fld"><label>Start date</label><input type="date" id="jobf-start"/></div>
+                <div class="fld"><label>End date</label><input type="date" id="jobf-end"/></div>
+              </div>
+              <div class="fld form-row"><label>Scope of work</label><textarea id="jobf-scope" rows="3" placeholder="What's being inspected, where, against which codes…"></textarea></div>
+              <div class="fld form-row"><label>Notes</label><textarea id="jobf-notes" rows="2" placeholder="Internal notes, PO references, anything worth noting…"></textarea></div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+                <button class="btn btn-sm" data-action="jobCloseForm">Cancel</button>
+                <button class="btn btn-primary btn-sm" data-action="jobSave">Save job</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="jobs-list-wrap"></div>
+      </div>
+    </div>
+    <!-- DETAIL VIEW -->
+    <div id="jobs-detail-view" style="display:none;flex:1;overflow-y:auto;padding:20px 24px 28px"></div>
   </div>
 
   <!-- Reports page -->
@@ -3589,6 +3658,7 @@
 <script defer src="js/settings.js"></script>
 <script defer src="js/reports.js"></script>
 <script defer src="js/dashboard.js"></script>
+<script defer src="js/jobs.js"></script>
 <script defer src="js/help.js"></script>
 <script defer src="js/defects.js"></script>
 <script defer src="js/editor.js"></script>

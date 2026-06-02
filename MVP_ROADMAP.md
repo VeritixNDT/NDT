@@ -71,12 +71,14 @@ _Remaining polish (deferred): job/customer i18n (English-only for now, matching 
 - ✅ **Quote → Invoice convert** (copies line items, links `sourceQuoteId`).
 - ⏳ Optional Xero / QuickBooks CSV export — not done (deferred).
 
-### Phase 3 — Approval workflow (Week 11–12)
-- Report status state machine: `Draft → Submitted → Approved → Final → Sent` (replaces today's free-form `verdict`)
-- "Submit for review" action on a report (Inspector role)
-- "Approve" / "Request changes" actions (Senior / Admin only) — role gating already exists
-- Sealed PDF on approval: snapshot of report at approval-time stored as immutable; subsequent edits create a revision
-- Audit trail on the report: who / when / what (extend the existing `auditLog` field)
+### Phase 3 — Approval workflow (Week 11–12) — ✅ built
+**✅ Built & browser-verified.** (Most scaffolding pre-existed — stages, Inbox, audit log — so this phase completed & hardened it.)
+- ✅ Stage state machine `Draft → Submitted → Approved → Sent` (+ legacy Reviewed/Archived retained); `verdict` kept as the technical result, stage is the workflow state.
+- ✅ "Submit for review" on report rows (Draft → Submitted); a plain "Save" now Submits unless the saver may approve.
+- ✅ "Approve" / "Request changes" on report rows **and** the Inbox (Senior/Admin, or self-approve inspector on own report).
+- ✅ **Sealed PDF on approval** — immutable `sealedHtml` snapshot stamped "APPROVED" (approver + date); approved reports are hard-locked, changes go through a new revision that re-enters review.
+- ✅ Audit trail extended (`auditLog`: created / submitted / approved & sealed / stage changes / sent).
+- ✅ **Extra (Carl):** per-inspector `canSelfApprove` checkbox (admin-set) lets chosen inspectors approve & seal their own reports without separate review.
 
 ### Phase 4 — Customer portal (Week 13–14)
 - Magic-link email auth for customers — lighter than full Supabase Auth accounts:

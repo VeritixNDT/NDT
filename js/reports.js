@@ -1355,10 +1355,14 @@ function vxEmailCompose(opts){
     to:      opts.to || tpl.to || '',
     subject: _rptEmailFill(tpl.subject, tokens),
     body:    _rptEmailFill(tpl.body, tokens),
+    onSend:  opts.onSend || null,
   });
 }
 // Which template type the open modal is editing (for "Save as default").
 var _vxEmailTplType = 'report';
+// Optional callback fired after the user hits Send (e.g. mark a quote/invoice
+// as Sent). Set per-open by _rptEmailOpenModal, cleared on close.
+var _vxEmailOnSend = null;
 function rptBulkEmail(){
   const idxs = Array.from(_rptSelectedIdx);
   if(!idxs.length){ toast(t('toast.select_reports','Select one or more reports first.'), 'warn'); return; }
@@ -1380,6 +1384,7 @@ function rptBulkEmail(){
 // starts from the new wording.
 function _rptEmailOpenModal(args){
   _vxEmailTplType = args.tplType || 'report';
+  _vxEmailOnSend  = (typeof args.onSend === 'function') ? args.onSend : null;
   const existing = document.getElementById('rpt-email-modal');
   if(existing) existing.remove();
   const overlay = document.createElement('div');
@@ -1427,6 +1432,7 @@ function _rptEmailOpenModal(args){
 }
 function _rptEmailClose(){
   const m = document.getElementById('rpt-email-modal'); if(m) m.remove();
+  _vxEmailOnSend = null;
 }
 function _rptEmailReadDraft(){
   return {
@@ -1449,7 +1455,10 @@ function _rptEmailSend(){
     toast('Body is long — your mail client may truncate it. Consider copy/pasting after the draft opens.', 'warn');
   }
   window.location.href = url;
+  // Capture the post-send hook before close clears it (e.g. mark Sent).
+  const onSend = _vxEmailOnSend;
   _rptEmailClose();
+  if(typeof onSend === 'function'){ try { onSend(); } catch(e){ console.warn('email onSend', e); } }
 }
 function _rptEmailSaveTemplate(){
   if(typeof vxRequireAdmin === 'function' && !vxRequireAdmin('save the email template')) return;

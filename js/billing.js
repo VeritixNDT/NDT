@@ -603,7 +603,12 @@ function billEmailDoc(type, id) {
   const cust = (typeof custLoad === 'function' ? custLoad() : []).find(x => x.id === doc.customerId) || {};
   const to = ((cust.contacts || [])[0] || {}).email || '';
   const noun = (type === 'invoice') ? 'invoice' : 'quote';
-  vxEmailCompose({ type: noun, tokens: _billEmailTokens(doc), to, heading: 'Email ' + noun + ' ' + (doc.number || '') });
+  vxEmailCompose({
+    type: noun, tokens: _billEmailTokens(doc), to,
+    heading: 'Email ' + noun + ' ' + (doc.number || ''),
+    // On Send: advance a still-Draft doc to Sent (re-read for a fresh status).
+    onSend: () => { const d = billGet(type, id); if(d && d.status === 'Draft') billSetStatus(type, id, 'Sent'); },
+  });
 }
 
 // Payment-reminder email for an unpaid invoice (reminder template).

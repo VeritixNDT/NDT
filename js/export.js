@@ -664,7 +664,8 @@ function ovPrintReport(idx){
   const reports = (typeof ls === 'function') ? ls(KEYS.reports, []) : [];
   const r = reports[idx];
   if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
-  let html = r.frozenHtml;
+  // An approved report prints its sealed (stamped, immutable) snapshot.
+  let html = r.sealedHtml || r.frozenHtml;
   if(!html) html = ovBuildReportSnapshot(r);
   if(!html){
     toast(t('toast.report_no_snapshot','No printable layout for this report — its method has no saved template.'),'error');
@@ -682,7 +683,7 @@ function ovViewReport(idx){
   const reports = (typeof ls === 'function') ? ls(KEYS.reports, []) : [];
   const r = reports[idx];
   if(!r){ toast(t('toast.report_not_found','Report not found.'),'error'); return; }
-  let html = r.frozenHtml;
+  let html = r.sealedHtml || r.frozenHtml;
   if(!html) html = ovBuildReportSnapshot(r);
   if(!html){
     toast(t('toast.report_no_snapshot','No printable layout for this report — its method has no saved template.'),'error');

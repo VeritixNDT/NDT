@@ -1976,6 +1976,7 @@ function inspOpenForm(idx) {
   el('if-name').value  = ins.name  || '';
   el('if-email').value = ins.email || '';
   el('if-notes').value = ins.notes || '';
+  if(el('if-self-approve')) el('if-self-approve').checked = !!ins.canSelfApprove;
   const et = ins.eyeTest || {};
   el('if-eye-certno').value    = et.certNo    || '';
   el('if-eye-authority').value = et.authority || '';
@@ -2016,6 +2017,9 @@ function inspSave() {
     // VT report this inspector signs — see the eye-cert smart card.
     eyeTest,
     signature:   sigGetData() || (_inspEditIdx !== null ? INSPECTORS[_inspEditIdx]?.signature : null),
+    // Phase 3 approval workflow: when set, this inspector may approve & seal
+    // their own reports without a separate Senior/Admin review.
+    canSelfApprove: el('if-self-approve') ? !!el('if-self-approve').checked : (_inspEditIdx !== null ? !!INSPECTORS[_inspEditIdx]?.canSelfApprove : false),
     updatedAt:   new Date().toISOString(),
   };
   if(_inspEditIdx !== null) { INSPECTORS[_inspEditIdx] = record; }

@@ -2654,21 +2654,33 @@ function ovSaveReport(mode) {
       author: CURRENT_USER ? (CURRENT_USER.name || CURRENT_USER.email || '') : '',
     });
   }
-  // V6: ensure new report has stage + audit log. "Save" issues the report
-  // straight to the Approved stage; "For review" puts it at the Submitted
-  // stage so it appears in the reviewers' Inbox instead.
+  // V6 + Phase 3: stage + audit. "For review" always Submits. A plain
+  // "Save" only goes straight to Approved (and seals) when the saver is
+  // allowed to approve — Senior/Admin, or an inspector flagged
+  // canSelfApprove on their own report. Otherwise "Save" submits for review
+  // so an un-privileged inspector can't self-approve. A revision therefore
+  // re-enters review unless the saver may approve.
   const forReview = (mode === 'review');
-  report.stage = forReview ? 'Submitted' : 'Approved';
+  const canApprove = (typeof _ovCanApprove === 'function') ? _ovCanApprove() : (typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());
+  const willApprove = !forReview && canApprove;
   report.auditLog = [];
   if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
   addReportAudit(report, 'created', _ovReviseSource ? ('Revision ' + (report.revision||'') + ' created') : 'Report created');
-  addReportAudit(report, forReview ? 'submitted' : 'approved', forReview ? 'Submitted for review' : 'Approved on save');
   // Stage 2 — freeze the fully rendered report so reprints are identical
-  // regardless of any later template / register change. Stored as a
-  // self-contained HTML document on the record.
+  // regardless of any later template / register change.
   try {
     if(typeof ovBuildReportSnapshot === 'function') report.frozenHtml = ovBuildReportSnapshot(report);
   } catch(e){ console.warn('report snapshot failed', e); }
+  if(willApprove){
+    // Seal at approval time (immutable approved snapshot + approval stamp).
+    if(typeof _sealReport === 'function') _sealReport(report);
+    else report.stage = 'Approved';
+    const selfApproved = !(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());
+    addReportAudit(report, 'approved', selfApproved ? 'Approved & sealed (self-approve)' : 'Approved & sealed on save');
+  } else {
+    report.stage = 'Submitted';
+    addReportAudit(report, 'submitted', 'Submitted for review');
+  }
   // Save
   const reports = ls(KEYS.reports, []);
   reports.push(report);
@@ -2687,7 +2699,7 @@ function ovSaveReport(mode) {
   _ovDraftClear(_ovMethod);
   _ovDraftStopTick();
   _ovDraftIndicator('idle');
-  toast(forReview ? `${m.id} report submitted for review.` : `${m.id} report saved.`);
+  toast(willApprove ? `${m.id} report approved & sealed.` : `${m.id} report submitted for review.`);
   ovShowSection('dashboard', el('ovi-dashboard'));
 }
 

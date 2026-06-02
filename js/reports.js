@@ -1543,7 +1543,7 @@ function rptRenderTable(list, allReports){
     wrap.innerHTML = `<div class="sc" style="margin-top:14px"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%"><thead><tr>
         <th scope="col" style="width:34px;padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select all visible reports" title="Select all visible"></th>
-        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col">Weld / object</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th>
+        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col">Weld / object</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="text-align:right">Workflow</th>
       </tr></thead><tbody></tbody></table></div></div>`;
     table = wrap.querySelector('table.tbl');
     tbody = table.querySelector('tbody');
@@ -1558,7 +1558,7 @@ function rptRenderTable(list, allReports){
 
   // Empty state
   if(!list.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--t3)">No reports match these filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--t3)">No reports match these filters.</td></tr>';
     visibleIdxListLatest = [];
     return;
   }
@@ -1657,6 +1657,7 @@ function _rptRowSig(r, idx) {
   return [
     r.reportNo, r.method, getReportStage(r), r.verdict, r.client, r.subject,
     r.drawing, r.inspector, r.createdAt, r.stageUpdatedAt,
+    r.sealedAt || '',
     _rptIsSuperseded(r) ? 'S' : '',
     _rptSelectedIdx.has(idx) ? '1' : '0',
   ].join('|');
@@ -1681,7 +1682,37 @@ function _rptRowInner(r, _origIdx) {
     <td style="font-size:12px;color:var(--t2)">${escapeHtml(r.drawing||'—')}</td>
     <td>${escapeHtml(r.inspector||'—')}</td>
     <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(r.createdAt)}</td>
-    <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>`;
+    <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>
+    ${_rptRowActions(r, _origIdx)}`;
+}
+
+// Stage-aware workflow actions for one report row + a sealed indicator.
+// Buttons only appear for the role/stage that can act; the handlers
+// re-check permissions, so this is presentation only.
+function _rptRowActions(r, idx){
+  const stage = getReportStage(r);
+  const sup = _rptIsSuperseded(r);
+  const seniorOrAdmin = (typeof vxIsSeniorOrAdmin === 'function') && vxIsSeniorOrAdmin();
+  const btns = [];
+  if(r.sealedAt){
+    btns.push(`<span title="Sealed by ${escapeHtml(r.approvedBy||'—')} on ${escapeHtml(fmtDate(r.sealedAt))}" style="color:var(--green);font-size:12px;cursor:default">🔒</span>`);
+  }
+  if(!sup){
+    if(stage === 'Draft'){
+      btns.push(`<button class="btn btn-sm" data-action="submitReport" data-args="${idx}" style="font-size:10px;padding:3px 7px">Submit</button>`);
+    } else if(stage === 'Submitted' || stage === 'Reviewed'){
+      if(_reportCanApprove(r)){
+        btns.push(`<button class="btn btn-sm btn-primary" data-action="inboxApprove" data-args="${idx}" style="font-size:10px;padding:3px 7px">Approve</button>`);
+        btns.push(`<button class="btn btn-sm btn-danger" data-action="inboxReject" data-args="${idx}" style="font-size:10px;padding:3px 7px">Changes</button>`);
+      }
+    } else if(stage === 'Approved'){
+      if(seniorOrAdmin || _reportCanApprove(r)){
+        btns.push(`<button class="btn btn-sm" data-action="markReportSent" data-args="${idx}" style="font-size:10px;padding:3px 7px">Mark sent</button>`);
+      }
+    }
+  }
+  btns.push(`<button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${idx}" title="View history" style="font-size:10px;padding:3px 6px">⌕</button>`);
+  return `<td style="white-space:nowrap;text-align:right">${btns.join(' ')}</td>`;
 }
 
 function rptRenderKanban(list, allReports){
@@ -1865,17 +1896,73 @@ function rptClearFilters() {
 // ══════════════════════════════════════════════════════════════════════════
 // V6 WORKFLOW — Report stages, audit log, approval routing
 // ══════════════════════════════════════════════════════════════════════════
-var RPT_STAGES = ['Draft', 'Submitted', 'Reviewed', 'Approved', 'Archived'];
+var RPT_STAGES = ['Draft', 'Submitted', 'Reviewed', 'Approved', 'Sent', 'Archived'];
 var RPT_STAGE_COLORS = {
   'Draft':     { bg:'rgba(127,140,170,.10)', fg:'var(--t2)',     accent:'#7f8caa' },
   'Submitted': { bg:'rgba(0,212,255,.10)',   fg:'var(--cyan)',   accent:'#00d4ff' },
   'Reviewed':  { bg:'rgba(167,139,250,.10)', fg:'var(--violet)', accent:'#a78bfa' },
-  // Approved is the terminal "signed off / officially issued" state.
-  // Green — matching the (green) checkmark in the Veritix shield — so the
-  // stage badge reads as an official, passed stamp.
+  // Approved = signed off / sealed. Green — matching the (green) checkmark
+  // in the Veritix shield — so the stage badge reads as an official stamp.
   'Approved':  { bg:'rgba(62,207,142,.10)',  fg:'var(--green)',  accent:'#3ecf8e' },
+  // Sent = the sealed report has been issued to the customer (terminal).
+  'Sent':      { bg:'rgba(99,102,241,.10)',  fg:'#818cf8',       accent:'#6366f1' },
   'Archived':  { bg:'rgba(255,255,255,.04)', fg:'var(--t3)',     accent:'#5a6880' },
 };
+
+// ── Approval gating + sealing (Phase 3) ───────────────────────────────────
+// Who may approve: Senior/Admin can approve any report; an inspector flagged
+// canSelfApprove (set by an admin on their inspector record) may approve
+// their OWN reports only.
+function _inspCanSelfApprove(){
+  try {
+    if(typeof _ovCurrentUserInspector === 'function'){
+      const rec = _ovCurrentUserInspector();
+      return !!(rec && rec.canSelfApprove);
+    }
+  } catch(e){}
+  return false;
+}
+// May the current user approve a *new* report they are saving (their own)?
+function _ovCanApprove(){
+  return (typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin()) || _inspCanSelfApprove();
+}
+// May the current user approve this specific (existing) report?
+function _reportCanApprove(r){
+  if(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin()) return true;
+  if(_inspCanSelfApprove() && typeof CURRENT_USER !== 'undefined' && CURRENT_USER){
+    return (r.inspector === CURRENT_USER.name) || (r.createdBy === CURRENT_USER.id);
+  }
+  return false;
+}
+
+// Seal a report at approval time: mark Approved, stamp approver + timestamp,
+// and freeze an immutable sealed snapshot (the official approved PDF). The
+// sealed report is never edited in place — changes go through a new revision.
+function _sealReport(r){
+  const now = new Date().toISOString();
+  r.stage = 'Approved';
+  r.stageUpdatedAt = now;
+  r.approvedBy   = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? (CURRENT_USER.name || CURRENT_USER.email || '') : '';
+  r.approvedById = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.id : null;
+  r.sealedAt = now;
+  let html = r.frozenHtml;
+  if(!html && typeof ovBuildReportSnapshot === 'function'){ try { html = ovBuildReportSnapshot(r); } catch(e){} }
+  if(html){ r.frozenHtml = html; r.sealedHtml = _stampApproval(html, r); }
+}
+
+// Inject a small "APPROVED" stamp into a sealed report's HTML so the printed
+// PDF shows it passed review (approver + date). position:fixed repeats the
+// stamp on every printed page.
+function _stampApproval(html, r){
+  if(!html || typeof html !== 'string') return html;
+  const by = escapeHtml(r.approvedBy || '');
+  const when = (typeof fmtDate === 'function') ? fmtDate(r.sealedAt) : (r.sealedAt || '');
+  const stamp = `<div style="position:fixed;bottom:9mm;right:9mm;border:1.5px solid #2e7d32;color:#2e7d32;border-radius:6px;padding:5px 11px;font-family:Arial,Helvetica,sans-serif;font-size:9px;line-height:1.3;background:rgba(46,125,50,.06);transform:rotate(-5deg);z-index:99999;text-align:center">
+    <div style="font-weight:800;letter-spacing:.1em;font-size:11px">&#10003; APPROVED</div>
+    <div>${by}</div><div>${escapeHtml(String(when))}</div>
+  </div>`;
+  return html.includes('</body>') ? html.replace('</body>', stamp + '</body>') : (html + stamp);
+}
 function getReportStage(r){ return r.stage || 'Draft'; }
 
 // Migration: ensure every report has stage + auditLog. Infers stage from verdict if missing.
@@ -1960,7 +2047,7 @@ function fmtDuration(ms){
 function stageHealthy(r){
   const dys = timeOnStage(r) / (1000*60*60*24);
   // Drafts can sit forever; submitted/reviewed should move within a week
-  if(getReportStage(r) === 'Draft' || getReportStage(r) === 'Approved' || getReportStage(r) === 'Archived') return 'fresh';
+  if(getReportStage(r) === 'Draft' || getReportStage(r) === 'Approved' || getReportStage(r) === 'Sent' || getReportStage(r) === 'Archived') return 'fresh';
   if(dys < 3) return 'fresh';
   if(dys < 7) return 'stale';
   return 'critical';
@@ -2215,18 +2302,56 @@ function inboxRender(){
 
 // Approval actions
 async function inboxApprove(idx){
-  // Approval is gated to Admin or Senior. The UI only shows the Approve
-  // button to those roles, but the action-level guard protects against
-  // direct calls (e.g. from console or stale UI). Backend will enforce
-  // this independently when it lands.
-  if(!vxIsSeniorOrAdmin()){
+  // Approval is gated: Senior/Admin can approve any report; a self-approve
+  // inspector can approve their own. The action-level guard protects against
+  // direct calls (console / stale UI). Backend will enforce independently.
+  const all = ls(KEYS.reports, []);
+  const r = all[idx];
+  if(!r){ return; }
+  if(!_reportCanApprove(r)){
     toast(t('toast.approver_required', 'Senior Inspector or Admin role required to approve.'), 'error');
     return;
   }
-  if(!await vxConfirm({ message: t('inb.confirm.approve','Are you sure you want to approve this report?'), okLabel: t('vxc.approve','Approve') })) return;
-  if(setReportStage(idx, 'Approved', '')){
-    toast(t('toast.report_approved','Report approved.'), 'success');
-    inboxRender();
+  if(!await vxConfirm({ message: t('inb.confirm.approve','Approve and seal this report? The approved version is locked — later changes require a new revision.'), okLabel: t('vxc.approve','Approve') })) return;
+  // Seal: mark Approved, stamp approver + freeze the immutable snapshot.
+  _sealReport(r);
+  const selfApproved = !(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());
+  addReportAudit(r, 'approved', selfApproved ? 'Approved & sealed (self-approve)' : 'Approved & sealed');
+  lss(KEYS.reports, all);
+  if(typeof rptRender === 'function') rptRender();
+  if(typeof inboxRender === 'function') inboxRender();
+  if(typeof updateReportCount === 'function') updateReportCount();
+  if(typeof updateInboxBadge === 'function') updateInboxBadge();
+  toast(t('toast.report_approved','Report approved & sealed.'), 'success');
+}
+
+// Mark an approved report as sent to the customer (terminal Sent stage).
+async function markReportSent(idx){
+  const all = ls(KEYS.reports, []);
+  const r = all[idx];
+  if(!r){ return; }
+  if(getReportStage(r) !== 'Approved'){
+    toast(t('toast.only_approved_sent','Only an approved report can be marked as sent.'), 'error');
+    return;
+  }
+  r.stage = 'Sent';
+  r.stageUpdatedAt = new Date().toISOString();
+  r.sentAt = new Date().toISOString();
+  addReportAudit(r, 'stage:Sent', 'Issued to customer');
+  lss(KEYS.reports, all);
+  if(typeof rptRender === 'function') rptRender();
+  if(typeof inboxRender === 'function') inboxRender();
+  if(typeof updateInboxBadge === 'function') updateInboxBadge();
+  toast(t('toast.report_sent','Report marked as sent.'), 'success');
+}
+
+// Submit a Draft report for review (owner action), surfaced on report rows.
+function submitReport(idx){
+  const all = ls(KEYS.reports, []);
+  const r = all[idx]; if(!r) return;
+  if(getReportStage(r) !== 'Draft'){ toast(t('toast.only_draft_submit','Only a draft can be submitted for review.'), 'error'); return; }
+  if(setReportStage(idx, 'Submitted', '')){
+    toast(t('toast.submitted_review','Submitted for review.'), 'success');
   }
 }
 async function inboxReject(idx){

@@ -1577,6 +1577,13 @@
                   <label data-i18n="insp.lbl.notes">Notes</label>
                   <textarea id="if-notes" rows="2" placeholder="Additional qualifications, remarks…" data-i18n-placeholder="insp.ph.notes"></textarea>
                 </div>
+                <div class="fld form-row">
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" id="if-self-approve" style="width:auto;cursor:pointer"/>
+                    <span>Allow this inspector to approve &amp; seal their own reports</span>
+                  </label>
+                  <div style="font-size:11px;color:var(--t3);margin-top:2px">When off, their reports go to a Senior/Admin for review before approval.</div>
+                </div>
                 <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
                   <button class="btn" data-action="inspCloseForm" data-i18n="btn.cancel">Cancel</button>
                   <button class="btn btn-primary" data-action="inspSave" data-i18n="insp.btn.save">Save inspector</button>

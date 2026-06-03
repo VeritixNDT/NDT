@@ -339,7 +339,7 @@ function _plAgendaHtml() {
   const startYmd = _plYmd(ms);
   const endYmd = _plYmd(new Date(ms.getFullYear(), ms.getMonth() + 1, 0));
   const items = plCollect(startYmd, endYmd);
-  if (!items.length) return `<div style="color:var(--t3);font-size:13px;padding:24px 4px">Nothing scheduled this month. <a href="#" data-action="plNewEvent" style="color:var(--cyan)">Add an event</a>.</div>`;
+  if (!items.length) return `<div style="color:var(--t3);font-size:13px;padding:24px 4px">Nothing scheduled this month. <a href="#" data-action="plNewEvent" data-prevent-default="1" style="color:var(--cyan)">Add an event</a>.</div>`;
 
   const byDay = {};
   items.forEach(it => { (byDay[it.ymd] = byDay[it.ymd] || []).push(it); });
@@ -515,7 +515,7 @@ function plUpView(v) { _plUpView = (v === 'week') ? 'week' : 'list'; plRenderUpc
 function _plUpListHtml() {
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
   const items = plCollect(_plTodayYmd(), _plYmd(_plAddDays(new Date(), 14)), { all: true }).slice(0, 8);
-  if (!items.length) return `<div style="padding:10px 16px 14px;color:var(--t3);font-size:12px">Nothing scheduled in the next 14 days. <a href="#" data-action="plNewEvent" style="color:var(--cyan)">Add an event</a>.</div>`;
+  if (!items.length) return `<div style="padding:10px 16px 14px;color:var(--t3);font-size:12px">Nothing scheduled in the next 14 days. <a href="#" data-action="plNewEvent" data-prevent-default="1" style="color:var(--cyan)">Add an event</a>.</div>`;
   const today = _plTodayYmd();
   return items.map(it => {
     const c = it.overdue ? '#e5484d' : _plColor(it.type);

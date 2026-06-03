@@ -652,7 +652,10 @@ function ovDrillDate(yyyyMMdd){
 // Top defect types as horizontal bar chart
 function ovRenderDefectTypes(){
   const wrap = el('ov-defect-types'); if(!wrap) return;
-  const all = ls(KEYS.defects, []);
+  // Combined defect source: report-embedded defects (latest revision only,
+  // via _defFromReports) + manually-logged standalone defects. Falls back to
+  // standalone-only if the defects module isn't loaded yet.
+  const all = (typeof _defCombined === 'function') ? _defCombined() : ls(KEYS.defects, []);
   const filtered = (_ovDateRange === 'all') ? all : all.filter(d => {
     if(!d.createdAt) return false;
     const t = new Date(d.createdAt).getTime();
@@ -675,7 +678,7 @@ function ovRenderDefectTypes(){
 }
 
 function ovDrillDefectType(type){
-  const all = ls(KEYS.defects, []);
+  const all = (typeof _defCombined === 'function') ? _defCombined() : ls(KEYS.defects, []);
   const matches = all.filter(d => (d.type||'Unknown') === type);
   ovOpenDefectDrilldown(`${type} defects (${matches.length})`, matches);
 }

@@ -321,7 +321,9 @@ function ovInit() {
       New ${m.id} report
     </button>
   `).join('');
-  ovRefreshDashboard();
+  // Home always lands on the Overview (dashboard) sub-section, even if another
+  // Overview section (Recent / Procedures / New report) was last open.
+  ovShowSection('dashboard', el('ovi-dashboard'));
 }
 
 function ovShowSection(id, btn) {

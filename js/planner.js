@@ -156,39 +156,69 @@ function plRender() {
   if (typeof a11yWireLabels === 'function') a11yWireLabels(root);
 }
 
-function _plMonthHtml() {
+// Lay out one row of days (a calendar week, or the all-day strip) into lanes,
+// rendering multi-day items as spanning bars and single-day items as chips.
+// Returns grid HTML (grid-column = day span, grid-row = lane+1) + lane count.
+function _plRowLanes(days, items, maxLanes) {
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
-  const gridStart = _plGridStart(_plCursor);
-  const startYmd = _plYmd(gridStart);
-  const endYmd = _plYmd(_plAddDays(gridStart, 41));
-  const items = plCollect(startYmd, endYmd);
-  const byDay = {};
-  items.forEach(it => { (byDay[it.ymd] = byDay[it.ymd] || []).push(it); });
+  const rowStart = _plYmd(days[0]), rowEnd = _plYmd(days[days.length - 1]);
+  const segs = [];
+  for (const it of items) {
+    const sY = it.ymd, eY = (it.endYmd && it.endYmd > it.ymd) ? it.endYmd : it.ymd;
+    if (!sY || eY < rowStart || sY > rowEnd) continue;
+    const ss = sY < rowStart ? rowStart : sY, ee = eY > rowEnd ? rowEnd : eY;
+    segs.push({ it, startCol: days.findIndex(d => _plYmd(d) === ss), endCol: days.findIndex(d => _plYmd(d) === ee),
+      contL: sY < rowStart, contR: eY > rowEnd, multi: eY > sY });
+  }
+  // Longer (multi-day) items first → they take stable top lanes; then by column.
+  segs.sort((a, b) => (b.endCol - b.startCol) - (a.endCol - a.startCol) || a.startCol - b.startCol);
+  const lanes = [];
+  for (const s of segs) {
+    let L = 0;
+    for (; L < lanes.length; L++) if (lanes[L].every(r => s.endCol < r.startCol || s.startCol > r.endCol)) break;
+    if (L === lanes.length) lanes.push([]);
+    lanes[L].push(s); s.lane = L;
+  }
+  const hidden = {};
+  let html = '';
+  for (const s of segs) {
+    if (s.lane >= maxLanes) { for (let c = s.startCol; c <= s.endCol; c++) hidden[c] = (hidden[c] || 0) + 1; continue; }
+    const it = s.it, c = it.overdue ? '#e5484d' : _plColor(it.type);
+    const lbl = (it.time ? it.time + ' ' : '') + it.title;
+    const rl = s.contL ? '0' : '4px', rr = s.contR ? '0' : '4px';
+    html += `<div class="pl-mseg${s.multi ? ' pl-mbar' : ''}" style="grid-column:${s.startCol + 1}/${s.endCol + 2};grid-row:${s.lane + 1};background:${s.multi ? c + 'cc' : c + '1f'};border-left:3px solid ${c};border-radius:${rl} ${rr} ${rr} ${rl};color:${s.multi ? '#fff' : 'var(--t1)'}" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(lbl)}${it.sub ? ' · ' + esc(it.sub) : ''}">${s.contL ? '‹ ' : ''}${esc(lbl)}${s.contR ? ' ›' : ''}</div>`;
+  }
+  for (const c in hidden) html += `<div class="pl-mmore" style="grid-column:${(+c) + 1};grid-row:${maxLanes + 1}" data-action="plDayPopover" data-args="'${_plYmd(days[+c])}'">+${hidden[c]} more</div>`;
+  return { html, laneCount: lanes.length };
+}
 
+function _plMonthHtml() {
+  const gridStart = _plGridStart(_plCursor);
+  const items = plCollect(_plYmd(gridStart), _plYmd(_plAddDays(gridStart, 41)));
   const dows = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const today = _plTodayYmd();
   const curMonth = _plCursor.getMonth();
+  const VIS = 3;
 
-  let cells = '';
-  for (let i = 0; i < 42; i++) {
-    const d = _plAddDays(gridStart, i);
-    const ymd = _plYmd(d);
-    const dayItems = byDay[ymd] || [];
-    const max = 4;
-    const chips = dayItems.slice(0, max).map(it => {
-      const c = it.overdue ? '#e5484d' : _plColor(it.type);
-      const lbl = (it.time ? it.time + ' ' : '') + it.title;
-      return `<div class="pl-ev" style="background:${c}1f;border-left-color:${c};color:var(--t1)"
-        data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(lbl)}${it.sub ? ' · ' + esc(it.sub) : ''}">${esc(lbl)}</div>`;
-    }).join('');
-    const more = dayItems.length > max
-      ? `<div class="pl-more" data-action="plDayPopover" data-args="'${ymd}'">+${dayItems.length - max} more</div>` : '';
-    cells += `<div class="pl-cell ${d.getMonth() === curMonth ? '' : 'other'} ${ymd === today ? 'today' : ''}"
-      data-action="plDayNew" data-args="'${ymd}'">
-      <div class="pl-daynum" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day">${d.getDate()}</div>${chips}${more}</div>`;
+  let rows = '';
+  for (let w = 0; w < 6; w++) {
+    const weekDays = []; for (let i = 0; i < 7; i++) weekDays.push(_plAddDays(gridStart, w * 7 + i));
+    const lay = _plRowLanes(weekDays, items, VIS);
+    const bg = weekDays.map(d => { const ymd = _plYmd(d);
+      return `<div class="pl-cell ${d.getMonth() === curMonth ? '' : 'other'} ${ymd === today ? 'today' : ''}" data-action="plDayNew" data-args="'${ymd}'"></div>`; }).join('');
+    const nums = weekDays.map(d => { const ymd = _plYmd(d);
+      return `<div class="pl-daynum ${d.getMonth() === curMonth ? '' : 'other'} ${ymd === today ? 'today' : ''}" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day">${d.getDate()}</div>`; }).join('');
+    rows += `<div class="pl-mrow">
+      <div class="pl-mbg">${bg}</div>
+      <div class="pl-mfg">
+        <div class="pl-mnums">${nums}</div>
+        <div class="pl-mlanes" style="grid-template-rows:repeat(${VIS + 1},18px)">${lay.html}</div>
+      </div>
+    </div>`;
   }
-  return `<div class="pl-grid">${dows.map(d => `<div class="pl-dow">${d}</div>`).join('')}${cells}</div>
-    <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a date to open the day · click empty space to add an event · click an item to open it.</div>`;
+  return `<div class="pl-mhead">${dows.map(d => `<div class="pl-dow">${d}</div>`).join('')}</div>
+    <div class="pl-mwrap">${rows}</div>
+    <div style="margin-top:10px;font-size:11px;color:var(--t3)">Multi-day items span as bars · click a date to open the day · click empty space to add · click an item to open it.</div>`;
 }
 
 function _plAgendaHtml() {
@@ -265,15 +295,12 @@ function _plTimeGridHtml(days) {
   const hours = []; for (let m = winS; m < winE; m += 60) hours.push(m);
   const bodyH = (winE - winS) / 60 * HPX;
 
-  const allChip = it => { const c = it.overdue ? '#e5484d' : _plColor(it.type);
-    return `<div class="pl-ev" style="background:${c}1f;border-left-color:${c};color:var(--t1)" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(it.title)}">${esc(it.title)}</div>`; };
-
   const heads = days.map(d => { const ymd = _plYmd(d);
     return `<div class="pl-tg-dayh ${ymd === today ? 'today' : ''}" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day"><span class="pl-wdow">${esc(d.toLocaleDateString(undefined, { weekday: 'short' }))}</span> ${d.getDate()}</div>`; }).join('');
 
-  const allCols = days.map(d => { const ymd = _plYmd(d); const all = (byDay[ymd] || []).filter(it => !it.time);
-    const max = 2; const more = all.length > max ? `<div class="pl-more" data-action="plDayPopover" data-args="'${ymd}'">+${all.length - max}</div>` : '';
-    return `<div class="pl-tg-allcol" data-action="plDayNew" data-args="'${ymd}'">${all.slice(0, max).map(allChip).join('')}${more}</div>`; }).join('');
+  // All-day strip: multi-day items span across day columns (lane-packed).
+  const allLay = _plRowLanes(days, items.filter(it => !it.time), 3);
+  const allBg = days.map(d => `<div class="pl-tg-allcell" data-action="plDayNew" data-args="'${_plYmd(d)}'"></div>`).join('');
 
   const gutter = hours.map(m => `<div class="pl-tg-hr" style="height:${HPX}px"><span>${_plHm(m)}</span></div>`).join('');
 
@@ -291,7 +318,10 @@ function _plTimeGridHtml(days) {
   const gcols = `grid-template-columns:repeat(${n},1fr)`;
   return `<div class="pl-tg ${n === 1 ? 'pl-tg-day' : ''}">
     <div class="pl-tg-head"><div class="pl-tg-gx"></div><div class="pl-tg-heads" style="${gcols}">${heads}</div></div>
-    <div class="pl-tg-allday"><div class="pl-tg-gx pl-tg-allbl">all-day</div><div class="pl-tg-allcols" style="${gcols}">${allCols}</div></div>
+    <div class="pl-tg-allday"><div class="pl-tg-gx pl-tg-allbl">all-day</div><div class="pl-tg-allwrap">
+      <div class="pl-tg-allbg" style="${gcols}">${allBg}</div>
+      <div class="pl-tg-alllanes" style="${gcols};grid-auto-rows:17px">${allLay.html}</div>
+    </div></div>
     <div class="pl-tg-body"><div class="pl-tg-gutter">${gutter}</div><div class="pl-tg-cols" style="${gcols};height:${bodyH}px">${cols}</div></div>
   </div>
   <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a time slot to add an event · click a date to open the day · click an item to open it.</div>`;
@@ -514,15 +544,29 @@ function _plInjectStyles() {
     .pl-chip.off{opacity:.38}
     .pl-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0;display:inline-block}
     .pl-body{flex:1;overflow-y:auto;padding:16px 24px 28px}
-    .pl-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden}
     .pl-dow{background:var(--panel);padding:7px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);text-align:center;font-weight:600}
-    .pl-cell{background:var(--bg);min-height:108px;padding:5px 6px;display:flex;flex-direction:column;gap:3px;cursor:pointer}
+    .pl-mhead{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-bottom:0;border-radius:8px 8px 0 0;overflow:hidden}
+    .pl-mwrap{border:1px solid var(--border);border-radius:0 0 8px 8px;overflow:hidden}
+    .pl-mrow{position:relative;border-top:1px solid var(--border)}
+    .pl-mrow:first-child{border-top:0}
+    .pl-mbg{display:grid;grid-template-columns:repeat(7,1fr);position:absolute;inset:0}
+    .pl-cell{background:var(--bg);border-left:1px solid var(--border);cursor:pointer}
+    .pl-cell:first-child{border-left:0}
     .pl-cell:hover{background:var(--bg2)}
-    .pl-cell.other{background:var(--bg2);opacity:.5}
-    .pl-daynum{font-size:11px;color:var(--t2);font-weight:600;align-self:flex-start;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center}
-    .pl-cell.today .pl-daynum{background:var(--cyan);color:#012;border-radius:50%}
-    .pl-ev{font-size:10.5px;line-height:1.3;padding:2px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border-left:3px solid}
-    .pl-ev:hover{filter:brightness(1.25)}
+    .pl-cell.other{background:var(--bg2)}
+    .pl-cell.today{background:rgba(34,184,206,.06)}
+    .pl-mfg{position:relative;pointer-events:none;min-height:110px;padding-bottom:3px}
+    .pl-mnums{display:grid;grid-template-columns:repeat(7,1fr)}
+    .pl-daynum{justify-self:start;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin:3px 0 2px 4px;font-size:11px;font-weight:600;color:var(--t2);border-radius:50%;pointer-events:auto;cursor:pointer}
+    .pl-daynum:hover{background:var(--bg2)}
+    .pl-daynum.other{color:var(--t3);opacity:.55}
+    .pl-daynum.today,.pl-daynum.today:hover{background:var(--cyan);color:#012}
+    .pl-mlanes{display:grid;grid-template-columns:repeat(7,1fr);column-gap:2px;row-gap:2px;padding:0 2px}
+    .pl-mseg{pointer-events:auto;height:17px;line-height:17px;font-size:10.5px;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
+    .pl-mseg:hover{filter:brightness(1.2)}
+    .pl-mbar{font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+    .pl-mmore{pointer-events:auto;align-self:center;font-size:10px;color:var(--t3);cursor:pointer;padding-left:4px}
+    .pl-mmore:hover{color:var(--cyan)}
     .pl-more{font-size:10px;color:var(--t3);cursor:pointer;padding-left:3px}
     .pl-more:hover{color:var(--cyan)}
     .pl-week{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-height:440px}
@@ -572,7 +616,7 @@ function _plInjectStyles() {
     .pl-tg-day{max-width:920px}
     .pl-tg-head,.pl-tg-allday,.pl-tg-body{display:flex}
     .pl-tg-gx{width:54px;flex-shrink:0;border-right:1px solid var(--border)}
-    .pl-tg-heads,.pl-tg-allcols,.pl-tg-cols{display:grid;flex:1}
+    .pl-tg-heads,.pl-tg-cols{display:grid;flex:1}
     .pl-tg-head{border-bottom:1px solid var(--border)}
     .pl-tg-dayh{padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:var(--t2);border-left:1px solid var(--border);cursor:pointer}
     .pl-tg-dayh:first-child{border-left:0}
@@ -580,8 +624,13 @@ function _plInjectStyles() {
     .pl-tg-dayh.today .pl-wdow{color:#012}
     .pl-tg-allday{border-bottom:1px solid var(--border);min-height:28px;max-height:76px;overflow-y:auto}
     .pl-tg-allbl{display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
-    .pl-tg-allcol{border-left:1px solid var(--border);padding:3px;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-height:24px}
-    .pl-tg-allcol:first-child{border-left:0}
+    .pl-tg-allwrap{flex:1;position:relative;min-height:24px}
+    .pl-tg-allbg{display:grid;position:absolute;inset:0}
+    .pl-tg-allcell{border-left:1px solid var(--border);cursor:pointer}
+    .pl-tg-allcell:first-child{border-left:0}
+    .pl-tg-allcell:hover{background:var(--bg2)}
+    .pl-tg-alllanes{display:grid;position:relative;pointer-events:none;padding:3px 2px;column-gap:2px;row-gap:2px}
+    .pl-tg-alllanes>*{pointer-events:auto}
     .pl-tg-body{position:relative}
     .pl-tg-gutter{width:54px;flex-shrink:0;border-right:1px solid var(--border)}
     .pl-tg-hr{position:relative}

@@ -370,6 +370,13 @@ function ovRefreshDashboard() {
   const passRate = total ? Math.round(passed / total * 100) : 0;
   const defects = reports.filter(r => r.verdict === 'Not acceptable').length;
   const activeMethodCount = methods.filter(m => reports.some(r => r.method === m.id)).length;
+  // Open-defect backlog — combined source (report defects at latest revision +
+  // standalone), range-scoped by createdAt like the other tiles. 'Open' matches
+  // the Defects register's own status vocabulary.
+  const _defAll = (typeof _defCombined === 'function') ? _defCombined() : (ls(KEYS.defects, []) || []);
+  const _defRanged = (_ovDateRange === 'all') ? _defAll : _defAll.filter(d => d.createdAt && new Date(d.createdAt).getTime() >= Date.now() - parseInt(_ovDateRange) * 864e5);
+  const defTotal = _defRanged.length;
+  const openDefects = _defRanged.filter(d => (d.status || 'Open') === 'Open').length;
   const mC = m => reports.filter(r => r.method === m).length;
   const mP = m => { const rs = reports.filter(r => r.method === m); return rs.length ? Math.round(rs.filter(r => r.verdict === 'Acceptable').length / rs.length * 100) : 0; };
 
@@ -447,17 +454,17 @@ function ovRefreshDashboard() {
       <div class="dash-met-sub">${passed} of ${total} acceptable</div>
       ${sparklineSVG(passSpark, '#3ecf8e')}
     </div>
-    <div class="dash-met" data-action="ovDrillMetric" data-args="'drafts'" style="cursor:pointer" title="Click to see drafts in progress">
-      <div class="dash-met-glow" style="background:var(--cyan)"></div>
+    <div class="dash-met" data-action="ovOpenDefects" style="cursor:pointer" title="${t('dash.tip_defects','Open the defect register')}">
+      <div class="dash-met-glow" style="background:#f5a623"></div>
       <div class="dash-met-head">
-        <div class="dash-met-label">Methods active</div>
-        <div class="dash-met-icon" style="background:rgba(0,153,204,.10);color:var(--cyan2)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v6.5a2 2 0 0 0 .35 1.13l5.3 7.66a2 2 0 0 1-1.65 3.13H6a2 2 0 0 1-1.65-3.13l5.3-7.66A2 2 0 0 0 10 8.5V2"/><path d="M9 2h6"/></svg>
+        <div class="dash-met-label" data-i18n="dash.open_defects">Open defects</div>
+        <div class="dash-met-icon" style="background:rgba(245,166,35,.12);color:#f5a623">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         </div>
       </div>
-      <div class="dash-met-val">${activeMethodCount}<span style="font-size:14px;color:var(--t3);font-weight:500"> / ${methods.length}</span></div>
-      <div class="dash-met-sub">${methods.length - activeMethodCount} methods unused</div>
-      <div class="dash-met-bar"><div class="dash-met-bar-fill" style="width:${methods.length?activeMethodCount*100/methods.length:0}%;background:var(--cyan2)"></div></div>
+      <div class="dash-met-val">${openDefects}</div>
+      <div class="dash-met-sub">${defTotal ? tf('dash.defects_logged', '{n} logged', { n: defTotal }) : t('dash.defects_none', 'No defects logged')}</div>
+      <div class="dash-met-bar"><div class="dash-met-bar-fill" style="width:${defTotal ? openDefects * 100 / defTotal : 0}%;background:#f5a623"></div></div>
     </div>`;
 
   // Method cards
@@ -1116,6 +1123,10 @@ function ovOpenDefectDrilldown(title, list){
 }
 
 // Drill-down from clicking a metric tile
+function ovOpenDefects(){
+  if(typeof showPage === 'function') showPage('defects', document.querySelector('.tn[data-args="\'defects\'"]'));
+}
+
 function ovDrillMetric(kind){
   // Match the metric tiles: count/list each report once at its latest revision
   // (so "Not acceptable" — welds with defects — excludes superseded revisions).

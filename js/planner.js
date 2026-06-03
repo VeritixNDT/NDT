@@ -112,7 +112,112 @@ function plCollect(startYmd, endYmd, opts) {
 }
 
 // ── Entry / render ───────────────────────────────────────────────────────────
-function plInit() { _plInjectStyles(); plRender(); }
+function plInit() { _plInjectStyles(); _plInstallDrag(); plRender(); }
+
+// ── Drag-to-reschedule ───────────────────────────────────────────────────────
+// Pointer-drag for the schedulable items (custom events + jobs). Moving a
+// timed block onto the time grid changes its day + time (15-min snap); moving
+// a chip/bar onto a month cell or the all-day strip changes its day. Jobs keep
+// their duration (start+end shift together). Aggregated deadlines (cert/calib/
+// billing/reports) are not draggable — a normal click opens them.
+var _plDragOn = false;
+function _plInstallDrag() {
+  if (_plDragOn) return; _plDragOn = true;
+  let st = null;
+  const onPlanner = () => { const p = document.getElementById('page-planner'); return p && p.classList.contains('active'); };
+
+  document.addEventListener('mousedown', e => {
+    if (e.button !== 0 || !onPlanner()) return;
+    const seg = e.target.closest('.pl-drag');
+    if (!seg) return;
+    const m = (seg.getAttribute('data-args') || '').match(/'([^']*)'\s*,\s*'([^']*)'/);
+    if (!m || (m[1] !== 'event' && m[1] !== 'job')) return;
+    st = { type: m[1], refId: m[2], seg, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, lastTgt: null, tgt: null };
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!st) return;
+    if (!st.moved) {
+      if (Math.abs(e.clientX - st.x0) + Math.abs(e.clientY - st.y0) < 4) return;
+      st.moved = true;
+      document.body.classList.add('pl-dragging');
+      const g = document.createElement('div'); g.className = 'pl-ghost';
+      g.textContent = (st.seg.textContent || '').replace(/[‹›]/g, '').trim() || 'event';
+      document.body.appendChild(g); st.ghost = g;
+      st.seg.style.opacity = '.35';
+    }
+    st.ghost.style.left = (e.clientX + 12) + 'px';
+    st.ghost.style.top = (e.clientY + 14) + 'px';
+    if (st.lastTgt) { st.lastTgt.classList.remove('pl-drop'); st.lastTgt = null; }
+    st.tgt = _plDropTarget(e.clientX, e.clientY);
+    if (st.tgt) { st.tgt.el.classList.add('pl-drop'); st.lastTgt = st.tgt.el; }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!st) return;
+    const s = st; st = null;
+    if (s.ghost) s.ghost.remove();
+    if (s.seg) s.seg.style.opacity = '';
+    document.body.classList.remove('pl-dragging');
+    if (s.lastTgt) s.lastTgt.classList.remove('pl-drop');
+    if (!s.moved) return;
+    // Swallow the click that fires after a real drag so it doesn't open the item.
+    const supp = ev => { ev.stopPropagation(); ev.preventDefault(); document.removeEventListener('click', supp, true); };
+    document.addEventListener('click', supp, true);
+    setTimeout(() => document.removeEventListener('click', supp, true), 60);
+    if (s.tgt) _plApplyDrag(s.type, s.refId, s.tgt);
+  });
+}
+
+// Resolve the drop target under (x,y) → { el, ymd, time|null }.
+function _plDropTarget(x, y) {
+  const el = document.elementFromPoint(x, y);  // ghost is pointer-events:none
+  if (!el) return null;
+  const col = el.closest('.pl-tg-col');
+  if (col && col.dataset.ymd) {
+    const grid = col.closest('.pl-tg-cols');
+    const wins = +grid.dataset.wins, hpx = +grid.dataset.hpx;
+    const r = col.getBoundingClientRect();
+    let min = wins + (y - r.top) / hpx * 60;
+    min = Math.max(wins, Math.min(min, wins + r.height / hpx * 60));
+    return { el: col, ymd: col.dataset.ymd, time: _plHmm(Math.round(min / 15) * 15) };
+  }
+  const ac = el.closest('.pl-tg-allcell');
+  if (ac && ac.dataset.ymd) return { el: ac, ymd: ac.dataset.ymd, time: null };
+  const cell = el.closest('.pl-cell');
+  if (cell && cell.dataset.ymd) return { el: cell, ymd: cell.dataset.ymd, time: null };
+  return null;
+}
+
+function _plApplyDrag(type, refId, tgt) {
+  if (type === 'event') {
+    const list = plLoadEvents(); const ev = list.find(e => e.id === refId); if (!ev) return;
+    const oldYmd = String(ev.date || '').slice(0, 10);
+    if (oldYmd === tgt.ymd && (tgt.time === null || tgt.time === ev.time)) return;
+    if (ev.endDate) ev.endDate = _plShiftYmd(String(ev.endDate).slice(0, 10), _plDayDelta(oldYmd, tgt.ymd));
+    ev.date = tgt.ymd;
+    if (tgt.time !== null) {
+      if (ev.time && ev.endTime) ev.endTime = _plHmm(Math.max(0, _plMin(ev.endTime) + (_plMin(tgt.time) - _plMin(ev.time))));
+      ev.time = tgt.time;
+    }
+    ev.updatedAt = new Date().toISOString();
+    plSaveEvents(list);
+    if (typeof toast === 'function') toast('Moved to ' + _plFmt(tgt.ymd) + (tgt.time ? ' ' + tgt.time : '') + '.', 'success');
+  } else if (type === 'job') {
+    if (typeof jobLoad !== 'function' || typeof jobSaveAll !== 'function') return;
+    const jobs = jobLoad(); const j = jobs.find(x => x.id === refId); if (!j || !j.startDate) return;
+    const oldYmd = String(j.startDate).slice(0, 10);
+    const delta = _plDayDelta(oldYmd, tgt.ymd);
+    if (delta === 0) return;
+    j.startDate = _plShiftYmd(oldYmd, delta);
+    if (j.endDate) j.endDate = _plShiftYmd(String(j.endDate).slice(0, 10), delta);
+    j.updatedAt = new Date().toISOString();
+    jobSaveAll(jobs);
+    if (typeof toast === 'function') toast('Job moved to ' + _plFmt(tgt.ymd) + '.', 'success');
+  }
+  plRender(); plRenderUpcoming();
+}
 
 function plRender() {
   const root = document.getElementById('planner-root');
@@ -186,7 +291,8 @@ function _plRowLanes(days, items, maxLanes) {
     const it = s.it, c = it.overdue ? '#e5484d' : _plColor(it.type);
     const lbl = (it.time ? it.time + ' ' : '') + it.title;
     const rl = s.contL ? '0' : '4px', rr = s.contR ? '0' : '4px';
-    html += `<div class="pl-mseg${s.multi ? ' pl-mbar' : ''}" style="grid-column:${s.startCol + 1}/${s.endCol + 2};grid-row:${s.lane + 1};background:${s.multi ? c + 'cc' : c + '1f'};border-left:3px solid ${c};border-radius:${rl} ${rr} ${rr} ${rl};color:${s.multi ? '#fff' : 'var(--t1)'}" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(lbl)}${it.sub ? ' · ' + esc(it.sub) : ''}">${s.contL ? '‹ ' : ''}${esc(lbl)}${s.contR ? ' ›' : ''}</div>`;
+    const drag = (it.type === 'event' || it.type === 'job') ? ' pl-drag' : '';
+    html += `<div class="pl-mseg${s.multi ? ' pl-mbar' : ''}${drag}" style="grid-column:${s.startCol + 1}/${s.endCol + 2};grid-row:${s.lane + 1};background:${s.multi ? c + 'cc' : c + '1f'};border-left:3px solid ${c};border-radius:${rl} ${rr} ${rr} ${rl};color:${s.multi ? '#fff' : 'var(--t1)'}" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(lbl)}${it.sub ? ' · ' + esc(it.sub) : ''}">${s.contL ? '‹ ' : ''}${esc(lbl)}${s.contR ? ' ›' : ''}</div>`;
   }
   for (const c in hidden) html += `<div class="pl-mmore" style="grid-column:${(+c) + 1};grid-row:${maxLanes + 1}" data-action="plDayPopover" data-args="'${_plYmd(days[+c])}'">+${hidden[c]} more</div>`;
   return { html, laneCount: lanes.length };
@@ -205,7 +311,7 @@ function _plMonthHtml() {
     const weekDays = []; for (let i = 0; i < 7; i++) weekDays.push(_plAddDays(gridStart, w * 7 + i));
     const lay = _plRowLanes(weekDays, items, VIS);
     const bg = weekDays.map(d => { const ymd = _plYmd(d);
-      return `<div class="pl-cell ${d.getMonth() === curMonth ? '' : 'other'} ${ymd === today ? 'today' : ''}" data-action="plDayNew" data-args="'${ymd}'"></div>`; }).join('');
+      return `<div class="pl-cell ${d.getMonth() === curMonth ? '' : 'other'} ${ymd === today ? 'today' : ''}" data-ymd="${ymd}" data-action="plDayNew" data-args="'${ymd}'"></div>`; }).join('');
     const nums = weekDays.map(d => { const ymd = _plYmd(d);
       return `<div class="pl-daynum ${d.getMonth() === curMonth ? '' : 'other'} ${ymd === today ? 'today' : ''}" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day">${d.getDate()}</div>`; }).join('');
     rows += `<div class="pl-mrow">
@@ -255,6 +361,9 @@ function _plWeekStart(d) { const x = new Date(d); const dow = (x.getDay() + 6) %
 // ── Time-grid helpers ────────────────────────────────────────────────────────
 function _plMin(t)  { const p = String(t || '').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); }
 function _plHm(m)   { return String(Math.floor(m / 60)).padStart(2, '0') + ':00'; }
+function _plHmm(m)  { const z = n => String(n).padStart(2, '0'); return z(Math.floor(m / 60)) + ':' + z(m % 60); }
+function _plDayDelta(a, b) { return Math.round((_plParse(b) - _plParse(a)) / 86400000); }
+function _plShiftYmd(ymd, days) { return _plYmd(_plAddDays(_plParse(ymd), days)); }
 function _plEvEnd(it) { const s = _plMin(it.time); return it.endTime ? Math.max(_plMin(it.endTime), s + 30) : s + 45; }
 
 // Lane-pack overlapping timed items (Google-calendar style) so they sit
@@ -300,7 +409,7 @@ function _plTimeGridHtml(days) {
 
   // All-day strip: multi-day items span across day columns (lane-packed).
   const allLay = _plRowLanes(days, items.filter(it => !it.time), 3);
-  const allBg = days.map(d => `<div class="pl-tg-allcell" data-action="plDayNew" data-args="'${_plYmd(d)}'"></div>`).join('');
+  const allBg = days.map(d => `<div class="pl-tg-allcell" data-ymd="${_plYmd(d)}" data-action="plDayNew" data-args="'${_plYmd(d)}'"></div>`).join('');
 
   const gutter = hours.map(m => `<div class="pl-tg-hr" style="height:${HPX}px"><span>${_plHm(m)}</span></div>`).join('');
 
@@ -310,10 +419,10 @@ function _plTimeGridHtml(days) {
       const top = (b.start - winS) / 60 * HPX, h = Math.max((b.end - b.start) / 60 * HPX, 22);
       const c = it.overdue ? '#e5484d' : _plColor(it.type);
       const w = 100 / b.lanes, left = b.lane * w;
-      return `<div class="pl-tg-ev" style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);background:${c}2b;border-left:3px solid ${c};color:var(--t1)" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(it.time + ' ' + it.title)}"><b>${esc(it.time)}</b> ${esc(it.title)}${it.sub ? `<span class="pl-ev-sub">${esc(it.sub)}</span>` : ''}</div>`; }).join('');
+      return `<div class="pl-tg-ev pl-drag" style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);background:${c}2b;border-left:3px solid ${c};color:var(--t1)" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(it.time + ' ' + it.title)}"><b>${esc(it.time)}</b> ${esc(it.title)}${it.sub ? `<span class="pl-ev-sub">${esc(it.sub)}</span>` : ''}</div>`; }).join('');
     let now = '';
     if (ymd === today) { const nm = new Date().getHours() * 60 + new Date().getMinutes(); if (nm >= winS && nm <= winE) now = `<div class="pl-tg-now" style="top:${(nm - winS) / 60 * HPX}px"></div>`; }
-    return `<div class="pl-tg-col">${cells}${blocks}${now}</div>`; }).join('');
+    return `<div class="pl-tg-col" data-ymd="${ymd}">${cells}${blocks}${now}</div>`; }).join('');
 
   const gcols = `grid-template-columns:repeat(${n},1fr)`;
   return `<div class="pl-tg ${n === 1 ? 'pl-tg-day' : ''}">
@@ -322,7 +431,7 @@ function _plTimeGridHtml(days) {
       <div class="pl-tg-allbg" style="${gcols}">${allBg}</div>
       <div class="pl-tg-alllanes" style="${gcols};grid-auto-rows:17px">${allLay.html}</div>
     </div></div>
-    <div class="pl-tg-body"><div class="pl-tg-gutter">${gutter}</div><div class="pl-tg-cols" style="${gcols};height:${bodyH}px">${cols}</div></div>
+    <div class="pl-tg-body"><div class="pl-tg-gutter">${gutter}</div><div class="pl-tg-cols" data-wins="${winS}" data-hpx="${HPX}" style="${gcols};height:${bodyH}px">${cols}</div></div>
   </div>
   <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a time slot to add an event · click a date to open the day · click an item to open it.</div>`;
 }
@@ -644,6 +753,12 @@ function _plInjectStyles() {
     .pl-tg-ev:hover{filter:brightness(1.2);z-index:5}
     .pl-tg-ev b{font-weight:700;font-family:var(--mono);font-size:9.5px;margin-right:2px}
     .pl-tg-now{position:absolute;left:0;right:0;height:0;border-top:2px solid #e5484d;z-index:6;pointer-events:none}
-    .pl-tg-now::before{content:'';position:absolute;left:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:#e5484d}`;
+    .pl-tg-now::before{content:'';position:absolute;left:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:#e5484d}
+    .pl-drag{cursor:grab}
+    .pl-drag:active{cursor:grabbing}
+    body.pl-dragging{cursor:grabbing !important;user-select:none}
+    body.pl-dragging .pl-mseg,body.pl-dragging .pl-tg-ev{cursor:grabbing}
+    .pl-ghost{position:fixed;z-index:10000;pointer-events:none;background:var(--cyan);color:#012;font-size:11px;font-weight:600;padding:3px 9px;border-radius:5px;box-shadow:0 6px 18px rgba(0,0,0,.5);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pl-cell.pl-drop,.pl-tg-col.pl-drop,.pl-tg-allcell.pl-drop{background:rgba(34,184,206,.14);box-shadow:inset 0 0 0 2px var(--cyan)}`;
   document.head.appendChild(s);
 }

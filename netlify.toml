@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Netlify — Veritix NDT Inspect (static, hash-routed SPA; no build step)
+#
+# Connect this repo in Netlify (Add new site → Import an existing project →
+# pick the GitHub repo). No build tooling is required.
+#
+# The "build" below just copies the app into a clean publish dir so ONLY the
+# app ships — the repo's docs, supabase/ function source, tools/ and package
+# files are NOT exposed on the public site. The app HTML is published as
+# index.html so the site serves at "/" with a clean URL (the ugly
+# veritix-…v3_44.html name never appears in the address bar).
+#
+# After the first deploy, point the custom domain veritix.io at the site
+# (Netlify → Domain settings) and set the Supabase secret:
+#     APP_URL = "https://veritix.io"
+# so portal/invite links are minted against the real domain.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[build]
+  publish = "dist"
+  command = "rm -rf dist && mkdir -p dist && cp veritix-ndt-inspect-v3_44.html dist/index.html && cp -r js css dist/"
+
+# SPA fallback: serve the app for "/" and any path. Real assets (/js/*, /css/*)
+# are served first; everything else falls back to the app, which then reads the
+# #/… hash route (e.g. #/portal/<token>).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Light, safe hardening for a public SaaS frontend.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"

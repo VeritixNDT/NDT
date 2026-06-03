@@ -359,7 +359,11 @@ function ovFilterByRange(reports){
 
 function ovRefreshDashboard() {
   const allReports = ls(KEYS.reports, []);
-  const reports = ovFilterByRange(allReports);
+  // Count each weld/report once — its current (latest) revision — so verdict
+  // metrics don't tally superseded revisions. (Heatmap below still uses the
+  // full allReports list as raw inspection activity.)
+  const latest = (typeof rptLatestRevisions === 'function') ? rptLatestRevisions(allReports) : allReports;
+  const reports = ovFilterByRange(latest);
   const methods = getActiveMethods();
   const total = reports.length;
   const passed = reports.filter(r => r.verdict === 'Acceptable').length;

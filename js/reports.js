@@ -1735,6 +1735,23 @@ function _rptIsSuperseded(r){
   return (parseInt(r.revision, 10) || 0) < (_rptMaxRev[r.reportNo] || 0);
 }
 
+// Collapse a report list to the current revision of each report number (the
+// highest revision), so counts treat each weld/report once instead of tallying
+// every superseded revision. Entries without a reportNo (un-numbered drafts)
+// are kept as-is and each counts once. Self-contained (no _rptMaxRev), so it's
+// safe to call from the dashboard before the reports table has rendered.
+function rptLatestRevisions(reports){
+  const best = Object.create(null);
+  const loose = [];
+  (reports || []).forEach(r => {
+    const rn = r && r.reportNo;
+    if(!rn){ loose.push(r); return; }
+    const cur = best[rn];
+    if(!cur || (parseInt(r.revision, 10) || 0) > (parseInt(cur.revision, 10) || 0)) best[rn] = r;
+  });
+  return Object.keys(best).map(k => best[k]).concat(loose);
+}
+
 function _rptRowSig(r, idx) {
   return [
     r.reportNo, r.method, getReportStage(r), r.verdict, r.client, r.subject,

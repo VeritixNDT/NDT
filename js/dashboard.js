@@ -580,6 +580,7 @@ function ovRefreshDashboard() {
   if(typeof refreshNotifBadge === 'function') refreshNotifBadge();
 
   // V8: Render heatmap, top defect types, leaderboard, expiry timeline
+  try { ovRenderAttention(); } catch(e){ console.warn('attention', e); }
   try { ovRenderHeatmap(allReports); } catch(e){ console.warn('heatmap', e); }
   try { ovRenderDefectTypes(); } catch(e){ console.warn('defect types', e); }
   try { ovRenderLeaderboard(reports); } catch(e){ console.warn('leaderboard', e); }
@@ -592,6 +593,73 @@ function ovRefreshDashboard() {
 // ══════════════════════════════════════════════════════════════════════════
 
 // Calendar heatmap of inspection activity (past 12 months)
+// ── "Needs attention" band — company-wide actionable items, surfaced top of
+// the dashboard. Computed from existing data (latest revisions); complements
+// the personal Inbox (which is "what needs MY action"). Each chip drills to the
+// page that resolves it. Critical (red) sorts before warnings (amber). ──────
+var OV_ATT_ICONS = {
+  approval:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  invoices:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  certs:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 13.5 17 22l-5-3-5 3 1.5-8.5"/></svg>',
+  calibration: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M12 11v3M10.5 12.5h3"/></svg>',
+};
+function ovRenderAttention(){
+  const host = el('ov-attention'); if(!host) return;
+  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+  const ymd = new Date().toISOString().slice(0, 10);
+  const daysTo = d => Math.ceil((new Date(d).getTime() - Date.now()) / 864e5);
+  const alerts = [];
+
+  // Reports awaiting approval (company-wide, latest revision).
+  let reps = ls(KEYS.reports, []) || [];
+  if(typeof rptLatestRevisions === 'function') reps = rptLatestRevisions(reps);
+  const awaiting = reps.filter(r => { const s = (typeof getReportStage === 'function') ? getReportStage(r) : (r.stage || 'Draft'); return s === 'Submitted' || s === 'Reviewed'; }).length;
+  if(awaiting) alerts.push({ kind:'approval', level:'warn', count:awaiting, label:`report${awaiting>1?'s':''} awaiting approval` });
+
+  // Overdue invoices.
+  if(typeof billLoad === 'function'){
+    const overdue = (billLoad('invoice') || []).filter(d => d.dueDate && d.status !== 'Paid' && String(d.dueDate).slice(0, 10) < ymd).length;
+    if(overdue) alerts.push({ kind:'invoices', level:'crit', count:overdue, label:`overdue invoice${overdue>1?'s':''}` });
+  }
+
+  // Inspector certs expired / expiring within 30 days.
+  let cExp = 0, cSoon = 0;
+  (ls(KEYS.inspectors, []) || []).forEach(ins => {
+    (typeof _inspCertList === 'function' ? _inspCertList(ins) : []).forEach(c => {
+      if(!c.expiry) return; const dd = daysTo(c.expiry); if(isNaN(dd)) return;
+      if(dd < 0) cExp++; else if(dd <= 30) cSoon++;
+    });
+  });
+  if(cExp + cSoon) alerts.push({ kind:'certs', level: cExp ? 'crit' : 'warn', count: cExp + cSoon, label:`cert${cExp + cSoon > 1 ? 's' : ''} ${cExp ? 'expired / expiring' : 'expiring soon'}` });
+
+  // Equipment out of / due for calibration within 30 days.
+  if(typeof eqLoad === 'function'){
+    let kOver = 0, kSoon = 0;
+    (eqLoad() || []).forEach(r => { if(!r.calDueAt) return; const dd = daysTo(r.calDueAt); if(dd < 0) kOver++; else if(dd <= 30) kSoon++; });
+    if(kOver + kSoon) alerts.push({ kind:'calibration', level: kOver ? 'crit' : 'warn', count: kOver + kSoon, label: kOver ? 'equipment out of calibration' : 'equipment calibration due' });
+  }
+
+  if(!alerts.length){
+    host.innerHTML = `<div class="ov-att-clear"><span class="ov-att-tick">✓</span> ${esc(t('ov.att.clear', 'Nothing needs attention right now.'))}</div>`;
+    return;
+  }
+  alerts.sort((a, b) => (a.level === 'crit' ? 0 : 1) - (b.level === 'crit' ? 0 : 1));
+  host.innerHTML = `<div class="ov-att-row">${alerts.map(a => `
+    <button class="ov-att ${a.level}" data-action="ovAttentionGo" data-args="'${a.kind}'" title="${esc(a.count + ' ' + a.label)}">
+      <span class="ov-att-ico">${OV_ATT_ICONS[a.kind] || ''}</span>
+      <span class="ov-att-n">${a.count}</span>
+      <span class="ov-att-lbl">${esc(a.label)}</span>
+    </button>`).join('')}</div>`;
+  if(typeof a11yWireLabels === 'function') a11yWireLabels(host);
+}
+function ovAttentionGo(kind){
+  const tn = s => document.querySelector('.tn[data-args="\'' + s + '\'"]');
+  if(kind === 'invoices') showPage('billing', tn('billing'));
+  else if(kind === 'approval') showPage('inbox', tn('inbox'));
+  else if(kind === 'certs') { showPage('settings', el('tn-settings')); if(typeof showSS === 'function') showSS('inspectors', el('sni-inspectors')); }
+  else if(kind === 'calibration') { showPage('settings', el('tn-settings')); if(typeof showSS === 'function') showSS('equipment', el('sni-equipment')); }
+}
+
 function ovRenderHeatmap(allReports){
   const wrap = el('ov-heatmap-grid');
   const wrapper = el('ov-heatmap-wrap');

@@ -52,7 +52,7 @@ function plCollect(startYmd, endYmd, opts) {
   // Custom events
   if (en('event')) plLoadEvents().forEach(e => push({
     ymd: String(e.date || '').slice(0, 10), endYmd: e.endDate ? String(e.endDate).slice(0, 10) : '',
-    time: e.time || '', title: e.title || '(untitled)', sub: e.inspector || '',
+    time: e.time || '', endTime: e.endTime || '', title: e.title || '(untitled)', sub: e.inspector || '',
     type: 'event', refId: e.id, editable: true,
   }));
 
@@ -222,58 +222,83 @@ function _plAgendaHtml() {
 // Monday on/before the given date.
 function _plWeekStart(d) { const x = new Date(d); const dow = (x.getDay() + 6) % 7; return _plAddDays(x, -dow); }
 
-function _plWeekHtml() {
+// ── Time-grid helpers ────────────────────────────────────────────────────────
+function _plMin(t)  { const p = String(t || '').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); }
+function _plHm(m)   { return String(Math.floor(m / 60)).padStart(2, '0') + ':00'; }
+function _plEvEnd(it) { const s = _plMin(it.time); return it.endTime ? Math.max(_plMin(it.endTime), s + 30) : s + 45; }
+
+// Lane-pack overlapping timed items (Google-calendar style) so they sit
+// side-by-side. Returns the same items annotated with { lane, lanes }.
+function _plLayoutDay(items) {
+  const evs = items.map(it => ({ item: it, start: _plMin(it.time), end: _plEvEnd(it), lane: 0, lanes: 1 }));
+  evs.sort((a, b) => a.start - b.start || a.end - b.end);
+  let cols = [], lastEnd = null;
+  const pack = () => cols.forEach((col, i) => col.forEach(ev => { ev.lane = i; ev.lanes = cols.length; }));
+  for (const ev of evs) {
+    if (lastEnd !== null && ev.start >= lastEnd) { pack(); cols = []; lastEnd = null; }
+    let placed = false;
+    for (const col of cols) { if (col[col.length - 1].end <= ev.start) { col.push(ev); placed = true; break; } }
+    if (!placed) cols.push([ev]);
+    if (lastEnd === null || ev.end > lastEnd) lastEnd = ev.end;
+  }
+  pack();
+  return evs;
+}
+
+// Shared time-grid renderer for Week (7 days) and Day (1 day): hour rail,
+// all-day strip, time-positioned event blocks, live "now" line, and
+// click-a-slot-to-create-at-that-hour.
+function _plTimeGridHtml(days) {
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
-  const ws = _plWeekStart(_plCursor);
-  const items = plCollect(_plYmd(ws), _plYmd(_plAddDays(ws, 6)));
+  const items = plCollect(_plYmd(days[0]), _plYmd(days[days.length - 1]));
   const byDay = {};
   items.forEach(it => { (byDay[it.ymd] = byDay[it.ymd] || []).push(it); });
   const today = _plTodayYmd();
+  const HPX = 44;
+  const n = days.length;
 
-  let cols = '';
-  for (let i = 0; i < 7; i++) {
-    const d = _plAddDays(ws, i);
-    const ymd = _plYmd(d);
-    const list = byDay[ymd] || [];
-    const chips = list.map(it => {
+  // Visible hour window — default 07:00–19:00, expanded to fit timed events.
+  let winS = 7 * 60, winE = 19 * 60;
+  items.forEach(it => { if (it.time) { winS = Math.min(winS, _plMin(it.time)); winE = Math.max(winE, _plEvEnd(it)); } });
+  winS = Math.max(0, Math.floor(winS / 60) * 60);
+  winE = Math.min(24 * 60, Math.ceil(winE / 60) * 60);
+  const hours = []; for (let m = winS; m < winE; m += 60) hours.push(m);
+  const bodyH = (winE - winS) / 60 * HPX;
+
+  const allChip = it => { const c = it.overdue ? '#e5484d' : _plColor(it.type);
+    return `<div class="pl-ev" style="background:${c}1f;border-left-color:${c};color:var(--t1)" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(it.title)}">${esc(it.title)}</div>`; };
+
+  const heads = days.map(d => { const ymd = _plYmd(d);
+    return `<div class="pl-tg-dayh ${ymd === today ? 'today' : ''}" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day"><span class="pl-wdow">${esc(d.toLocaleDateString(undefined, { weekday: 'short' }))}</span> ${d.getDate()}</div>`; }).join('');
+
+  const allCols = days.map(d => { const ymd = _plYmd(d); const all = (byDay[ymd] || []).filter(it => !it.time);
+    const max = 2; const more = all.length > max ? `<div class="pl-more" data-action="plDayPopover" data-args="'${ymd}'">+${all.length - max}</div>` : '';
+    return `<div class="pl-tg-allcol" data-action="plDayNew" data-args="'${ymd}'">${all.slice(0, max).map(allChip).join('')}${more}</div>`; }).join('');
+
+  const gutter = hours.map(m => `<div class="pl-tg-hr" style="height:${HPX}px"><span>${_plHm(m)}</span></div>`).join('');
+
+  const cols = days.map(d => { const ymd = _plYmd(d); const timed = (byDay[ymd] || []).filter(it => it.time);
+    const cells = hours.map(m => `<div class="pl-tg-cell" style="height:${HPX}px" data-action="plDayNewAt" data-args="'${ymd}','${_plHm(m)}'"></div>`).join('');
+    const blocks = _plLayoutDay(timed).map(b => { const it = b.item;
+      const top = (b.start - winS) / 60 * HPX, h = Math.max((b.end - b.start) / 60 * HPX, 22);
       const c = it.overdue ? '#e5484d' : _plColor(it.type);
-      const lbl = (it.time ? it.time + ' ' : '') + it.title;
-      return `<div class="pl-ev pl-ev-wk" style="background:${c}1f;border-left-color:${c};color:var(--t1)"
-        data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(lbl)}">${esc(lbl)}${it.sub ? `<span class="pl-ev-sub">${esc(it.sub)}</span>` : ''}</div>`;
-    }).join('') || '<div class="pl-wk-empty">—</div>';
-    const wd = d.toLocaleDateString(undefined, { weekday: 'short' });
-    cols += `<div class="pl-wcol" data-action="plDayNew" data-args="'${ymd}'">
-      <div class="pl-whead ${ymd === today ? 'today' : ''}" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day"><span class="pl-wdow">${esc(wd)}</span> ${d.getDate()}</div>
-      <div class="pl-wbody">${chips}</div></div>`;
-  }
-  return `<div class="pl-week">${cols}</div>
-    <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a day to add an event · click an item to open it.</div>`;
+      const w = 100 / b.lanes, left = b.lane * w;
+      return `<div class="pl-tg-ev" style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);background:${c}2b;border-left:3px solid ${c};color:var(--t1)" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(it.time + ' ' + it.title)}"><b>${esc(it.time)}</b> ${esc(it.title)}${it.sub ? `<span class="pl-ev-sub">${esc(it.sub)}</span>` : ''}</div>`; }).join('');
+    let now = '';
+    if (ymd === today) { const nm = new Date().getHours() * 60 + new Date().getMinutes(); if (nm >= winS && nm <= winE) now = `<div class="pl-tg-now" style="top:${(nm - winS) / 60 * HPX}px"></div>`; }
+    return `<div class="pl-tg-col">${cells}${blocks}${now}</div>`; }).join('');
+
+  const gcols = `grid-template-columns:repeat(${n},1fr)`;
+  return `<div class="pl-tg ${n === 1 ? 'pl-tg-day' : ''}">
+    <div class="pl-tg-head"><div class="pl-tg-gx"></div><div class="pl-tg-heads" style="${gcols}">${heads}</div></div>
+    <div class="pl-tg-allday"><div class="pl-tg-gx pl-tg-allbl">all-day</div><div class="pl-tg-allcols" style="${gcols}">${allCols}</div></div>
+    <div class="pl-tg-body"><div class="pl-tg-gutter">${gutter}</div><div class="pl-tg-cols" style="${gcols};height:${bodyH}px">${cols}</div></div>
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a time slot to add an event · click a date to open the day · click an item to open it.</div>`;
 }
 
-// Single-day detail view: all-day items + timed (scheduled) items.
-function _plDayHtml() {
-  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
-  const ymd = _plYmd(_plCursor);
-  const items = plCollect(ymd, ymd);
-  const timed = items.filter(it => it.time);
-  const allday = items.filter(it => !it.time);
-  const row = it => {
-    const c = it.overdue ? '#e5484d' : _plColor(it.type);
-    return `<div class="pl-arow" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'">
-      <span class="pl-dot" style="background:${c}"></span>
-      <span class="pl-atime">${esc(it.time || (it.endYmd && it.endYmd !== ymd ? '→ ' + _plFmt(it.endYmd) : 'all day'))}</span>
-      <span class="pl-atitle">${esc(it.title)}${it.sub ? ` <span style="color:var(--t3)">· ${esc(it.sub)}</span>` : ''}${it.overdue ? ' <span style="color:#e5484d;font-weight:600">overdue</span>' : ''}</span>
-    </div>`;
-  };
-  const sec = (title, arr, empty) => `<div class="pl-day-sec">
-    <div class="pl-day-h">${esc(title)}${arr.length ? ` <span class="pl-day-n">${arr.length}</span>` : ''}</div>
-    <div class="pl-arows">${arr.length ? arr.map(row).join('') : `<div class="pl-day-empty">${esc(empty)}</div>`}</div></div>`;
-  return `<div class="pl-day">
-    ${sec('All day', allday, 'Nothing all-day.')}
-    ${sec('Scheduled', timed, 'No timed events.')}
-    <button class="btn btn-sm" data-action="plDayNew" data-args="'${ymd}'" style="margin-top:12px">+ Add event on this day</button>
-  </div>`;
-}
+function _plWeekHtml() { const ws = _plWeekStart(_plCursor); const days = []; for (let i = 0; i < 7; i++) days.push(_plAddDays(ws, i)); return _plTimeGridHtml(days); }
+function _plDayHtml()  { return _plTimeGridHtml([new Date(_plCursor)]); }
 
 // ── Dashboard widget: List (next 14 days) ⇄ Week (this week). Ignores the
 // planner's legend filters — always shows every source. ──────────────────────
@@ -386,16 +411,18 @@ function plDayPopover(ymd) {
 }
 
 // ── Event editor ─────────────────────────────────────────────────────────────
-function plNewEvent()      { plOpenEventForm(null, _plView === 'day' ? _plYmd(_plCursor) : _plTodayYmd()); }
-function plDayNew(ymd)     { plOpenEventForm(null, ymd); }
+function plNewEvent()        { plOpenEventForm(null, _plView === 'day' ? _plYmd(_plCursor) : _plTodayYmd()); }
+function plDayNew(ymd)       { plOpenEventForm(null, ymd); }
+function plDayNewAt(ymd, tm) { plOpenEventForm(null, ymd, tm); }
 
-function plOpenEventForm(id, prefillYmd) {
+function plOpenEventForm(id, prefillYmd, prefillTime) {
   _plEditId = id || null;
   const ev = id ? (plGetEvent(id) || {}) : {};
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
   const inspectors = (typeof ls === 'function') ? (ls(KEYS.inspectors, []) || []) : [];
   const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
   const date = (ev.date ? String(ev.date).slice(0, 10) : (prefillYmd || _plTodayYmd()));
+  const time = ev.time || prefillTime || '';
 
   const inspOpts = ['<option value="">— Unassigned —</option>']
     .concat(inspectors.map(i => `<option value="${esc(i.name)}" ${ev.inspector === i.name ? 'selected' : ''}>${esc(i.name)}</option>`)).join('');
@@ -407,9 +434,10 @@ function plOpenEventForm(id, prefillYmd) {
     <div class="fld form-row"><label>Title</label><input id="pl-f-title" value="${esc(ev.title || '')}" placeholder="Site visit, inspection booking…"/></div>
     <div class="fg form-row">
       <div class="fld"><label>Date</label><input type="date" id="pl-f-date" value="${esc(date)}"/></div>
-      <div class="fld"><label>Time <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="time" id="pl-f-time" value="${esc(ev.time || '')}"/></div>
-      <div class="fld"><label>End date <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="date" id="pl-f-end" value="${esc(ev.endDate ? String(ev.endDate).slice(0, 10) : '')}"/></div>
+      <div class="fld"><label>Start time <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="time" id="pl-f-time" value="${esc(time)}"/></div>
+      <div class="fld"><label>End time <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="time" id="pl-f-endtime" value="${esc(ev.endTime || '')}"/></div>
     </div>
+    <div class="fld form-row"><label>End date <span style="color:var(--t3);font-weight:400">(optional — for multi-day)</span></label><input type="date" id="pl-f-end" value="${esc(ev.endDate ? String(ev.endDate).slice(0, 10) : '')}"/></div>
     <div class="fg form-row">
       <div class="fld"><label>Inspector</label><select id="pl-f-insp">${inspOpts}</select></div>
       <div class="fld"><label>Linked job</label><select id="pl-f-job">${jobOpts}</select></div>
@@ -434,7 +462,7 @@ function plSaveEvent() {
   const list = plLoadEvents();
   const rec = {
     id: _plEditId || ('evt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7)),
-    title, date, time: val('pl-f-time'), endDate: val('pl-f-end'),
+    title, date, time: val('pl-f-time'), endTime: val('pl-f-endtime'), endDate: val('pl-f-end'),
     inspector: val('pl-f-insp'), jobId: val('pl-f-job'), notes: val('pl-f-notes').trim(),
     updatedAt: now,
   };
@@ -539,6 +567,34 @@ function _plInjectStyles() {
     .pl-day-h{background:var(--panel);padding:9px 14px;font-size:12px;font-weight:600;color:var(--t1);border-bottom:1px solid var(--border)}
     .pl-day-n{display:inline-block;margin-left:4px;background:var(--bg2);color:var(--t2);border-radius:9px;padding:0 7px;font-size:11px;font-family:var(--mono)}
     .pl-day-empty{padding:12px 14px;color:var(--t3);font-size:12px}
-    .pl-day .pl-arow{padding:10px 14px;font-size:13px}`;
+    .pl-day .pl-arow{padding:10px 14px;font-size:13px}
+    .pl-tg{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg)}
+    .pl-tg-day{max-width:920px}
+    .pl-tg-head,.pl-tg-allday,.pl-tg-body{display:flex}
+    .pl-tg-gx{width:54px;flex-shrink:0;border-right:1px solid var(--border)}
+    .pl-tg-heads,.pl-tg-allcols,.pl-tg-cols{display:grid;flex:1}
+    .pl-tg-head{border-bottom:1px solid var(--border)}
+    .pl-tg-dayh{padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:var(--t2);border-left:1px solid var(--border);cursor:pointer}
+    .pl-tg-dayh:first-child{border-left:0}
+    .pl-tg-dayh.today{background:var(--cyan);color:#012}
+    .pl-tg-dayh.today .pl-wdow{color:#012}
+    .pl-tg-allday{border-bottom:1px solid var(--border);min-height:28px;max-height:76px;overflow-y:auto}
+    .pl-tg-allbl{display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
+    .pl-tg-allcol{border-left:1px solid var(--border);padding:3px;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-height:24px}
+    .pl-tg-allcol:first-child{border-left:0}
+    .pl-tg-body{position:relative}
+    .pl-tg-gutter{width:54px;flex-shrink:0;border-right:1px solid var(--border)}
+    .pl-tg-hr{position:relative}
+    .pl-tg-hr span{position:absolute;top:-7px;right:6px;font-size:10px;color:var(--t3);font-family:var(--mono);line-height:1}
+    .pl-tg-col{position:relative;border-left:1px solid var(--border)}
+    .pl-tg-col:first-child{border-left:0}
+    .pl-tg-cell{border-top:1px solid var(--border);cursor:pointer}
+    .pl-tg-cell:first-child{border-top:0}
+    .pl-tg-cell:hover{background:var(--bg2)}
+    .pl-tg-ev{position:absolute;border-radius:4px;padding:2px 5px;font-size:10.5px;line-height:1.2;overflow:hidden;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+    .pl-tg-ev:hover{filter:brightness(1.2);z-index:5}
+    .pl-tg-ev b{font-weight:700;font-family:var(--mono);font-size:9.5px;margin-right:2px}
+    .pl-tg-now{position:absolute;left:0;right:0;height:0;border-top:2px solid #e5484d;z-index:6;pointer-events:none}
+    .pl-tg-now::before{content:'';position:absolute;left:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:#e5484d}`;
   document.head.appendChild(s);
 }

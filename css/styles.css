@@ -590,7 +590,10 @@
 /* .snav-collapse-btn — canonical definition lives further down this file
    (the boxed 30x30 variant). Previous duplicate ruleset here was overridden
    anyway, so it's been removed to keep one source of truth. */
-[data-sidebar-collapsed="true"] .snav-collapse-btn { margin: 8px 8px 4px; }
+/* Collapsed: sidebar shrinks to 56px, so the edge button follows to that edge. */
+html[data-sidebar-collapsed="true"] .snav-collapse-btn { left: 56px; }
+html[data-sidebar-pos="right"][data-sidebar-collapsed="true"] .snav-collapse-btn,
+[data-sidebar="right"][data-sidebar-collapsed="true"] .snav-collapse-btn { left: auto; right: 56px; }
 [data-sidebar-collapsed="true"] .snav-collapse-btn svg { transform: rotate(180deg); }
 
 /* .signal.offline — canonical (red/error) definition lives further down this
@@ -1610,20 +1613,35 @@
 }
 [data-sidebar-collapsed="true"] .snav-divider { margin: 6px 8px; }
 
+/* Edge-mounted collapse toggle (Foxit-style): floats on the divider between
+   the sidebar and the content, vertically centred. Anchored to .settings-wrap
+   (position:relative) so the sidebar's own overflow doesn't clip or scroll it. */
 .snav-collapse-btn {
+  position: absolute;
+  left: var(--sidebar-w);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px; height: 30px;
-  border-radius: var(--r);
+  width: 26px; height: 26px;
+  margin: 0;
+  border-radius: 50%;
   border: 1px solid var(--border2);
   background: var(--bg2);
   color: var(--t3);
   cursor: pointer;
-  margin: 8px auto 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .32);
   transition: all var(--motion-fast);
 }
-.snav-collapse-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+.snav-collapse-btn:hover { color: var(--cyan); border-color: var(--cyan); background: var(--panel); }
+.snav-collapse-btn svg { width: 13px; height: 13px; }
+/* Sidebar on the right → button hugs the sidebar's left (inner) edge. */
+html[data-sidebar-pos="right"] .snav-collapse-btn,
+[data-sidebar="right"] .snav-collapse-btn {
+  left: auto; right: var(--sidebar-w); transform: translate(50%, -50%);
+}
 
 /* Sidebar workspace block — company logo + workspace name at the top
    of each sidebar. Replaces the old topbar workspace pill. Whole block
@@ -2460,6 +2478,7 @@ a { color: var(--cyan); text-decoration: none; }
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;   /* anchors the edge-mounted .snav-collapse-btn */
 }
 
 .snav {
@@ -4606,6 +4625,7 @@ a { color: var(--cyan); text-decoration: none; }
 @media (max-width: 760px) {
   :root { --sidebar-w: 0px; }
   .snav { display: none; }
+  .snav-collapse-btn { display: none; }
   .stat-row { grid-template-columns: 1fr 1fr; }
   .fg { grid-template-columns: 1fr; }
 }

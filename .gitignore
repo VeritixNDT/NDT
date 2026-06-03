@@ -10,3 +10,7 @@ Thumbs.db
 node_modules/
 test-results/
 .verify-out/
+
+# Supabase CLI scratch + Deno lockfile from local function typechecks
+supabase/.temp/
+deno.lock

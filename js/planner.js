@@ -185,36 +185,41 @@ function _plDropTarget(x, y) {
   }
   const ac = el.closest('.pl-tg-allcell');
   if (ac && ac.dataset.ymd) return { el: ac, ymd: ac.dataset.ymd, time: null };
+  const rc = el.closest('.pl-res-cell');
+  if (rc && rc.dataset.ymd) return { el: rc, ymd: rc.dataset.ymd, time: null, inspector: rc.dataset.insp || '' };
   const cell = el.closest('.pl-cell');
   if (cell && cell.dataset.ymd) return { el: cell, ymd: cell.dataset.ymd, time: null };
   return null;
 }
 
 function _plApplyDrag(type, refId, tgt) {
+  const reassign = (tgt.inspector !== undefined);  // dropped on a resource lane
   if (type === 'event') {
     const list = plLoadEvents(); const ev = list.find(e => e.id === refId); if (!ev) return;
     const oldYmd = String(ev.date || '').slice(0, 10);
-    if (oldYmd === tgt.ymd && (tgt.time === null || tgt.time === ev.time)) return;
+    const noMove = oldYmd === tgt.ymd && (tgt.time === null || tgt.time === ev.time);
+    if (noMove && (!reassign || ev.inspector === tgt.inspector)) return;
     if (ev.endDate) ev.endDate = _plShiftYmd(String(ev.endDate).slice(0, 10), _plDayDelta(oldYmd, tgt.ymd));
     ev.date = tgt.ymd;
     if (tgt.time !== null) {
       if (ev.time && ev.endTime) ev.endTime = _plHmm(Math.max(0, _plMin(ev.endTime) + (_plMin(tgt.time) - _plMin(ev.time))));
       ev.time = tgt.time;
     }
+    if (reassign) ev.inspector = tgt.inspector;
     ev.updatedAt = new Date().toISOString();
     plSaveEvents(list);
-    if (typeof toast === 'function') toast('Moved to ' + _plFmt(tgt.ymd) + (tgt.time ? ' ' + tgt.time : '') + '.', 'success');
+    if (typeof toast === 'function') toast((reassign && tgt.inspector ? tgt.inspector + ' · ' : '') + 'moved to ' + _plFmt(tgt.ymd) + (tgt.time ? ' ' + tgt.time : '') + '.', 'success');
   } else if (type === 'job') {
     if (typeof jobLoad !== 'function' || typeof jobSaveAll !== 'function') return;
     const jobs = jobLoad(); const j = jobs.find(x => x.id === refId); if (!j || !j.startDate) return;
     const oldYmd = String(j.startDate).slice(0, 10);
     const delta = _plDayDelta(oldYmd, tgt.ymd);
-    if (delta === 0) return;
-    j.startDate = _plShiftYmd(oldYmd, delta);
-    if (j.endDate) j.endDate = _plShiftYmd(String(j.endDate).slice(0, 10), delta);
+    if (delta === 0 && !(reassign && j.leadInspector !== tgt.inspector)) return;
+    if (delta !== 0) { j.startDate = _plShiftYmd(oldYmd, delta); if (j.endDate) j.endDate = _plShiftYmd(String(j.endDate).slice(0, 10), delta); }
+    if (reassign) j.leadInspector = tgt.inspector;
     j.updatedAt = new Date().toISOString();
     jobSaveAll(jobs);
-    if (typeof toast === 'function') toast('Job moved to ' + _plFmt(tgt.ymd) + '.', 'success');
+    if (typeof toast === 'function') toast('Job ' + (reassign && tgt.inspector ? '→ ' + tgt.inspector + ' · ' : '') + 'moved to ' + _plFmt(tgt.ymd) + '.', 'success');
   }
   plRender(); plRenderUpcoming();
 }
@@ -224,7 +229,7 @@ function plRender() {
   if (!root) return;
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
   let periodLbl;
-  if (_plView === 'week') {
+  if (_plView === 'week' || _plView === 'resource') {
     const ws = _plWeekStart(_plCursor), we = _plAddDays(ws, 6);
     periodLbl = ws.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' – ' +
                 we.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -250,13 +255,14 @@ function plRender() {
         <button class="${_plView === 'month' ? 'on' : ''}" data-action="plSetView" data-args="'month'">Month</button>
         <button class="${_plView === 'week' ? 'on' : ''}" data-action="plSetView" data-args="'week'">Week</button>
         <button class="${_plView === 'day' ? 'on' : ''}" data-action="plSetView" data-args="'day'">Day</button>
+        <button class="${_plView === 'resource' ? 'on' : ''}" data-action="plSetView" data-args="'resource'">Team</button>
         <button class="${_plView === 'agenda' ? 'on' : ''}" data-action="plSetView" data-args="'agenda'">Agenda</button>
       </div>
       <div class="pl-legend">${legend}</div>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-sm" data-action="plNewEvent" style="white-space:nowrap">+ New event</button>
     </div>
-    <div class="pl-body">${_plView === 'week' ? _plWeekHtml() : _plView === 'day' ? _plDayHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
+    <div class="pl-body">${_plView === 'week' ? _plWeekHtml() : _plView === 'day' ? _plDayHtml() : _plView === 'resource' ? _plResourceHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
 
   if (typeof a11yWireLabels === 'function') a11yWireLabels(root);
 }
@@ -439,6 +445,51 @@ function _plTimeGridHtml(days) {
 function _plWeekHtml() { const ws = _plWeekStart(_plCursor); const days = []; for (let i = 0; i < 7; i++) days.push(_plAddDays(ws, i)); return _plTimeGridHtml(days); }
 function _plDayHtml()  { return _plTimeGridHtml([new Date(_plCursor)]); }
 
+// ── Resource lanes ("Team") — inspectors × week. Each row reuses _plRowLanes
+// so multi-day jobs span; drag an item to another row reassigns the inspector.
+function _plResourceHtml() {
+  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+  const ws = _plWeekStart(_plCursor);
+  const weekDays = []; for (let i = 0; i < 7; i++) weekDays.push(_plAddDays(ws, i));
+  const today = _plTodayYmd();
+  const norm = v => String(v || '').trim();
+
+  // Scheduled work that carries an inspector: events, jobs, report exams.
+  const items = [];
+  if (_plEnabled('event')) plLoadEvents().forEach(e => { const y = String(e.date || '').slice(0, 10); if (!y) return;
+    items.push({ insp: norm(e.inspector), ymd: y, endYmd: e.endDate ? String(e.endDate).slice(0, 10) : '', time: e.time || '', endTime: e.endTime || '', title: e.title || '(untitled)', type: 'event', refId: e.id }); });
+  if (_plEnabled('job') && typeof jobLoad === 'function') jobLoad().forEach(j => { if (!j.startDate) return;
+    items.push({ insp: norm(j.leadInspector), ymd: String(j.startDate).slice(0, 10), endYmd: j.endDate ? String(j.endDate).slice(0, 10) : '', time: '', title: j.title || 'Job', type: 'job', refId: j.id }); });
+  if (_plEnabled('report')) (ls(KEYS.reports, []) || []).forEach(r => { if (!r.examDate) return;
+    items.push({ insp: norm(r.inspector), ymd: String(r.examDate).slice(0, 10), endYmd: '', time: '', title: (r.method || '') + ' ' + (r.reportNo || ''), type: 'report', refId: r.reportNo || r.id || '' }); });
+
+  const roster = (ls(KEYS.inspectors, []) || []).map(i => norm(i.name)).filter(Boolean);
+  const names = [...new Set([...roster, ...items.map(it => it.insp).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
+
+  const heads = weekDays.map(d => { const ymd = _plYmd(d);
+    return `<div class="pl-res-dayh ${ymd === today ? 'today' : ''}" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day"><span class="pl-wdow">${esc(d.toLocaleDateString(undefined, { weekday: 'short' }))}</span> ${d.getDate()}</div>`; }).join('');
+
+  const row = name => {
+    const mine = items.filter(it => name ? it.insp === name : !it.insp);
+    const lay = _plRowLanes(weekDays, mine, 6);
+    const bg = weekDays.map(d => `<div class="pl-res-cell" data-ymd="${_plYmd(d)}" data-insp="${esc(name)}" data-action="plResNew" data-args="'${_plYmd(d)}'" data-pass-el="1"></div>`).join('');
+    const label = name || 'Unassigned';
+    return `<div class="pl-res-row${name ? '' : ' pl-res-unassigned'}">
+      <div class="pl-res-name" title="${esc(label)}"><span class="pl-res-nm">${esc(label)}</span>${mine.length ? `<span class="pl-res-cnt">${mine.length}</span>` : '<span class="pl-res-free">free</span>'}</div>
+      <div class="pl-res-lanewrap">
+        <div class="pl-res-bg" style="grid-template-columns:repeat(7,1fr)">${bg}</div>
+        <div class="pl-res-lanes" style="grid-template-columns:repeat(7,1fr);grid-auto-rows:18px">${lay.html}</div>
+      </div></div>`;
+  };
+
+  return `<div class="pl-res">
+    <div class="pl-res-head"><div class="pl-res-gx">Inspector</div><div class="pl-res-days" style="grid-template-columns:repeat(7,1fr)">${heads}</div></div>
+    ${[...names, ''].map(row).join('')}
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:var(--t3)">Drag an item to a different inspector or day to reassign · click a cell to schedule · click an item to open it.</div>`;
+}
+function plResNew(ymd, el) { plOpenEventForm(null, ymd, '', (el && el.dataset && el.dataset.insp) || ''); }
+
 // ── Dashboard widget: List (next 14 days) ⇄ Week (this week). Ignores the
 // planner's legend filters — always shows every source. ──────────────────────
 var _plUpView = 'list';   // 'list' | 'week'
@@ -506,11 +557,11 @@ function _plUpWeekHtml() {
 }
 
 // ── Navigation / view ────────────────────────────────────────────────────────
-function _plStep(dir) { return (_plView === 'day') ? _plAddDays(_plCursor, dir) : (_plView === 'week') ? _plAddDays(_plCursor, dir * 7) : new Date(_plCursor.getFullYear(), _plCursor.getMonth() + dir, 1); }
+function _plStep(dir) { return (_plView === 'day') ? _plAddDays(_plCursor, dir) : (_plView === 'week' || _plView === 'resource') ? _plAddDays(_plCursor, dir * 7) : new Date(_plCursor.getFullYear(), _plCursor.getMonth() + dir, 1); }
 function plPrev()  { _plCursor = _plStep(-1); plRender(); }
 function plNext()  { _plCursor = _plStep(1);  plRender(); }
 function plToday() { _plCursor = new Date(); plRender(); }
-function plSetView(v) { _plView = (v === 'agenda' || v === 'week' || v === 'day') ? v : 'month'; plRender(); }
+function plSetView(v) { _plView = (v === 'agenda' || v === 'week' || v === 'day' || v === 'resource') ? v : 'month'; plRender(); }
 // Drill into a single day (from a month cell / week column date).
 function plOpenDay(ymd) { _plCursor = _plParse(ymd); _plView = 'day'; plRender(); }
 function plToggleFilter(key) {
@@ -554,7 +605,7 @@ function plNewEvent()        { plOpenEventForm(null, _plView === 'day' ? _plYmd(
 function plDayNew(ymd)       { plOpenEventForm(null, ymd); }
 function plDayNewAt(ymd, tm) { plOpenEventForm(null, ymd, tm); }
 
-function plOpenEventForm(id, prefillYmd, prefillTime) {
+function plOpenEventForm(id, prefillYmd, prefillTime, prefillInsp) {
   _plEditId = id || null;
   const ev = id ? (plGetEvent(id) || {}) : {};
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
@@ -562,9 +613,10 @@ function plOpenEventForm(id, prefillYmd, prefillTime) {
   const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
   const date = (ev.date ? String(ev.date).slice(0, 10) : (prefillYmd || _plTodayYmd()));
   const time = ev.time || prefillTime || '';
+  const insp = ev.inspector || prefillInsp || '';
 
   const inspOpts = ['<option value="">— Unassigned —</option>']
-    .concat(inspectors.map(i => `<option value="${esc(i.name)}" ${ev.inspector === i.name ? 'selected' : ''}>${esc(i.name)}</option>`)).join('');
+    .concat(inspectors.map(i => `<option value="${esc(i.name)}" ${insp === i.name ? 'selected' : ''}>${esc(i.name)}</option>`)).join('');
   const jobOpts = ['<option value="">— None —</option>']
     .concat(jobs.map(j => `<option value="${esc(j.id)}" ${ev.jobId === j.id ? 'selected' : ''}>${esc(j.title || j.id)}</option>`)).join('');
 
@@ -759,6 +811,29 @@ function _plInjectStyles() {
     body.pl-dragging{cursor:grabbing !important;user-select:none}
     body.pl-dragging .pl-mseg,body.pl-dragging .pl-tg-ev{cursor:grabbing}
     .pl-ghost{position:fixed;z-index:10000;pointer-events:none;background:var(--cyan);color:#012;font-size:11px;font-weight:600;padding:3px 9px;border-radius:5px;box-shadow:0 6px 18px rgba(0,0,0,.5);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pl-cell.pl-drop,.pl-tg-col.pl-drop,.pl-tg-allcell.pl-drop{background:rgba(34,184,206,.14);box-shadow:inset 0 0 0 2px var(--cyan)}`;
+    .pl-cell.pl-drop,.pl-tg-col.pl-drop,.pl-tg-allcell.pl-drop,.pl-res-cell.pl-drop{background:rgba(34,184,206,.14);box-shadow:inset 0 0 0 2px var(--cyan)}
+    .pl-res{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .pl-res-head{display:flex;border-bottom:1px solid var(--border);background:var(--panel)}
+    .pl-res-gx{width:150px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);font-weight:600;display:flex;align-items:center}
+    .pl-res-days{display:grid;flex:1}
+    .pl-res-dayh{padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:var(--t2);border-left:1px solid var(--border);cursor:pointer}
+    .pl-res-dayh:first-child{border-left:0}
+    .pl-res-dayh.today{background:var(--cyan);color:#012}
+    .pl-res-dayh.today .pl-wdow{color:#012}
+    .pl-res-row{display:flex;border-top:1px solid var(--border);min-height:44px}
+    .pl-res-row:first-of-type{border-top:0}
+    .pl-res-unassigned{background:rgba(255,255,255,.015)}
+    .pl-res-name{width:150px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--t1)}
+    .pl-res-unassigned .pl-res-name{color:var(--t3);font-weight:500}
+    .pl-res-nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pl-res-cnt{background:var(--bg2);color:var(--t2);border-radius:9px;padding:0 7px;font-size:10px;font-family:var(--mono)}
+    .pl-res-free{color:#2fb380;font-size:10px;font-weight:500}
+    .pl-res-lanewrap{flex:1;position:relative;min-height:44px}
+    .pl-res-bg{display:grid;position:absolute;inset:0}
+    .pl-res-cell{border-left:1px solid var(--border);cursor:pointer}
+    .pl-res-cell:first-child{border-left:0}
+    .pl-res-cell:hover{background:var(--bg2)}
+    .pl-res-lanes{display:grid;position:relative;pointer-events:none;padding:4px 2px;column-gap:2px;row-gap:2px}
+    .pl-res-lanes>*{pointer-events:auto}`;
   document.head.appendChild(s);
 }

@@ -43,20 +43,21 @@ function _plFmt(ymd)      { return (typeof fmtDate === 'function') ? fmtDate(ymd
 // ── Aggregation ─────────────────────────────────────────────────────────────
 // Returns normalized items whose date falls in [startYmd, endYmd] (inclusive).
 //   { ymd, endYmd, time, title, sub, type, refId, editable, overdue }
-function plCollect(startYmd, endYmd) {
+function plCollect(startYmd, endYmd, opts) {
   const out = [];
+  const en = (opts && opts.all) ? (() => true) : _plEnabled;  // dashboard ignores legend filters
   const inRange = ymd => ymd && ymd >= startYmd && ymd <= endYmd;
-  const push = o => { if (inRange(o.ymd) && _plEnabled(o.type)) out.push(o); };
+  const push = o => { if (inRange(o.ymd) && en(o.type)) out.push(o); };
 
   // Custom events
-  if (_plEnabled('event')) plLoadEvents().forEach(e => push({
+  if (en('event')) plLoadEvents().forEach(e => push({
     ymd: String(e.date || '').slice(0, 10), endYmd: e.endDate ? String(e.endDate).slice(0, 10) : '',
     time: e.time || '', title: e.title || '(untitled)', sub: e.inspector || '',
     type: 'event', refId: e.id, editable: true,
   }));
 
   // Jobs (placed on their start date; range shown in the label)
-  if (_plEnabled('job')) jobLoad().forEach(j => {
+  if (en('job')) jobLoad().forEach(j => {
     if (!j.startDate) return;
     const cust = (typeof jobCustomerName === 'function') ? jobCustomerName(j.customerId) : '';
     push({ ymd: String(j.startDate).slice(0, 10), endYmd: j.endDate ? String(j.endDate).slice(0, 10) : '',
@@ -65,7 +66,7 @@ function plCollect(startYmd, endYmd) {
   });
 
   // Report exam dates
-  if (_plEnabled('report')) (ls(KEYS.reports, []) || []).forEach(r => {
+  if (en('report')) (ls(KEYS.reports, []) || []).forEach(r => {
     if (!r.examDate) return;
     push({ ymd: String(r.examDate).slice(0, 10), endYmd: '', time: '',
       title: (r.method || '') + ' ' + (r.reportNo || ''), sub: r.client || r.project || '',
@@ -73,7 +74,7 @@ function plCollect(startYmd, endYmd) {
   });
 
   // Inspector cert expiries (per-method + legacy + eye test)
-  if (_plEnabled('cert')) (ls(KEYS.inspectors, []) || []).forEach(ins => {
+  if (en('cert')) (ls(KEYS.inspectors, []) || []).forEach(ins => {
     const seen = [];
     const mc = ins.methodCerts || {};
     Object.keys(mc).forEach(m => { if (mc[m] && mc[m].expiry) seen.push([mc[m].expiry, m + ' cert']); });
@@ -85,7 +86,7 @@ function plCollect(startYmd, endYmd) {
   });
 
   // Equipment calibration due
-  if (_plEnabled('calib')) eqLoad().forEach(eq => {
+  if (en('calib')) eqLoad().forEach(eq => {
     if (!eq.calDueAt) return;
     push({ ymd: String(eq.calDueAt).slice(0, 10), endYmd: '', time: '',
       title: (eq.name || 'Equipment') + ' calibration due', sub: eq.svId || '',
@@ -93,7 +94,7 @@ function plCollect(startYmd, endYmd) {
   });
 
   // Invoices + quotes due
-  if (_plEnabled('billing')) {
+  if (en('billing')) {
     const today = _plTodayYmd();
     (billLoad('invoice') || []).forEach(d => { if (!d.dueDate) return;
       const ymd = String(d.dueDate).slice(0, 10);
@@ -117,7 +118,14 @@ function plRender() {
   const root = document.getElementById('planner-root');
   if (!root) return;
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
-  const monthLbl = _plCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  let periodLbl;
+  if (_plView === 'week') {
+    const ws = _plWeekStart(_plCursor), we = _plAddDays(ws, 6);
+    periodLbl = ws.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' – ' +
+                we.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  } else {
+    periodLbl = _plCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  }
 
   const legend = PL_SOURCES.map(s =>
     `<span class="pl-chip ${_plEnabled(s.key) ? '' : 'off'}" data-action="plToggleFilter" data-args="'${s.key}'" title="Show/hide ${esc(s.label)}">
@@ -126,20 +134,21 @@ function plRender() {
   root.innerHTML = `
     <div class="pl-head">
       <div class="pl-nav">
-        <button class="pl-iconbtn" data-action="plPrev" title="Previous month" aria-label="Previous month">‹</button>
+        <button class="pl-iconbtn" data-action="plPrev" title="Previous" aria-label="Previous">‹</button>
         <button class="btn btn-sm" data-action="plToday" style="font-size:12px">Today</button>
-        <button class="pl-iconbtn" data-action="plNext" title="Next month" aria-label="Next month">›</button>
+        <button class="pl-iconbtn" data-action="plNext" title="Next" aria-label="Next">›</button>
       </div>
-      <div class="pl-title">${esc(monthLbl)}</div>
+      <div class="pl-title">${esc(periodLbl)}</div>
       <div class="pl-seg" role="tablist">
         <button class="${_plView === 'month' ? 'on' : ''}" data-action="plSetView" data-args="'month'">Month</button>
+        <button class="${_plView === 'week' ? 'on' : ''}" data-action="plSetView" data-args="'week'">Week</button>
         <button class="${_plView === 'agenda' ? 'on' : ''}" data-action="plSetView" data-args="'agenda'">Agenda</button>
       </div>
       <div class="pl-legend">${legend}</div>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-sm" data-action="plNewEvent" style="white-space:nowrap">+ New event</button>
     </div>
-    <div class="pl-body">${_plView === 'month' ? _plMonthHtml() : _plAgendaHtml()}</div>`;
+    <div class="pl-body">${_plView === 'week' ? _plWeekHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
 
   if (typeof a11yWireLabels === 'function') a11yWireLabels(root);
 }
@@ -207,11 +216,67 @@ function _plAgendaHtml() {
   }).join('');
 }
 
+// Monday on/before the given date.
+function _plWeekStart(d) { const x = new Date(d); const dow = (x.getDay() + 6) % 7; return _plAddDays(x, -dow); }
+
+function _plWeekHtml() {
+  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+  const ws = _plWeekStart(_plCursor);
+  const items = plCollect(_plYmd(ws), _plYmd(_plAddDays(ws, 6)));
+  const byDay = {};
+  items.forEach(it => { (byDay[it.ymd] = byDay[it.ymd] || []).push(it); });
+  const today = _plTodayYmd();
+
+  let cols = '';
+  for (let i = 0; i < 7; i++) {
+    const d = _plAddDays(ws, i);
+    const ymd = _plYmd(d);
+    const list = byDay[ymd] || [];
+    const chips = list.map(it => {
+      const c = it.overdue ? '#e5484d' : _plColor(it.type);
+      const lbl = (it.time ? it.time + ' ' : '') + it.title;
+      return `<div class="pl-ev pl-ev-wk" style="background:${c}1f;border-left-color:${c};color:var(--t1)"
+        data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(lbl)}">${esc(lbl)}${it.sub ? `<span class="pl-ev-sub">${esc(it.sub)}</span>` : ''}</div>`;
+    }).join('') || '<div class="pl-wk-empty">—</div>';
+    const wd = d.toLocaleDateString(undefined, { weekday: 'short' });
+    cols += `<div class="pl-wcol" data-action="plDayNew" data-args="'${ymd}'">
+      <div class="pl-whead ${ymd === today ? 'today' : ''}"><span class="pl-wdow">${esc(wd)}</span> ${d.getDate()}</div>
+      <div class="pl-wbody">${chips}</div></div>`;
+  }
+  return `<div class="pl-week">${cols}</div>
+    <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a day to add an event · click an item to open it.</div>`;
+}
+
+// ── Dashboard widget: next 14 days (ignores legend filters) ──────────────────
+function plRenderUpcoming() {
+  const host = document.getElementById('ov-upcoming');
+  if (!host) return;
+  _plInjectStyles();
+  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+  const items = plCollect(_plTodayYmd(), _plYmd(_plAddDays(new Date(), 14)), { all: true }).slice(0, 8);
+  if (!items.length) {
+    host.innerHTML = `<div style="padding:14px 16px;color:var(--t3);font-size:12px">Nothing scheduled in the next 14 days. <a href="#" data-action="plNewEvent" style="color:var(--cyan)">Add an event</a>.</div>`;
+    if (typeof a11yWireLabels === 'function') a11yWireLabels(host);
+    return;
+  }
+  const today = _plTodayYmd();
+  host.innerHTML = items.map(it => {
+    const c = it.overdue ? '#e5484d' : _plColor(it.type);
+    const when = it.ymd === today ? 'Today' : _plFmt(it.ymd);
+    return `<div class="pl-arow" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'">
+      <span class="pl-dot" style="background:${c}"></span>
+      <span class="pl-atime">${esc(when)}${it.time ? ' ' + esc(it.time) : ''}</span>
+      <span class="pl-atitle">${esc(it.title)}${it.sub ? ` <span style="color:var(--t3)">· ${esc(it.sub)}</span>` : ''}${it.overdue ? ' <span style="color:#e5484d;font-weight:600">overdue</span>' : ''}</span>
+    </div>`;
+  }).join('');
+  if (typeof a11yWireLabels === 'function') a11yWireLabels(host);
+}
+
 // ── Navigation / view ────────────────────────────────────────────────────────
-function plPrev()  { _plCursor = new Date(_plCursor.getFullYear(), _plCursor.getMonth() - 1, 1); plRender(); }
-function plNext()  { _plCursor = new Date(_plCursor.getFullYear(), _plCursor.getMonth() + 1, 1); plRender(); }
+function plPrev()  { _plCursor = (_plView === 'week') ? _plAddDays(_plCursor, -7) : new Date(_plCursor.getFullYear(), _plCursor.getMonth() - 1, 1); plRender(); }
+function plNext()  { _plCursor = (_plView === 'week') ? _plAddDays(_plCursor,  7) : new Date(_plCursor.getFullYear(), _plCursor.getMonth() + 1, 1); plRender(); }
 function plToday() { _plCursor = new Date(); plRender(); }
-function plSetView(v) { _plView = (v === 'agenda') ? 'agenda' : 'month'; plRender(); }
+function plSetView(v) { _plView = (v === 'agenda' || v === 'week') ? v : 'month'; plRender(); }
 function plToggleFilter(key) {
   if (!_plFilters) _plFilters = new Set(PL_SOURCES.map(s => s.key));
   if (_plFilters.has(key)) _plFilters.delete(key); else _plFilters.add(key);
@@ -360,6 +425,17 @@ function _plInjectStyles() {
     .pl-ev:hover{filter:brightness(1.25)}
     .pl-more{font-size:10px;color:var(--t3);cursor:pointer;padding-left:3px}
     .pl-more:hover{color:var(--cyan)}
+    .pl-week{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-height:440px}
+    .pl-wcol{background:var(--bg);display:flex;flex-direction:column;cursor:pointer}
+    .pl-wcol:hover{background:var(--bg2)}
+    .pl-whead{padding:8px;font-size:11px;font-weight:600;color:var(--t2);border-bottom:1px solid var(--border);text-align:center}
+    .pl-whead.today{background:var(--cyan);color:#012}
+    .pl-wdow{color:var(--t3);font-weight:600;margin-right:3px}
+    .pl-whead.today .pl-wdow{color:#012}
+    .pl-wbody{padding:6px;display:flex;flex-direction:column;gap:5px;flex:1}
+    .pl-ev-wk{white-space:normal;line-height:1.3}
+    .pl-ev-sub{display:block;color:var(--t3);font-size:9.5px;margin-top:1px}
+    .pl-wk-empty{color:var(--t3);opacity:.35;text-align:center;font-size:11px;padding:6px 0}
     .pl-aday{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden}
     .pl-aday.today{border-color:var(--cyan)}
     .pl-adate{background:var(--panel);padding:8px 12px;font-size:12px;font-weight:600;color:var(--t1);border-bottom:1px solid var(--border)}

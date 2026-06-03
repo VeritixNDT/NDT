@@ -1714,7 +1714,7 @@ function showPage(id, btn) {
   document.querySelectorAll('.tn').forEach(b=>{ b.classList.remove('active'); b.removeAttribute('aria-current'); });
   const pg = el('page-'+id); if(pg) pg.classList.add('active');
   if(btn) { btn.classList.add('active'); btn.setAttribute('aria-current', 'page'); }
-  if(id === 'overview') ovInit();
+  if(id === 'overview') { ovInit(); if(typeof plRenderUpcoming === 'function') plRenderUpcoming(); }
   if(id === 'reports') rptInit();
   if(id === 'jobs') { if(typeof jobsInit === 'function') jobsInit(); }
   if(id === 'planner') { if(typeof plInit === 'function') plInit(); }

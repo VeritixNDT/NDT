@@ -425,6 +425,14 @@
           </div>
           <!-- Metric tiles -->
           <div class="dash-metrics" id="ov-metrics"></div>
+          <!-- Planner — upcoming (next 14 days) -->
+          <div class="sc" style="margin-bottom:14px" aria-labelledby="ov-upcoming-title">
+            <div class="sc-head">
+              <span class="sc-title" id="ov-upcoming-title" data-i18n="ov.dash.upcoming">Upcoming · next 14 days</span>
+              <button class="btn btn-sm" data-action="showPage" data-pass-el="1" data-args="'planner'" style="font-size:11px" data-i18n="ov.dash.open_planner">Open planner →</button>
+            </div>
+            <div class="sc-body np" id="ov-upcoming"></div>
+          </div>
           <!-- V8: Calendar heatmap -->
           <div class="heatmap-wrap" id="ov-heatmap-wrap" style="display:none">
             <div class="heatmap-head">

@@ -247,20 +247,34 @@ function _plWeekHtml() {
     <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a day to add an event · click an item to open it.</div>`;
 }
 
-// ── Dashboard widget: next 14 days (ignores legend filters) ──────────────────
+// ── Dashboard widget: List (next 14 days) ⇄ Week (this week). Ignores the
+// planner's legend filters — always shows every source. ──────────────────────
+var _plUpView = 'list';   // 'list' | 'week'
+
 function plRenderUpcoming() {
   const host = document.getElementById('ov-upcoming');
   if (!host) return;
   _plInjectStyles();
+  const cap = _plUpView === 'week' ? 'This week' : '';
+  host.innerHTML = `
+    <div class="pl-up-bar">
+      <span class="pl-up-cap">${cap}</span><span style="flex:1"></span>
+      <div class="pl-seg pl-seg-sm" role="tablist">
+        <button class="${_plUpView === 'list' ? 'on' : ''}" data-action="plUpView" data-args="'list'">List</button>
+        <button class="${_plUpView === 'week' ? 'on' : ''}" data-action="plUpView" data-args="'week'">Week</button>
+      </div>
+    </div>
+    ${_plUpView === 'week' ? _plUpWeekHtml() : _plUpListHtml()}`;
+  if (typeof a11yWireLabels === 'function') a11yWireLabels(host);
+}
+function plUpView(v) { _plUpView = (v === 'week') ? 'week' : 'list'; plRenderUpcoming(); }
+
+function _plUpListHtml() {
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
   const items = plCollect(_plTodayYmd(), _plYmd(_plAddDays(new Date(), 14)), { all: true }).slice(0, 8);
-  if (!items.length) {
-    host.innerHTML = `<div style="padding:14px 16px;color:var(--t3);font-size:12px">Nothing scheduled in the next 14 days. <a href="#" data-action="plNewEvent" style="color:var(--cyan)">Add an event</a>.</div>`;
-    if (typeof a11yWireLabels === 'function') a11yWireLabels(host);
-    return;
-  }
+  if (!items.length) return `<div style="padding:10px 16px 14px;color:var(--t3);font-size:12px">Nothing scheduled in the next 14 days. <a href="#" data-action="plNewEvent" style="color:var(--cyan)">Add an event</a>.</div>`;
   const today = _plTodayYmd();
-  host.innerHTML = items.map(it => {
+  return items.map(it => {
     const c = it.overdue ? '#e5484d' : _plColor(it.type);
     const when = it.ymd === today ? 'Today' : _plFmt(it.ymd);
     return `<div class="pl-arow" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'">
@@ -269,7 +283,34 @@ function plRenderUpcoming() {
       <span class="pl-atitle">${esc(it.title)}${it.sub ? ` <span style="color:var(--t3)">· ${esc(it.sub)}</span>` : ''}${it.overdue ? ' <span style="color:#e5484d;font-weight:600">overdue</span>' : ''}</span>
     </div>`;
   }).join('');
-  if (typeof a11yWireLabels === 'function') a11yWireLabels(host);
+}
+
+// Compact 7-day grid of the current week for the dashboard card.
+function _plUpWeekHtml() {
+  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+  const ws = _plWeekStart(new Date());
+  const items = plCollect(_plYmd(ws), _plYmd(_plAddDays(ws, 6)), { all: true });
+  const byDay = {};
+  items.forEach(it => { (byDay[it.ymd] = byDay[it.ymd] || []).push(it); });
+  const today = _plTodayYmd();
+  let cols = '';
+  for (let i = 0; i < 7; i++) {
+    const d = _plAddDays(ws, i);
+    const ymd = _plYmd(d);
+    const list = byDay[ymd] || [];
+    const max = 3;
+    const chips = list.slice(0, max).map(it => {
+      const c = it.overdue ? '#e5484d' : _plColor(it.type);
+      const lbl = (it.time ? it.time + ' ' : '') + it.title;
+      return `<div class="pl-up-ev" style="background:${c}1f;border-left-color:${c}" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'" title="${esc(lbl)}">${esc(lbl)}</div>`;
+    }).join('');
+    const more = list.length > max ? `<div class="pl-up-more" data-action="plDayPopover" data-args="'${ymd}'">+${list.length - max}</div>` : '';
+    const wd = d.toLocaleDateString(undefined, { weekday: 'short' });
+    cols += `<div class="pl-up-col ${ymd === today ? 'today' : ''}" data-action="plDayNew" data-args="'${ymd}'">
+      <div class="pl-up-head"><span>${esc(wd)}</span><b>${d.getDate()}</b></div>
+      <div class="pl-up-body">${chips}${more}</div></div>`;
+  }
+  return `<div class="pl-up-week">${cols}</div>`;
 }
 
 // ── Navigation / view ────────────────────────────────────────────────────────
@@ -371,14 +412,14 @@ function plSaveEvent() {
   else { rec.createdAt = now; list.push(rec); }
   plSaveEvents(list);
   if (typeof toast === 'function') toast(_plEditId ? 'Event updated.' : 'Event added.', 'success');
-  plCloseModal(); plRender();
+  plCloseModal(); plRender(); plRenderUpcoming();
 }
 
 async function plDeleteEvent(id) {
   if (typeof vxConfirm === 'function') { if (!await vxConfirm({ message: 'Delete this event?', okLabel: 'Delete', danger: true })) return; }
   plSaveEvents(plLoadEvents().filter(e => e.id !== id));
   if (typeof toast === 'function') toast('Event deleted.');
-  plCloseModal(); plRender();
+  plCloseModal(); plRender(); plRenderUpcoming();
 }
 
 // ── Modal + styles ───────────────────────────────────────────────────────────
@@ -436,6 +477,21 @@ function _plInjectStyles() {
     .pl-ev-wk{white-space:normal;line-height:1.3}
     .pl-ev-sub{display:block;color:var(--t3);font-size:9.5px;margin-top:1px}
     .pl-wk-empty{color:var(--t3);opacity:.35;text-align:center;font-size:11px;padding:6px 0}
+    .pl-up-bar{display:flex;align-items:center;gap:8px;padding:8px 12px 4px}
+    .pl-up-cap{font-size:11px;color:var(--t3);font-weight:600}
+    .pl-seg-sm button{padding:3px 10px;font-size:11px}
+    .pl-up-week{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .pl-up-col{background:var(--bg);min-height:88px;display:flex;flex-direction:column;cursor:pointer}
+    .pl-up-col:hover{background:var(--bg2)}
+    .pl-up-head{display:flex;flex-direction:column;align-items:center;line-height:1.15;font-size:9.5px;color:var(--t3);padding:4px 2px;border-bottom:1px solid var(--border)}
+    .pl-up-head b{color:var(--t2);font-size:12px;font-weight:700}
+    .pl-up-col.today .pl-up-head{background:var(--cyan)}
+    .pl-up-col.today .pl-up-head,.pl-up-col.today .pl-up-head b{color:#012}
+    .pl-up-body{padding:3px;display:flex;flex-direction:column;gap:2px}
+    .pl-up-ev{font-size:9.5px;line-height:1.25;padding:1px 4px;border-radius:3px;border-left:2px solid;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+    .pl-up-ev:hover{filter:brightness(1.25)}
+    .pl-up-more{font-size:9px;color:var(--t3);padding-left:3px;cursor:pointer}
+    .pl-up-more:hover{color:var(--cyan)}
     .pl-aday{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden}
     .pl-aday.today{border-color:var(--cyan)}
     .pl-adate{background:var(--panel);padding:8px 12px;font-size:12px;font-weight:600;color:var(--t1);border-bottom:1px solid var(--border)}

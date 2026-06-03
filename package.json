@@ -1,0 +1,18 @@
+{
+  "name": "veritix-ndt-inspect-devtools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling only (Playwright verify harness + ESLint). The Veritix NDT Inspect app itself is static — open veritix-ndt-inspect-v3_44.html directly or run `npm run serve`; there is NO build step.",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "verify": "node tools/verify.mjs",
+    "lint": "eslint js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.1",
+    "globals": "^17.6.0",
+    "playwright": "^1.60.0"
+  }
+}

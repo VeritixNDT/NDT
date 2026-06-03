@@ -4,3 +4,9 @@
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Dev tooling only — the app itself is static (no build step).
+# These back the Playwright verify harness + ESLint; not part of the shipped app.
+node_modules/
+test-results/
+.verify-out/

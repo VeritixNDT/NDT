@@ -170,9 +170,21 @@ function bootApp() {
             vxPlatformSet({ accessToken: null, refreshToken: null, tokenExpiry: null });
             try { if(typeof vxRealtimeDisconnect === 'function') vxRealtimeDisconnect(); } catch(e){}
           } else if(session){
-            // Use the helper so orgId gets re-resolved if it wasn't set.
-            _vxApplySupabaseSession(session).catch(function(e){ console.warn('apply session', e); });
-            try { if(typeof vxRealtimeConnect === 'function') vxRealtimeConnect(); } catch(e){}
+            // Defer to the next tick. supabase-js fires this callback
+            // *synchronously* while it is still committing the freshly-issued
+            // token to the PostgREST client. Calling _vxApplySupabaseSession
+            // inline (it issues authenticated org_members / orgs queries)
+            // races that commit: the requests go out with no JWT, auth.uid()
+            // is null server-side, the membership read returns empty, and the
+            // reconcile path then 401s inserting into orgs (RLS) — which can
+            // also spawn a spurious duplicate org. setTimeout(…, 0) lets the
+            // SDK finish wiring the session first. (Matches supabase-js
+            // guidance: never await Supabase calls directly in this callback.)
+            setTimeout(function(){
+              // Use the helper so orgId gets re-resolved if it wasn't set.
+              _vxApplySupabaseSession(session).catch(function(e){ console.warn('apply session', e); });
+              try { if(typeof vxRealtimeConnect === 'function') vxRealtimeConnect(); } catch(e){}
+            }, 0);
           }
         });
       }

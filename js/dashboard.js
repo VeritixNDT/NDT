@@ -538,12 +538,20 @@ function ovRefreshDashboard() {
   if(sevEl) {
     const sevs = ['Critical','High','Medium','Low'];
     const sevColors = {Critical:'var(--sev-critical)',High:'var(--sev-high)',Medium:'var(--sev-medium)',Low:'var(--sev-low)'};
+    // Distinct SHAPE per severity so they're distinguishable without colour
+    // (WCAG 1.4.1 — don't rely on colour alone). Glyphs: ▲ ◆ ● ▬.
+    const sevGlyph = {Critical:'▲',High:'◆',Medium:'●',Low:'▬'};
+    // Count actual defects by severity (combined source, range-scoped).
+    const sevDefs = (typeof _defCombined === 'function') ? _defCombined() : (ls(KEYS.defects, []) || []);
+    const sevRanged = (_ovDateRange === 'all') ? sevDefs : sevDefs.filter(d => d.createdAt && new Date(d.createdAt).getTime() >= Date.now() - parseInt(_ovDateRange) * 864e5);
     const sevCounts = {};
     sevs.forEach(s => sevCounts[s] = 0);
+    sevRanged.forEach(d => { if(sevCounts[d.severity] != null) sevCounts[d.severity]++; });
     const maxSev = Math.max(1, ...Object.values(sevCounts));
+    const sevLbl = s => (typeof tSeverity === 'function') ? tSeverity(s) : s;
     sevEl.innerHTML = sevs.map(s => `
       <div class="sev-row">
-        <div class="sev-label">${s}</div>
+        <div class="sev-label"><span class="sev-glyph" style="color:${sevColors[s]};display:inline-block;width:12px;text-align:center;margin-right:6px;font-size:10px" aria-hidden="true">${sevGlyph[s]}</span>${escapeHtml(sevLbl(s))}</div>
         <div class="sev-track"><div class="sev-fill" style="width:${Math.round(sevCounts[s]/maxSev*100)}%;background:${sevColors[s]}"></div></div>
         <div class="sev-count">${sevCounts[s]}</div>
       </div>
@@ -844,7 +852,7 @@ function ovRenderExpiryTimeline(){
         <div class="timeline-today" style="left:${todayPct.toFixed(2)}%"></div>
         <div class="timeline-bar" style="left:${startPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;background:${color}">${expired ? `EXPIRED ${Math.abs(days)}d ago` : `${days}d → ${fmtDate(new Date(it.expMs).toISOString())}`}</div>
       </div>
-      <div style="font-family:var(--mono);font-size:11px;color:${color};text-align:right">${expired ? '⚠ Expired' : days+' days'}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:${color};text-align:right">${expired ? '⚠ Expired' : (urgent ? '⏳ ' : '✓ ') + days + ' days'}</div>
     </div>`;
   });
   wrap.innerHTML = html;

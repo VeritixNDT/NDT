@@ -157,6 +157,11 @@ var KEYS = {
   // endDate, notes, createdAt, updatedAt }. A job belongs to a customer;
   // reports carry a jobId so they nest under the job they were run for.
   jobs:'vx-jobs-v1',
+  // Planner events (calendar). Each entry is { id, title, date (yyyy-mm-dd),
+  // time, endDate, inspector (name), jobId, notes, createdAt, updatedAt }.
+  // The planner also aggregates dates from jobs/reports/inspectors/equipment/
+  // billing read-only — only these custom events are stored here.
+  events:'vx-events-v1',
   // Quotes & invoices (Phase 2). Each entry is { id, number, jobId,
   // customerId, status, issueDate, dueDate/validUntil, lineItems:[{desc,
   // qty, unitPrice}], vatRate, currency, notes, sentAt, paidAt/acceptedAt,

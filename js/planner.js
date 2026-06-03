@@ -123,6 +123,8 @@ function plRender() {
     const ws = _plWeekStart(_plCursor), we = _plAddDays(ws, 6);
     periodLbl = ws.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' – ' +
                 we.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  } else if (_plView === 'day') {
+    periodLbl = _plCursor.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   } else {
     periodLbl = _plCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   }
@@ -142,13 +144,14 @@ function plRender() {
       <div class="pl-seg" role="tablist">
         <button class="${_plView === 'month' ? 'on' : ''}" data-action="plSetView" data-args="'month'">Month</button>
         <button class="${_plView === 'week' ? 'on' : ''}" data-action="plSetView" data-args="'week'">Week</button>
+        <button class="${_plView === 'day' ? 'on' : ''}" data-action="plSetView" data-args="'day'">Day</button>
         <button class="${_plView === 'agenda' ? 'on' : ''}" data-action="plSetView" data-args="'agenda'">Agenda</button>
       </div>
       <div class="pl-legend">${legend}</div>
       <div style="flex:1"></div>
       <button class="btn btn-primary btn-sm" data-action="plNewEvent" style="white-space:nowrap">+ New event</button>
     </div>
-    <div class="pl-body">${_plView === 'week' ? _plWeekHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
+    <div class="pl-body">${_plView === 'week' ? _plWeekHtml() : _plView === 'day' ? _plDayHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
 
   if (typeof a11yWireLabels === 'function') a11yWireLabels(root);
 }
@@ -182,10 +185,10 @@ function _plMonthHtml() {
       ? `<div class="pl-more" data-action="plDayPopover" data-args="'${ymd}'">+${dayItems.length - max} more</div>` : '';
     cells += `<div class="pl-cell ${d.getMonth() === curMonth ? '' : 'other'} ${ymd === today ? 'today' : ''}"
       data-action="plDayNew" data-args="'${ymd}'">
-      <div class="pl-daynum">${d.getDate()}</div>${chips}${more}</div>`;
+      <div class="pl-daynum" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day">${d.getDate()}</div>${chips}${more}</div>`;
   }
   return `<div class="pl-grid">${dows.map(d => `<div class="pl-dow">${d}</div>`).join('')}${cells}</div>
-    <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a day to add an event · click an item to open it.</div>`;
+    <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a date to open the day · click empty space to add an event · click an item to open it.</div>`;
 }
 
 function _plAgendaHtml() {
@@ -240,11 +243,36 @@ function _plWeekHtml() {
     }).join('') || '<div class="pl-wk-empty">—</div>';
     const wd = d.toLocaleDateString(undefined, { weekday: 'short' });
     cols += `<div class="pl-wcol" data-action="plDayNew" data-args="'${ymd}'">
-      <div class="pl-whead ${ymd === today ? 'today' : ''}"><span class="pl-wdow">${esc(wd)}</span> ${d.getDate()}</div>
+      <div class="pl-whead ${ymd === today ? 'today' : ''}" data-action="plOpenDay" data-args="'${ymd}'" title="Open this day"><span class="pl-wdow">${esc(wd)}</span> ${d.getDate()}</div>
       <div class="pl-wbody">${chips}</div></div>`;
   }
   return `<div class="pl-week">${cols}</div>
     <div style="margin-top:10px;font-size:11px;color:var(--t3)">Click a day to add an event · click an item to open it.</div>`;
+}
+
+// Single-day detail view: all-day items + timed (scheduled) items.
+function _plDayHtml() {
+  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+  const ymd = _plYmd(_plCursor);
+  const items = plCollect(ymd, ymd);
+  const timed = items.filter(it => it.time);
+  const allday = items.filter(it => !it.time);
+  const row = it => {
+    const c = it.overdue ? '#e5484d' : _plColor(it.type);
+    return `<div class="pl-arow" data-action="plItemClick" data-args="'${it.type}','${esc(it.refId)}'">
+      <span class="pl-dot" style="background:${c}"></span>
+      <span class="pl-atime">${esc(it.time || (it.endYmd && it.endYmd !== ymd ? '→ ' + _plFmt(it.endYmd) : 'all day'))}</span>
+      <span class="pl-atitle">${esc(it.title)}${it.sub ? ` <span style="color:var(--t3)">· ${esc(it.sub)}</span>` : ''}${it.overdue ? ' <span style="color:#e5484d;font-weight:600">overdue</span>' : ''}</span>
+    </div>`;
+  };
+  const sec = (title, arr, empty) => `<div class="pl-day-sec">
+    <div class="pl-day-h">${esc(title)}${arr.length ? ` <span class="pl-day-n">${arr.length}</span>` : ''}</div>
+    <div class="pl-arows">${arr.length ? arr.map(row).join('') : `<div class="pl-day-empty">${esc(empty)}</div>`}</div></div>`;
+  return `<div class="pl-day">
+    ${sec('All day', allday, 'Nothing all-day.')}
+    ${sec('Scheduled', timed, 'No timed events.')}
+    <button class="btn btn-sm" data-action="plDayNew" data-args="'${ymd}'" style="margin-top:12px">+ Add event on this day</button>
+  </div>`;
 }
 
 // ── Dashboard widget: List (next 14 days) ⇄ Week (this week). Ignores the
@@ -314,10 +342,13 @@ function _plUpWeekHtml() {
 }
 
 // ── Navigation / view ────────────────────────────────────────────────────────
-function plPrev()  { _plCursor = (_plView === 'week') ? _plAddDays(_plCursor, -7) : new Date(_plCursor.getFullYear(), _plCursor.getMonth() - 1, 1); plRender(); }
-function plNext()  { _plCursor = (_plView === 'week') ? _plAddDays(_plCursor,  7) : new Date(_plCursor.getFullYear(), _plCursor.getMonth() + 1, 1); plRender(); }
+function _plStep(dir) { return (_plView === 'day') ? _plAddDays(_plCursor, dir) : (_plView === 'week') ? _plAddDays(_plCursor, dir * 7) : new Date(_plCursor.getFullYear(), _plCursor.getMonth() + dir, 1); }
+function plPrev()  { _plCursor = _plStep(-1); plRender(); }
+function plNext()  { _plCursor = _plStep(1);  plRender(); }
 function plToday() { _plCursor = new Date(); plRender(); }
-function plSetView(v) { _plView = (v === 'agenda' || v === 'week') ? v : 'month'; plRender(); }
+function plSetView(v) { _plView = (v === 'agenda' || v === 'week' || v === 'day') ? v : 'month'; plRender(); }
+// Drill into a single day (from a month cell / week column date).
+function plOpenDay(ymd) { _plCursor = _plParse(ymd); _plView = 'day'; plRender(); }
 function plToggleFilter(key) {
   if (!_plFilters) _plFilters = new Set(PL_SOURCES.map(s => s.key));
   if (_plFilters.has(key)) _plFilters.delete(key); else _plFilters.add(key);
@@ -355,7 +386,7 @@ function plDayPopover(ymd) {
 }
 
 // ── Event editor ─────────────────────────────────────────────────────────────
-function plNewEvent()      { plOpenEventForm(null, _plTodayYmd()); }
+function plNewEvent()      { plOpenEventForm(null, _plView === 'day' ? _plYmd(_plCursor) : _plTodayYmd()); }
 function plDayNew(ymd)     { plOpenEventForm(null, ymd); }
 
 function plOpenEventForm(id, prefillYmd) {
@@ -500,6 +531,14 @@ function _plInjectStyles() {
     .pl-arow{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;font-size:12.5px;color:var(--t1)}
     .pl-arow:hover{background:var(--bg2)}
     .pl-atime{font-family:var(--mono);font-size:11px;color:var(--t3);min-width:64px}
-    .pl-atitle{flex:1;min-width:0}`;
+    .pl-atitle{flex:1;min-width:0}
+    .pl-daynum[data-action],.pl-whead[data-action]{cursor:pointer}
+    .pl-daynum[data-action]:hover{background:var(--bg2);border-radius:4px}
+    .pl-day{max-width:680px}
+    .pl-day-sec{border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden}
+    .pl-day-h{background:var(--panel);padding:9px 14px;font-size:12px;font-weight:600;color:var(--t1);border-bottom:1px solid var(--border)}
+    .pl-day-n{display:inline-block;margin-left:4px;background:var(--bg2);color:var(--t2);border-radius:9px;padding:0 7px;font-size:11px;font-family:var(--mono)}
+    .pl-day-empty{padding:12px 14px;color:var(--t3);font-size:12px}
+    .pl-day .pl-arow{padding:10px 14px;font-size:13px}`;
   document.head.appendChild(s);
 }

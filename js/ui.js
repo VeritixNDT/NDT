@@ -1692,12 +1692,40 @@ async function savePwdModal() {
   if(!cur) { err.textContent='Enter current password.'; err.style.display=''; return; }
   if(nw.length < 6) { err.textContent='New password must be at least 6 characters.'; err.style.display=''; return; }
   if(nw !== cf) { err.textContent='Passwords do not match.'; err.style.display=''; return; }
+
+  const setLocalHash = async () => {
+    u.pwd = await sha256(nw);
+    const idx = AUTH_USERS.findIndex(x => x.id === u.id);
+    if(idx >= 0) AUTH_USERS[idx] = u;
+    saveUsers();
+  };
+
+  // Cloud-aware path. When signed in to Supabase the real password lives
+  // server-side; the local hash (u.pwd) is the original *local-only* password
+  // and would wrongly reject a valid cloud password (the temp-reset trap).
+  // Verify the current password by re-auth, then update it via the SDK, and
+  // mirror it into the local hash so the offline/local fallback stays in sync.
+  let sb = null, cloudUser = null;
+  try {
+    sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+    if(sb){ const { data } = await sb.auth.getSession(); cloudUser = data && data.session ? data.session.user : null; }
+  } catch(e){ cloudUser = null; }
+
+  if(sb && cloudUser){
+    const reauth = await sb.auth.signInWithPassword({ email: cloudUser.email, password: cur });
+    if(reauth.error){ err.textContent='Current password is incorrect.'; err.style.display=''; return; }
+    const upd = await sb.auth.updateUser({ password: nw });
+    if(upd.error){ err.textContent = upd.error.message || 'Couldn\'t update password.'; err.style.display=''; return; }
+    await setLocalHash();
+    closePwdModal();
+    toast(t('toast.password_changed','Password changed.'));
+    return;
+  }
+
+  // Local-only path (no cloud session).
   const hash = await sha256(cur);
   if(hash !== u.pwd) { err.textContent='Current password is incorrect.'; err.style.display=''; return; }
-  u.pwd = await sha256(nw);
-  const idx = AUTH_USERS.findIndex(x => x.id === u.id);
-  if(idx >= 0) AUTH_USERS[idx] = u;
-  saveUsers();
+  await setLocalHash();
   closePwdModal();
   toast(t('toast.password_changed','Password changed.'));
 }

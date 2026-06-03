@@ -1046,7 +1046,9 @@ function ovOpenDefectDrilldown(title, list){
 
 // Drill-down from clicking a metric tile
 function ovDrillMetric(kind){
-  const all = ls(KEYS.reports, []);
+  // Match the metric tiles: count/list each report once at its latest revision
+  // (so "Not acceptable" — welds with defects — excludes superseded revisions).
+  const all = (typeof rptLatestRevisions === 'function') ? rptLatestRevisions(ls(KEYS.reports, [])) : ls(KEYS.reports, []);
   const reports = ovFilterByRange(all);
   let title, list;
   if(kind === 'total'){ title = `All reports in selected period`; list = reports; }

@@ -4659,6 +4659,25 @@ a { color: var(--cyan); text-decoration: none; }
   .snav-collapse-btn { display: none; }
   .stat-row { grid-template-columns: 1fr 1fr; }
   .fg { grid-template-columns: 1fr; }
+  /* Mobile topbar: free up room and make the primary nav a horizontally
+     scrollable strip so every tab stays reachable (was clipped after ~3). */
+  .topbar { padding: 0 10px; }
+  .topbar-search { display: none; }
+  .signal { display: none; }
+  .logo-name { display: none; }      /* shield only — reclaim wordmark width */
+  #vx-mode-pill { display: none; }
+  .logo { margin-right: 6px; }
+  .topnav {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topnav::-webkit-scrollbar { display: none; }
+  .tn { flex-shrink: 0; padding: 7px 11px; }
 }
 /* ═══ PDF TEMPLATE EDITOR ═══ */
 .ribbon-tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border2);padding:0 10px;gap:0;flex-shrink:0}

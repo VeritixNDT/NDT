@@ -240,6 +240,12 @@ async function _vxApplySupabaseSession(session){
     }
   } catch(e){ console.warn('vx: realtime setAuth failed', e); }
   vxPlatformSet(patch);
+  // Remember that a real Supabase session has existed on this device. Lets
+  // renderTrialBanner tell apart "never signed in to cloud" (genuine trial)
+  // from "has a cloud account here but is now on a stale local-only session"
+  // — the latter gets a clear reconnect banner instead of being silently
+  // left at local Inspector privilege (which is what masked Carl's admin).
+  try { localStorage.setItem('vx-sb-cloud-seen', '1'); } catch(e){}
   // Resolve orgId via the membership table. If the user has no membership
   // (signed up under email-confirm-on so vxApi.register returned early
   // without provisioning, or invitation pending), reconcile by creating
@@ -941,6 +947,17 @@ function renderTrialBanner() {
     if(banner) banner.remove();
     return;
   }
+
+  // V44.7: "Signed in locally, cloud unreachable" state. The app keeps a
+  // local CURRENT_USER session that auto-restores on launch independently of
+  // the Supabase session. If this device has signed in to the cloud before
+  // (vx-sb-cloud-seen) but there's no live cloud session now, the user is
+  // silently running at local Inspector privilege — exactly the trap where
+  // admin tools vanish with no explanation. Surface it instead of masking it.
+  var cloudSeen = false;
+  try { cloudSeen = localStorage.getItem('vx-sb-cloud-seen') === '1'; } catch(e){}
+  var cloudOffline = (typeof vxSupabaseConfigured === 'function' && vxSupabaseConfigured())
+                  && cloudSeen && !!CURRENT_USER && state !== 'authenticated';
   if(banner) return;   // already showing
   if(sessionStorage.getItem('vx-trial-banner-dismissed') === '1') return;
   banner = document.createElement('div');
@@ -951,9 +968,13 @@ function renderTrialBanner() {
   const dirty = vxStore.dirtyKeys().length;
   const isSignedOut = state === 'signed_out';
 
-  // V14: three banner states — unverified / signed_out / trial
+  // V14: banner states — cloud-offline / unverified / signed_out / trial
   let bodyHtml, ctaText, ctaAction;
-  if(needsVerification) {
+  if(cloudOffline) {
+    bodyHtml = t('banner.cloud_offline','<strong>Signed in locally.</strong> You’re not connected to Veritix Cloud, so admin tools and sync are unavailable. Sign in to reconnect.');
+    ctaText = t('app.signin','Sign in');
+    ctaAction = 'vxOpenSignup';
+  } else if(needsVerification) {
     bodyHtml = tf('banner.verify','<strong>Confirm your email.</strong> We sent a verification link to {email}. Some features unlock after you click it.',
                   { email: escapeHtml(CURRENT_USER?.email || t('banner.your_inbox','your inbox')) });
     ctaText = t('banner.resend','Resend email');
@@ -978,7 +999,7 @@ function renderTrialBanner() {
   }
 
   banner.innerHTML = `
-    <span class="vx-trial-banner-icon" aria-hidden="true">${(isSignedOut || needsVerification)
+    <span class="vx-trial-banner-icon" aria-hidden="true">${(isSignedOut || needsVerification || cloudOffline)
       ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
       : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
     }</span>
@@ -3415,7 +3436,12 @@ async function doLogin() {
     if(btn && origLabel) { btn.disabled = false; btn.textContent = origLabel; }
   }
 
-  // Local fallback for legacy trial accounts
+  // Local fallback for legacy trial accounts. Only reached when the cloud
+  // call errored at the network/server level (status 0 or >=500) or threw —
+  // genuine 401/403 already returned above. Don't masquerade as a normal
+  // sign-in: a stale local account can carry lower privilege than the user's
+  // real cloud role (this is what silently kept Carl at local Inspector
+  // instead of cloud admin). Make the offline downgrade explicit.
   const hash = await sha256(pwd);
   const user = AUTH_USERS.find(u=>u.email===email && u.pwd===hash);
   if(!user){ err.textContent=t('validation.invalid_creds','Incorrect email or password.'); err.classList.add('show'); return; }
@@ -3423,6 +3449,12 @@ async function doLogin() {
   user.lastLogin = new Date().toISOString();
   saveUsers();
   saveSession(user.id);
+  // If the cloud is configured, the user expected a cloud sign-in — tell them
+  // plainly that they're offline/local-only so a missing admin tool or unsynced
+  // change is never a silent surprise.
+  if(typeof vxSupabaseConfigured === 'function' && vxSupabaseConfigured()){
+    toast(t('toast.signed_in_local','Couldn\'t reach Veritix Cloud — signed in offline (local only). Admin tools and sync are unavailable until you reconnect.'), 'warn');
+  }
   bootApp();
 }
 

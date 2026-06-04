@@ -557,6 +557,29 @@ function vxApplyRoleGating(){
     if(!navItem) return;
     navItem.style.display = admin ? '' : 'none';
   });
+  // V46: top-nav admin "Manage" group (Jobs / Customers / Planner / Billing).
+  // Hidden for non-admins, who reach the read-only Planner via the home side
+  // menu instead.
+  const manage = document.getElementById('tn-manage-wrap');
+  if(manage) manage.style.display = admin ? '' : 'none';
+  _vxWireManageMenu();
+}
+
+// Wire the top-nav "Manage" dropdown once: toggle on the button, close on an
+// item click or an outside click. Idempotent (guarded by btn._vxWired).
+function _vxWireManageMenu(){
+  const btn = document.getElementById('tn-manage');
+  const menu = document.getElementById('tn-manage-menu');
+  if(!btn || !menu || btn._vxWired) return;
+  btn._vxWired = true;
+  const setOpen = (open) => { menu.style.display = open ? '' : 'none'; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+  btn.addEventListener('click', () => setOpen(menu.style.display === 'none'));
+  menu.addEventListener('click', () => setOpen(false));   // any item navigates then closes
+  document.addEventListener('click', (e) => {
+    if(menu.style.display === 'none') return;
+    if(btn.contains(e.target) || menu.contains(e.target)) return;
+    setOpen(false);
+  });
 }
 
 // V28 — Support-facing diagnostics. Call from the browser console:

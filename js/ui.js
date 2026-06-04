@@ -1734,8 +1734,15 @@ async function savePwdModal() {
 // PAGE NAVIGATION
 // ══════════════════════════════════════════════
 function showPage(id, btn) {
-  if(id === 'settings' && !(typeof vxIsAdmin === 'function' ? vxIsAdmin() : CURRENT_USER?.role === 'Admin')) {
+  const _isAdmin = (typeof vxIsAdmin === 'function') ? vxIsAdmin() : (CURRENT_USER && CURRENT_USER.role === 'Admin');
+  if(id === 'settings' && !_isAdmin) {
     toast(t('toast.admin_required_settings','Admin access required for Settings.'), 'error');
+    return;
+  }
+  // V46: Jobs & Billing are admin-only (grouped under the top-nav Manage menu).
+  // Planner is intentionally NOT gated — inspectors view it read-only.
+  if((id === 'jobs' || id === 'billing') && !_isAdmin) {
+    toast(t('toast.admin_required','Admin access required.'), 'error');
     return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));

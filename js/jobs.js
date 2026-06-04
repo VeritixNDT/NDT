@@ -88,7 +88,14 @@ function jobsRender() {
   }
 
   if(!all.length) {
-    wrap.innerHTML = `<div class="sc"><div class="sc-body" style="text-align:center;color:var(--t3);font-size:13px;padding:30px">No jobs yet. Click <strong>+ New job</strong> above to create your first one.${(typeof custLoad === 'function' && !custLoad().length) ? '<br><span style="font-size:12px">Tip: add a customer first under Settings → Customers.</span>' : ''}</div></div>`;
+    // Chain the empty state to the prerequisite: a job needs a customer, so
+    // with none yet, point straight at adding one (top-nav Customers) rather
+    // than at "+ New job" (which would dead-end on an empty customer picker).
+    const noCust = (typeof custLoad === 'function' && !custLoad().length);
+    const body = noCust
+      ? `<div style="color:var(--t3);font-size:13px;margin-bottom:14px">${escapeHtml(t('jobs.empty.needcust','A job belongs to a customer. Add your first customer to get started.'))}</div><button class="btn btn-primary btn-sm" data-action="ovOpenCustomers">+ ${escapeHtml(t('gs.cta1','Add customer'))}</button>`
+      : `<div style="color:var(--t3);font-size:13px;margin-bottom:14px">${escapeHtml(t('jobs.empty.nojobs','No jobs yet — create your first one.'))}</div><button class="btn btn-primary btn-sm" data-action="jobOpenForm" data-args="null">+ ${escapeHtml(t('gs.cta2','New job'))}</button>`;
+    wrap.innerHTML = `<div class="sc"><div class="sc-body" style="text-align:center;padding:34px 20px">${body}</div></div>`;
     return;
   }
   if(!list.length) {
@@ -136,7 +143,7 @@ function jobOpenForm(id) {
   if(sel) {
     const customers = (typeof custLoad === 'function' ? custLoad() : [])
       .slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
-    let opts = '<option value="">— Select customer —</option>'
+    let opts = '<option value="">'+(customers.length ? '— Select customer —' : t('jobs.form.nocust','— No customers yet — add one first —'))+'</option>'
       + customers.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name||'(unnamed)')}</option>`).join('');
     // Preserve a since-deleted customer reference so editing doesn't silently
     // drop it.

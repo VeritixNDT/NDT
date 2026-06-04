@@ -1809,9 +1809,81 @@ function _rptRowActions(r, idx){
         btns.push(`<button class="btn btn-sm" data-action="markReportSent" data-args="${idx}" style="font-size:10px;padding:3px 7px">Mark sent</button>`);
       }
     }
+    // Lightweight job/customer routing — no revision needed (the job link is
+    // portal-routing metadata, never part of the sealed report). Lets an
+    // orphaned approved report be routed to its customer's portal in one click.
+    btns.push(`<button class="btn btn-sm" data-action="ovAssignJob" data-args="${idx}" title="Assign this report to a job / customer" style="font-size:10px;padding:3px 7px">Job…</button>`);
   }
   btns.push(`<button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${idx}" title="View history" style="font-size:10px;padding:3px 6px">⌕</button>`);
   return `<td style="white-space:nowrap;text-align:right">${btns.join(' ')}</td>`;
+}
+
+// Lightweight re-assign of a report's job/customer link WITHOUT creating a
+// revision. The job link is portal-routing metadata — it never appears in the
+// sealed PDF — so changing it on an existing (even Approved/Sent) report is
+// safe and doesn't need a new revision. Persists + syncs immediately. This is
+// the one-click way to route an orphaned approved report to its customer's
+// portal; the approval gate (_ovEnsureReportLinkedForApproval) covers new
+// approvals, this covers ones already sealed without a job.
+async function ovAssignJob(idx){
+  const all = ls(KEYS.reports, []);
+  const r = all[idx];
+  if(!r){ toast(t('toast.report_not_found','Report not found.'), 'error'); return; }
+  const jobs = (typeof jobLoad === 'function') ? jobLoad() : ls(KEYS.jobs, []);
+  const custName = (id) => (typeof jobCustomerName === 'function') ? (jobCustomerName(id) || '') : '';
+  const sorted = jobs.slice().sort((a,b)=>{
+    const oa=(a.status==='Closed')?1:0, ob=(b.status==='Closed')?1:0;
+    if(oa!==ob) return oa-ob;
+    return (a.title||'').localeCompare(b.title||'');
+  });
+  const cur = r.jobId || '';
+  let hasCur = false;
+  let opts = '<option value="">'+escapeHtml(t('assignjob.unassigned','— Unassigned —'))+'</option>';
+  opts += sorted.map(j=>{
+    const sel = (j.id === cur); if(sel) hasCur = true;
+    const label = (j.title||'(untitled)')+' — '+(custName(j.customerId)||t('approve.link.nocust','no customer'))+(j.status==='Closed'?' (closed)':'');
+    return '<option value="'+escapeHtml(j.id)+'"'+(sel?' selected':'')+'>'+escapeHtml(label)+'</option>';
+  }).join('');
+  if(cur && !hasCur) opts += '<option value="'+escapeHtml(cur)+'" selected>'+escapeHtml(t('assignjob.deleted','(deleted job)'))+'</option>';
+
+  const choice = await new Promise((resolve)=>{
+    const ov = document.createElement('div');
+    ov.className = 'vx-assign-job-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+    ov.innerHTML =
+      '<div role="dialog" aria-modal="true" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:460px;width:100%;padding:20px;box-shadow:0 18px 50px rgba(0,0,0,.5)">'
+      + '<div style="font-weight:700;font-size:15px;margin-bottom:6px">'+escapeHtml(t('assignjob.title','Assign report to a job'))+'</div>'
+      + '<div style="font-size:12.5px;color:var(--t2);line-height:1.5;margin-bottom:14px">'+escapeHtml(t('assignjob.body','The job decides which customer sees this report in their portal. This is routing only — it does not change the sealed report.'))+'</div>'
+      + '<div class="fld" style="margin-bottom:10px"><label style="font-size:12px;display:block;margin-bottom:4px">'+escapeHtml(t('approve.link.job','Job'))+'</label>'
+      + '<select id="vxAssignJobSel" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box">'+opts+'</select></div>'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--t2);cursor:pointer"><input type="checkbox" id="vxAssignInternal"'+(r.internalNoCustomer?' checked':'')+'> '+escapeHtml(t('approve.link.internal','Internal report — no customer (never shown in a portal)'))+'</label>'
+      + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">'
+      + '<button class="btn btn-sm" id="vxAssignCancel">'+escapeHtml(t('vxc.cancel','Cancel'))+'</button>'
+      + '<button class="btn btn-sm btn-primary" id="vxAssignOk">'+escapeHtml(t('vxc.save','Save'))+'</button>'
+      + '</div></div>';
+    document.body.appendChild(ov);
+    const sel  = ov.querySelector('#vxAssignJobSel');
+    const intl = ov.querySelector('#vxAssignInternal');
+    if(intl.checked) sel.disabled = true;
+    intl.addEventListener('change', ()=>{ sel.disabled = intl.checked; });
+    const done = (v)=>{ try { ov.remove(); } catch(e){} resolve(v); };
+    ov.querySelector('#vxAssignCancel').addEventListener('click', ()=>done(null));
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) done(null); });
+    ov.querySelector('#vxAssignOk').addEventListener('click', ()=>{ done({ jobId: intl.checked ? '' : sel.value, internal: intl.checked }); });
+    setTimeout(()=>{ try { sel.focus(); } catch(e){} }, 30);
+  });
+  if(!choice) return; // cancelled
+
+  r.jobId = choice.jobId || '';
+  if(r.jobId){ const job = jobs.find(j=>j.id===r.jobId); r.jobTitle = job ? (job.title||'') : (r.jobTitle||''); }
+  else { r.jobTitle = ''; }
+  r.internalNoCustomer = !!choice.internal;
+  addReportAudit(r, 'job', r.jobId ? ('Routed to job '+(r.jobTitle||r.jobId)) : (r.internalNoCustomer ? 'Marked internal (no customer)' : 'Unassigned from job'));
+  lss(KEYS.reports, all);
+  if(typeof rptRender === 'function') rptRender();
+  if(typeof inboxRender === 'function') inboxRender();
+  if(typeof ovRenderRecentList === 'function') ovRenderRecentList();
+  toast(r.jobId ? t('toast.job_assigned','Report routed to job.') : (r.internalNoCustomer ? t('toast.job_internal','Report marked internal.') : t('toast.job_unassigned','Report unassigned.')), 'success');
 }
 
 function rptRenderKanban(list, allReports){

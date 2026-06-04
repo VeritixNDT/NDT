@@ -12,6 +12,9 @@
 function plLoadEvents()     { return (typeof ls === 'function') ? (ls(KEYS.events, []) || []) : []; }
 function plSaveEvents(list) { if (typeof lss === 'function') lss(KEYS.events, list); }
 function plGetEvent(id)     { return plLoadEvents().find(e => e.id === id) || null; }
+// V46: scheduling is admin-only. Inspectors (non-admins) reach the planner via
+// the home side menu and get a READ-ONLY view — no create, drag, edit or delete.
+function _plCanEdit() { return (typeof vxIsAdmin === 'function') ? vxIsAdmin() : true; }
 
 // ── State ───────────────────────────────────────────────────────────────────
 var _plCursor  = new Date();    // any day within the displayed month
@@ -128,6 +131,7 @@ function _plInstallDrag() {
 
   document.addEventListener('mousedown', e => {
     if (e.button !== 0 || !onPlanner()) return;
+    if (!_plCanEdit()) return;   // read-only: no drag-to-reschedule for non-admins
     const seg = e.target.closest('.pl-drag');
     if (!seg) return;
     const m = (seg.getAttribute('data-args') || '').match(/'([^']*)'\s*,\s*'([^']*)'/);
@@ -260,7 +264,7 @@ function plRender() {
       </div>
       <div class="pl-legend">${legend}</div>
       <div style="flex:1"></div>
-      <button class="btn btn-primary btn-sm" data-action="plNewEvent" style="white-space:nowrap">+ New event</button>
+      ${_plCanEdit() ? `<button class="btn btn-primary btn-sm" data-action="plNewEvent" style="white-space:nowrap">+ New event</button>` : ''}
     </div>
     <div class="pl-body">${_plView === 'week' ? _plWeekHtml() : _plView === 'day' ? _plDayHtml() : _plView === 'resource' ? _plResourceHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
 
@@ -339,7 +343,7 @@ function _plAgendaHtml() {
   const startYmd = _plYmd(ms);
   const endYmd = _plYmd(new Date(ms.getFullYear(), ms.getMonth() + 1, 0));
   const items = plCollect(startYmd, endYmd);
-  if (!items.length) return `<div style="color:var(--t3);font-size:13px;padding:24px 4px">Nothing scheduled this month. <a href="#" data-action="plNewEvent" data-prevent-default="1" style="color:var(--cyan)">Add an event</a>.</div>`;
+  if (!items.length) return `<div style="color:var(--t3);font-size:13px;padding:24px 4px">Nothing scheduled this month.${_plCanEdit() ? ` <a href="#" data-action="plNewEvent" data-prevent-default="1" style="color:var(--cyan)">Add an event</a>.` : ''}</div>`;
 
   const byDay = {};
   items.forEach(it => { (byDay[it.ymd] = byDay[it.ymd] || []).push(it); });
@@ -597,7 +601,7 @@ function plDayPopover(ymd) {
   _plModal(`<div style="font-weight:700;color:var(--t1);margin-bottom:8px">${esc(_plFmt(ymd))}</div>
     <div class="pl-arows">${rows}</div>
     <div style="margin-top:12px;text-align:right"><button class="btn btn-sm" data-action="plCloseModal">Close</button>
-    <button class="btn btn-primary btn-sm" data-action="plDayNew" data-args="'${ymd}'" style="margin-left:6px">+ Event</button></div>`);
+    ${_plCanEdit() ? `<button class="btn btn-primary btn-sm" data-action="plDayNew" data-args="'${ymd}'" style="margin-left:6px">+ Event</button>` : ''}</div>`);
 }
 
 // ── Event editor ─────────────────────────────────────────────────────────────
@@ -606,6 +610,9 @@ function plDayNew(ymd)       { plOpenEventForm(null, ymd); }
 function plDayNewAt(ymd, tm) { plOpenEventForm(null, ymd, tm); }
 
 function plOpenEventForm(id, prefillYmd, prefillTime, prefillInsp) {
+  const canEdit = _plCanEdit();
+  if (!id && !canEdit) { if (typeof toast === 'function') toast(t('pl.readonly','Read-only — scheduling is admin-only.'), 'info'); return; }
+  const dis = canEdit ? '' : ' disabled';
   _plEditId = id || null;
   const ev = id ? (plGetEvent(id) || {}) : {};
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
@@ -621,29 +628,30 @@ function plOpenEventForm(id, prefillYmd, prefillTime, prefillInsp) {
     .concat(jobs.map(j => `<option value="${esc(j.id)}" ${ev.jobId === j.id ? 'selected' : ''}>${esc(j.title || j.id)}</option>`)).join('');
 
   _plModal(`
-    <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:12px">${id ? 'Edit event' : 'New event'}</div>
-    <div class="fld form-row"><label>Title</label><input id="pl-f-title" value="${esc(ev.title || '')}" placeholder="Site visit, inspection booking…"/></div>
+    <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:12px">${id ? (canEdit ? 'Edit event' : 'View event') : 'New event'}</div>
+    <div class="fld form-row"><label>Title</label><input id="pl-f-title" value="${esc(ev.title || '')}" placeholder="Site visit, inspection booking…"${dis}/></div>
     <div class="fg form-row">
-      <div class="fld"><label>Date</label><input type="date" id="pl-f-date" value="${esc(date)}"/></div>
-      <div class="fld"><label>Start time <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="time" id="pl-f-time" value="${esc(time)}"/></div>
-      <div class="fld"><label>End time <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="time" id="pl-f-endtime" value="${esc(ev.endTime || '')}"/></div>
+      <div class="fld"><label>Date</label><input type="date" id="pl-f-date" value="${esc(date)}"${dis}/></div>
+      <div class="fld"><label>Start time <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="time" id="pl-f-time" value="${esc(time)}"${dis}/></div>
+      <div class="fld"><label>End time <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="time" id="pl-f-endtime" value="${esc(ev.endTime || '')}"${dis}/></div>
     </div>
-    <div class="fld form-row"><label>End date <span style="color:var(--t3);font-weight:400">(optional — for multi-day)</span></label><input type="date" id="pl-f-end" value="${esc(ev.endDate ? String(ev.endDate).slice(0, 10) : '')}"/></div>
+    <div class="fld form-row"><label>End date <span style="color:var(--t3);font-weight:400">(optional — for multi-day)</span></label><input type="date" id="pl-f-end" value="${esc(ev.endDate ? String(ev.endDate).slice(0, 10) : '')}"${dis}/></div>
     <div class="fg form-row">
-      <div class="fld"><label>Inspector</label><select id="pl-f-insp">${inspOpts}</select></div>
-      <div class="fld"><label>Linked job</label><select id="pl-f-job">${jobOpts}</select></div>
+      <div class="fld"><label>Inspector</label><select id="pl-f-insp"${dis}>${inspOpts}</select></div>
+      <div class="fld"><label>Linked job</label><select id="pl-f-job"${dis}>${jobOpts}</select></div>
     </div>
-    <div class="fld form-row"><label>Notes</label><textarea id="pl-f-notes" rows="3" placeholder="Address, contact, scope…">${esc(ev.notes || '')}</textarea></div>
+    <div class="fld form-row"><label>Notes</label><textarea id="pl-f-notes" rows="3" placeholder="Address, contact, scope…"${dis}>${esc(ev.notes || '')}</textarea></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:14px">
-      ${id ? `<button class="btn btn-sm btn-danger" data-action="plDeleteEvent" data-args="'${esc(id)}'">Delete</button>` : ''}
+      ${(id && canEdit) ? `<button class="btn btn-sm btn-danger" data-action="plDeleteEvent" data-args="'${esc(id)}'">Delete</button>` : ''}
       <span style="flex:1"></span>
-      <button class="btn btn-sm" data-action="plCloseModal">Cancel</button>
-      <button class="btn btn-primary btn-sm" data-action="plSaveEvent">${id ? 'Save' : 'Add event'}</button>
+      <button class="btn btn-sm" data-action="plCloseModal">${canEdit ? 'Cancel' : 'Close'}</button>
+      ${canEdit ? `<button class="btn btn-primary btn-sm" data-action="plSaveEvent">${id ? 'Save' : 'Add event'}</button>` : ''}
     </div>`);
   setTimeout(() => { const t = document.getElementById('pl-f-title'); if (t) t.focus(); }, 30);
 }
 
 function plSaveEvent() {
+  if (!_plCanEdit()) return;   // read-only guard
   const val = id => (document.getElementById(id) || {}).value || '';
   const title = val('pl-f-title').trim();
   if (!title) { if (typeof toast === 'function') toast('Give the event a title.', 'warn'); document.getElementById('pl-f-title')?.focus(); return; }
@@ -666,6 +674,7 @@ function plSaveEvent() {
 }
 
 async function plDeleteEvent(id) {
+  if (!_plCanEdit()) return;   // read-only guard
   if (typeof vxConfirm === 'function') { if (!await vxConfirm({ message: 'Delete this event?', okLabel: 'Delete', danger: true })) return; }
   plSaveEvents(plLoadEvents().filter(e => e.id !== id));
   if (typeof toast === 'function') toast('Event deleted.');

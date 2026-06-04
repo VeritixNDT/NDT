@@ -3053,6 +3053,15 @@ var _custEditId = null;   // null when adding, otherwise the customer id being e
 function custLoad()        { return ls(KEYS.customers, []) || []; }
 function custSaveAll(list) { lss(KEYS.customers, list); }
 
+// Top-nav shortcut to customer management (Phase 5 onboarding item B). Customer
+// records previously sat 1-of-17 sub-sections deep under Settings; this surfaces
+// them as a primary nav entry. Admin-gated like the rest of Settings (customer
+// records are an org-admin concern); the first signup is the org admin.
+function ovOpenCustomers(btn){
+  if(typeof showPage === 'function') showPage('settings', btn || (typeof el === 'function' ? el('tn-customers') : null));
+  if(typeof showSS === 'function') showSS('customers', (typeof el === 'function' ? el('sni-customers') : null));
+}
+
 // ── Repeatable sub-rows (contacts / sites) ────────────────────────
 // Both are appended into their host container. Callable two ways:
 //   • from the "+ Add" buttons via data-action with data-args="null"

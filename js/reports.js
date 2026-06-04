@@ -2064,6 +2064,71 @@ function _stampApproval(html, r){
 }
 function getReportStage(r){ return r.stage || 'Draft'; }
 
+// ── Foolproof customer-portal linkage at approval ────────────────────────
+// An Approved/Sent report only reaches the customer portal if it's filed
+// under a job (the job carries the customer — portal-data joins report.jobId
+// -> job -> customer). To stop approved reports being silently orphaned,
+// both approval paths (inboxApprove and the form's save-and-approve) call
+// this before sealing. Resolves true to proceed — the report already has a
+// jobId, OR the user picks one here, OR they explicitly mark it an internal
+// report (no customer). Resolves false if they cancel. Mutates r.jobId /
+// r.jobTitle / r.internalNoCustomer on a choice.
+function _ovEnsureReportLinkedForApproval(r){
+  return new Promise((resolve) => {
+    if(!r || r.jobId || r.internalNoCustomer){ resolve(true); return; }
+    const jobs = (typeof jobLoad === 'function') ? jobLoad() : ls(KEYS.jobs, []);
+    const custName = (id) => (typeof jobCustomerName === 'function') ? (jobCustomerName(id) || '') : '';
+    const sorted = jobs.slice().sort((a,b)=>{
+      const oa=(a.status==='Closed')?1:0, ob=(b.status==='Closed')?1:0;
+      if(oa!==ob) return oa-ob;
+      return (a.title||'').localeCompare(b.title||'');
+    });
+    const noJobs = !jobs.length;
+    let opts = '<option value="">'+escapeHtml(t('approve.link.choose','— Select a job —'))+'</option>';
+    opts += sorted.map(j=>{
+      const cn = custName(j.customerId);
+      const label = (j.title||'(untitled)')+' — '+(cn || t('approve.link.nocust','no customer'))+(j.status==='Closed'?' (closed)':'');
+      return '<option value="'+escapeHtml(j.id)+'">'+escapeHtml(label)+'</option>';
+    }).join('');
+
+    const ov = document.createElement('div');
+    ov.className = 'vx-approve-link-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+    ov.innerHTML =
+      '<div role="dialog" aria-modal="true" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:460px;width:100%;padding:20px;box-shadow:0 18px 50px rgba(0,0,0,.5)">'
+      + '<div style="font-weight:700;font-size:15px;margin-bottom:8px">'+escapeHtml(t('approve.link.title','Link this report to a customer'))+'</div>'
+      + '<div style="font-size:12.5px;color:var(--t2);line-height:1.5;margin-bottom:14px">'+escapeHtml(t('approve.link.body','Approved reports are shared through the customer portal. Choose the job this report belongs to so the right customer can see it.'))+'</div>'
+      + '<div class="fld" style="margin-bottom:10px"><label style="font-size:12px;display:block;margin-bottom:4px">'+escapeHtml(t('approve.link.job','Job'))+'</label>'
+      + '<select id="vxApproveJobSel"'+(noJobs?' disabled':'')+' style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box">'+opts+'</select>'
+      + (noJobs?('<div style="font-size:11px;color:var(--t3);margin-top:4px">'+escapeHtml(t('approve.link.nojobs','No jobs yet — create one on the Jobs tab, or mark this report internal.'))+'</div>'):'')
+      + '</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--t2);cursor:pointer"><input type="checkbox" id="vxApproveInternal"> '+escapeHtml(t('approve.link.internal','Internal report — no customer (never shown in a portal)'))+'</label>'
+      + '<div id="vxApproveErr" style="display:none;color:var(--red);font-size:11.5px;margin-top:8px"></div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">'
+      + '<button class="btn btn-sm" id="vxApproveCancel">'+escapeHtml(t('vxc.cancel','Cancel'))+'</button>'
+      + '<button class="btn btn-sm btn-primary" id="vxApproveOk">'+escapeHtml(t('vxc.approve','Approve'))+'</button>'
+      + '</div></div>';
+    document.body.appendChild(ov);
+    const sel  = ov.querySelector('#vxApproveJobSel');
+    const intl = ov.querySelector('#vxApproveInternal');
+    const err  = ov.querySelector('#vxApproveErr');
+    const done = (v)=>{ try { ov.remove(); } catch(e){} resolve(v); };
+    intl.addEventListener('change', ()=>{ sel.disabled = intl.checked || noJobs; err.style.display='none'; });
+    ov.querySelector('#vxApproveCancel').addEventListener('click', ()=>done(false));
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) done(false); });
+    ov.querySelector('#vxApproveOk').addEventListener('click', ()=>{
+      if(intl.checked){ r.internalNoCustomer = true; done(true); return; }
+      const jid = sel.value;
+      if(!jid){ err.textContent = t('approve.link.required','Pick a job, or tick the internal-report box.'); err.style.display=''; return; }
+      r.jobId = jid;
+      const job = jobs.find(j=>j.id===jid);
+      if(job) r.jobTitle = job.title || '';
+      done(true);
+    });
+    setTimeout(()=>{ try { (noJobs?intl:sel).focus(); } catch(e){} }, 30);
+  });
+}
+
 // Migration: ensure every report has stage + auditLog. Infers stage from verdict if missing.
 function migrateReportsWorkflow(){
   const all = ls(KEYS.reports, []);
@@ -2412,6 +2477,9 @@ async function inboxApprove(idx){
     return;
   }
   if(!await vxConfirm({ message: t('inb.confirm.approve','Approve and seal this report? The approved version is locked — later changes require a new revision.'), okLabel: t('vxc.approve','Approve') })) return;
+  // Foolproof portal linkage: an approved report must be filed under a job
+  // (or explicitly marked internal) or it can never reach the customer portal.
+  if(typeof _ovEnsureReportLinkedForApproval === 'function' && !await _ovEnsureReportLinkedForApproval(r)) return;
   // Seal: mark Approved, stamp approver + freeze the immutable snapshot.
   _sealReport(r);
   const selfApproved = !(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());

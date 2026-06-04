@@ -2474,7 +2474,7 @@ function ovItemsRerender() {
   }
 }
 
-function ovSaveReport(mode) {
+async function ovSaveReport(mode) {
   if(!_ovMethod) { toast(t('toast.no_method', 'No method selected.'), 'error'); return; }
   const m = NDT_METHODS.find(x => x.id === _ovMethod); if(!m) return;
   // A non-admin without a valid certification for this method can't
@@ -2760,7 +2760,15 @@ function ovSaveReport(mode) {
   // re-enters review unless the saver may approve.
   const forReview = (mode === 'review');
   const canApprove = (typeof _ovCanApprove === 'function') ? _ovCanApprove() : (typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());
-  const willApprove = !forReview && canApprove;
+  let willApprove = !forReview && canApprove;
+  // Foolproof portal linkage: don't seal an approved report that isn't filed
+  // under a job — it would never reach the customer portal. Require a job (or
+  // an explicit internal mark) first; cancelling downgrades to "submit for
+  // review" rather than sealing an orphaned report.
+  if(willApprove && !report.jobId && !report.internalNoCustomer
+     && typeof _ovEnsureReportLinkedForApproval === 'function'){
+    if(!await _ovEnsureReportLinkedForApproval(report)) willApprove = false;
+  }
   report.auditLog = [];
   if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
   addReportAudit(report, 'created', _ovReviseSource ? ('Revision ' + (report.revision||'') + ' created') : 'Report created');

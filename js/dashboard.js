@@ -319,6 +319,37 @@ function ovInit() {
   ovShowSection('dashboard', el('ovi-dashboard'));
 }
 
+// Single "New report" side-menu entry → method picker (replaces the old
+// per-method button list). One enabled method skips the picker and goes
+// straight in; none → nudge to Settings → Methods.
+function ovNewReportPicker(){
+  const methods = (typeof getActiveMethods === 'function') ? getActiveMethods() : [];
+  if(!methods.length){ if(typeof toast === 'function') toast(t('ov.nomethods','No inspection methods are enabled — turn them on in Settings → Methods.'), 'info'); return; }
+  if(methods.length === 1){ if(typeof ovNewReport === 'function') ovNewReport(methods[0].id); return; }
+  const rows = methods.map(m =>
+    '<button class="btn btn-sm" data-mid="'+escapeHtml(m.id)+'" style="display:flex;align-items:center;gap:10px;width:100%;justify-content:flex-start;margin-bottom:6px;font-size:13px;padding:9px 12px">'
+    + '<span style="width:9px;height:9px;border-radius:50%;background:'+(m.color||'var(--t2)')+';flex-shrink:0"></span>'
+    + escapeHtml((typeof tf === 'function' ? tf('ov.new_method_report','New {m} report',{m:m.id}) : ('New '+m.id+' report')))
+    + '</button>'
+  ).join('');
+  const ov = document.createElement('div');
+  ov.className = 'vx-method-picker-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+  ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:360px;width:100%;padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.5)">'
+    + '<div style="display:flex;align-items:center;margin-bottom:4px"><div style="font-weight:700;font-size:14px">'+escapeHtml(t('side.new_report','New report'))+'</div>'
+    + '<button class="btn btn-sm" data-close="1" aria-label="Close" style="margin-left:auto;font-size:13px;padding:2px 9px">&times;</button></div>'
+    + '<div style="font-size:11.5px;color:var(--t3);margin-bottom:12px">'+escapeHtml(t('ov.pick_method','Choose a method'))+'</div>'
+    + rows + '</div>';
+  document.body.appendChild(ov);
+  const close = () => { try { ov.remove(); } catch(e){} };
+  ov.addEventListener('click', (e) => {
+    if(e.target === ov || (e.target.getAttribute && e.target.getAttribute('data-close') === '1')){ close(); return; }
+    const b = e.target.closest ? e.target.closest('button[data-mid]') : null;
+    if(b){ const mid = b.getAttribute('data-mid'); close(); if(typeof ovNewReport === 'function') ovNewReport(mid); }
+  });
+  setTimeout(() => { try { const f = ov.querySelector('button[data-mid]'); if(f) f.focus(); } catch(e){} }, 30);
+}
+
 function ovShowSection(id, btn) {
   document.querySelectorAll('#page-overview .ss').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('#ov-snav .snav-item').forEach(b => b.classList.remove('active'));

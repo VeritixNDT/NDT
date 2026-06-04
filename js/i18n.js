@@ -1393,6 +1393,9 @@ var STRINGS = {
     'side.dashboard':       'Dashboard',
     'side.documents':       'Documents',
     'side.new_report':      'New report',
+    'ov.pick_method': 'Choose a method',
+    'ov.new_method_report': 'New {m} report',
+    'ov.nomethods': 'No inspection methods are enabled — turn them on in Settings → Methods.',
     'side.navigate':        'Navigate',
     // Extended coverage — added for comprehensive UI translation
     // Settings sub-section titles
@@ -2906,6 +2909,9 @@ var STRINGS = {
     'side.dashboard':       'Dashboard',
     'side.documents':       'Documenten',
     'side.new_report':      'Nieuw rapport',
+    'ov.pick_method': 'Kies een methode',
+    'ov.new_method_report': 'Nieuw {m}-rapport',
+    'ov.nomethods': 'Er zijn geen inspectiemethoden ingeschakeld — schakel ze in via Instellingen → Methoden.',
     'side.navigate':        'Navigatie',
 
     // V18 extended coverage
@@ -4399,6 +4405,9 @@ var STRINGS = {
     'side.dashboard':       'Dashboard',
     'side.documents':       'Dokumente',
     'side.new_report':      'Neuer Bericht',
+    'ov.pick_method': 'Methode wählen',
+    'ov.new_method_report': 'Neuer {m}-Bericht',
+    'ov.nomethods': 'Es sind keine Prüfmethoden aktiviert — aktivieren Sie sie unter Einstellungen → Methoden.',
     'side.navigate':        'Navigation',
 
     // V18 extended coverage
@@ -5892,6 +5901,9 @@ var STRINGS = {
     'side.dashboard':       'Tableau de bord',
     'side.documents':       'Documents',
     'side.new_report':      'Nouveau rapport',
+    'ov.pick_method': 'Choisissez une méthode',
+    'ov.new_method_report': 'Nouveau rapport {m}',
+    'ov.nomethods': 'Aucune méthode d\'inspection activée — activez-les dans Paramètres → Méthodes.',
     'side.navigate':        'Navigation',
 
     // V18 extended coverage
@@ -7383,6 +7395,9 @@ var STRINGS = {
     'side.dashboard':       'Panel',
     'side.documents':       'Documentos',
     'side.new_report':      'Nuevo informe',
+    'ov.pick_method': 'Elija un método',
+    'ov.new_method_report': 'Nuevo informe {m}',
+    'ov.nomethods': 'No hay métodos de inspección activados — actívelos en Ajustes → Métodos.',
     'side.navigate':        'Navegación',
 
     // V18 extended coverage

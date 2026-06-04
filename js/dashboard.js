@@ -331,7 +331,7 @@ function ovShowSection(id, btn) {
   document.querySelectorAll('#ov-snav .snav-item').forEach(b => b.classList.remove('active'));
   const sec = el('ov-' + id); if(sec) sec.classList.add('active');
   if(btn) btn.classList.add('active');
-  if(id === 'dashboard') ovRefreshDashboard();
+  if(id === 'dashboard'){ ovRefreshDashboard(); ovRenderGettingStarted(); }
   if(id === 'recent') ovRenderRecentList();
   if(id === 'procedures') procInitView();
 }
@@ -355,6 +355,73 @@ function ovFilterByRange(reports){
     const t = new Date(r.createdAt).getTime();
     return t >= cutoff;
   });
+}
+
+// ── Getting-started checklist (Phase 5 onboarding) ───────────────────────
+// Shown at the top of the dashboard until the new user has created their
+// first customer, job, and report — the core customer -> job -> report chain
+// the rest of the app builds on (and which the empty dashboard otherwise
+// gives no path to). Dismissible; auto-hides once all three are done, so it
+// never shows for established users.
+var VX_GS_DISMISS_KEY = 'vx-gs-dismissed-v1';
+function ovRenderGettingStarted(){
+  const host = el('ov-dashboard'); if(!host) return;
+  let panel = el('ov-getting-started');
+  let dismissed = false;
+  try { dismissed = localStorage.getItem(VX_GS_DISMISS_KEY) === '1'; } catch(e){}
+  const steps = [
+    { done: (ls(KEYS.customers, []) || []).length > 0, label: t('gs.step1','Add your first customer'), cta: t('gs.cta1','Add customer'), action: 'gsAddCustomer' },
+    { done: (ls(KEYS.jobs, []) || []).length > 0,      label: t('gs.step2','Create a job'),           cta: t('gs.cta2','New job'),      action: 'gsAddJob' },
+    { done: (ls(KEYS.reports, []) || []).length > 0,   label: t('gs.step3','Make your first report'),  cta: t('gs.cta3','New report'),   action: 'gsNewReport' },
+  ];
+  const allDone = steps.every(s => s.done);
+  if(dismissed || allDone){ if(panel) panel.remove(); return; }
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'ov-getting-started';
+    const sh = host.querySelector('.sh');
+    if(sh && sh.parentNode) sh.parentNode.insertBefore(panel, sh.nextSibling);
+    else host.insertBefore(panel, host.firstChild);
+  }
+  const firstPending = steps.findIndex(s => !s.done);
+  const doneCount = steps.filter(s => s.done).length;
+  const rows = steps.map((s, i) => {
+    const badge = s.done
+      ? '<span style="width:22px;height:22px;border-radius:50%;background:var(--green);color:#04130a;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">&#10003;</span>'
+      : '<span style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);color:var(--t2);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--mono);flex-shrink:0">'+(i+1)+'</span>';
+    const labelStyle = s.done ? 'color:var(--t3);text-decoration:line-through' : 'color:var(--t1)';
+    const cta = s.done ? '' : '<button class="btn btn-sm '+(i===firstPending?'btn-primary':'')+'" data-action="'+s.action+'" style="margin-left:auto;font-size:11px">'+escapeHtml(s.cta)+'</button>';
+    return '<div style="display:flex;align-items:center;gap:11px;padding:7px 0">'+badge+'<span style="font-size:13px;'+labelStyle+'">'+escapeHtml(s.label)+'</span>'+cta+'</div>';
+  }).join('');
+  panel.innerHTML =
+    '<div class="sc" style="margin:0 0 16px">'
+    + '<div class="sc-body" style="padding:16px 18px">'
+    + '<div style="display:flex;align-items:center;margin-bottom:8px">'
+    + '<div><div style="font-weight:700;font-size:14px">'+escapeHtml(t('gs.title','Get started'))+'</div>'
+    + '<div style="font-size:11.5px;color:var(--t3)">'+escapeHtml(t('gs.subtitle','Three steps to your first inspection report'))+' &middot; '+doneCount+'/3</div></div>'
+    + '<button class="btn btn-sm" data-action="gsDismiss" title="'+escapeHtml(t('gs.dismiss','Dismiss'))+'" style="margin-left:auto;font-size:13px;padding:2px 9px">&times;</button>'
+    + '</div>'
+    + rows
+    + '</div></div>';
+}
+// Deep-link helpers — route to the right place and open the create form.
+function gsAddCustomer(){
+  if(typeof showPage==='function') showPage('settings', el('tn-settings'));
+  if(typeof showSS==='function') showSS('customers', el('sni-customers'));
+  setTimeout(function(){ try { if(typeof custOpenForm==='function') custOpenForm(null); } catch(e){} }, 60);
+}
+function gsAddJob(){
+  if(typeof showPage==='function') showPage('jobs', null);
+  try { if(typeof jobsInit==='function') jobsInit(); } catch(e){}
+  setTimeout(function(){ try { if(typeof jobOpenForm==='function') jobOpenForm(null); } catch(e){} }, 60);
+}
+function gsNewReport(){
+  if(typeof _wOvNewReportFromActiveMethod==='function') _wOvNewReportFromActiveMethod();
+  else if(typeof ovShowSection==='function') ovShowSection('newreport', el('ovi-newreport'));
+}
+function gsDismiss(){
+  try { localStorage.setItem(VX_GS_DISMISS_KEY, '1'); } catch(e){}
+  const p = el('ov-getting-started'); if(p) p.remove();
 }
 
 function ovRefreshDashboard() {

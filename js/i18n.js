@@ -1393,6 +1393,7 @@ var STRINGS = {
     'side.dashboard':       'Dashboard',
     'side.documents':       'Documents',
     'side.new_report':      'New report',
+    'side.navigate':        'Navigate',
     // Extended coverage — added for comprehensive UI translation
     // Settings sub-section titles
     'sc.theme':            'Theme',
@@ -2905,6 +2906,7 @@ var STRINGS = {
     'side.dashboard':       'Dashboard',
     'side.documents':       'Documenten',
     'side.new_report':      'Nieuw rapport',
+    'side.navigate':        'Navigatie',
 
     // V18 extended coverage
     'sc.theme':             'Thema',
@@ -4397,6 +4399,7 @@ var STRINGS = {
     'side.dashboard':       'Dashboard',
     'side.documents':       'Dokumente',
     'side.new_report':      'Neuer Bericht',
+    'side.navigate':        'Navigation',
 
     // V18 extended coverage
     'sc.theme':             'Thema',
@@ -5889,6 +5892,7 @@ var STRINGS = {
     'side.dashboard':       'Tableau de bord',
     'side.documents':       'Documents',
     'side.new_report':      'Nouveau rapport',
+    'side.navigate':        'Navigation',
 
     // V18 extended coverage
     'sc.theme':             'Thème',
@@ -7379,6 +7383,7 @@ var STRINGS = {
     'side.dashboard':       'Panel',
     'side.documents':       'Documentos',
     'side.new_report':      'Nuevo informe',
+    'side.navigate':        'Navegación',
 
     // V18 extended coverage
     'sc.theme':             'Tema',

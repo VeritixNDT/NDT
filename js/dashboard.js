@@ -312,17 +312,10 @@ function _ovDraftMaybeShowRestoreBanner(){
 }
 
 function ovInit() {
-  // Build new report method buttons
-  const wrap = el('ov-new-report-btns'); if(!wrap) return;
-  const methods = getActiveMethods();
-  wrap.innerHTML = methods.map(m => `
-    <button class="snav-item" data-action="ovNewReport" data-pass-el="1" data-args="'${m.id}'" style="gap:9px">
-      <span style="width:8px;height:8px;border-radius:50%;background:${m.color};flex-shrink:0"></span>
-      New ${m.id} report
-    </button>
-  `).join('');
-  // Home always lands on the Overview (dashboard) sub-section, even if another
-  // Overview section (Recent / Procedures / New report) was last open.
+  // The per-method "New report" buttons were removed from the home side menu
+  // (report creation lives on the dashboard CTA / getting-started checklist /
+  // Reports page; the side menu now links to Reports + Planner). Home always
+  // lands on the Overview (dashboard) sub-section.
   ovShowSection('dashboard', el('ovi-dashboard'));
 }
 

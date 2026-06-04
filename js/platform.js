@@ -697,8 +697,19 @@ function _vxReportHtmlSig(r){
   if(!has) return null;
   return String(r.sealedAt || (r.revision || '') + ':' + ((r.sealedHtml || r.frozenHtml || '').length));
 }
+// Stable per-report key for addressing its html row. Reports created before
+// an `id` field existed are keyed by reportNo::revision (unique per revision).
+// Returns null if neither is available — caller then must NOT strip its HTML.
+function _vxReportKey(r){
+  if(!r) return null;
+  if(r.id) return String(r.id);
+  if(r.reportNo) return String(r.reportNo) + '::' + String(r.revision || '');
+  return null;
+}
 // Return a shallow clone of the array with the heavy fields removed from each
 // item (never mutates the caller's objects), plus the html put/delete ops.
+// SAFETY: an item's HTML is only stripped when we have a stable key to re-home
+// it in a per-report row — never strip HTML we can't address, or it'd be lost.
 function _vxSplitHeavy(collectionKey, value){
   const fields = VX_HEAVY_FIELDS[collectionKey];
   if(!fields || !Array.isArray(value)) return { stripped: value, puts: [], deletes: [] };
@@ -708,15 +719,20 @@ function _vxSplitHeavy(collectionKey, value){
   const puts = [];
   for(const item of value){
     if(!item || typeof item !== 'object'){ stripped.push(item); continue; }
-    const clone = Object.assign({}, item);
     let heavy = null;
-    for(const f of fields){ if(clone[f] != null){ (heavy = heavy || {})[f] = clone[f]; } delete clone[f]; }
-    stripped.push(clone);
-    const id = item.id;
-    if(id && heavy){
-      liveIds[id] = true;
+    for(const f of fields){ if(item[f] != null){ (heavy = heavy || {})[f] = item[f]; } }
+    const key = heavy ? _vxReportKey(item) : null;
+    if(heavy && key){
+      const clone = Object.assign({}, item);
+      for(const f of fields) delete clone[f];
+      stripped.push(clone);
+      liveIds[key] = true;
       const sig = _vxReportHtmlSig(item);
-      if(sig && sigMap[id] !== sig){ puts.push({ id: id, sig: sig, value: heavy }); }
+      if(sig && sigMap[key] !== sig){ puts.push({ id: key, sig: sig, value: heavy }); }
+    } else {
+      // No heavy fields, or no stable key to address an html row → leave the
+      // item exactly as-is (do not strip HTML we couldn't re-home).
+      stripped.push(item);
     }
   }
   // Reports we've synced HTML for that are no longer present → delete their rows.
@@ -2170,7 +2186,7 @@ function vxRealtimeConnect() {
               if(!Array.isArray(reps)) return;
               var fields = VX_HEAVY_FIELDS['vx-reports-v1']; var hit = false;
               reps.forEach(function(r){
-                if(r && r.id === rid){ fields.forEach(function(f){ if(val[f] != null) r[f] = val[f]; }); hit = true; var s = _vxReportHtmlSig(r); if(s) _vxHtmlSigSet(rid, s); }
+                if(r && _vxReportKey(r) === rid){ fields.forEach(function(f){ if(val[f] != null) r[f] = val[f]; }); hit = true; var s = _vxReportHtmlSig(r); if(s) _vxHtmlSigSet(rid, s); }
               });
               if(hit){
                 _vxRawLss('vx-reports-v1', reps);
@@ -3017,10 +3033,11 @@ var vxStore = {
             const sig = _vxHtmlSigMap();
             let changed = false;
             reports.forEach(r => {
-              const h = (r && r.id) ? htmlMap[r.id] : null;
+              const key = _vxReportKey(r);
+              const h = key ? htmlMap[key] : null;
               if(h){
                 fields.forEach(f => { if(h[f] != null && r[f] !== h[f]){ r[f] = h[f]; changed = true; } });
-                const s = _vxReportHtmlSig(r); if(s) sig[r.id] = s;
+                const s = _vxReportHtmlSig(r); if(s) sig[key] = s;
               }
             });
             _vxHtmlSigSave(sig);

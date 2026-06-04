@@ -72,7 +72,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const reports = asArray(byKey["vx-reports-v1"])
     .filter((r) => r && jobIds.has(r.jobId) && (r.stage === "Approved" || r.stage === "Sent"))
     .map((r) => {
-      const h = htmlById[r.id] || {};
+      // Match the client's _vxReportKey: prefer an explicit id, else the
+      // stable composite reportNo::revision (older reports have no id).
+      const rkey = r.id || (r.reportNo != null ? String(r.reportNo) + "::" + String(r.revision || "") : "");
+      const h = (rkey && htmlById[rkey]) || {};
       return {
         reportNo: r.reportNo, method: r.method, revision: r.revision, createdAt: r.createdAt,
         verdict: r.verdict, jobId: r.jobId, stage: r.stage,

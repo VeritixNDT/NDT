@@ -48,6 +48,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const byKey: Record<string, unknown> = {};
   (rows || []).forEach((r) => { byKey[r.key] = r.value; });
 
+  // Per-report sealed-HTML rows (vx-report-html::<reportId>). The client moved
+  // the heavy frozenHtml/sealedHtml snapshots out of the vx-reports-v1 blob into
+  // write-once per-report rows. Dual-read: prefer the inline value if a report
+  // still carries it (un-migrated org), else look it up here by report id.
+  const HTML_PREFIX = "vx-report-html::";
+  const htmlById: Record<string, { sealedHtml?: string; frozenHtml?: string }> = {};
+  const { data: htmlRows } = await service
+    .from("entities").select("key,value").eq("org_id", orgId).like("key", HTML_PREFIX + "%");
+  (htmlRows || []).forEach((r) => {
+    const id = String(r.key).slice(HTML_PREFIX.length);
+    // deno-lint-ignore no-explicit-any
+    if (id) htmlById[id] = (r.value as any) || {};
+  });
+
   const customers = asArray(byKey["vx-customers-v1"]);
   const cust = customers.find((c) => c && c.id === customerId);
   if (!cust) return jsonResponse({ error: "Customer not found." }, 404);
@@ -57,10 +71,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const reports = asArray(byKey["vx-reports-v1"])
     .filter((r) => r && jobIds.has(r.jobId) && (r.stage === "Approved" || r.stage === "Sent"))
-    .map((r) => ({
-      reportNo: r.reportNo, method: r.method, revision: r.revision, createdAt: r.createdAt,
-      verdict: r.verdict, jobId: r.jobId, stage: r.stage, sealedHtml: r.sealedHtml || r.frozenHtml || "",
-    }));
+    .map((r) => {
+      const h = htmlById[r.id] || {};
+      return {
+        reportNo: r.reportNo, method: r.method, revision: r.revision, createdAt: r.createdAt,
+        verdict: r.verdict, jobId: r.jobId, stage: r.stage,
+        sealedHtml: r.sealedHtml || h.sealedHtml || h.frozenHtml || r.frozenHtml || "",
+      };
+    });
 
   const quotes = asArray(byKey["vx-quotes-v1"]).filter((q) => q && q.customerId === customerId && (q.status === "Sent" || q.status === "Accepted"));
   const invoices = asArray(byKey["vx-invoices-v1"]).filter((i) => i && i.customerId === customerId);

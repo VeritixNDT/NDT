@@ -11,7 +11,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-import { signPortalToken } from "../_shared/portal.ts";
+import { signPortalToken, signToken } from "../_shared/portal.ts";
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -36,11 +36,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (userErr || !userData?.user) return jsonResponse({ error: "invalid session" }, 401);
   const caller = userData.user;
 
-  let payload: { orgId?: string; customerId?: string };
+  let payload: { orgId?: string; customerId?: string; reportId?: string; kind?: string };
   try { payload = await req.json(); } catch { return jsonResponse({ error: "invalid JSON body" }, 400); }
   const orgId = String(payload.orgId || "");
+  const kind = payload.kind === "verify" ? "verify" : "portal";
   const customerId = String(payload.customerId || "");
-  if (!orgId || !customerId) return jsonResponse({ error: "orgId and customerId required" }, 400);
+  const reportId = String(payload.reportId || "");
+  if (!orgId) return jsonResponse({ error: "orgId required" }, 400);
+  if (kind === "portal" && !customerId) return jsonResponse({ error: "customerId required" }, 400);
+  if (kind === "verify" && !reportId) return jsonResponse({ error: "reportId required" }, 400);
 
   // Verify the caller is an admin of this org (service role — RLS-independent).
   const service = createClient(supabaseUrl, envOrThrow("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
@@ -48,9 +52,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .from("org_members").select("role").eq("org_id", orgId).eq("user_id", caller.id).maybeSingle();
   if (!membership || membership.role !== "admin") return jsonResponse({ error: "admin access required" }, 403);
 
-  const exp = Date.now() + TOKEN_TTL_MS;
-  const token = await signPortalToken({ orgId, customerId, exp }, envOrThrow("PORTAL_SECRET"));
+  const secret = envOrThrow("PORTAL_SECRET");
   const base = envOrThrow("APP_URL").replace(/\/+$/, "");
-  const url = `${base}#/portal/${token}`;
-  return jsonResponse({ ok: true, token, url, expiresAt: new Date(exp).toISOString() });
+
+  // V47: report-verify QR token — long-lived (no exp) so a printed report's QR
+  // keeps verifying indefinitely. reportId is the client's _vxReportKey
+  // (id || reportNo::revision).
+  if (kind === "verify") {
+    const token = await signToken({ orgId, reportId, k: "v" }, secret);
+    return jsonResponse({ ok: true, token, url: `${base}#/verify/${token}` });
+  }
+
+  const exp = Date.now() + TOKEN_TTL_MS;
+  const token = await signPortalToken({ orgId, customerId, exp }, secret);
+  return jsonResponse({ ok: true, token, url: `${base}#/portal/${token}`, expiresAt: new Date(exp).toISOString() });
 });

@@ -61,3 +61,32 @@ export async function verifyPortalToken(token: string, secret: string): Promise<
   if (claims.exp && Date.now() > claims.exp) return null;
   return claims;
 }
+
+// ── Generic HMAC token (V47) ─────────────────────────────────────────────
+// Same wire format as the portal token but claims-agnostic — used by the
+// report-verify QR flow (claims { orgId, reportId }, long-lived: no exp).
+// deno-lint-ignore no-explicit-any
+export async function signToken(claims: Record<string, any>, secret: string): Promise<string> {
+  const body = b64url(enc.encode(JSON.stringify(claims)));
+  const sig = b64url(await hmac(body, secret));
+  return body + "." + sig;
+}
+// Verifies the signature (and exp if present); returns the claims or null.
+// deno-lint-ignore no-explicit-any
+export async function verifyToken(token: string, secret: string): Promise<Record<string, any> | null> {
+  if (!token || typeof token !== "string") return null;
+  const dot = token.indexOf(".");
+  if (dot < 1) return null;
+  const body = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  const expected = b64url(await hmac(body, secret));
+  if (sig.length !== expected.length) return null;
+  let diff = 0;
+  for (let i = 0; i < sig.length; i++) diff |= sig.charCodeAt(i) ^ expected.charCodeAt(i);
+  if (diff !== 0) return null;
+  try {
+    const claims = JSON.parse(new TextDecoder().decode(b64urlToBytes(body)));
+    if (claims && claims.exp && Date.now() > claims.exp) return null;
+    return claims;
+  } catch { return null; }
+}

@@ -22,6 +22,15 @@ var VX_PLAN_KEY        = 'vx-plan-v1';          // current subscription tier + l
 var VX_HTML_PREFIX     = 'vx-report-html::';
 var VX_HTML_SIG_KEY    = 'vx-rpt-html-sig-v1'; // {reportId: sig} of HTML already synced
 var VX_HEAVY_FIELDS    = { 'vx-reports-v1': ['sealedHtml', 'frozenHtml'] };
+// V48: per-report metadata rows. The reports array used to sync as ONE blob
+// (entities key 'vx-reports-v1', last-writer-wins) — two devices each saving a
+// different new report clobbered each other and one was lost. Each report now
+// syncs as its own row 'vx-report::<reportKey>' (heavy HTML still in its own
+// 'vx-report-html::<reportKey>' write-once row), and pulls MERGE by key instead
+// of replacing the blob. The local 'vx-reports-v1' key stays the assembled
+// read cache (still IDB-backed via VX_ENTITY_KEYS) — only the sync path changed.
+var VX_REPORT_PREFIX        = 'vx-report::';
+var VX_REPORT_META_SIG_KEY  = 'vx-rpt-meta-sig-v1'; // {reportKey: sig} of metadata already synced
 
 // Set of localStorage keys that represent core entity data (user-content) and
 // must sync to the server. Everything else (UI prefs) stays per-device.
@@ -712,6 +721,14 @@ function _vxHtmlSigMap(){ try { return JSON.parse(localStorage.getItem(VX_HTML_S
 function _vxHtmlSigSave(m){ try { localStorage.setItem(VX_HTML_SIG_KEY, JSON.stringify(m)); } catch(e){} }
 function _vxHtmlSigSet(id, sig){ const m = _vxHtmlSigMap(); if(m[id] !== sig){ m[id] = sig; _vxHtmlSigSave(m); } }
 function _vxHtmlSigClear(id){ const m = _vxHtmlSigMap(); if(id in m){ delete m[id]; _vxHtmlSigSave(m); } }
+// V48: parallel signature map for per-report METADATA rows, so a report whose
+// light metadata hasn't changed is not re-uploaded on every save of any report.
+function _vxReportMetaSigMap(){ try { return JSON.parse(localStorage.getItem(VX_REPORT_META_SIG_KEY) || '{}'); } catch { return {}; } }
+function _vxReportMetaSigSave(m){ try { localStorage.setItem(VX_REPORT_META_SIG_KEY, JSON.stringify(m)); } catch(e){} }
+function _vxReportMetaSigSet(id, sig){ const m = _vxReportMetaSigMap(); if(m[id] !== sig){ m[id] = sig; _vxReportMetaSigSave(m); } }
+function _vxReportMetaSigClear(id){ const m = _vxReportMetaSigMap(); if(id in m){ delete m[id]; _vxReportMetaSigSave(m); } }
+// Signature of a light (HTML-stripped) report — any field change flips it.
+function _vxReportMetaSig(lightReport){ try { return JSON.stringify(lightReport); } catch { return String(Date.now()); } }
 // Stable per-seal signature: sealedAt is set once at approval and never
 // changes for a given sealed report/revision. Falls back to a length tag.
 function _vxReportHtmlSig(r){
@@ -728,6 +745,111 @@ function _vxReportKey(r){
   if(r.id) return String(r.id);
   if(r.reportNo) return String(r.reportNo) + '::' + String(r.revision || '');
   return null;
+}
+
+// V48: a stable client-side UUID for a new report, so its sync-row key is
+// independent of its (later-allocated) report number.
+function vxNewId(){
+  try { if(typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID(); } catch(e){}
+  try {
+    if(typeof crypto !== 'undefined' && crypto.getRandomValues){
+      const b = new Uint8Array(16); crypto.getRandomValues(b);
+      b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+      const h = Array.from(b).map(x => x.toString(16).padStart(2, '0'));
+      return h.slice(0,4).join('') + '-' + h.slice(4,6).join('') + '-' + h.slice(6,8).join('') + '-' + h.slice(8,10).join('') + '-' + h.slice(10).join('');
+    }
+  } catch(e){}
+  return 'r-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+// V48: format a human report number from an integer sequence + the org's local
+// numbering config (prefix / separator / year digits / seq digits / method
+// position). Single source of truth — the new-report, editor preview and
+// settings preview all call this. Mirrors the original inline algorithm.
+function vxFormatReportNo(seq, method, settings){
+  const s = settings || (typeof ls === 'function' ? ls('vx-settings-v1', {}) : {});
+  const prefix    = s.numPrefix || 'INS';
+  const sep       = s.numSep !== undefined ? s.numSep : '-';
+  const yrDigits  = parseInt(s.numYear || '4', 10);
+  const digits    = parseInt(s.numDigits || '3', 10);
+  const methodPos = s.numMethodPos || 'none';
+  const yr = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
+  const sq = String(seq).padStart(digits, '0');
+  const mCode = (method || '').toUpperCase();
+  const parts = [prefix];
+  if(methodPos === 'after-prefix' && mCode) parts.push(mCode);
+  if(yr) parts.push(yr);
+  if(methodPos === 'after-year' && mCode) parts.push(mCode);
+  parts.push(sq);
+  return parts.filter(Boolean).join(sep);
+}
+
+// V48: seed the server counter ONCE from the org's configured "next number",
+// the first time this org allocates — so an org that set a starting number in
+// Settings keeps it. No-op if the counter has already advanced (peek != 1) or
+// the local start is the default 1. Best-effort; guarded server-side so it can
+// never lower a counter below an already-issued number.
+var _vxReportCounterSeeded = false;
+async function _vxSeedReportCounterOnce(sb, orgId){
+  if(_vxReportCounterSeeded) return;
+  _vxReportCounterSeeded = true;
+  try {
+    const s = (typeof ls === 'function') ? ls('vx-settings-v1', {}) : {};
+    const localNext = parseInt(s.numNext || '1', 10);
+    if(!(localNext > 1)) return;
+    const peek = await sb.rpc('vx_peek_report_no', { p_org: orgId });
+    if(peek.error || peek.data == null) return;
+    if(Number(peek.data) === 1){
+      await sb.rpc('vx_set_report_no', { p_org: orgId, p_next: localNext });
+    }
+  } catch(e){ /* best-effort seed */ }
+}
+
+// V48: allocate a report's final number from the server — atomic, gap-free, and
+// exactly-once per report id (a retry returns the same number, never skips).
+// Online + authenticated only. On success sets report.reportNo + reportSeq and
+// clears isDraft; on offline/error leaves it a Draft (no number) and returns
+// null, so the caller can save it as a Draft to be numbered when back online.
+// V48: number any Drafts that were saved offline (have a stable id but no
+// reportNo yet). Runs after a sync/flush and after signin, when online. The
+// allocation RPC is idempotent on report id, so this is safe to re-run. Returns
+// how many it numbered.
+async function vxNumberPendingDrafts(){
+  try {
+    if(!vxIsAuthenticated()) return 0;
+    if(typeof navigator !== 'undefined' && navigator.onLine === false) return 0;
+    const reports = ls('vx-reports-v1', []);
+    if(!Array.isArray(reports) || !reports.length) return 0;
+    let numbered = 0;
+    for(const r of reports){
+      if(r && r.id && !r.reportNo){
+        const no = await vxAllocReportNo(r);
+        if(no){ r.updatedAt = new Date().toISOString(); numbered++; }
+      }
+    }
+    if(numbered){ lss('vx-reports-v1', reports); if(typeof rptRender === 'function') try { rptRender(); } catch(e){} }
+    return numbered;
+  } catch(e){ console.warn('vx: vxNumberPendingDrafts failed', e); return 0; }
+}
+
+async function vxAllocReportNo(report){
+  try {
+    if(!report || !report.id) return null;
+    if(report.reportNo) return report.reportNo;          // already numbered (idempotent caller-side)
+    if(!vxIsAuthenticated() || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
+    const sb  = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+    const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+    if(!sb || !sb.rpc || !cfg.orgId) return null;
+    await _vxSeedReportCounterOnce(sb, cfg.orgId);
+    const res = await sb.rpc('vx_alloc_report_no', { p_org: cfg.orgId, p_report_uuid: report.id });
+    if(res.error || res.data == null){ console.warn('vx: alloc_report_no', res.error && res.error.message); return null; }
+    const seq = res.data;
+    const s = (typeof ls === 'function') ? ls('vx-settings-v1', {}) : {};
+    report.reportNo  = vxFormatReportNo(seq, report.method, s);
+    report.reportSeq = Number(seq);
+    report.isDraft   = false;
+    return report.reportNo;
+  } catch(e){ console.warn('vx: vxAllocReportNo failed', e); return null; }
 }
 
 // V47: mint the report-verify URL that the report's QR code encodes. The
@@ -786,21 +908,14 @@ function _vxSplitHeavy(collectionKey, value){
 
 function vxSyncEnqueue(op) {
   if(!vxIsAuthenticated()) return;
-  // V45: for a collection with heavy fields, split the HTML into its own
-  // write-once per-report rows and queue a stripped (light) blob. Recurse for
-  // each html put/delete, then fall through to queue the stripped blob.
-  if(op.kind === 'put' && VX_HEAVY_FIELDS[op.key]){
-    const split = _vxSplitHeavy(op.key, op.value);
-    op = { kind: 'put', key: op.key, value: split.stripped };
-    for(const p of split.puts){
-      vxSyncEnqueue({ kind: 'put', key: VX_HTML_PREFIX + p.id, value: p.value, htmlId: p.id, htmlSig: p.sig });
-    }
-    for(const id of split.deletes){
-      vxSyncEnqueue({ kind: 'delete', key: VX_HTML_PREFIX + id, htmlId: id });
-    }
-    // fall through to enqueue the stripped blob (vx-reports-v1)
-  }
-  if(!VX_ENTITY_KEYS.has(op.key) && op.key.indexOf(VX_HTML_PREFIX) !== 0) return;  // only sync entity keys or html rows
+  // V48: the reports collection ('vx-reports-v1') no longer syncs as a blob —
+  // it is split into per-report rows by vxSyncEnqueueReports, which is called
+  // directly from lss(). Any stray blob-level enqueue for it is ignored here.
+  if(op.key === 'vx-reports-v1'){ try { vxSyncEnqueueReports(op.value); } catch(e){} return; }
+  // only sync generic entity keys, per-report metadata rows, or html rows
+  if(!VX_ENTITY_KEYS.has(op.key)
+     && op.key.indexOf(VX_HTML_PREFIX) !== 0
+     && op.key.indexOf(VX_REPORT_PREFIX) !== 0) return;
   try {
     let queue = JSON.parse(localStorage.getItem(VX_SYNC_QUEUE_KEY) || '[]');
 
@@ -813,6 +928,7 @@ function vxSyncEnqueue(op) {
       queue[existingIdx].value = op.value;
       queue[existingIdx].at = new Date().toISOString();
       if(op.htmlId){ queue[existingIdx].htmlId = op.htmlId; queue[existingIdx].htmlSig = op.htmlSig; }
+      if(op.metaId){ queue[existingIdx].metaId = op.metaId; queue[existingIdx].metaSig = op.metaSig; }
     } else {
       queue.push({
         id: 'op-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
@@ -822,6 +938,8 @@ function vxSyncEnqueue(op) {
         value: op.value,
         htmlId: op.htmlId,                      // V45: set for vx-report-html:: ops
         htmlSig: op.htmlSig,
+        metaId: op.metaId,                      // V48: set for vx-report:: ops
+        metaSig: op.metaSig,
         tries: 0,
         status: 'pending',
       });
@@ -843,6 +961,36 @@ function vxSyncEnqueue(op) {
     } catch(e){ console.warn("ls setItem failed", e); }
     vxSyncPokeBadge();
   } catch(e) { console.warn('vxSyncEnqueue', e); }
+}
+
+// V48: enqueue the reports array as per-report rows instead of one blob.
+// Reuses _vxSplitHeavy to peel each report's heavy HTML into its write-once
+// 'vx-report-html::<key>' row (unchanged), then enqueues each CHANGED light
+// report as its own 'vx-report::<key>' row (skipping reports whose metadata
+// signature is unchanged, so saving one report doesn't re-upload the rest).
+// Marks each changed report's per-report dirty flag so a concurrent pull keeps
+// the local copy until the queue drains. There are no per-report deletes — the
+// product never deletes a report (a wrong report is revised), which removes the
+// whole "did a teammate's report get resurrected on pull" class of bug.
+function vxSyncEnqueueReports(arr){
+  if(!vxIsAuthenticated()) return;
+  if(!Array.isArray(arr)) return;
+  const split = _vxSplitHeavy('vx-reports-v1', arr);   // { stripped, puts, deletes } for HTML
+  for(const p of split.puts){
+    vxSyncEnqueue({ kind: 'put', key: VX_HTML_PREFIX + p.id, value: p.value, htmlId: p.id, htmlSig: p.sig });
+  }
+  for(const id of split.deletes){
+    vxSyncEnqueue({ kind: 'delete', key: VX_HTML_PREFIX + id, htmlId: id });
+  }
+  const sigMap = _vxReportMetaSigMap();
+  for(const light of split.stripped){
+    const key = _vxReportKey(light);
+    if(!key) continue;                                  // unkeyable draft — stays local until it has an id
+    const sig = _vxReportMetaSig(light);
+    if(sigMap[key] === sig) continue;                   // metadata unchanged — skip
+    _vxMarkDirty(VX_REPORT_PREFIX + key);
+    vxSyncEnqueue({ kind: 'put', key: VX_REPORT_PREFIX + key, value: light, metaId: key, metaSig: sig });
+  }
 }
 function vxSyncList()   { try { return JSON.parse(localStorage.getItem(VX_SYNC_QUEUE_KEY) || '[]'); } catch { return []; } }
 function vxSyncStats()  {
@@ -910,6 +1058,9 @@ async function vxSyncFlush() {
         // V45: a per-report HTML row reached the cloud — record (or clear, on
         // delete) its signature so we never re-upload that immutable snapshot.
         if(op.htmlId){ if(op.op === 'delete') _vxHtmlSigClear(op.htmlId); else _vxHtmlSigSet(op.htmlId, op.htmlSig); }
+        // V48: a per-report metadata row reached the cloud — record its sig so an
+        // unchanged report isn't re-uploaded on the next save of another report.
+        if(op.metaId){ if(op.op === 'delete') _vxReportMetaSigClear(op.metaId); else _vxReportMetaSigSet(op.metaId, op.metaSig); }
       } else {
         op.status = 'failed'; op.lastError = r.error || 'sync error';
         failed++;
@@ -979,7 +1130,9 @@ var _vxSyncTimer = null;
 function vxSyncStart() {
   if(_vxSyncTimer) clearInterval(_vxSyncTimer);
   _vxSyncTimer = setInterval(() => {
-    if(vxIsCloud() && navigator.onLine) vxSyncFlush().catch(() => {});
+    if(vxIsCloud() && navigator.onLine){
+      vxSyncFlush().then(() => vxNumberPendingDrafts()).catch(() => {});
+    }
   }, 30 * 1000);
 }
 
@@ -1511,6 +1664,13 @@ async function _vxMigrateTrialDataToCloud() {
   var migrated = 0, failed = 0;
   for(var i = 0; i < dirty.length; i++){
     var key = dirty[i];
+    // V48: reports migrate as per-report rows, not one blob. Enqueue them and
+    // let the post-migration vxSyncFlush() drain the queue.
+    if(key === 'vx-reports-v1'){
+      try { vxSyncEnqueueReports(ls('vx-reports-v1', [])); _vxClearDirty('vx-reports-v1'); migrated++; }
+      catch(e){ failed++; }
+      continue;
+    }
     if(!VX_ENTITY_KEYS.has(key)) continue;
     // Read the local value (parsed) and upsert it under the new org.
     var value = ls(key, null);
@@ -1600,6 +1760,7 @@ async function vxDoSignin() {
   toast(t('toast.signed_in','Signed in to Veritix Cloud.'), 'success');
   await vxStore.pullAll();
   try { await vxSyncFlush(); } catch(e){}
+  try { await vxNumberPendingDrafts(); } catch(e){}   // V48: number any offline drafts
   updateDeployModePill();
   vxRenderSubscription();
 }
@@ -2240,6 +2401,41 @@ function vxRealtimeConnect() {
             }).catch(function(){});
             return;
           }
+          // V48: a per-report METADATA row changed (teammate created/edited a
+          // report). Merge that one report into the local array — keep our copy
+          // if it has unpushed local edits, else take theirs. New reports from a
+          // teammate appear; nothing is clobbered (each report is its own row).
+          if(key.indexOf(VX_REPORT_PREFIX) === 0){
+            var mkey = key.slice(VX_REPORT_PREFIX.length);
+            if(vxStore.isDirty(VX_REPORT_PREFIX + mkey)) return;  // our unpushed edit wins
+            vxApi.hydrate(key).then(function(val){
+              if(!val) return;
+              var reps = ls('vx-reports-v1', []);
+              if(!Array.isArray(reps)) reps = [];
+              var fields = VX_HEAVY_FIELDS['vx-reports-v1'];
+              var idx = reps.findIndex(function(r){ return _vxReportKey(r) === mkey; });
+              var rec = val;
+              if(idx >= 0){
+                var prev = reps[idx];
+                if(fields.some(function(f){ return rec[f] == null && prev[f] != null; })){
+                  rec = Object.assign({}, rec);
+                  fields.forEach(function(f){ if(rec[f] == null && prev[f] != null) rec[f] = prev[f]; });
+                }
+                reps[idx] = rec;
+              } else {
+                reps.push(rec);
+              }
+              _vxReportMetaSigSet(mkey, _vxReportMetaSig(val));
+              _vxClearDirty(VX_REPORT_PREFIX + mkey);
+              _vxRawLss('vx-reports-v1', reps);
+              _vxDispatchEntityChange('vx-reports-v1', actor);
+              _vxReportTeammateToast();
+              var active = document.querySelector('.page.active');
+              if(active && active.id === 'page-reports' && typeof rptRender === 'function') rptRender();
+              else if(active && active.id === 'page-overview' && typeof ovRefreshDashboard === 'function') ovRefreshDashboard();
+            }).catch(function(){});
+            return;
+          }
           // Re-pull this single key so the local cache catches up
           vxStore.pull(key).then(function(){
             _vxDispatchEntityChange(key, actor);
@@ -2580,6 +2776,32 @@ var vxApi = {
       });
       return map;
     } catch(e){ console.warn('vx: hydrateReportHtml failed', e); return null; }
+  },
+
+  /**
+   * V48: Fetch all per-report METADATA rows for the org as a map
+   * { reportKey: lightReport }. The merge in vxPullReports unions these with
+   * the local array. null on error (so the caller leaves local untouched).
+   */
+  async hydrateReports(){
+    if(!vxIsAuthenticated()) return null;
+    var sb = _vxSupabase();
+    if(!sb) return null;
+    var cfg = vxPlatformConfig();
+    if(!cfg.orgId) return null;
+    try {
+      var r = await sb.from('entities')
+        .select('key,value')
+        .eq('org_id', cfg.orgId)
+        .like('key', VX_REPORT_PREFIX + '%');
+      if(r.error){ console.warn('vx: hydrateReports', r.error.message); return null; }
+      var map = {};
+      (r.data || []).forEach(function(row){
+        var id = String(row.key).slice(VX_REPORT_PREFIX.length);
+        if(id) map[id] = row.value || null;
+      });
+      return map;
+    } catch(e){ console.warn('vx: hydrateReports failed', e); return null; }
   },
 
   /**
@@ -3028,13 +3250,82 @@ function lss(k, v) {
   // When the user signs in (or back in), the queue replays. Before then,
   // writes are local-only and dirty-tracked so a "Sign in to save N changes"
   // banner can surface their pending work.
-  if(VX_ENTITY_KEYS.has(k)) {
+  if(k === 'vx-reports-v1') {
+    // V48: reports sync as per-report rows, not one blob. When authenticated,
+    // enqueue each changed report (which marks its own per-report dirty flag).
+    // When NOT authenticated (trial mode), mark the coarse key dirty so the
+    // first-cloud-login migration knows there are reports to push.
+    if(vxIsAuthenticated()) vxSyncEnqueueReports(v);
+    else _vxMarkDirty('vx-reports-v1');
+  } else if(VX_ENTITY_KEYS.has(k)) {
     _vxMarkDirty(k);
     if(vxIsAuthenticated()) vxSyncEnqueue({ kind: 'put', key: k, value: v });
   }
 }
 
 // Cloud-mode helpers exposed for views that want richer behavior
+// V48: a teammate may save several reports at once (each its own row event) —
+// coalesce the "Reports updated by a teammate" toast so it fires once per burst.
+var _vxReportToastTimer = null;
+function _vxReportTeammateToast(){
+  if(typeof toast !== 'function') return;
+  if(_vxReportToastTimer) clearTimeout(_vxReportToastTimer);
+  _vxReportToastTimer = setTimeout(function(){
+    _vxReportToastTimer = null;
+    toast('Reports updated by a teammate.', 'info');
+  }, 800);
+}
+
+// V48: pull reports as per-report rows and MERGE into the local array (never a
+// whole-blob replace). Rule per report key: if the local copy has unpushed edits
+// (its per-report dirty flag is set) keep local — the queue will push it; else
+// take the server copy. Local-only reports (offline drafts / not yet uploaded)
+// are always kept. Heavy HTML is reattached from its write-once row. This is
+// what makes two devices saving DIFFERENT reports safe — neither can clobber the
+// other, because each report is its own row and the merge is a union by key.
+async function vxPullReports(){
+  if(!vxIsAuthenticated()) return { skipped: true };
+  const metaMap = await vxApi.hydrateReports();
+  if(metaMap == null) return { error: true };            // network/error — leave local untouched
+  const htmlMap = (await vxApi.hydrateReportHtml()) || {};
+  const localArr = (() => { const a = ls('vx-reports-v1', []); return Array.isArray(a) ? a : []; })();
+  const localByKey = {};
+  localArr.forEach(r => { const k = _vxReportKey(r); if(k) localByKey[k] = r; });
+  const metaSig = _vxReportMetaSigMap();
+  const htmlSig = _vxHtmlSigMap();
+  const fields  = VX_HEAVY_FIELDS['vx-reports-v1'];
+  const merged = [];
+  const seen = {};
+  Object.keys(metaMap).forEach(key => {
+    const remote = metaMap[key];
+    if(!remote) return;
+    const localR = localByKey[key];
+    let rec;
+    if(localR && vxStore.isDirty(VX_REPORT_PREFIX + key)){
+      rec = localR;                                      // unpushed local edit wins (queue pushes it)
+    } else {
+      rec = remote;
+      metaSig[key] = _vxReportMetaSig(remote);           // we just pulled it — don't re-upload
+      _vxClearDirty(VX_REPORT_PREFIX + key);
+    }
+    const h = htmlMap[key];
+    if(h){
+      if(fields.some(f => rec[f] == null && h[f] != null)){
+        rec = Object.assign({}, rec);
+        fields.forEach(f => { if(rec[f] == null && h[f] != null) rec[f] = h[f]; });
+      }
+      const s = _vxReportHtmlSig(rec); if(s) htmlSig[key] = s;
+    }
+    merged.push(rec);
+    seen[key] = true;
+  });
+  localArr.forEach(r => { const k = _vxReportKey(r); if(!k || !seen[k]) merged.push(r); });
+  _vxReportMetaSigSave(metaSig);
+  _vxHtmlSigSave(htmlSig);
+  _vxRawLss('vx-reports-v1', merged);
+  return { count: Object.keys(metaMap).length };
+}
+
 var vxStore = {
   get: ls,
   set: lss,
@@ -3044,6 +3335,7 @@ var vxStore = {
    *  roll the local change back. Keep local; the sync queue pushes it up. */
   async pull(k) {
     if(!vxIsAuthenticated()) return null;
+    if(k === 'vx-reports-v1'){ await vxPullReports(); return ls(k, null); }  // V48: merge, never blob-replace
     if(vxStore.isDirty(k)) return ls(k, null);
     const remote = await vxApi.hydrate(k);
     if(remote != null) { _vxRawLss(k, remote); _vxClearDirty(k); }
@@ -3055,40 +3347,16 @@ var vxStore = {
    *  revert to its old layout on the next refresh. */
   async pullAll() {
     if(!vxIsAuthenticated()) return { skipped: true };
-    let count = 0, kept = 0, reportsPulled = false;
+    let count = 0, kept = 0;
     for(const k of VX_ENTITY_KEYS) {
+      if(k === 'vx-reports-v1') continue;                // V48: reports merge separately (never blob-replaced)
       if(vxStore.isDirty(k)) { kept++; continue; }
       const r = await vxApi.hydrate(k);
-      if(r != null) { _vxRawLss(k, r); _vxClearDirty(k); count++; if(k === 'vx-reports-v1') reportsPulled = true; }
+      if(r != null) { _vxRawLss(k, r); _vxClearDirty(k); count++; }
     }
-    // V45: re-attach the per-report HTML rows onto the freshly-pulled (light)
-    // reports blob so local rendering keeps frozenHtml/sealedHtml. Only mark a
-    // report's HTML as "synced" when an actual html ROW exists — a report whose
-    // HTML is still inline in an un-migrated blob must stay un-marked so the
-    // next local write migrates it (stripping the blob WITH an html op).
-    if(reportsPulled){
-      try {
-        const htmlMap = await vxApi.hydrateReportHtml();
-        if(htmlMap){
-          const reports = ls('vx-reports-v1', []);
-          if(Array.isArray(reports) && reports.length){
-            const fields = VX_HEAVY_FIELDS['vx-reports-v1'];
-            const sig = _vxHtmlSigMap();
-            let changed = false;
-            reports.forEach(r => {
-              const key = _vxReportKey(r);
-              const h = key ? htmlMap[key] : null;
-              if(h){
-                fields.forEach(f => { if(h[f] != null && r[f] !== h[f]){ r[f] = h[f]; changed = true; } });
-                const s = _vxReportHtmlSig(r); if(s) sig[key] = s;
-              }
-            });
-            _vxHtmlSigSave(sig);
-            if(changed) _vxRawLss('vx-reports-v1', reports);
-          }
-        }
-      } catch(e){ console.warn('vx: report-html reassembly failed', e); }
-    }
+    // V48: merge the per-report rows (+ their write-once HTML rows) into the
+    // local array. Replaces the old "pull the blob then reattach HTML" path.
+    try { await vxPullReports(); } catch(e){ console.warn('vx: pullReports failed', e); }
     vxPlatformSet({ lastSyncAt: new Date().toISOString() });
     return { count, kept };
   },

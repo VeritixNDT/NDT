@@ -17,6 +17,14 @@ function vxSyncCopyrightYear(){
       el.textContent = year;
     });
   } catch(e){}
+  // Stamp the running build id into any `.vx-build-stamp` element so a glance
+  // at the footer confirms whether a deploy is actually live in this browser.
+  try {
+    const build = (typeof VX_BUILD !== 'undefined') ? VX_BUILD : '';
+    document.querySelectorAll('.vx-build-stamp').forEach(el => {
+      el.textContent = 'build ' + build;
+    });
+  } catch(e){}
 }
 // V12: Validate that a URL is safe to render in <img src="">. Only allow:
 //   - https:// URLs (subject to CSP)

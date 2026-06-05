@@ -1773,7 +1773,7 @@ function _rptRowInner(r, _origIdx) {
   const isSelected = _rptSelectedIdx.has(_origIdx);
   const health = stageHealthy(r);
   return `<td style="padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select report ${escapeHtml(r.reportNo||'')}" ${isSelected?'checked':''} data-action="rptToggleSelect" data-pass-event="1" data-args="${_origIdx}"></td>
-    <td style="font-family:var(--mono);font-size:12px">${escapeHtml(r.reportNo||'—')} <span style="color:var(--t3);font-weight:400">Rev ${escapeHtml(r.revision||'00')}</span>${sup?' <span title="Superseded by a later revision — locked" style="color:var(--t3)">🔒</span>':''}</td>
+    <td style="font-family:var(--mono);font-size:12px">${r.reportNo ? escapeHtml(r.reportNo) : '<span title="Saved offline — number is assigned when this report syncs to the cloud" style="color:var(--amber);font-style:italic">number pending</span>'} <span style="color:var(--t3);font-weight:400">Rev ${escapeHtml(r.revision||'00')}</span>${sup?' <span title="Superseded by a later revision — locked" style="color:var(--t3)">🔒</span>':''}</td>
     <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${escapeHtml(r.method||'—')}</span></td>
     <td><span class="badge" data-no-glyph style="background:${sc.bg};color:${sc.fg};box-shadow:inset 0 0 0 1px ${sc.accent}33;font-size:10px">${tStage(stage)}</span>${health!=='fresh'?` <span title="${fmtDuration(timeOnStage(r))} on this stage" style="font-size:10px;color:${health==='critical'?'var(--red)':'var(--amber)'};font-family:var(--mono)">·${fmtDuration(timeOnStage(r))}</span>`:''}</td>
     <td>${escapeHtml(r.client||'—')}</td>
@@ -2547,6 +2547,15 @@ async function inboxApprove(idx){
   if(!_reportCanApprove(r)){
     toast(t('toast.approver_required', 'Senior Inspector or Admin role required to approve.'), 'error');
     return;
+  }
+  // V48: a report can't be sealed without a number. If it's an unnumbered draft
+  // (saved offline), allocate now while online; block approval if that fails.
+  if(!r.reportNo){
+    if(typeof vxAllocReportNo === 'function'){ try { await vxAllocReportNo(r); } catch(e){} }
+    if(!r.reportNo){
+      toast(t('toast.draft_no_number_approve','This report has no number yet — connect to the cloud to allocate its number before approving.'), 'error');
+      return;
+    }
   }
   if(!await vxConfirm({ message: t('inb.confirm.approve','Approve and seal this report? The approved version is locked — later changes require a new revision.'), okLabel: t('vxc.approve','Approve') })) return;
   // Foolproof portal linkage: an approved report must be filed under a job

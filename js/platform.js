@@ -3573,9 +3573,10 @@ async function vxRegisterServiceWorker() {
 
   const swCode = `
     // Veritix service worker — minimal shell + background sync placeholder
-    // CACHE name is versioned; bump it whenever the caching strategy
-    // changes so the activate handler can purge stale caches.
-    const CACHE = 'veritix-shell-v2';
+    // CACHE name is versioned PER BUILD (VX_BUILD is injected below), so every
+    // deploy gets a fresh cache and the activate handler purges the old one —
+    // no stale js/*.js can survive a deploy.
+    const CACHE = 'veritix-shell-${(typeof VX_BUILD !== 'undefined' ? VX_BUILD : 'v2')}';
     self.addEventListener('install', (e) => {
       self.skipWaiting();
     });

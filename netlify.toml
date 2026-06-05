@@ -35,3 +35,26 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Frame-Options = "SAMEORIGIN"
+
+# Cache freshness — the app is an audit tool; a browser must never run stale
+# code. "no-cache" means the browser MAY store the file but MUST revalidate it
+# with the server on every load (ETag → cheap 304 when unchanged, fresh bytes
+# the instant a deploy changes them). This closes the HTTP-cache path that let
+# old js/*.js linger after a deploy. (The service worker is network-first and
+# its cache name is versioned per build — see vxRegisterServiceWorker.)
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "no-cache"

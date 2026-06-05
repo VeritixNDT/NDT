@@ -117,6 +117,14 @@ function bootApp() {
     }
   } catch(e){ console.warn('vx: portal boot failed', e); }
 
+  // V47: report-verify (#/verify/<token>) — a printed report's QR. Public,
+  // read-only, token-authenticated; render the verify view instead of the app.
+  try {
+    if(typeof vxVerifyActive === 'function' && vxVerifyActive()){
+      if(typeof vxVerifyBoot === 'function'){ await vxVerifyBoot(); return; }
+    }
+  } catch(e){ console.warn('vx: verify boot failed', e); }
+
   // V44: Supabase bootstrap.
   // If the meta tags are populated AND there's a persisted session in
   // localStorage (the SDK restores it automatically on createClient), copy

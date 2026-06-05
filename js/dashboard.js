@@ -2616,6 +2616,10 @@ async function ovSaveReport(mode) {
   // cal date onto the report so the historical record is stable even
   // if the equipment record is later edited or deleted. Also keeps
   // r.eq_id around for traceability / live-lookup place cards.
+  // Compliance gaps — unregistered equipment / certs used on this report.
+  // A non-empty gap list forces the report to wait for senior/admin review
+  // (it can't be self-approved) and posts a message to the inbox.
+  const complianceGaps = [];
   try {
     const eqList = (typeof eqLoad === 'function') ? eqLoad() : [];
     all.forEach(f => {
@@ -2623,12 +2627,18 @@ async function ovSaveReport(mode) {
       const pickedId = report[f.id];
       if(!pickedId) return;
       const rec = eqList.find(r => r.id === pickedId);
+      // A value that isn't a register id (no `eq-` prefix) is a name the
+      // inspector free-typed via the empty-register fallback — keep it. Only a
+      // dangling register id (record deleted between render and save) is dropped.
+      const looksLikeId = /^eq-/.test(String(pickedId));
+      // Free-typed value with no matching record → unregistered equipment.
+      if(!rec && !looksLikeId) complianceGaps.push({ type:'equipment', label:f.label, value:String(pickedId) });
       if(f.eqType) {
         // Light meter picker (UV-A / white-light) — keep the register id
         // on the field so the light/UV smart card resolves it; never
         // claim the primary eq_id / eq_svid / eq_caldate snapshot, which
         // belongs to the main NDT equipment.
-        if(!rec) report[f.id] = '';
+        if(!rec && looksLikeId) report[f.id] = '';
       } else if(rec) {
         // Primary NDT-equipment snapshot — only the first useEquipment\
         // Register field without eqType (and not flagged secondary)
@@ -2649,9 +2659,10 @@ async function ovSaveReport(mode) {
         }
         report[f.id] = rec.name || '';
       } else {
-        // Picked id no longer exists (equipment was deleted between
-        // render and save). Don't carry a dead reference forward.
-        report[f.id] = '';
+        // No matching record. Keep a free-typed name (empty-register
+        // fallback); only drop a dangling register id whose record was
+        // deleted between render and save.
+        if(looksLikeId) report[f.id] = '';
       }
     });
   } catch(e) { console.warn('equipment snapshot failed', e); }
@@ -2680,6 +2691,21 @@ async function ovSaveReport(mode) {
       };
     }
   } catch(e) { console.warn('eye-test snapshot failed', e); }
+  // Compliance: flag when the signoff inspector has no registered certification
+  // for this method (e.g. an admin picked an uncertified inspector, or the
+  // inspector name doesn't match a directory record). The non-admin self-sign
+  // path is already hard-blocked upstream by _ovSignBlockReason; this catches
+  // the admin-assigns-uncertified-inspector case and holds it for review.
+  try {
+    const list = (typeof INSPECTORS !== 'undefined' && Array.isArray(INSPECTORS) && INSPECTORS.length)
+      ? INSPECTORS
+      : ((typeof ls === 'function') ? ls('vx-inspectors-v1', []) : []);
+    const insp = list.find(i => i.name === report.inspector);
+    const certs = (insp && typeof _inspMethodCerts === 'function') ? _inspMethodCerts(insp) : {};
+    if(report.inspector && !(certs && certs[_ovMethod])){
+      complianceGaps.push({ type:'cert', label:_ovMethod, value:report.inspector });
+    }
+  } catch(e){ console.warn('cert compliance check failed', e); }
   // Inspected-items table — capture every row, then mirror row 0 to the
   // top-level report fields so existing PDF place cards, list filters, and
   // CSV exports keep reading r.subject / r.drawing / r.welders / … as
@@ -2877,6 +2903,22 @@ async function ovSaveReport(mode) {
      && typeof _ovEnsureReportLinkedForApproval === 'function'){
     if(!await _ovEnsureReportLinkedForApproval(report)) willApprove = false;
   }
+  // Compliance hold: a report that used unregistered equipment, or whose
+  // signoff inspector holds no registered certification for the method, has a
+  // traceability gap. It must NOT be self-approved/sealed — it waits for
+  // senior/admin review (see inboxApprove) and is surfaced to approvers in the
+  // inbox. This overrides self-approve permission.
+  if(complianceGaps.length){
+    report.complianceHold = true;
+    report.complianceReasons = complianceGaps.map(g =>
+      g.type === 'equipment'
+        ? `Unregistered equipment — “${g.value}” (${g.label}) is not in the equipment register`
+        : `Unregistered certification — ${g.value} holds no registered ${g.label} certification`);
+    if(willApprove){
+      willApprove = false;
+      toast('Held for review — this report uses unregistered equipment or an uncertified inspector. An approver has been notified.', 'warn');
+    }
+  }
   // V48: allocate the report NUMBER now — must happen BEFORE the frozen snapshot
   // so the PDF carries the number. New reports only; a revision keeps its number.
   //  • Cloud account: the number comes from the server (atomic, gap-free,
@@ -2926,7 +2968,9 @@ async function ovSaveReport(mode) {
     addReportAudit(report, 'draft', 'Saved as draft (awaiting report number)');
   } else {
     report.stage = 'Submitted';
-    addReportAudit(report, 'submitted', 'Submitted for review');
+    addReportAudit(report, 'submitted', report.complianceHold
+      ? ('Submitted — held for review: ' + (report.complianceReasons || []).join('; '))
+      : 'Submitted for review');
   }
   // Save. V48: the report NUMBER counter now lives on the server (allocated
   // above via vxAllocReportNo) — there is no local numNext to bump here.

@@ -794,16 +794,42 @@ function equipmentSelectHtml(methodId, f, val, fid, data) {
   // Settings → Equipment to have it shown method-filtered.)
   if(!filtered.length && pool.length) filtered = pool.slice();
   if(!filtered.length) {
-    // Render a disabled select rather than a text input so the form
-    // stays visually consistent — two equipment cells in a row both
-    // look like dropdowns even if the register is empty for one of
-    // them. The single placeholder option tells the inspector where
-    // to add gear without breaking the layout.
-    return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· from Settings → Equipment</span></label>
-      <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}" disabled style="opacity:.55">
-        <option value="">— No ${escapeHtml(f.eqType==='white-light'?'white-light meter':f.eqType==='uv-light'?'UV-A meter':'equipment')} in register —</option>
-      </select>
-      <div style="font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">Add via Settings → Equipment, tag for ${escapeHtml(methodId)}.</div>
+    // Nothing of this type is registered yet. Instead of a dead disabled
+    // dropdown (which made the white-light / UV meter look broken — entering a
+    // lux reading appeared to do nothing because there was no meter to pick),
+    // offer a FREE-TEXT fallback so the inspector can still record the
+    // instrument on day one, with a nudge to add it to the register (where it
+    // gains cal tracking + smart-card resolution). For the gated light-meter
+    // pickers the fallback greys out until the lux regime qualifies, exactly
+    // as the dropdown would — and re-enables the moment a valid reading is in.
+    const typeWord = f.eqType === 'white-light' ? 'white-light meter'
+                   : f.eqType === 'uv-light'    ? 'UV-A meter'
+                   : 'equipment';
+    const settingsType = f.eqType === 'white-light' ? 'White-light meter'
+                       : f.eqType === 'uv-light'    ? 'UV-A lamp'
+                       : null;
+    let disAttr = '', inStyle = '', gateAttrs = '', gateHint = '';
+    if(f.gatedBy){
+      const raw = data && (data['eq_'+f.gatedBy] != null ? data['eq_'+f.gatedBy] : data[f.gatedBy]);
+      const gv  = parseFloat(raw == null ? '' : raw);
+      const applies = !isNaN(gv)
+        && (f.gateMin == null || gv > f.gateMin)
+        && (f.gateMax == null || gv <= f.gateMax);
+      gateAttrs = ` data-gatedby="${escapeHtml(f.gatedBy)}"`
+        + (f.gateMin != null ? ` data-gatemin="${f.gateMin}"` : '')
+        + (f.gateMax != null ? ` data-gatemax="${f.gateMax}"` : '');
+      const cond = f.gateMin != null ? `the white-light reading is above ${f.gateMin} lux`
+                 : f.gateMax != null ? `the white-light reading is ${f.gateMax} lux or below`
+                 : '';
+      gateHint = `<div class="rpt-gate-hint" style="display:${applies?'none':'block'};font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">Applies when ${cond}.</div>`;
+      if(!applies){ disAttr = ' disabled'; inStyle = 'opacity:.45'; }
+    }
+    const tip = settingsType
+      ? `No ${typeWord} in your register — type it here, or add it under Settings → Equipment (Type: <b>${escapeHtml(settingsType)}</b>) for cal tracking and auto-fill.`
+      : `Not in your register yet — type it here, or add it under Settings → Equipment.`;
+    return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· none in register</span></label>
+      <input id="${fid}" class="rf-equipment-freetext" data-method="${escapeHtml(methodId)}"${gateAttrs}${disAttr} value="${escapeHtml(val||'')}" placeholder="Type your ${escapeHtml(typeWord)} (make / serial)"${inStyle?` style="${inStyle}"`:''}/>
+      <div style="font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">${tip}</div>${gateHint}
     </div>`;
   }
   // Resolve which option to mark selected. `val` may be the equipment id
@@ -2341,7 +2367,20 @@ function inboxBuild(){
   // 5. Calibration due — currently no equipment store; placeholder for future
   const calDue = []; // future hook
 
-  return { awaitingApproval, myDrafts, stale, certsExpiring, calDue };
+  // 6. Compliance review — reports held because they used UNREGISTERED
+  // equipment or an inspector with no registered certification for the method.
+  // Only a Senior/Admin (or the named approver) can clear these, so they are
+  // surfaced to them as a prominent "needs review" message.
+  const complianceReview = reports.filter((r, idx) => {
+    r._idx = idx;
+    if(!r.complianceHold) return false;
+    const stage = getReportStage(r);
+    if(stage === 'Approved' || stage === 'Sent') return false;   // already cleared
+    if(!me) return false;
+    return me.role === 'Admin' || me.role === 'Senior' || r.approver === me.name;
+  });
+
+  return { awaitingApproval, myDrafts, stale, certsExpiring, calDue, complianceReview };
 }
 
 function inboxBadgeCount(){
@@ -2378,6 +2417,11 @@ function inboxRender(){
         </div>
       </div>`;
     summaryEl.innerHTML = [
+      (data.complianceReview && data.complianceReview.length
+        ? tile(data.complianceReview.length, t('inb.tile.compliance','Compliance review'), 'urgent',
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            'rgba(242,92,92,.10)','var(--red)', 'inbox-sec-compliance', false)
+        : ''),
       tile(data.awaitingApproval.length, t('inb.tile.approval','Awaiting your approval'), data.awaitingApproval.length>0?'attention':null,
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
         'rgba(0,212,255,.10)','var(--cyan)',
@@ -2400,6 +2444,39 @@ function inboxRender(){
   const contentEl = el('inbox-content');
   if(!contentEl) return;
   let html = '';
+
+  // ── Compliance review (held: unregistered equipment / certification) ──
+  // Only shown to approvers (built that way in inboxBuild). This is the
+  // "message to admin": a report used gear/cert that isn't on file, so it was
+  // withheld from self-approval and must be reviewed before it can be sealed.
+  if(data.complianceReview && data.complianceReview.length){
+    html += `<div class="inbox-section" id="inbox-sec-compliance">
+      <div class="inbox-section-head">
+        <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${escapeHtml(t('inb.sec.compliance','Compliance review — unregistered equipment / certification'))}</span>
+        <span class="inbox-section-count">${data.complianceReview.length}</span>
+      </div>`;
+    data.complianceReview.forEach(r => {
+      const md = NDT_METHODS.find(x => x.id === r.method);
+      const reasons = (r.complianceReasons || []).map(x => `<li>${escapeHtml(x)}</li>`).join('');
+      html += `<div class="inbox-row">
+        <div class="inbox-row-meta">
+          <div class="inbox-row-primary">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--cyan);font-weight:600">${escapeHtml(r.reportNo||'—')}</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:700;background:${(md?.color||'#5a6880')+'1a'};color:${md?.color||'#5a6880'};padding:1px 6px;border-radius:3px">${r.method||'?'}</span>
+            <span style="background:rgba(242,92,92,.12);color:var(--red);font-size:10px;padding:2px 7px;border-radius:5px">${escapeHtml(t('inb.compliance.badge','Held — needs review'))}</span>
+          </div>
+          <div class="inbox-row-secondary">${escapeHtml(r.subject || r.client || t('inb.row.no_subject','No subject'))} · ${escapeHtml(t('inb.row.inspector','Inspector'))}: ${escapeHtml(r.inspector||'—')}</div>
+          <ul style="margin:5px 0 0;padding-left:18px;font-size:11px;color:var(--amber)">${reasons}</ul>
+        </div>
+        <div class="inbox-row-actions">
+          <button class="btn btn-sm btn-primary" data-action="inboxApprove" data-args="${r._idx}">${escapeHtml(t('inb.btn.review_approve','Review & approve'))}</button>
+          <button class="btn btn-sm btn-danger" data-action="inboxReject" data-args="${r._idx}">${escapeHtml(t('inb.btn.reject','Reject'))}</button>
+          <button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${r._idx}" title="${escapeHtml(t('inb.btn.view_history','View history'))}">⌕</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
 
   // ── Awaiting approval ──
   html += `<div class="inbox-section" id="inbox-sec-approval">
@@ -2548,6 +2625,12 @@ async function inboxApprove(idx){
     toast(t('toast.approver_required', 'Senior Inspector or Admin role required to approve.'), 'error');
     return;
   }
+  // Compliance hold (unregistered equipment / cert) can only be cleared by a
+  // Senior or Admin — never self-approved, even by a self-approve inspector.
+  if(r.complianceHold && !(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin())){
+    toast(t('toast.compliance_hold_approver','This report used unregistered equipment or an uncertified inspector — it needs Senior/Admin review and can’t be self-approved.'), 'error');
+    return;
+  }
   // V48: a report can't be sealed without a number. If it's an unnumbered draft
   // (saved offline), allocate now while online; block approval if that fails.
   if(!r.reportNo){
@@ -2569,6 +2652,11 @@ async function inboxApprove(idx){
   _sealReport(r);
   const selfApproved = !(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());
   addReportAudit(r, 'approved', selfApproved ? 'Approved & sealed (self-approve)' : 'Approved & sealed');
+  // Record that a held report's compliance gap was reviewed and accepted.
+  if(r.complianceHold){
+    addReportAudit(r, 'compliance', 'Compliance hold reviewed & cleared on approval: ' + (r.complianceReasons || []).join('; '));
+    r.complianceCleared = true;
+  }
   lss(KEYS.reports, all);
   if(typeof rptRender === 'function') rptRender();
   if(typeof inboxRender === 'function') inboxRender();

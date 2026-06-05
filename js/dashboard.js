@@ -44,9 +44,27 @@ var _ovRevisionOriginal = '';
 // revision, carry the revision history forward, and skip the numbering
 // counter. Null for a fresh new report.
 var _ovReviseSource = null;
+// V48: the stable UUID id assigned to the report being edited (new or revision),
+// set at form-open and threaded into the saved record + autosave draft so its
+// sync-row key and server number allocation stay stable across reloads.
+var _ovReportId = null;
 // Next-revision string from a numeric revision ("00" → "01", "01" → "02").
 function _ovBumpRevision(rev){
   return String((parseInt(rev, 10) || 0) + 1).padStart(2, '0');
+}
+// V48: local report-number allocation for trial / local-only mode (no cloud, so
+// no concurrency). Reads the settings counter, formats via the shared
+// vxFormatReportNo, and bumps the counter. Authenticated cloud users never take
+// this path — their numbers come from the server (vxAllocReportNo).
+function _ovAllocLocalReportNo(report){
+  const s = ls(KEYS.settings, {});
+  const seq = parseInt(s.numNext || '1', 10);
+  const no = (typeof vxFormatReportNo === 'function')
+    ? vxFormatReportNo(seq, report.method, s)
+    : ((s.numPrefix || 'INS') + '-' + new Date().getFullYear() + '-' + String(seq).padStart(parseInt(s.numDigits||'3',10), '0'));
+  s.numNext = seq + 1;
+  lss(KEYS.settings, s);
+  return no;
 }
 // Overall report verdict rolled up from the inspected-items results —
 // worst case wins. '' when no row carries a result yet.
@@ -177,6 +195,7 @@ function _ovDraftCollect(){
   const reasonEl  = document.getElementById('ov-revision-reason');
   return {
     method: _ovMethod,
+    id: _ovReportId,                 // V48: keep the report's stable id across reloads
     form,
     items,
     examRemarks:    remarksEl ? remarksEl.value : '',
@@ -253,6 +272,7 @@ function _ovDraftRestore(){
   if(!_ovMethod) return;
   const draft = _ovDraftLoad(_ovMethod);
   if(!draft || draft.method !== _ovMethod) return;
+  if(draft.id) _ovReportId = draft.id;   // V48: restore the report's stable id
   // Hydrate top-level form inputs
   Object.keys(draft.form || {}).forEach(fid => {
     const inp = el(`rf-${_ovMethod}-${fid}`);
@@ -1498,33 +1518,27 @@ function ovNewReport(methodId, btn, sourceReport) {
   _ovReviseSource = sourceReport || null;
 
   if(sourceReport){
-    // Revision of an existing report — keep the report number, advance
-    // the revision number. The reason guardrail in ovSaveReport keys off
+    // Revision of an existing report — keep the report number, advance the
+    // revision number. A revision is its OWN sync row, so it gets a fresh id
+    // (must overwrite the id copied from sourceReport, or it would clobber the
+    // source's row). The reason guardrail in ovSaveReport keys off
     // _ovRevisionOriginal (set below to the source's own revision).
+    merged.id = vxNewId();
+    merged.isDraft = false;
     merged.reportNo = sourceReport.reportNo || merged.reportNo || '';
     merged.revision = _ovBumpRevision((sourceReport.revision || '00').trim());
   } else {
-    // Generate report number — pulls the per-report method code into the
-    // configured numMethodPos slot so each method (UT, MT, VT, …) shows up
-    // automatically in the report's identifier.
-    const s = ls(KEYS.settings, {});
-    const prefix = s.numPrefix || 'INS';
-    const sep = s.numSep !== undefined ? s.numSep : '-';
-    const yrDigits = parseInt(s.numYear || '4');
-    const digits = parseInt(s.numDigits || '3');
-    const next = parseInt(s.numNext || '1');
-    const methodPos = s.numMethodPos || 'none';
-    const yr = yrDigits === 4 ? new Date().getFullYear() : yrDigits === 2 ? String(new Date().getFullYear()).slice(-2) : '';
-    const seq = String(next).padStart(digits, '0');
-    const mCode = (methodId || merged.method || '').toUpperCase();
-    const parts = [prefix];
-    if(methodPos === 'after-prefix' && mCode) parts.push(mCode);
-    if(yr) parts.push(yr);
-    if(methodPos === 'after-year' && mCode) parts.push(mCode);
-    parts.push(seq);
-    merged.reportNo = parts.filter(Boolean).join(sep);
+    // V48: a new report gets a stable UUID id now; its human report NUMBER is
+    // allocated atomically by the server at SAVE (online) — see vxAllocReportNo
+    // — so two devices can never mint the same number. Until then it's a Draft
+    // with no reportNo.
+    merged.id = vxNewId();
+    merged.reportNo = '';
+    merged.isDraft = true;
     if(!merged.revision) merged.revision = '00';
   }
+  // V48: remember this report's stable id for the save + autosave draft.
+  _ovReportId = merged.id;
 
   // Items table — seed row 0 from any top-level values the template /
   // saved-form may have pre-filled, so the user doesn't lose data when the
@@ -2583,6 +2597,9 @@ async function ovSaveReport(mode) {
   const specific = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])].map(f => ({...f, id:'eq_'+f.id}));
   const all = [...allFields, ...specific];
   const report = { method: _ovMethod, createdAt: new Date().toISOString() };
+  // V48: stable id assigned at form-open (or restored from the autosave draft).
+  // It keys the report's sync row and drives exactly-once number allocation.
+  report.id = _ovReportId || (typeof vxNewId === 'function' ? vxNewId() : ('r-' + Date.now()));
   all.forEach(f => {
     const inp = el(`rf-${_ovMethod}-${f.id}`);
     if(inp) report[f.id] = (f.type === 'select') ? inp.value : inp.value.trim();
@@ -2860,6 +2877,31 @@ async function ovSaveReport(mode) {
      && typeof _ovEnsureReportLinkedForApproval === 'function'){
     if(!await _ovEnsureReportLinkedForApproval(report)) willApprove = false;
   }
+  // V48: allocate the report NUMBER now — must happen BEFORE the frozen snapshot
+  // so the PDF carries the number. New reports only; a revision keeps its number.
+  //  • Cloud account: the number comes from the server (atomic, gap-free,
+  //    exactly-once per id). Offline → stays a Draft (no number) to be numbered
+  //    on the first sync; a Draft can never be approved/sealed.
+  //  • Trial / local-only (no cloud, single device, no concurrency): number
+  //    locally from the settings counter, as before.
+  if(!_ovReviseSource && !report.reportNo){
+    if(vxIsAuthenticated()){
+      if(typeof vxAllocReportNo === 'function'){
+        try { await vxAllocReportNo(report); } catch(e){ console.warn('vx: report-number alloc failed', e); }
+      }
+      if(!report.reportNo){
+        report.isDraft = true;
+        if(willApprove){
+          willApprove = false;   // can't seal an unnumbered draft
+          toast(t('toast.draft_no_number','Saved as a draft — connect to the cloud to allocate the report number before approval.'), 'warn');
+        }
+      }
+    } else {
+      report.reportNo = _ovAllocLocalReportNo(report);
+      report.isDraft = false;
+    }
+  }
+  report.updatedAt = new Date().toISOString();
   report.auditLog = [];
   if(CURRENT_USER) report.createdBy = CURRENT_USER.id;
   addReportAudit(report, 'created', _ovReviseSource ? ('Revision ' + (report.revision||'') + ' created') : 'Report created');
@@ -2877,21 +2919,20 @@ async function ovSaveReport(mode) {
     else report.stage = 'Approved';
     const selfApproved = !(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());
     addReportAudit(report, 'approved', selfApproved ? 'Approved & sealed (self-approve)' : 'Approved & sealed on save');
+  } else if(report.isDraft){
+    // V48: no number yet (saved offline) — hold as a Draft until it syncs and
+    // the server allocates its number. Never enters review without a number.
+    report.stage = 'Draft';
+    addReportAudit(report, 'draft', 'Saved as draft (awaiting report number)');
   } else {
     report.stage = 'Submitted';
     addReportAudit(report, 'submitted', 'Submitted for review');
   }
-  // Save
+  // Save. V48: the report NUMBER counter now lives on the server (allocated
+  // above via vxAllocReportNo) — there is no local numNext to bump here.
   const reports = ls(KEYS.reports, []);
   reports.push(report);
   lss(KEYS.reports, reports);
-  // Increment numbering — a revision keeps the original report number,
-  // so the counter only advances for a genuinely new report.
-  if(!_ovReviseSource){
-    const s = ls(KEYS.settings, {});
-    s.numNext = (parseInt(s.numNext || '1')) + 1;
-    lss(KEYS.settings, s);
-  }
   updateReportCount();
   if(typeof updateInboxBadge === 'function') updateInboxBadge();
   // The form's autosave draft is now superseded by the persisted record —
@@ -2899,7 +2940,9 @@ async function ovSaveReport(mode) {
   _ovDraftClear(_ovMethod);
   _ovDraftStopTick();
   _ovDraftIndicator('idle');
-  toast(willApprove ? `${m.id} report approved & sealed.` : `${m.id} report submitted for review.`);
+  toast(report.isDraft
+          ? `${m.id} report saved as a draft — number will be assigned when online.`
+          : (willApprove ? `${m.id} report approved & sealed.` : `${m.id} report submitted for review.`));
   ovShowSection('dashboard', el('ovi-dashboard'));
 }
 

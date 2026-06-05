@@ -23,6 +23,7 @@ function envOrThrow(name: string): string {
 }
 
 const HTML_PREFIX = "vx-report-html::";
+const REPORT_PREFIX = "vx-report::";
 // Matches the client's _vxReportKey: explicit id, else reportNo::revision.
 // deno-lint-ignore no-explicit-any
 function reportKey(r: any): string {
@@ -48,13 +49,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
     { auth: { persistSession: false } },
   );
 
-  // Report metadata from the (light) reports blob.
-  const { data: blobRow, error } = await service
-    .from("entities").select("value").eq("org_id", orgId).eq("key", "vx-reports-v1").maybeSingle();
-  if (error) return jsonResponse({ error: "could not load report" }, 500);
+  // Report metadata. The client now syncs each report as its own row
+  // (vx-report::<key>) instead of one vx-reports-v1 blob — read that directly
+  // by key. Dual-read the old blob as a fallback for un-migrated orgs.
   // deno-lint-ignore no-explicit-any
-  const reports: any[] = Array.isArray(blobRow?.value) ? (blobRow!.value as any[]) : [];
-  const r = reports.find((x) => x && reportKey(x) === reportId);
+  let r: any = null;
+  const { data: rptRow, error: rptErr } = await service
+    .from("entities").select("value").eq("org_id", orgId).eq("key", REPORT_PREFIX + reportId).maybeSingle();
+  if (rptErr) return jsonResponse({ error: "could not load report" }, 500);
+  if (rptRow?.value) {
+    r = rptRow.value;
+  } else {
+    const { data: blobRow, error } = await service
+      .from("entities").select("value").eq("org_id", orgId).eq("key", "vx-reports-v1").maybeSingle();
+    if (error) return jsonResponse({ error: "could not load report" }, 500);
+    // deno-lint-ignore no-explicit-any
+    const reports: any[] = Array.isArray(blobRow?.value) ? (blobRow!.value as any[]) : [];
+    r = reports.find((x) => x && reportKey(x) === reportId) || null;
+  }
   if (!r) return jsonResponse({ error: "Report not found." }, 404);
   if (r.stage !== "Approved" && r.stage !== "Sent") {
     return jsonResponse({ error: "This report is not an approved version." }, 403);

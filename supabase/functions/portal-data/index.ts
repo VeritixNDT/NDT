@@ -62,6 +62,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (id) htmlById[id] = (r.value as any) || {};
   });
 
+  // Per-report metadata rows (vx-report::<key>). The client moved reports out of
+  // the single vx-reports-v1 blob into one row per report. Read those; fall back
+  // to the blob for un-migrated orgs (zero per-report rows).
+  const REPORT_PREFIX = "vx-report::";
+  const { data: reportRows } = await service
+    .from("entities").select("value").eq("org_id", orgId).like("key", REPORT_PREFIX + "%");
+  // deno-lint-ignore no-explicit-any
+  const reportsSource: any[] = (reportRows && reportRows.length)
+    ? reportRows.map((r) => r.value).filter(Boolean)
+    : asArray(byKey["vx-reports-v1"]);
+
   const customers = asArray(byKey["vx-customers-v1"]);
   const cust = customers.find((c) => c && c.id === customerId);
   if (!cust) return jsonResponse({ error: "Customer not found." }, 404);
@@ -69,7 +80,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const jobs = asArray(byKey["vx-jobs-v1"]).filter((j) => j && j.customerId === customerId);
   const jobIds = new Set(jobs.map((j) => j.id));
 
-  const reports = asArray(byKey["vx-reports-v1"])
+  const reports = reportsSource
     .filter((r) => r && jobIds.has(r.jobId) && (r.stage === "Approved" || r.stage === "Sent"))
     .map((r) => {
       // Match the client's _vxReportKey: prefer an explicit id, else the

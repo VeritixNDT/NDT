@@ -33,6 +33,9 @@ function loadSettings() {
   if(el('num-digits'))  el('num-digits').value    = s.numDigits||'3';
   if(el('num-next'))    el('num-next').value      = s.numNext||1;
   if(el('num-method-pos')) el('num-method-pos').value = s.numMethodPos||'none';
+  // V48: for a cloud account the "next number" is authoritative on the server
+  // (atomic allocation). Refresh the field from the server counter.
+  if(typeof _vxRefreshNextNumberDisplay === 'function') _vxRefreshNextNumberDisplay();
   if(el('notif-cert'))  el('notif-cert').checked  = s.notifCert!==false;
   if(el('notif-calib')) el('notif-calib').checked = s.notifCalib!==false;
   if(el('notif-report'))el('notif-report').checked= !!s.notifReport;
@@ -2588,15 +2591,50 @@ function renderNumberingPreview() {
   });
 });
 
-function saveNumbering() {
+// V48: read the server's authoritative "next number" and reflect it in the
+// Settings field (cloud accounts only; best-effort).
+async function _vxRefreshNextNumberDisplay(){
+  try {
+    if(typeof vxIsAuthenticated !== 'function' || !vxIsAuthenticated()) return;
+    if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    const sb  = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+    const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+    if(!sb || !sb.rpc || !cfg.orgId) return;
+    const res = await sb.rpc('vx_peek_report_no', { p_org: cfg.orgId });
+    if(res.error || res.data == null) return;
+    const inp = el('num-next'); if(inp) inp.value = Number(res.data);
+    if(typeof renderNumberingPreview === 'function') renderNumberingPreview();
+  } catch(e){ /* best-effort */ }
+}
+
+async function saveNumbering() {
   const s = ls(KEYS.settings,{});
   s.numPrefix    = el('num-prefix')?.value||'INS';
   s.numSep       = el('num-sep')?.value;
   s.numYear      = el('num-year')?.value||'4';
   s.numDigits    = el('num-digits')?.value||'3';
-  s.numNext      = parseInt(el('num-next')?.value||'1');
   s.numMethodPos = el('num-method-pos')?.value||'none';
+  const nextVal  = parseInt(el('num-next')?.value||'1');
+  s.numNext      = nextVal;   // local hint / trial-mode counter
   lss(KEYS.settings, s);
+  // V48: for a cloud account the counter lives on the server — push the "next
+  // number" via the admin RPC (it refuses to go below an already-issued number,
+  // so the sequence can never produce a duplicate).
+  if(typeof vxIsAuthenticated === 'function' && vxIsAuthenticated()
+     && (typeof navigator === 'undefined' || navigator.onLine !== false)){
+    try {
+      const sb  = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+      const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+      if(sb && sb.rpc && cfg.orgId){
+        const res = await sb.rpc('vx_set_report_no', { p_org: cfg.orgId, p_next: nextVal });
+        if(res.error){
+          toast((res.error.message || 'Could not update the report counter.'), 'error');
+          _vxRefreshNextNumberDisplay();
+          return;
+        }
+      }
+    } catch(e){ console.warn('vx: set_report_no', e); }
+  }
   toast(t('toast.numbering_saved', 'Numbering settings saved.'));
 }
 

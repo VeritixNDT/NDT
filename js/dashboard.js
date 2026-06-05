@@ -2869,6 +2869,9 @@ async function ovSaveReport(mode) {
     if(typeof ovBuildReportSnapshot === 'function') report.frozenHtml = ovBuildReportSnapshot(report);
   } catch(e){ console.warn('report snapshot failed', e); }
   if(willApprove){
+    // V47: mint the verify URL BEFORE sealing so the frozen PDF's QR encodes a
+    // working #/verify/<token> link (best-effort — needs cloud).
+    if(typeof vxEnsureReportVerifyUrl === 'function'){ try { const _vu = await vxEnsureReportVerifyUrl(report); if(_vu) report.verifyUrl = _vu; } catch(e){} }
     // Seal at approval time (immutable approved snapshot + approval stamp).
     if(typeof _sealReport === 'function') _sealReport(report);
     else report.stage = 'Approved';

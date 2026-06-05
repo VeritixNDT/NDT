@@ -50,7 +50,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const service = createClient(supabaseUrl, envOrThrow("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
   const { data: membership } = await service
     .from("org_members").select("role").eq("org_id", orgId).eq("user_id", caller.id).maybeSingle();
-  if (!membership || membership.role !== "admin") return jsonResponse({ error: "admin access required" }, 403);
+  if (!membership) return jsonResponse({ error: "not a member of this org" }, 403);
+  // Portal links stay admin-only; verify tokens may be minted by any member
+  // (they only expose an already-approved report for an authenticity check).
+  if (kind === "portal" && membership.role !== "admin") return jsonResponse({ error: "admin access required" }, 403);
 
   const secret = envOrThrow("PORTAL_SECRET");
   const base = envOrThrow("APP_URL").replace(/\/+$/, "");

@@ -2552,6 +2552,10 @@ async function inboxApprove(idx){
   // Foolproof portal linkage: an approved report must be filed under a job
   // (or explicitly marked internal) or it can never reach the customer portal.
   if(typeof _ovEnsureReportLinkedForApproval === 'function' && !await _ovEnsureReportLinkedForApproval(r)) return;
+  // V47: mint the verify URL BEFORE sealing so the frozen PDF's QR encodes a
+  // working #/verify/<token> link (best-effort — needs cloud; offline seals
+  // without a verify QR).
+  if(typeof vxEnsureReportVerifyUrl === 'function'){ try { const _vu = await vxEnsureReportVerifyUrl(r); if(_vu) r.verifyUrl = _vu; } catch(e){} }
   // Seal: mark Approved, stamp approver + freeze the immutable snapshot.
   _sealReport(r);
   const selfApproved = !(typeof vxIsSeniorOrAdmin === 'function' && vxIsSeniorOrAdmin());

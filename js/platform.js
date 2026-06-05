@@ -729,6 +729,26 @@ function _vxReportKey(r){
   if(r.reportNo) return String(r.reportNo) + '::' + String(r.revision || '');
   return null;
 }
+
+// V47: mint the report-verify URL that the report's QR code encodes. The
+// signed token is minted server-side (portal-token kind:'verify') and is
+// long-lived. The caller stores the URL on the report BEFORE sealing, so the
+// frozen PDF's QR opens a working #/verify/<token> link. Returns the URL, or
+// null when offline / not cloud-configured (the report still seals, just
+// without a verify QR until re-approved online).
+async function vxEnsureReportVerifyUrl(r){
+  try {
+    if(r && r.verifyUrl) return r.verifyUrl;
+    const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+    const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+    if(!sb || !sb.functions || !cfg.orgId) return null;
+    const reportId = _vxReportKey(r);
+    if(!reportId) return null;
+    const res = await sb.functions.invoke('portal-token', { body: { kind: 'verify', orgId: cfg.orgId, reportId: reportId } });
+    if(res.error || !res.data || !res.data.url) return null;
+    return res.data.url;
+  } catch(e){ console.warn('vx: verify-url mint failed', e); return null; }
+}
 // Return a shallow clone of the array with the heavy fields removed from each
 // item (never mutates the caller's objects), plus the html put/delete ops.
 // SAFETY: an item's HTML is only stripped when we have a stable key to re-home

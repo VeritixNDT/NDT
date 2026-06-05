@@ -3882,7 +3882,10 @@ function cvRenderBlockContent(block, report, preview){
 
   // V3: QR code
   if(def.qr){
-    const payload = block.qrPayload || (report ? `${location.origin || 'https://verify.veritix'}/r/${report.reportNo||report.id||'sample'}` : 'sample-qr');
+    // V47: encode the report-verify link (minted at approval) so scanning the
+    // QR opens #/verify/<token>. A custom qrPayload wins; un-verified/draft
+    // reports fall back to plain text (not a dead URL).
+    const payload = block.qrPayload || (report && report.verifyUrl) || (report ? ('Veritix report ' + (report.reportNo || report.id || '')) : 'sample-qr');
     const size = Math.min(block.w, block.h) - 6;
     return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px;box-sizing:border-box">
       ${cvRenderQR(payload, size)}

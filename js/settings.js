@@ -3045,7 +3045,7 @@ function eqCloseForm() {
   const wrap = el('eq-form-wrap'); if(wrap) wrap.style.display = 'none';
 }
 
-function eqSave() {
+async function eqSave() {
   const name = (el('eqf-name').value || '').trim();
   if(!name) { toast('Equipment needs a name.', 'error'); el('eqf-name').focus(); return; }
   const rec = {
@@ -3059,6 +3059,23 @@ function eqSave() {
     methods:   Array.from(document.querySelectorAll('.eqf-method-cb:checked')).map(cb => cb.value),
     updatedAt: new Date().toISOString(),
   };
+  // Nudge: a meter-sounding name left as the default "General" type won't show
+  // up in the report white-light / UV-A meter pickers (those pull only the
+  // matching Type). Offer to set the right type so it appears there.
+  if(rec.type === 'general' && typeof vxConfirm === 'function'){
+    const n = name.toLowerCase();
+    let suggest = null;
+    if(/\b(uv|uv-?a|black ?light|wood'?s lamp)\b/.test(n))                 suggest = 'uv-light';
+    else if(/(lux|light ?meter|white ?light|photometer|illuminance|luxmeter)/.test(n)) suggest = 'white-light';
+    if(suggest){
+      const label = suggest === 'white-light' ? 'White-light meter' : 'UV-A lamp';
+      const ok = await vxConfirm({
+        message: `“${name}” looks like a light/UV meter, but its Type is set to “General”. Set Type to “${label}” so it appears in the report light-meter pickers (with calibration tracking)?`,
+        okLabel: 'Set to ' + label, cancelLabel: 'Keep as General',
+      });
+      if(ok){ rec.type = suggest; if(el('eqf-type')) el('eqf-type').value = suggest; }
+    }
+  }
   const list = eqLoad();
   const i = list.findIndex(r => r.id === rec.id);
   if(i >= 0) list[i] = { ...list[i], ...rec };

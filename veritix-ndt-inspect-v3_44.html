@@ -86,16 +86,9 @@
   s.onerror=function(){console.warn('pdf.js CDN unavailable — PDF text extraction disabled');};
   document.head.appendChild(s);
 })();
-// QR code generator CDN loader — for real QR encoding in templates
-(function(){
-  var s=document.createElement('script');
-  s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
-  s.crossOrigin='anonymous';
-  // s.integrity='sha384-…';   // pin before production launch
-  s.onload=function(){window._qrReady=true;if(typeof cvRenderCanvas==='function')try{cvRenderCanvas();}catch(e){}};
-  s.onerror=function(){console.warn('QR CDN unavailable — using fallback pattern');};
-  document.head.appendChild(s);
-})();
+// QR code generator is now bundled locally (js/qrcode.min.js, loaded below as a
+// deferred script) so report-verify QR codes always encode for real — even when
+// cdnjs is blocked by a corporate proxy. No CDN loader needed.
 // Leaflet CDN loader — for the Geographic map on the dashboard
 (function(){
   var css=document.createElement('link');
@@ -3851,6 +3844,7 @@
 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script>
 
+<script defer src="js/qrcode.min.js"></script>
 <script defer src="js/constants.js"></script>
 <script defer src="js/utils.js"></script>
 <script defer src="js/a11y.js"></script>

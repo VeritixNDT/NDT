@@ -829,7 +829,7 @@ function equipmentSelectHtml(methodId, f, val, fid, data) {
       : `Not in your register yet — type it here, or add it under Settings → Equipment.`;
     return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· none in register</span></label>
       <input id="${fid}" class="rf-equipment-freetext" data-method="${escapeHtml(methodId)}"${gateAttrs}${disAttr} value="${escapeHtml(val||'')}" placeholder="Type your ${escapeHtml(typeWord)} (make / serial)"${inStyle?` style="${inStyle}"`:''}/>
-      <div style="font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">${tip}</div>${gateHint}
+      <div style="font-size:11px;color:var(--t3);font-style:italic;margin-top:3px">${tip}</div>${_rptEquipLink(methodId, f.eqType)}${gateHint}
     </div>`;
   }
   // Resolve which option to mark selected. `val` may be the equipment id
@@ -872,8 +872,44 @@ function equipmentSelectHtml(methodId, f, val, fid, data) {
     if(!applies){ disAttr = ' disabled'; selStyle = ' style="opacity:.45"'; }
   }
   return `<div class="fld"><label>${escapeHtml(f.label)} <span style="font-size:10px;color:var(--t3);font-weight:400">· from Settings → Equipment</span></label>
-    <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}"${gateAttrs}${disAttr}${selStyle}><option value="">— Select —</option>${opts}</select>${gateHint}
+    <select id="${fid}" class="rf-equipment" data-method="${escapeHtml(methodId)}"${gateAttrs}${disAttr}${selStyle}><option value="">— Select —</option>${opts}</select>${_rptEquipLink(methodId, f.eqType)}${gateHint}
   </div>`;
+}
+
+// Inline link on an equipment cell that jumps to Settings → Equipment and opens
+// the Add form PRE-TAGGED for this report's method (and pre-typed for the
+// white-light / UV-A cells) — so a missing meter can be registered for the
+// method in two clicks without leaving the report blind. Admin-only, because
+// the equipment register is admin-gated; inspectors use the free-text fallback
+// (and the report then routes to compliance review).
+function _rptEquipLink(methodId, eqType){
+  if(!(typeof vxIsAdmin === 'function' && vxIsAdmin())) return '';
+  const word = eqType === 'white-light' ? 'white-light meter'
+             : eqType === 'uv-light'    ? 'UV-A meter'
+             : 'equipment';
+  const args = eqType ? `'${methodId}','${eqType}'` : `'${methodId}'`;
+  return `<span class="rpt-eq-link" data-action="_rptAddEquipmentForMethod" data-args="${args}" role="button" tabindex="0" style="display:inline-block;margin-top:4px;font-size:11px;color:var(--cyan);cursor:pointer">＋ ${escapeHtml('Add a ' + word + ' for ' + methodId)}</span>`;
+}
+// Navigate to Settings → Equipment, open a fresh Add-equipment form, and
+// pre-tag it for the given method (+ type for light meters).
+function _rptAddEquipmentForMethod(method, eqType){
+  try {
+    if(typeof vxIsAdmin === 'function' && !vxIsAdmin()){
+      if(typeof toast === 'function') toast(t('toast.equip_admin_only','Only an admin can manage the equipment register.'), 'info');
+      return;
+    }
+    if(typeof showPage === 'function') showPage('settings', document.getElementById('tn-settings'));
+    if(typeof showSS === 'function')   showSS('equipment', document.getElementById('sni-equipment'));
+    if(typeof eqOpenForm === 'function') eqOpenForm(null);   // fresh Add form (rebuilds the method grid)
+    if(eqType){ const tEl = document.getElementById('eqf-type'); if(tEl) tEl.value = eqType; }
+    if(method){
+      const cb = Array.prototype.find.call(document.querySelectorAll('.eqf-method-cb'), c => c.value === method);
+      if(cb) cb.checked = true;
+    }
+    const nameEl = document.getElementById('eqf-name'); if(nameEl) nameEl.focus();
+    const typeLabel = eqType === 'white-light' ? ' as a white-light meter' : eqType === 'uv-light' ? ' as a UV-A lamp' : '';
+    if(typeof toast === 'function') toast('New equipment — pre-tagged for ' + method + typeLabel + '. Fill in the details and Save.', 'info');
+  } catch(e){ console.warn('add-equipment-for-method nav failed', e); }
 }
 
 // Inspector-register dropdown — used by any field with

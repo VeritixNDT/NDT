@@ -883,6 +883,13 @@ function equipmentSelectHtml(methodId, f, val, fid, data) {
 // the equipment register is admin-gated; inspectors use the free-text fallback
 // (and the report then routes to compliance review).
 function _rptEquipLink(methodId, eqType){
+  // Meters (white-light / UV-A) are NOT registerable from the report area —
+  // they must be added under Settings → Equipment so cal tracking and
+  // smart-card resolution are never bypassed. The inspector picks from the
+  // gated dropdown (or types into the free-text fallback, which routes the
+  // report to compliance review). Only the general NDT-equipment cell keeps
+  // the inline "add" shortcut.
+  if(eqType === 'white-light' || eqType === 'uv-light') return '';
   if(!(typeof vxIsAdmin === 'function' && vxIsAdmin())) return '';
   const word = eqType === 'white-light' ? 'white-light meter'
              : eqType === 'uv-light'    ? 'UV-A meter'

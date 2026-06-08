@@ -32,6 +32,10 @@ var PL_SOURCES = [
 ];
 function _plColor(key) { const s = PL_SOURCES.find(x => x.key === key); return s ? s.color : '#888'; }
 function _plEnabled(key) { return !_plFilters || _plFilters.has(key); }
+// Invoices/quotes are financial data — only admins see them on the planner
+// (the Billing page itself is admin-only). Inspectors / observers never do,
+// on either the top-nav planner or the Inspector workspace planner.
+function _plCanSeeBilling() { return (typeof vxIsAdmin === 'function') ? vxIsAdmin() : false; }
 
 // ── Date helpers (work in local time; compare as yyyy-mm-dd strings) ─────────
 function _plYmd(d)        { const z = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); }
@@ -118,8 +122,8 @@ function plCollect(startYmd, endYmd, opts) {
       type: 'calib', refId: eq.id || '', editable: false });
   });
 
-  // Invoices + quotes due
-  if (en('billing')) {
+  // Invoices + quotes due (admins only — financial data)
+  if (en('billing') && _plCanSeeBilling()) {
     const today = _plTodayYmd();
     (billLoad('invoice') || []).forEach(d => { if (!d.dueDate) return;
       const ymd = String(d.dueDate).slice(0, 10);
@@ -265,7 +269,7 @@ function plRender() {
     periodLbl = _plCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   }
 
-  const legend = PL_SOURCES.map(s =>
+  const legend = PL_SOURCES.filter(s => s.key !== 'billing' || _plCanSeeBilling()).map(s =>
     `<span class="pl-chip ${_plEnabled(s.key) ? '' : 'off'}" data-action="plToggleFilter" data-args="'${s.key}'" title="Show/hide ${esc(s.label)}">
        <span class="pl-dot" style="background:${s.color}"></span>${esc(s.label)}</span>`).join('');
 

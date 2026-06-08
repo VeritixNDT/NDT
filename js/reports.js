@@ -2366,7 +2366,13 @@ function inboxBuild(){
   const reports = ls(KEYS.reports, []);
   const inspectors = ls(KEYS.inspectors, []);
 
-  // 1. Reports awaiting my approval (I'm the named approver, OR I'm Admin/Senior and stage is Submitted/Reviewed and there is no specific approver)
+  // 1. Reports awaiting approval. Approvers (the named approver, or Admin/Senior
+  // when no approver is assigned) act on these. The report's OWN inspector also
+  // sees them here — read-only — so they can track that a report they submitted
+  // is awaiting approval; inspectors can't approve their own reports, so no
+  // approve/reject is offered to them (inboxRender gates the buttons on
+  // _reportCanApprove and switches the heading to the passive "Awaiting
+  // approval"). Actionability is decided per row at render time.
   const awaitingApproval = reports.filter((r, idx) => {
     r._idx = idx;
     const stage = getReportStage(r);
@@ -2374,8 +2380,10 @@ function inboxBuild(){
     if(!me) return false;
     // Explicit approver assignment
     if(r.approver && r.approver === me.name) return true;
-    // Otherwise, only show to senior/admin roles
+    // Approver roles (when unassigned or assigned to me)
     if((me.role === 'Admin' || me.role === 'Senior') && (!r.approver || r.approver === me.name)) return true;
+    // The submitting inspector tracks their own pending reports (read-only)
+    if(r.inspector === me.name || r.createdBy === me.id) return true;
     return false;
   });
 
@@ -2430,8 +2438,12 @@ function inboxBadgeCount(){
   const me = CURRENT_USER;
   if(!me) return 0;
   const data = inboxBuild();
-  // What deserves a badge: things needing the user's action today
-  return data.awaitingApproval.length + data.certsExpiring.length;
+  // What deserves a badge: things needing the user's ACTION today. The
+  // approval list now also includes the inspector's own pending reports (which
+  // they can't approve), so count only the ones the viewer can actually act on.
+  const actionableApprovals = data.awaitingApproval.filter(r =>
+    (typeof _reportCanApprove === 'function') ? _reportCanApprove(r) : true).length;
+  return actionableApprovals + data.certsExpiring.length;
 }
 
 function updateInboxBadge(){
@@ -2459,6 +2471,11 @@ function inboxRender(hostId){
     : t('inb.sub', 'What needs your attention right now');
 
   const data = inboxBuild();
+  // Can the viewer actually act on any of the "awaiting approval" reports?
+  // Inspectors see their own submitted reports here but can't approve them, so
+  // the section/tile read passively ("Awaiting approval") and offer no buttons.
+  const _canApprove = r => (typeof _reportCanApprove === 'function') ? _reportCanApprove(r) : false;
+  const approvalActionable = data.awaitingApproval.some(_canApprove);
   const summaryEl = el(P+'-summary');
   if(summaryEl){
     const tile = (count, label, urgent, iconSvg, iconBg, iconColor, sectionId, navTo) => `
@@ -2475,7 +2492,7 @@ function inboxRender(hostId){
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
             'rgba(242,92,92,.10)','var(--red)', sid('compliance'), false)
         : ''),
-      tile(data.awaitingApproval.length, t('inb.tile.approval','Awaiting your approval'), data.awaitingApproval.length>0?'attention':null,
+      tile(data.awaitingApproval.length, approvalActionable ? t('inb.tile.approval','Awaiting your approval') : t('inb.tile.approval_passive','Awaiting approval'), (approvalActionable && data.awaitingApproval.length>0)?'attention':null,
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
         'rgba(0,212,255,.10)','var(--cyan)',
         sid('approval'), P==='inbox'),
@@ -2534,7 +2551,7 @@ function inboxRender(hostId){
   // ── Awaiting approval ──
   html += `<div class="inbox-section" id="${sid('approval')}">
     <div class="inbox-section-head">
-      <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${escapeHtml(t('inb.sec.approval','Awaiting your approval'))}</span>
+      <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${escapeHtml(approvalActionable ? t('inb.sec.approval','Awaiting your approval') : t('inb.sec.approval_passive','Awaiting approval'))}</span>
       <span class="inbox-section-count">${data.awaitingApproval.length}</span>
     </div>`;
   if(data.awaitingApproval.length === 0){
@@ -2558,8 +2575,10 @@ function inboxRender(hostId){
           <div class="inbox-row-secondary">${escapeHtml(r.subject || r.client || t('inb.row.no_subject','No subject'))} · ${escapeHtml(t('inb.row.inspector','Inspector'))}: ${escapeHtml(r.inspector||'—')}</div>
         </div>
         <div class="inbox-row-actions">
-          <button class="btn btn-sm btn-primary" data-action="inboxApprove" data-args="${r._idx}">${escapeHtml(t('inb.btn.approve','Approve'))}</button>
-          <button class="btn btn-sm btn-danger" data-action="inboxReject" data-args="${r._idx}">${escapeHtml(t('inb.btn.reject','Reject'))}</button>
+          ${_canApprove(r)
+            ? `<button class="btn btn-sm btn-primary" data-action="inboxApprove" data-args="${r._idx}">${escapeHtml(t('inb.btn.approve','Approve'))}</button>
+          <button class="btn btn-sm btn-danger" data-action="inboxReject" data-args="${r._idx}">${escapeHtml(t('inb.btn.reject','Reject'))}</button>`
+            : `<span style="font-size:11px;color:var(--t3);font-style:italic;align-self:center;margin-right:4px">${escapeHtml(t('inb.row.pending_approval','Awaiting approval'))}</span>`}
           <button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${r._idx}" title="${escapeHtml(t('inb.btn.view_history','View history'))}">⌕</button>
         </div>
       </div>`;

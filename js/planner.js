@@ -880,6 +880,31 @@ function _plInjectStyles() {
     .pl-res-cell:first-child{border-left:0}
     .pl-res-cell:hover{background:var(--bg2)}
     .pl-res-lanes{display:grid;position:relative;pointer-events:none;padding:4px 2px;column-gap:2px;row-gap:2px}
-    .pl-res-lanes>*{pointer-events:auto}`;
+    .pl-res-lanes>*{pointer-events:auto}
+    /* Softer day-cell outlines — a bit lighter than the global border, derived
+       from it so it still adapts per theme. Scoped to the planner roots; if
+       color-mix is unsupported the rules below no-op and the normal border
+       shows. Applies to the day grid only (month/week/day/team), not the toolbar. */
+    #page-planner,#insp-planner-root{--pl-line:color-mix(in srgb,var(--border) 60%,transparent)}
+    .pl-mhead{background:var(--pl-line);border-color:var(--pl-line)}
+    .pl-mwrap{border-color:var(--pl-line)}
+    .pl-mrow{border-top-color:var(--pl-line)}
+    .pl-cell{border-left-color:var(--pl-line)}
+    .pl-week{background:var(--pl-line);border-color:var(--pl-line)}
+    .pl-whead{border-bottom-color:var(--pl-line)}
+    .pl-tg{border-color:var(--pl-line)}
+    .pl-tg-gx,.pl-tg-gutter{border-right-color:var(--pl-line)}
+    .pl-tg-head{border-bottom-color:var(--pl-line)}
+    .pl-tg-dayh{border-left-color:var(--pl-line)}
+    .pl-tg-allday{border-bottom-color:var(--pl-line)}
+    .pl-tg-allcell{border-left-color:var(--pl-line)}
+    .pl-tg-col{border-left-color:var(--pl-line)}
+    .pl-tg-cell{border-top-color:var(--pl-line)}
+    .pl-res{border-color:var(--pl-line)}
+    .pl-res-head{border-bottom-color:var(--pl-line)}
+    .pl-res-gx,.pl-res-name{border-right-color:var(--pl-line)}
+    .pl-res-dayh{border-left-color:var(--pl-line)}
+    .pl-res-row{border-top-color:var(--pl-line)}
+    .pl-res-cell{border-left-color:var(--pl-line)}`;
   document.head.appendChild(s);
 }

@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veritix NDT Inspect — Inspection management, engineered</title>
+<meta name="description" content="Veritix NDT Inspect turns field inspections into audit-ready, sealed PDF reports. Plan jobs, log defects, track equipment & certifications, and deliver to customers — on any device.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23070910'/%3E%3Cpath d='M12 3l7 3v5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V6z' fill='none' stroke='%232ee6ff' stroke-width='1.6'/%3E%3Cpath d='M8.5 12l2.2 2.2L15.5 9.5' fill='none' stroke='%232ee6ff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070910;
+  --bg2:#0b0f18;
+  --panel:#0f1420;
+  --panel2:#131b29;
+  --line:rgba(125,165,205,.12);
+  --line-strong:rgba(125,165,205,.22);
+  --t1:#eaeff7;
+  --t2:#9fb0c4;
+  --t3:#5f6f86;
+  --cyan:#2ee6ff;
+  --cyan-deep:#0a93b8;
+  --amber:#ffb24a;
+  --green:#4fe1a8;
+  --red:#ff6b6b;
+  --display:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
+  --body:'Hanken Grotesk',ui-sans-serif,system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --maxw:1180px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--body);
+  background:var(--bg);
+  color:var(--t1);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+::selection{background:var(--cyan);color:#04121a}
+a{color:inherit;text-decoration:none}
+
+/* ── Atmosphere: blueprint grid + glow + grain ───────────────────── */
+.bg-layer{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.bg-grid{
+  background-image:
+    linear-gradient(var(--line) 1px,transparent 1px),
+    linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 75%);
+  -webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 75%);
+  opacity:.6;
+}
+.bg-glow{
+  background:
+    radial-gradient(60% 50% at 78% -6%,rgba(46,230,255,.16),transparent 60%),
+    radial-gradient(50% 40% at 8% 8%,rgba(10,147,184,.12),transparent 60%),
+    radial-gradient(80% 60% at 50% 120%,rgba(255,178,74,.05),transparent 60%);
+}
+.bg-grain{
+  opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Shell ────────────────────────────────────────────────────────── */
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+.mono{font-family:var(--mono)}
+.kicker{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--cyan);display:inline-flex;align-items:center;gap:10px;
+}
+.kicker::before{content:"";width:26px;height:1px;background:var(--cyan);opacity:.7}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--t3)}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+header{
+  position:sticky;top:0;z-index:50;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  background:linear-gradient(180deg,rgba(7,9,16,.86),rgba(7,9,16,.5));
+  border-bottom:1px solid transparent;transition:border-color .3s,background .3s;
+}
+header.scrolled{border-bottom-color:var(--line);background:rgba(7,9,16,.92)}
+.nav{display:flex;align-items:center;gap:14px;height:70px}
+.brand{display:flex;align-items:center;gap:11px;font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:.02em}
+.brand .mark{width:30px;height:30px;flex-shrink:0}
+.brand small{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:var(--t3);display:block;margin-top:1px;font-weight:500}
+.nav-links{display:flex;gap:30px;margin-left:auto}
+.nav-links a{font-size:14px;color:var(--t2);transition:color .2s;position:relative}
+.nav-links a:hover{color:var(--t1)}
+.nav-links a::after{content:"";position:absolute;left:0;bottom:-6px;width:0;height:1px;background:var(--cyan);transition:width .25s}
+.nav-links a:hover::after{width:100%}
+.nav-cta{margin-left:8px}
+
+.btn{
+  display:inline-flex;align-items:center;gap:9px;font-family:var(--body);font-weight:600;font-size:14px;
+  padding:11px 20px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:.2s;white-space:nowrap;
+}
+.btn-primary{background:var(--cyan);color:#04121a;box-shadow:0 0 0 1px rgba(46,230,255,.4),0 8px 30px -8px rgba(46,230,255,.5)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(46,230,255,.6),0 14px 40px -8px rgba(46,230,255,.6)}
+.btn-ghost{background:rgba(255,255,255,.02);color:var(--t1);border-color:var(--line-strong)}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn svg{width:15px;height:15px}
+.menu-btn{display:none;margin-left:auto;background:none;border:1px solid var(--line-strong);border-radius:8px;padding:8px;cursor:pointer}
+.menu-btn svg{width:20px;height:20px;stroke:var(--t1)}
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+.hero{padding:78px 0 40px;position:relative}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
+.hero h1{
+  font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.02;
+  font-size:clamp(40px,6vw,72px);margin:22px 0 0;
+}
+.hero h1 em{font-style:normal;color:var(--cyan);position:relative}
+.hero p.lead{font-size:clamp(16px,1.5vw,19px);color:var(--t2);max-width:35ch;margin-top:22px;line-height:1.6}
+.hero-cta{display:flex;gap:14px;margin-top:32px;flex-wrap:wrap}
+.hero-sub{margin-top:22px;font-family:var(--mono);font-size:12px;color:var(--t3);display:flex;align-items:center;gap:8px}
+.hero-sub .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
+
+/* reveal */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+.d1{transition-delay:.06s}.d2{transition-delay:.13s}.d3{transition-delay:.2s}.d4{transition-delay:.27s}.d5{transition-delay:.34s}
+
+/* ── Instrument panel (hero visual) ──────────────────────────────── */
+.panel{
+  position:relative;background:linear-gradient(160deg,var(--panel),var(--bg2));
+  border:1px solid var(--line-strong);border-radius:16px;overflow:hidden;
+  box-shadow:0 40px 90px -40px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.04);
+}
+.tick{position:absolute;width:12px;height:12px;pointer-events:none}
+.tick::before,.tick::after{content:"";position:absolute;background:var(--cyan);opacity:.5}
+.tick::before{width:12px;height:1px}.tick::after{height:12px;width:1px}
+.tick.tl{top:9px;left:9px}.tick.tr{top:9px;right:9px}.tick.tr::before{right:0}.tick.tr::after{right:0}
+.tick.bl{bottom:9px;left:9px}.tick.bl::before{bottom:0}.tick.bl::after{bottom:0}
+.tick.br{bottom:9px;right:9px}.tick.br::before{right:0;bottom:0}.tick.br::after{right:0;bottom:0}
+
+.scope{padding:20px 20px 0}
+.scope-head{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--t3);text-transform:uppercase}
+.scope-head b{color:var(--cyan);font-weight:600}
+.ascan{width:100%;height:148px;display:block;margin-top:8px}
+.ascan .grid line{stroke:var(--line);stroke-width:1}
+.ascan .trace{fill:none;stroke:var(--cyan);stroke-width:2;filter:drop-shadow(0 0 6px rgba(46,230,255,.55));
+  stroke-dasharray:1400;stroke-dashoffset:1400;animation:draw 2.4s ease forwards .4s}
+.ascan .gate{stroke:var(--amber);stroke-width:1;stroke-dasharray:4 4;opacity:.55}
+.ascan .sweep{stroke:rgba(46,230,255,.7);stroke-width:1.5;animation:sweep 3.4s linear infinite}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes sweep{0%{transform:translateX(0);opacity:0}6%{opacity:.9}94%{opacity:.9}100%{transform:translateX(560px);opacity:0}}
+
+.scope-readout{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);margin-top:14px}
+.scope-readout div{padding:14px 16px;border-right:1px solid var(--line)}
+.scope-readout div:last-child{border-right:none}
+.scope-readout .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--t3)}
+.scope-readout .val{font-family:var(--display);font-weight:700;font-size:22px;margin-top:4px}
+.scope-readout .val.ok{color:var(--green)}.scope-readout .val.cy{color:var(--cyan)}
+
+.minirow{display:flex;align-items:center;gap:10px;padding:11px 16px;border-top:1px solid var(--line);font-size:12.5px}
+.chip{font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:.05em}
+.chip.ut{background:rgba(155,135,245,.16);color:#b9a9ff}
+.chip.sealed{background:rgba(79,225,168,.14);color:var(--green);margin-left:auto}
+.minirow .id{font-family:var(--mono);color:var(--cyan);font-size:11.5px}
+.minirow .who{color:var(--t3)}
+
+/* ── Section scaffolding ─────────────────────────────────────────── */
+section{padding:96px 0;position:relative}
+.sec-head{max-width:680px;margin-bottom:52px}
+.sec-head h2{font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.06;
+  font-size:clamp(30px,4vw,46px);margin-top:18px}
+.sec-head p{color:var(--t2);font-size:17px;margin-top:16px;max-width:58ch}
+.rule{height:1px;background:var(--line);position:relative}
+.rule::before{content:"";position:absolute;left:0;top:0;width:90px;height:1px;background:var(--cyan)}
+
+/* ── Methods strip ───────────────────────────────────────────────── */
+.methods{padding:38px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.methods-inner{display:flex;align-items:center;gap:26px;flex-wrap:wrap;justify-content:space-between}
+.methods .label{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--t3);max-width:160px}
+.method-tags{display:flex;gap:10px;flex-wrap:wrap}
+.method-tags span{
+  font-family:var(--mono);font-weight:600;font-size:14px;letter-spacing:.06em;
+  padding:9px 16px;border:1px solid var(--line-strong);border-radius:7px;color:var(--t2);
+  transition:.2s;position:relative;
+}
+.method-tags span:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(46,230,255,.05)}
+.method-tags span b{color:var(--cyan)}
+
+/* ── Value props ─────────────────────────────────────────────────── */
+.values{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.value{background:var(--bg2);padding:34px 30px}
+.value .num{font-family:var(--mono);font-size:11px;color:var(--cyan);letter-spacing:.1em}
+.value h3{font-family:var(--display);font-weight:700;font-size:21px;margin:14px 0 9px}
+.value p{color:var(--t2);font-size:14.5px;line-height:1.6}
+
+/* ── Features grid ───────────────────────────────────────────────── */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.feat{
+  position:relative;background:linear-gradient(165deg,var(--panel),var(--bg2));
+  border:1px solid var(--line);border-radius:14px;padding:26px 24px 28px;
+  transition:.25s;overflow:hidden;
+}
+.feat::after{content:"";position:absolute;inset:0;border-radius:14px;padding:1px;
+  background:linear-gradient(160deg,rgba(46,230,255,.5),transparent 40%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .25s}
+.feat:hover{transform:translateY(-4px);border-color:transparent}
+.feat:hover::after{opacity:1}
+.feat .ic{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;
+  background:rgba(46,230,255,.08);border:1px solid rgba(46,230,255,.2);margin-bottom:18px}
+.feat .ic svg{width:21px;height:21px;stroke:var(--cyan);fill:none;stroke-width:1.7}
+.feat h3{font-family:var(--display);font-weight:700;font-size:18.5px;margin-bottom:9px}
+.feat p{color:var(--t2);font-size:14px;line-height:1.6}
+.feat .tag{position:absolute;top:20px;right:20px;font-family:var(--mono);font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--t3)}
+
+/* ── How it works ────────────────────────────────────────────────── */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;counter-reset:s;position:relative}
+.step{padding:30px 26px 30px 0;position:relative}
+.step::before{counter-increment:s;content:"0" counter(s);font-family:var(--mono);font-size:13px;color:var(--cyan);
+  display:block;margin-bottom:18px;letter-spacing:.1em}
+.step::after{content:"";position:absolute;top:7px;right:24px;width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.step .bar{position:absolute;top:10px;left:0;right:0;height:1px;background:var(--line)}
+.step h3{font-family:var(--display);font-weight:700;font-size:19px;margin-bottom:10px}
+.step p{color:var(--t2);font-size:14px;line-height:1.6}
+
+/* ── Roles ───────────────────────────────────────────────────────── */
+.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.role{background:linear-gradient(165deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:28px 26px;position:relative}
+.role .badge{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  padding:5px 11px;border-radius:20px;display:inline-block;margin-bottom:18px;font-weight:600}
+.role.admin .badge{background:rgba(46,230,255,.12);color:var(--cyan);border:1px solid rgba(46,230,255,.3)}
+.role.senior .badge{background:rgba(255,178,74,.12);color:var(--amber);border:1px solid rgba(255,178,74,.3)}
+.role.insp .badge{background:rgba(79,225,168,.12);color:var(--green);border:1px solid rgba(79,225,168,.3)}
+.role h3{font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:14px}
+.role ul{list-style:none;display:flex;flex-direction:column;gap:11px}
+.role li{display:flex;gap:11px;font-size:14px;color:var(--t2);line-height:1.45}
+.role li svg{width:16px;height:16px;flex-shrink:0;stroke:var(--cyan);fill:none;stroke-width:2;margin-top:2px}
+
+/* ── Pricing ─────────────────────────────────────────────────────── */
+.prices{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
+.price{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:32px 28px;display:flex;flex-direction:column;position:relative}
+.price.feature{background:linear-gradient(170deg,rgba(46,230,255,.07),var(--panel));border-color:rgba(46,230,255,.4);box-shadow:0 30px 70px -40px rgba(46,230,255,.5)}
+.price .pop{position:absolute;top:-11px;left:28px;background:var(--cyan);color:#04121a;font-family:var(--mono);
+  font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:4px 11px;border-radius:20px}
+.price .pname{font-family:var(--display);font-weight:700;font-size:21px}
+.price .pdesc{color:var(--t3);font-size:13px;margin-top:6px;min-height:34px}
+.price .amt{font-family:var(--display);font-weight:800;font-size:46px;margin:18px 0 2px;letter-spacing:-.02em}
+.price .amt span{font-family:var(--body);font-weight:500;font-size:15px;color:var(--t3)}
+.price .per{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.05em;margin-bottom:24px}
+.price ul{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:28px;flex:1}
+.price li{display:flex;gap:11px;font-size:14px;color:var(--t2)}
+.price li svg{width:16px;height:16px;flex-shrink:0;stroke:var(--cyan);fill:none;stroke-width:2.2;margin-top:2px}
+.price li.off{color:var(--t3);opacity:.55}
+.price li.off svg{stroke:var(--t3)}
+.price .btn{width:100%;justify-content:center}
+.note{text-align:center;color:var(--t3);font-size:13px;margin-top:22px;font-family:var(--mono);letter-spacing:.03em}
+
+/* ── FAQ ─────────────────────────────────────────────────────────── */
+.faq{max-width:820px;margin:0 auto}
+.qa{border-bottom:1px solid var(--line)}
+.qa summary{list-style:none;cursor:pointer;padding:22px 0;display:flex;align-items:center;justify-content:space-between;gap:20px;
+  font-family:var(--display);font-weight:600;font-size:18px}
+.qa summary::-webkit-details-marker{display:none}
+.qa summary .pm{width:22px;height:22px;flex-shrink:0;position:relative}
+.qa summary .pm::before,.qa summary .pm::after{content:"";position:absolute;background:var(--cyan);transition:.25s}
+.qa summary .pm::before{top:10px;left:0;width:22px;height:2px}
+.qa summary .pm::after{left:10px;top:0;width:2px;height:22px}
+.qa[open] summary .pm::after{transform:rotate(90deg);opacity:0}
+.qa .ans{color:var(--t2);font-size:15px;line-height:1.65;padding:0 0 24px;max-width:64ch}
+
+/* ── CTA band ────────────────────────────────────────────────────── */
+.cta-band{position:relative;border:1px solid var(--line-strong);border-radius:20px;overflow:hidden;
+  background:linear-gradient(150deg,var(--panel2),var(--bg2));padding:60px 50px;text-align:center}
+.cta-band::before{content:"";position:absolute;inset:0;
+  background:radial-gradient(60% 120% at 50% 0%,rgba(46,230,255,.16),transparent 60%);pointer-events:none}
+.cta-band h2{font-family:var(--display);font-weight:700;font-size:clamp(28px,4vw,44px);letter-spacing:-.02em;line-height:1.05;position:relative}
+.cta-band p{color:var(--t2);margin:16px auto 30px;max-width:50ch;font-size:16.5px;position:relative}
+.cta-band .hero-cta{justify-content:center;position:relative}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+footer{border-top:1px solid var(--line);padding:56px 0 40px;margin-top:40px}
+.foot{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+.foot .brand{margin-bottom:16px}
+.foot p.about{color:var(--t3);font-size:13.5px;line-height:1.6;max-width:34ch}
+.foot h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--t3);margin-bottom:16px}
+.foot a{display:block;color:var(--t2);font-size:14px;margin-bottom:11px;transition:color .2s}
+.foot a:hover{color:var(--cyan)}
+.foot-base{display:flex;justify-content:space-between;align-items:center;margin-top:48px;padding-top:24px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11.5px;color:var(--t3);letter-spacing:.04em;flex-wrap:wrap;gap:12px}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media(max-width:920px){
+  .hero-grid{grid-template-columns:1fr;gap:40px}
+  .values,.feat-grid,.roles,.prices{grid-template-columns:1fr 1fr}
+  .steps{grid-template-columns:1fr 1fr;gap:18px}
+  .step .bar{display:none}
+  .foot{grid-template-columns:1fr 1fr}
+}
+@media(max-width:680px){
+  .nav-links{display:none}.nav-cta{display:none}.menu-btn{display:block}
+  .values,.feat-grid,.roles,.prices,.steps,.foot{grid-template-columns:1fr}
+  .price.feature{order:-1}
+  section{padding:70px 0}
+  .wrap{padding:0 20px}
+  .mobile-nav.open{display:flex}
+}
+.mobile-nav{display:none;flex-direction:column;gap:4px;padding:14px 20px 22px;border-top:1px solid var(--line);background:var(--bg)}
+.mobile-nav a{padding:12px 0;font-size:16px;border-bottom:1px solid var(--line);color:var(--t2)}
+.mobile-nav .btn{margin-top:14px;justify-content:center}
+</style>
+</head>
+<body>
+<div class="bg-layer bg-glow"></div>
+<div class="bg-layer bg-grid"></div>
+<div class="bg-layer bg-grain"></div>
+
+<!-- ══ HEADER ══ -->
+<header id="hdr">
+  <div class="wrap nav">
+    <a href="#top" class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="rgba(46,230,255,.08)" stroke="rgba(46,230,255,.3)"/><path d="M12 3.4l7 3v5c0 4-3 6.6-7 8.2-4-1.6-7-4.2-7-8.2v-5z" fill="none" stroke="#2ee6ff" stroke-width="1.4"/><path d="M8.4 12l2.3 2.3 4.9-5" fill="none" stroke="#2ee6ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>VERITIX<small>NDT INSPECT</small></span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#roles">Workspaces</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a href="https://veritix.io" class="btn btn-primary nav-cta">Start free trial</a>
+    <button class="menu-btn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+  </div>
+  <div class="mobile-nav" id="mobileNav">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#roles">Workspaces</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://veritix.io" class="btn btn-primary">Start free trial</a>
+  </div>
+</header>
+
+<a id="top"></a>
+<!-- ══ HERO ══ -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="kicker reveal">NDT Inspection Management Platform</span>
+      <h1 class="reveal d1">Every inspection, report&nbsp;and defect — in one <em>precise</em> system.</h1>
+      <p class="lead reveal d2">Veritix NDT Inspect turns field inspections into audit-ready, sealed PDF reports. Plan jobs, log defects, track equipment and certifications, and deliver to your customers — on any device, online or off.</p>
+      <div class="hero-cta reveal d3">
+        <a href="https://veritix.io" class="btn btn-primary">Start free trial <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+        <a href="#how" class="btn btn-ghost">See how it works</a>
+      </div>
+      <div class="hero-sub reveal d4"><span class="dot"></span> No card required · Built for ISO 9712 / ASNT TC-1A workflows</div>
+    </div>
+
+    <div class="panel reveal d3" aria-hidden="true">
+      <span class="tick tl"></span><span class="tick tr"></span><span class="tick bl"></span><span class="tick br"></span>
+      <div class="scope">
+        <div class="scope-head"><span>A-SCAN · WELD 03 · UT</span><span><b>● LIVE</b> 5.0 MHz</span></div>
+        <svg class="ascan" viewBox="0 0 560 148" preserveAspectRatio="none">
+          <g class="grid">
+            <line x1="0" y1="37" x2="560" y2="37"/><line x1="0" y1="74" x2="560" y2="74"/><line x1="0" y1="111" x2="560" y2="111"/>
+            <line x1="140" y1="0" x2="140" y2="148"/><line x1="280" y1="0" x2="280" y2="148"/><line x1="420" y1="0" x2="420" y2="148"/>
+          </g>
+          <line class="gate" x1="0" y1="58" x2="560" y2="58"/>
+          <path class="trace" d="M0,112 L60,112 L78,40 L96,112 L150,112 L168,96 L186,112 L300,112 L320,18 L340,112 L470,112 L486,84 L502,112 L560,112"/>
+          <line class="sweep" x1="0" y1="6" x2="0" y2="142"/>
+        </svg>
+        <div class="scope-readout">
+          <div><div class="lbl">Gain</div><div class="val cy">42.0 dB</div></div>
+          <div><div class="lbl">Amplitude</div><div class="val">88%</div></div>
+          <div><div class="lbl">Result</div><div class="val ok">ACCEPT</div></div>
+        </div>
+        <div class="minirow">
+          <span class="id">UT-2026-0042</span>
+          <span class="chip ut">UT</span>
+          <span class="who">· J. Mensah</span>
+          <span class="chip sealed">✓ SEALED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ METHODS STRIP ══ -->
+<div class="methods">
+  <div class="wrap methods-inner reveal">
+    <div class="label">One platform · every method</div>
+    <div class="method-tags">
+      <span><b>UT</b> Ultrasonic</span>
+      <span><b>MT</b> Magnetic&nbsp;Particle</span>
+      <span><b>PT</b> Penetrant</span>
+      <span><b>RT</b> Radiographic</span>
+      <span><b>VT</b> Visual</span>
+      <span><b>ET</b> Eddy&nbsp;Current</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VALUE PROPS ══ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Why Veritix</span>
+      <h2>Built for the shop floor, ready for the auditor.</h2>
+    </div>
+    <div class="values reveal d1">
+      <div class="value">
+        <div class="num">/ 01</div>
+        <h3>Reports in minutes</h3>
+        <p>Method-aware templates pre-fill from your settings. Capture results in the field and issue a clean, branded PDF — no more rebuilding reports in a word processor.</p>
+      </div>
+      <div class="value">
+        <div class="num">/ 02</div>
+        <h3>Audit-ready by design</h3>
+        <p>Every report carries the inspector's certification, calibrated equipment, acceptance criteria and a full approval trail. Non-compliant work is held for review automatically.</p>
+      </div>
+      <div class="value">
+        <div class="num">/ 03</div>
+        <h3>One source of truth</h3>
+        <p>Customers, jobs, reports, defects, equipment and certs live together and sync across every device in real time — web, tablet and phone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FEATURES ══ -->
+<section id="features">
+  <div class="wrap">
+    <div class="rule"></div>
+    <div class="sec-head reveal" style="margin-top:48px">
+      <span class="kicker">Capabilities</span>
+      <h2>Everything an NDT operation runs on.</h2>
+      <p>From the first customer enquiry to a sealed report in your client's hands — Veritix replaces the spreadsheets, folders and email threads.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <span class="tag">Reports</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></div>
+        <h3>Sealed PDF reports</h3>
+        <p>Editable, method-specific templates that freeze on approval into an immutable, signed PDF — complete with your logo, layout and a verification QR code.</p>
+      </div>
+      <div class="feat reveal d1">
+        <span class="tag">Quality</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <h3>Defect register</h3>
+        <p>Every rejected indication rolls into a searchable register — severity, location, disposition and photos — linked back to its source report.</p>
+      </div>
+      <div class="feat reveal d2">
+        <span class="tag">Schedule</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <h3>Planner &amp; dispatch</h3>
+        <p>Month, week, day and team views. Drag to reschedule, assign inspectors and see jobs, exams, calibrations and cert expiries on one calendar.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="tag">Delivery</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <h3>Customer portal</h3>
+        <p>Issue a secure magic link and your client sees their approved reports, read-only — no logins to manage, no documents lost in inboxes.</p>
+      </div>
+      <div class="feat reveal d1">
+        <span class="tag">Billing</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 3h18v6H3z"/><path d="M3 9v12h18V9"/><line x1="7" y1="14" x2="11" y2="14"/></svg></div>
+        <h3>Quotes &amp; invoices</h3>
+        <p>Raise quotes and invoices against jobs with the same branded, editable templates — PDF out, emailed, tracked through to paid.</p>
+      </div>
+      <div class="feat reveal d2">
+        <span class="tag">Compliance</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/><path d="M14 10h4"/><path d="M14 14h2.5"/></svg></div>
+        <h3>Equipment &amp; certs</h3>
+        <p>Track calibration due-dates and inspector certifications per method. Out-of-cal gear and lapsed certs are flagged before they reach a report.</p>
+      </div>
+      <div class="feat reveal">
+        <span class="tag">Trust</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Verifiable &amp; sealed</h3>
+        <p>Approval locks the report and stamps an approver. A scannable QR resolves to a public verification page — proof the document is genuine.</p>
+      </div>
+      <div class="feat reveal d1">
+        <span class="tag">Anywhere</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 7v6c0 4 8 8 8 8s8-4 8-8V7"/></svg></div>
+        <h3>Offline &amp; in sync</h3>
+        <p>Keep working with no signal — data syncs the moment you reconnect, with gap-free report numbering and no two-device clashes.</p>
+      </div>
+      <div class="feat reveal d2">
+        <span class="tag">Insight</span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16V11"/><path d="M12 16V7"/><path d="M17 16v-3"/></svg></div>
+        <h3>Live dashboard</h3>
+        <p>Throughput, defect trends, inspector leaderboards, an inspection heatmap and what needs attention — the health of your operation at a glance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HOW IT WORKS ══ -->
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Workflow</span>
+      <h2>Customer to sealed report, in four moves.</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><div class="bar"></div><h3>Set up the job</h3><p>Add the customer and raise a job. Quote it if you need to — it all stays linked.</p></div>
+      <div class="step reveal d1"><div class="bar"></div><h3>Inspect &amp; record</h3><p>Pick a method, pull in your registered equipment and certs, and capture results per weld or component.</p></div>
+      <div class="step reveal d2"><div class="bar"></div><h3>Review &amp; approve</h3><p>Senior inspectors approve and seal. Anything non-compliant is held for review first.</p></div>
+      <div class="step reveal d3"><div class="bar"></div><h3>Deliver &amp; invoice</h3><p>Send the sealed PDF or a portal link, raise the invoice, and track it to paid.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ROLES ══ -->
+<section id="roles">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Role workspaces</span>
+      <h2>The right tools for every seat in the shop.</h2>
+      <p>One login, one focused workspace. Permissions and views adapt to who's signed in.</p>
+    </div>
+    <div class="roles">
+      <div class="role insp reveal">
+        <span class="badge">Inspector</span>
+        <h3>Get the work done</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>New reports, their own planner &amp; reports</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Defect register &amp; NDT procedures</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>A personal inbox of what's due</li>
+        </ul>
+      </div>
+      <div class="role senior reveal d1">
+        <span class="badge">Senior Inspector</span>
+        <h3>Own the quality</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Everything an inspector can do</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Approve &amp; seal their own and others' reports</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Plan and reschedule inspections</li>
+        </ul>
+      </div>
+      <div class="role admin reveal d2">
+        <span class="badge">Admin</span>
+        <h3>Run the operation</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Dashboard, reports, inbox &amp; defects</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Jobs, customers, planner &amp; billing</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Templates, equipment, users &amp; settings</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PRICING ══ -->
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head reveal" style="margin:0 auto 52px;text-align:center;max-width:640px">
+      <span class="kicker" style="justify-content:center">Pricing</span>
+      <h2>Simple plans that grow with your shop.</h2>
+      <p style="margin-left:auto;margin-right:auto">Start free, upgrade when you're ready. Every plan includes sealed PDF reports and the defect register.</p>
+    </div>
+    <div class="prices">
+      <div class="price reveal">
+        <div class="pname">Starter</div>
+        <div class="pdesc">For solo inspectors getting organised.</div>
+        <div class="amt">€<span>—</span></div>
+        <div class="per">per month · billed yearly</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Sealed PDF reports</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Defect register</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>1 inspector</li>
+          <li class="off"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Planner &amp; billing</li>
+          <li class="off"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Customer portal</li>
+        </ul>
+        <a href="https://veritix.io" class="btn btn-ghost">Start free</a>
+      </div>
+      <div class="price feature reveal d1">
+        <span class="pop">Most popular</span>
+        <div class="pname">Team</div>
+        <div class="pdesc">For shops running multiple inspectors.</div>
+        <div class="amt">€<span>—</span></div>
+        <div class="per">per user / month · billed yearly</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Everything in Starter</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Planner, jobs &amp; customers</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Quotes &amp; invoices</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Customer portal &amp; QR verify</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Role workspaces &amp; approvals</li>
+        </ul>
+        <a href="https://veritix.io" class="btn btn-primary">Start free trial</a>
+      </div>
+      <div class="price reveal d2">
+        <div class="pname">Enterprise</div>
+        <div class="pdesc">For asset-integrity teams &amp; multi-site.</div>
+        <div class="amt" style="font-size:34px;margin-top:24px">Let's talk</div>
+        <div class="per">tailored to your operation</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Everything in Team</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>SSO &amp; advanced permissions</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Custom templates &amp; onboarding</li>
+          <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Priority support &amp; SLA</li>
+        </ul>
+        <a href="mailto:carl@smartveritas.com?subject=Veritix%20Enterprise%20enquiry" class="btn btn-ghost">Contact sales</a>
+      </div>
+    </div>
+    <p class="note">Placeholder pricing — drop your real numbers into <span style="color:var(--cyan)">.price .amt</span> when you set them.</p>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head reveal" style="margin:0 auto 44px;text-align:center;max-width:560px">
+      <span class="kicker" style="justify-content:center">FAQ</span>
+      <h2>Questions, answered.</h2>
+    </div>
+    <div class="faq reveal d1">
+      <details class="qa"><summary>Which NDT methods are supported?<span class="pm"></span></summary><div class="ans">UT, MT, PT, RT, VT and ET out of the box, each with its own method-aware report template and acceptance-criteria fields. Templates are fully editable to match your procedures and standards.</div></details>
+      <details class="qa"><summary>Does it work offline in the field?<span class="pm"></span></summary><div class="ans">Yes. Veritix runs in the browser and keeps working with no connection. Your work syncs automatically when you're back online, with gap-free report numbering so two devices never clash.</div></details>
+      <details class="qa"><summary>How are reports kept audit-ready?<span class="pm"></span></summary><div class="ans">Each report records the inspector's certification, the calibrated equipment used and the acceptance criteria applied. On approval it's sealed into an immutable PDF with an approval stamp and a verification QR code. Work using unregistered gear or a lapsed cert is automatically held for senior review.</div></details>
+      <details class="qa"><summary>Can my customers see their reports?<span class="pm"></span></summary><div class="ans">Yes — issue a secure magic link and the customer gets a read-only portal of their approved reports. No account to create, nothing to install.</div></details>
+      <details class="qa"><summary>What does it run on?<span class="pm"></span></summary><div class="ans">Any modern browser — desktop, tablet or phone. There's nothing to install; sign in at veritix.io and your data is there on every device.</div></details>
+      <details class="qa"><summary>How do I get started?<span class="pm"></span></summary><div class="ans">Start a free trial at veritix.io — no card required. Add your company details, turn on the methods you run, and create your first report in minutes. For multi-site or enterprise needs, get in touch and we'll tailor a rollout.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CTA BAND ══ -->
+<section style="padding-top:20px">
+  <div class="wrap">
+    <div class="cta-band reveal">
+      <span class="tick tl"></span><span class="tick tr"></span><span class="tick bl"></span><span class="tick br"></span>
+      <h2>Put the paperwork behind you.</h2>
+      <p>Join the NDT shops issuing sealed, audit-ready reports from the field. Free to start — no card, no commitment.</p>
+      <div class="hero-cta">
+        <a href="https://veritix.io" class="btn btn-primary">Start free trial <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+        <a href="mailto:carl@smartveritas.com?subject=Veritix%20demo%20request" class="btn btn-ghost">Book a demo</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a href="#top" class="brand">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="rgba(46,230,255,.08)" stroke="rgba(46,230,255,.3)"/><path d="M12 3.4l7 3v5c0 4-3 6.6-7 8.2-4-1.6-7-4.2-7-8.2v-5z" fill="none" stroke="#2ee6ff" stroke-width="1.4"/><path d="M8.4 12l2.3 2.3 4.9-5" fill="none" stroke="#2ee6ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>VERITIX<small>NDT INSPECT</small></span>
+        </a>
+        <p class="about">Inspection management for NDT shops, fabricators and asset-integrity teams. Built by Smart Veritas BV.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#roles">Workspaces</a>
+        <a href="#pricing">Pricing</a>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <a href="mailto:carl@smartveritas.com">Contact</a>
+        <a href="mailto:carl@smartveritas.com?subject=Veritix%20demo%20request">Book a demo</a>
+        <a href="https://veritix.io">Sign in</a>
+      </div>
+      <div>
+        <h4>Get started</h4>
+        <a href="https://veritix.io">Start free trial</a>
+        <a href="mailto:carl@smartveritas.com?subject=Veritix%20Enterprise%20enquiry">Enterprise</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© <span id="yr">2026</span> Smart Veritas BV · All rights reserved.</span>
+      <span>VERITIX NDT INSPECT · veritix.io</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Year
+  document.getElementById('yr').textContent = new Date().getFullYear();
+  // Sticky header state
+  const hdr = document.getElementById('hdr');
+  const onScroll = () => hdr.classList.toggle('scrolled', window.scrollY > 8);
+  onScroll(); addEventListener('scroll', onScroll, {passive:true});
+  // Mobile nav
+  const mb = document.getElementById('menuBtn'), mn = document.getElementById('mobileNav');
+  mb.addEventListener('click', () => mn.classList.toggle('open'));
+  mn.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mn.classList.remove('open')));
+  // Scroll reveals
+  const io = new IntersectionObserver((es) => {
+    es.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:.12, rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>

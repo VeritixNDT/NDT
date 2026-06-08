@@ -223,7 +223,7 @@ function _wToggleUfPasswordVis() {
 }
 function _wHelpToDefects() {
   helpClose();
-  const t = document.querySelectorAll('.tn')[3];
+  const t = document.getElementById('tn-defects');
   if(t) showPage('defects', t);
 }
 function _wCvLoadSnapshotAndClose(ts) {
@@ -676,13 +676,13 @@ function _wFormSubmitSignup(e) { e.preventDefault(); vxDoSignup(); }
 // Final-pass wrappers — replace template-literal-generated and complex handlers
 function _wInboxJumpToSection(sectionId, navTo) {
   if(navTo) {
-    const tab = document.querySelectorAll('.tn')[1];
+    const tab = document.getElementById('tn-inbox');
     if(tab) showPage('inbox', tab);
   }
   document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
 }
-function _wHelpToInbox()    { helpClose(); const t=document.querySelectorAll('.tn')[1]; if(t) showPage('inbox',  t); }
-function _wHelpToReports()  { helpClose(); const t=document.querySelectorAll('.tn')[2]; if(t) showPage('reports',t); }
+function _wHelpToInbox()    { helpClose(); const t=document.getElementById('tn-inbox'); if(t) showPage('inbox',  t); }
+function _wHelpToReports()  { helpClose(); const t=document.getElementById('tn-reports'); if(t) showPage('reports',t); }
 function _wHelpToSubscription() {
   helpClose();
   const t = el('tn-settings'); if(t) showPage('settings', t);
@@ -1204,14 +1204,14 @@ function _cmdkBuildItems() {
     title: 'All Reports',
     sub: 'Browse and filter inspection reports',
     iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-    action: () => showPage('reports', document.querySelectorAll('.tn')[2])
+    action: () => showPage('reports', document.getElementById('tn-reports'))
   });
   items.push({
     section: 'Navigation',
     title: 'Defects',
     sub: 'Track and review defects across reports',
     iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>',
-    action: () => showPage('defects', document.querySelectorAll('.tn')[3])
+    action: () => showPage('defects', document.getElementById('tn-defects'))
   });
   items.push({
     section: 'Navigation',
@@ -1249,7 +1249,7 @@ function _cmdkBuildItems() {
       title: r.reportNo || `${r.method} report`,
       sub: `${r.method} · ${escapeHtml(r.subject || r.client || 'No subject')} · ${(r.verdict || 'Draft')}`,
       iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-      action: () => { showPage('reports', document.querySelectorAll('.tn')[2]); }
+      action: () => { showPage('reports', document.getElementById('tn-reports')); }
     });
   });
 
@@ -1267,7 +1267,7 @@ function _cmdkBuildItems() {
       sub: `${r.method} · ${escapeHtml(r.subject || r.client || '—')} · ${fmtDate(r.createdAt)}`,
       _haystack: haystack,
       iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-      action: () => { showPage('reports', document.querySelectorAll('.tn')[2]); }
+      action: () => { showPage('reports', document.getElementById('tn-reports')); }
     });
   });
 
@@ -1282,7 +1282,7 @@ function _cmdkBuildItems() {
       sub: `${d.type || '—'} · ${d.severity || '—'} · ${d.location || ''}`,
       _haystack: haystack,
       iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>',
-      action: () => { showPage('defects', document.querySelectorAll('.tn')[3]); }
+      action: () => { showPage('defects', document.getElementById('tn-defects')); }
     });
   });
 
@@ -1734,6 +1734,9 @@ async function savePwdModal() {
 // PAGE NAVIGATION
 // ══════════════════════════════════════════════
 function showPage(id, btn) {
+  // The Admin workspace relocates other pages' DOM nodes into its body; return
+  // any relocated node home before rendering a new page so it's never orphaned.
+  if(typeof adminRestore === 'function') adminRestore();
   const _isAdmin = (typeof vxIsAdmin === 'function') ? vxIsAdmin() : (CURRENT_USER && CURRENT_USER.role === 'Admin');
   if(id === 'settings' && !_isAdmin) {
     toast(t('toast.admin_required_settings','Admin access required for Settings.'), 'error');
@@ -1757,6 +1760,7 @@ function showPage(id, btn) {
   if(id === 'defects') defInit();
   if(id === 'inbox') inboxRender('inbox');   // pin the top-nav host (Inspector workspace uses 'insp-inbox')
   if(id === 'inspector') { if(typeof inspInit === 'function') inspInit(); }
+  if(id === 'admin') { if(typeof adminInit === 'function') adminInit(); }
   // V12: re-wire any newly-rendered labels on this page
   if(typeof a11yWireLabels === 'function') a11yWireLabels(pg || document);
   closeProfilePanel();

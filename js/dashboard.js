@@ -3033,7 +3033,7 @@ async function ovCancelReport(){
   _ovDraftStopTick();
   _ovDraftIndicator('idle');
   if(_ovReviseSource && typeof showPage === 'function'){
-    showPage('reports', document.querySelectorAll('.tn')[2]);
+    showPage('reports', document.getElementById('tn-reports'));
   } else if(_ovHostPfx === 'insp' && typeof inspShowSection === 'function'){
     inspShowSection('reports', el('inspi-reports'));
   } else {

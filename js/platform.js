@@ -566,24 +566,26 @@ function vxApplyRoleGating(){
     if(!navItem) return;
     navItem.style.display = admin ? '' : 'none';
   });
-  // V46: top-nav admin "Manage" group (Jobs / Customers / Planner / Billing).
-  // Hidden for non-admins, who reach the read-only Planner via the home side
-  // menu instead.
+  // The Manage group (Jobs / Customers / Planner / Billing) and the standalone
+  // Home/Inbox/Reports/Defects buttons are superseded by the role workspaces —
+  // keep the Manage wrap hidden for everyone (its destinations live in the Admin
+  // workspace now). The four standalone buttons are hidden in the HTML.
   const manage = document.getElementById('tn-manage-wrap');
-  if(manage) manage.style.display = admin ? '' : 'none';
+  if(manage) manage.style.display = 'none';
   _vxWireManageMenu();
 
-  // Role-gated workspace buttons — both open the same role-adaptive workspace
-  // (page-inspector); the capability differences (approve, editable planner)
-  // are enforced by role inside it. Each user sees the button for their role:
+  // Role-gated top-level workspace buttons. Each user sees the one for their
+  // role; admins additionally get the consolidated Admin workspace.
   //   Inspector / Observer → "Inspector"; Senior → "Senior Inspector";
-  //   Admin → both (for oversight).
+  //   Admin → "Admin" (+ both inspector workspaces, for oversight).
   const role = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.role : null;
   const senior = (typeof vxIsSeniorOrAdmin === 'function') ? vxIsSeniorOrAdmin() : (role === 'Senior' || admin);
-  const inspBtn = document.getElementById('tn-inspector');
-  const srBtn   = document.getElementById('tn-senior');
-  if(inspBtn) inspBtn.style.display = (admin || role === 'Inspector' || role === 'Observer') ? '' : 'none';
-  if(srBtn)   srBtn.style.display   = senior ? '' : 'none';
+  const adminBtn = document.getElementById('tn-admin');
+  const inspBtn  = document.getElementById('tn-inspector');
+  const srBtn    = document.getElementById('tn-senior');
+  if(adminBtn) adminBtn.style.display = admin ? '' : 'none';
+  if(inspBtn)  inspBtn.style.display  = (admin || role === 'Inspector' || role === 'Observer') ? '' : 'none';
+  if(srBtn)    srBtn.style.display    = senior ? '' : 'none';
 }
 
 // Wire the top-nav "Manage" dropdown once: toggle on the button, close on an
@@ -3536,13 +3538,13 @@ function vxRouteFromHash() {
   // /reports, /reports/REPORT_NO, /defects, /inbox, /help, /help/CHAPTER, /settings/SECTION
   try {
     if(parts[0] === 'reports') {
-      showPage('reports', document.querySelectorAll('.tn')[2]);
+      showPage('reports', document.getElementById('tn-reports'));
       // Specific report deep-link: filter by report no.
       if(parts[1]) setTimeout(() => { const f = el('rpt-f-repno'); if(f) { f.value = parts[1]; if(typeof rptRender === 'function') rptRender(); } }, 100);
     } else if(parts[0] === 'defects') {
-      showPage('defects', document.querySelectorAll('.tn')[3]);
+      showPage('defects', document.getElementById('tn-defects'));
     } else if(parts[0] === 'inbox') {
-      showPage('inbox', document.querySelectorAll('.tn')[1]);
+      showPage('inbox', document.getElementById('tn-inbox'));
     } else if(parts[0] === 'home' || parts[0] === 'dashboard') {
       showPage('overview', document.querySelector('.tn'));
     } else if(parts[0] === 'help') {

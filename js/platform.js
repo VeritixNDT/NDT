@@ -572,6 +572,18 @@ function vxApplyRoleGating(){
   const manage = document.getElementById('tn-manage-wrap');
   if(manage) manage.style.display = admin ? '' : 'none';
   _vxWireManageMenu();
+
+  // Role-gated workspace buttons — both open the same role-adaptive workspace
+  // (page-inspector); the capability differences (approve, editable planner)
+  // are enforced by role inside it. Each user sees the button for their role:
+  //   Inspector / Observer → "Inspector"; Senior → "Senior Inspector";
+  //   Admin → both (for oversight).
+  const role = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.role : null;
+  const senior = (typeof vxIsSeniorOrAdmin === 'function') ? vxIsSeniorOrAdmin() : (role === 'Senior' || admin);
+  const inspBtn = document.getElementById('tn-inspector');
+  const srBtn   = document.getElementById('tn-senior');
+  if(inspBtn) inspBtn.style.display = (admin || role === 'Inspector' || role === 'Observer') ? '' : 'none';
+  if(srBtn)   srBtn.style.display   = senior ? '' : 'none';
 }
 
 // Wire the top-nav "Manage" dropdown once: toggle on the button, close on an

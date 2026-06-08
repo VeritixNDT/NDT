@@ -14,7 +14,10 @@ function plSaveEvents(list) { if (typeof lss === 'function') lss(KEYS.events, li
 function plGetEvent(id)     { return plLoadEvents().find(e => e.id === id) || null; }
 // V46: scheduling is admin-only. Inspectors (non-admins) reach the planner via
 // the home side menu and get a READ-ONLY view — no create, drag, edit or delete.
-function _plCanEdit() { return (typeof vxIsAdmin === 'function') ? vxIsAdmin() : true; }
+// Who may plan/reschedule on the calendar. Seniors and Admins can create,
+// edit and drag events (a Senior plans their own inspections from the Senior
+// Inspector workspace); Inspectors / Observers see a read-only planner.
+function _plCanEdit() { return (typeof vxIsSeniorOrAdmin === 'function') ? vxIsSeniorOrAdmin() : ((typeof vxIsAdmin === 'function') ? vxIsAdmin() : true); }
 
 // ── State ───────────────────────────────────────────────────────────────────
 var _plCursor  = new Date();    // any day within the displayed month
@@ -153,7 +156,15 @@ var _plDragOn = false;
 function _plInstallDrag() {
   if (_plDragOn) return; _plDragOn = true;
   let st = null;
-  const onPlanner = () => { const p = document.getElementById('page-planner'); return p && p.classList.contains('active'); };
+  // Drag is live on the top-nav Planner page AND on the Inspector workspace's
+  // embedded Planner section (so seniors can reschedule there too).
+  const onPlanner = () => {
+    const p = document.getElementById('page-planner');
+    if(p && p.classList.contains('active')) return true;
+    const ip = document.getElementById('page-inspector');
+    const sec = document.getElementById('insp-planner');
+    return !!(ip && ip.classList.contains('active') && sec && sec.classList.contains('active'));
+  };
 
   document.addEventListener('mousedown', e => {
     if (e.button !== 0 || !onPlanner()) return;

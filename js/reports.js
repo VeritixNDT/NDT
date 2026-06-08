@@ -2441,15 +2441,25 @@ function updateInboxBadge(){
   else { pill.style.display = 'none'; }
 }
 
-function inboxRender(){
+// The inbox renders in two hosts: the top-nav Inbox page (prefix 'inbox')
+// and the Inspector workspace (prefix 'insp-inbox'). _inboxPfx names the
+// active host so the built section ids (and the tiles' jump-to-section
+// targets) stay unique per host. The internal action handlers re-call
+// inboxRender() with no args, so they refresh whichever host is current;
+// showPage('inbox') passes 'inbox' explicitly to pin the top-nav page.
+var _inboxPfx = 'inbox';
+function inboxRender(hostId){
+  const P = hostId || _inboxPfx || 'inbox';
+  _inboxPfx = P;
+  const sid = key => P + '-sec-' + key;
   const me = CURRENT_USER;
-  const subEl = el('inbox-sub');
+  const subEl = el(P+'-sub');
   if(subEl) subEl.textContent = me
     ? tf('inb.sub.hello', 'Hello {name} — what needs your attention right now', { name: me.name.split(' ')[0] })
     : t('inb.sub', 'What needs your attention right now');
 
   const data = inboxBuild();
-  const summaryEl = el('inbox-summary');
+  const summaryEl = el(P+'-summary');
   if(summaryEl){
     const tile = (count, label, urgent, iconSvg, iconBg, iconColor, sectionId, navTo) => `
       <div class="inbox-tile ${urgent==='attention'?'attention':urgent==='urgent'?'urgent':''}" data-action="_wInboxJumpToSection" data-args="'${sectionId}',${navTo?1:0}">
@@ -2463,28 +2473,28 @@ function inboxRender(){
       (data.complianceReview && data.complianceReview.length
         ? tile(data.complianceReview.length, t('inb.tile.compliance','Compliance review'), 'urgent',
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-            'rgba(242,92,92,.10)','var(--red)', 'inbox-sec-compliance', false)
+            'rgba(242,92,92,.10)','var(--red)', sid('compliance'), false)
         : ''),
       tile(data.awaitingApproval.length, t('inb.tile.approval','Awaiting your approval'), data.awaitingApproval.length>0?'attention':null,
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
         'rgba(0,212,255,.10)','var(--cyan)',
-        'inbox-sec-approval', true),
+        sid('approval'), P==='inbox'),
       tile(data.myDrafts.length, t('inb.tile.drafts','Your drafts in progress'), null,
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
         'rgba(127,140,170,.10)','var(--t2)',
-        'inbox-sec-drafts', false),
+        sid('drafts'), false),
       tile(data.stale.length, t('inb.tile.stale','Stale reports (7d+)'), data.stale.length>0?'urgent':null,
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
         'rgba(242,92,92,.10)','var(--red)',
-        'inbox-sec-stale', false),
+        sid('stale'), false),
       tile(data.certsExpiring.length, t('inb.tile.certs','Certs expiring (60d)'), data.certsExpiring.length>0?'attention':null,
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/><path d="M14 10h4"/><path d="M14 14h2.5"/></svg>',
         'rgba(245,166,35,.10)','var(--amber)',
-        'inbox-sec-certs', false),
+        sid('certs'), false),
     ].join('');
   }
 
-  const contentEl = el('inbox-content');
+  const contentEl = el(P+'-content');
   if(!contentEl) return;
   let html = '';
 
@@ -2493,7 +2503,7 @@ function inboxRender(){
   // "message to admin": a report used gear/cert that isn't on file, so it was
   // withheld from self-approval and must be reviewed before it can be sealed.
   if(data.complianceReview && data.complianceReview.length){
-    html += `<div class="inbox-section" id="inbox-sec-compliance">
+    html += `<div class="inbox-section" id="${sid('compliance')}">
       <div class="inbox-section-head">
         <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${escapeHtml(t('inb.sec.compliance','Compliance review — unregistered equipment / certification'))}</span>
         <span class="inbox-section-count">${data.complianceReview.length}</span>
@@ -2522,7 +2532,7 @@ function inboxRender(){
   }
 
   // ── Awaiting approval ──
-  html += `<div class="inbox-section" id="inbox-sec-approval">
+  html += `<div class="inbox-section" id="${sid('approval')}">
     <div class="inbox-section-head">
       <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${escapeHtml(t('inb.sec.approval','Awaiting your approval'))}</span>
       <span class="inbox-section-count">${data.awaitingApproval.length}</span>
@@ -2558,7 +2568,7 @@ function inboxRender(){
   html += `</div>`;
 
   // ── My drafts ──
-  html += `<div class="inbox-section" id="inbox-sec-drafts">
+  html += `<div class="inbox-section" id="${sid('drafts')}">
     <div class="inbox-section-head">
       <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${escapeHtml(t('inb.sec.drafts','Your drafts'))}</span>
       <span class="inbox-section-count">${data.myDrafts.length}</span>
@@ -2586,7 +2596,7 @@ function inboxRender(){
   html += `</div>`;
 
   // ── Stale reports ──
-  html += `<div class="inbox-section" id="inbox-sec-stale">
+  html += `<div class="inbox-section" id="${sid('stale')}">
     <div class="inbox-section-head">
       <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${escapeHtml(t('inb.sec.stale','Stale (7+ days on stage)'))}</span>
       <span class="inbox-section-count">${data.stale.length}</span>
@@ -2617,7 +2627,7 @@ function inboxRender(){
   html += `</div>`;
 
   // ── Cert expiry ──
-  html += `<div class="inbox-section" id="inbox-sec-certs">
+  html += `<div class="inbox-section" id="${sid('certs')}">
     <div class="inbox-section-head">
       <span class="inbox-section-title"><svg class="inbox-section-title-icon" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/></svg>${escapeHtml(t('inb.sec.certs','Certifications expiring within 60 days'))}</span>
       <div style="display:flex;align-items:center;gap:8px">

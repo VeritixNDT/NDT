@@ -342,10 +342,11 @@ function ovInit() {
 // Single "New report" side-menu entry → method picker (replaces the old
 // per-method button list). One enabled method skips the picker and goes
 // straight in; none → nudge to Settings → Methods.
-function ovNewReportPicker(){
+function ovNewReportPicker(hostPrefix){
+  const _pfx = hostPrefix || 'ov';
   const methods = (typeof getActiveMethods === 'function') ? getActiveMethods() : [];
   if(!methods.length){ if(typeof toast === 'function') toast(t('ov.nomethods','No inspection methods are enabled — turn them on in Settings → Methods.'), 'info'); return; }
-  if(methods.length === 1){ if(typeof ovNewReport === 'function') ovNewReport(methods[0].id); return; }
+  if(methods.length === 1){ if(typeof ovNewReport === 'function') ovNewReport(methods[0].id, null, null, _pfx); return; }
   const rows = methods.map(m =>
     '<button class="btn btn-sm" data-mid="'+escapeHtml(m.id)+'" style="display:flex;align-items:center;gap:10px;width:100%;justify-content:flex-start;margin-bottom:6px;font-size:13px;padding:9px 12px">'
     + '<span style="width:9px;height:9px;border-radius:50%;background:'+(m.color||'var(--t2)')+';flex-shrink:0"></span>'
@@ -365,7 +366,7 @@ function ovNewReportPicker(){
   ov.addEventListener('click', (e) => {
     if(e.target === ov || (e.target.getAttribute && e.target.getAttribute('data-close') === '1')){ close(); return; }
     const b = e.target.closest ? e.target.closest('button[data-mid]') : null;
-    if(b){ const mid = b.getAttribute('data-mid'); close(); if(typeof ovNewReport === 'function') ovNewReport(mid); }
+    if(b){ const mid = b.getAttribute('data-mid'); close(); if(typeof ovNewReport === 'function') ovNewReport(mid, null, null, _pfx); }
   });
   setTimeout(() => { try { const f = ov.querySelector('button[data-mid]'); if(f) f.focus(); } catch(e){} }, 30);
 }
@@ -1488,23 +1489,39 @@ function webhookLoadIntoUi(){
 // stage change delivered two webhooks per subscriber. Removed — single wrap
 // is the source of truth.
 
-function ovNewReport(methodId, btn, sourceReport) {
+// Host of the active new-report form — 'ov' (Overview, default) or 'insp'
+// (Inspector workspace). Read by ovSaveReport / ovCancelReport / ovResetReport
+// so they navigate within the host the form was opened from.
+var _ovHostPfx = 'ov';
+function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   _ovMethod = methodId;
   const m = NDT_METHODS.find(x => x.id === methodId); if(!m) return;
 
-  // Switch to new report section
-  document.querySelectorAll('#page-overview .ss').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('#ov-snav .snav-item').forEach(b => b.classList.remove('active'));
-  el('ov-newreport').classList.add('active');
+  // Host — the form renders in the Overview page ('ov') or the Inspector
+  // workspace ('insp'). Clear the OTHER host's body first so the form's global
+  // field ids (rf-*, eq_*) live in exactly one place — otherwise ovSaveReport
+  // would read stale inputs from a hidden duplicate form.
+  const pfx = (_ovHostPfx = hostPrefix || 'ov');
+  const pageId = pfx === 'insp' ? 'page-inspector' : 'page-overview';
+  const snavId = pfx === 'insp' ? 'insp-snav' : 'ov-snav';
+  ['ov','insp'].forEach(p => { if(p !== pfx){ const ob = el(p+'-nr-body'); if(ob) ob.innerHTML = ''; } });
+
+  // Switch to new report section. Overview runs new-report as a one-shot snav
+  // action (no persistent highlight), so it clears the snav actives; the
+  // Inspector workspace's inspShowSection already owns its side-menu highlight,
+  // so leave #insp-snav alone (clearing it would un-highlight "New report").
+  document.querySelectorAll('#'+pageId+' .ss').forEach(s => s.classList.remove('active'));
+  if(pfx === 'ov') document.querySelectorAll('#'+snavId+' .snav-item').forEach(b => b.classList.remove('active'));
+  el(pfx+'-newreport').classList.add('active');
   if(btn) btn.classList.add('active');
 
   if(sourceReport){
     const _nextRev = _ovBumpRevision((sourceReport.revision || '00').trim());
-    el('ov-nr-title').textContent = `Revise ${m.id} report — ${escapeHtml(sourceReport.reportNo || '')} Rev ${_nextRev}`;
-    el('ov-nr-desc').textContent  = `Saving creates revision ${_nextRev} of this report. The report number stays the same; a reason for the change is required.`;
+    el(pfx+'-nr-title').textContent = `Revise ${m.id} report — ${escapeHtml(sourceReport.reportNo || '')} Rev ${_nextRev}`;
+    el(pfx+'-nr-desc').textContent  = `Saving creates revision ${_nextRev} of this report. The report number stays the same; a reason for the change is required.`;
   } else {
-    el('ov-nr-title').textContent = `New ${m.id} report — ${escapeHtml(m.name)}`;
-    el('ov-nr-desc').textContent = `Fill in the ${escapeHtml(m.name)} report details below. Fields are pre-filled from your saved templates.`;
+    el(pfx+'-nr-title').textContent = `New ${m.id} report — ${escapeHtml(m.name)}`;
+    el(pfx+'-nr-desc').textContent = `Fill in the ${escapeHtml(m.name)} report details below. Fields are pre-filled from your saved templates.`;
   }
 
   // Load template data
@@ -1560,7 +1577,7 @@ function ovNewReport(methodId, btn, sourceReport) {
   });
 
   // Build form
-  const body = el('ov-nr-body'); if(!body) return;
+  const body = el(pfx+'-nr-body'); if(!body) return;
   let html = '';
 
   // Fields kept off the new-report form: item-table columns (entered in
@@ -1694,11 +1711,15 @@ function ovNewReport(methodId, btn, sourceReport) {
   // Autosave wiring — attach the delegated listener once (handler reads
   // _ovMethod live so it adapts to method changes), reset the indicator,
   // surface the restore banner for fresh forms with a pending draft.
-  _ovDraftWireOnce();
-  _ovDraftSavedAt = 0;
-  _ovDraftIndicator('idle');
-  _ovDraftStartTick();
-  _ovDraftMaybeShowRestoreBanner();
+  // Autosave is an Overview-only nicety for now; the Inspector workspace
+  // form skips it (its indicator/banner ids live on the Overview page).
+  if(pfx === 'ov'){
+    _ovDraftWireOnce();
+    _ovDraftSavedAt = 0;
+    _ovDraftIndicator('idle');
+    _ovDraftStartTick();
+    _ovDraftMaybeShowRestoreBanner();
+  }
 }
 
 function ovFormSection(title, fields, methodId, data, m) {
@@ -2987,7 +3008,14 @@ async function ovSaveReport(mode) {
   toast(report.isDraft
           ? `${m.id} report saved as a draft — number will be assigned when online.`
           : (willApprove ? `${m.id} report approved & sealed.` : `${m.id} report submitted for review.`));
-  ovShowSection('dashboard', el('ovi-dashboard'));
+  // Return to the right place for the host the form was opened from: the
+  // Inspector workspace lands on the inspector's own Reports list; the
+  // Overview lands back on the dashboard.
+  if(_ovHostPfx === 'insp' && typeof inspShowSection === 'function'){
+    inspShowSection('reports', el('inspi-reports'));
+  } else {
+    ovShowSection('dashboard', el('ovi-dashboard'));
+  }
 }
 
 // Close the report form without saving — e.g. a report opened by
@@ -3006,6 +3034,8 @@ async function ovCancelReport(){
   _ovDraftIndicator('idle');
   if(_ovReviseSource && typeof showPage === 'function'){
     showPage('reports', document.querySelectorAll('.tn')[2]);
+  } else if(_ovHostPfx === 'insp' && typeof inspShowSection === 'function'){
+    inspShowSection('reports', el('inspi-reports'));
   } else {
     ovShowSection('dashboard', el('ovi-dashboard'));
   }
@@ -3014,7 +3044,8 @@ async function ovCancelReport(){
 async function ovResetReport() {
   if(!_ovMethod) return;
   if(!await vxConfirm({ message: 'Are you sure you want to clear the report form? Any unsaved changes will be lost.', okLabel: t('vxc.clear','Clear'), danger: true })) return;
-  ovNewReport(_ovMethod, document.querySelector('#ov-snav .snav-item.active'));
+  const snavId = _ovHostPfx === 'insp' ? 'insp-snav' : 'ov-snav';
+  ovNewReport(_ovMethod, document.querySelector('#'+snavId+' .snav-item.active'), null, _ovHostPfx);
 }
 
 function ovRenderRecentList() {

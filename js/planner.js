@@ -43,6 +43,15 @@ function _plMonthStart(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 function _plGridStart(d)  { const f = _plMonthStart(d); const dow = (f.getDay() + 6) % 7; return _plAddDays(f, -dow); }
 function _plFmt(ymd)      { return (typeof fmtDate === 'function') ? fmtDate(ymd) : ymd; }
 
+// Embed support — the inspector workspace renders the planner inside its own
+// page, scoped to the current inspector's own events. _plRootId is the
+// container plRender writes into (the prev/next/today/view buttons re-call
+// plRender() with no args, so the target must live on a module var, not a
+// param); _plScopeInspector filters plCollect to CURRENT_USER. plInit (the
+// top-nav path) resets both to the full-planner defaults.
+var _plRootId = 'planner-root';
+var _plScopeInspector = false;
+
 // ── Aggregation ─────────────────────────────────────────────────────────────
 // Returns normalized items whose date falls in [startYmd, endYmd] (inclusive).
 //   { ymd, endYmd, time, title, sub, type, refId, editable, overdue }
@@ -51,17 +60,28 @@ function plCollect(startYmd, endYmd, opts) {
   const en = (opts && opts.all) ? (() => true) : _plEnabled;  // dashboard ignores legend filters
   const inRange = ymd => ymd && ymd >= startYmd && ymd <= endYmd;
   const push = o => { if (inRange(o.ymd) && en(o.type)) out.push(o); };
+  // Inspector-scoped view (the Inspector workspace) — restrict the
+  // person-linked sources (events, jobs, report exams, cert expiries) to the
+  // logged-in inspector, matched by display name exactly as the inbox does.
+  // Equipment-calibration / billing deadlines aren't person-linked, so they
+  // stay visible (and are toggleable via the legend either way).
+  const _me = (_plScopeInspector && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.name : '';
+  const _mineOnly = !!_me;
 
   // Custom events
-  if (en('event')) plLoadEvents().forEach(e => push({
-    ymd: String(e.date || '').slice(0, 10), endYmd: e.endDate ? String(e.endDate).slice(0, 10) : '',
-    time: e.time || '', endTime: e.endTime || '', title: e.title || '(untitled)', sub: e.inspector || '',
-    type: 'event', refId: e.id, editable: true,
-  }));
+  if (en('event')) plLoadEvents().forEach(e => {
+    if (_mineOnly && (e.inspector || '') !== _me) return;
+    push({
+      ymd: String(e.date || '').slice(0, 10), endYmd: e.endDate ? String(e.endDate).slice(0, 10) : '',
+      time: e.time || '', endTime: e.endTime || '', title: e.title || '(untitled)', sub: e.inspector || '',
+      type: 'event', refId: e.id, editable: true,
+    });
+  });
 
   // Jobs (placed on their start date; range shown in the label)
   if (en('job')) jobLoad().forEach(j => {
     if (!j.startDate) return;
+    if (_mineOnly && (j.leadInspector || '') !== _me) return;
     const cust = (typeof jobCustomerName === 'function') ? jobCustomerName(j.customerId) : '';
     push({ ymd: String(j.startDate).slice(0, 10), endYmd: j.endDate ? String(j.endDate).slice(0, 10) : '',
       time: '', title: j.title || 'Job', sub: [cust, j.leadInspector].filter(Boolean).join(' · '),
@@ -71,6 +91,7 @@ function plCollect(startYmd, endYmd, opts) {
   // Report exam dates
   if (en('report')) (ls(KEYS.reports, []) || []).forEach(r => {
     if (!r.examDate) return;
+    if (_mineOnly && (r.inspector || '') !== _me) return;
     push({ ymd: String(r.examDate).slice(0, 10), endYmd: '', time: '',
       title: (r.method || '') + ' ' + (r.reportNo || ''), sub: r.client || r.project || '',
       type: 'report', refId: r.reportNo || r.id || '', editable: false });
@@ -78,6 +99,7 @@ function plCollect(startYmd, endYmd, opts) {
 
   // Inspector cert expiries (per-method + legacy + eye test)
   if (en('cert')) (ls(KEYS.inspectors, []) || []).forEach(ins => {
+    if (_mineOnly && (ins.name || '') !== _me) return;
     const seen = [];
     const mc = ins.methodCerts || {};
     Object.keys(mc).forEach(m => { if (mc[m] && mc[m].expiry) seen.push([mc[m].expiry, m + ' cert']); });
@@ -115,7 +137,7 @@ function plCollect(startYmd, endYmd, opts) {
 }
 
 // ── Entry / render ───────────────────────────────────────────────────────────
-function plInit() { _plInjectStyles(); _plInstallDrag(); plRender(); }
+function plInit() { _plRootId = 'planner-root'; _plScopeInspector = false; _plInjectStyles(); _plInstallDrag(); plRender(); }
 
 // ── Drag-to-reschedule ───────────────────────────────────────────────────────
 // Pointer-drag for the schedulable items (custom events + jobs). Moving a
@@ -229,7 +251,7 @@ function _plApplyDrag(type, refId, tgt) {
 }
 
 function plRender() {
-  const root = document.getElementById('planner-root');
+  const root = document.getElementById(_plRootId);
   if (!root) return;
   const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
   let periodLbl;

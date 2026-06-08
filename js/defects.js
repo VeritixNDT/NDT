@@ -461,8 +461,16 @@ function procInit(){
 }
 
 // ── Home page: View-only procedures ──────────────────────────────────
-function procInitView(){
-  const sel = el('proc-view-f-method');
+// The read-only procedures view is embedded in two places (the Overview
+// "NDT procedures" section and the Inspector workspace). Both reuse these
+// functions; _procViewPfx names the active host's id prefix so the filter
+// inputs, metrics, table and viewer all resolve to the right copy. The
+// data-on-input handlers re-call procRenderView() with no args, so the
+// prefix lives on a module var (set by procInitView), not a parameter.
+var _procViewPfx = 'proc-view';
+function procInitView(hostId){
+  _procViewPfx = hostId || 'proc-view';
+  const sel = el(_procViewPfx + '-f-method');
   if(sel){
     const v = sel.value;
     sel.innerHTML = '<option value="">All methods</option>' + getActiveMethods().map(m=>`<option>${m.id}</option>`).join('');
@@ -475,12 +483,13 @@ function procRenderView(){
   // See procRender — procGetAll() returns a fresh parse each call, so each
   // procedure's stored-array index must be captured while `list` still
   // holds these object instances (indexOf against a second call fails).
+  const P = _procViewPfx || 'proc-view';
   const stored = procGetAll();
   const idxOf  = new Map(stored.map((p, i) => [p, i]));
   let list = stored.slice();
-  const search = (el('proc-view-search')?.value||'').toLowerCase().trim();
-  const fMethod = el('proc-view-f-method')?.value||'';
-  const fStatus = el('proc-view-f-status')?.value||'';
+  const search = (el(P+'-search')?.value||'').toLowerCase().trim();
+  const fMethod = el(P+'-f-method')?.value||'';
+  const fStatus = el(P+'-f-status')?.value||'';
 
   if(fMethod) list = list.filter(p=>p.method===fMethod);
   if(fStatus) list = list.filter(p=>p.status===fStatus);
@@ -492,7 +501,7 @@ function procRenderView(){
 
   // Metrics
   const all = stored;
-  const metricsEl = el('proc-view-metrics');
+  const metricsEl = el(P+'-metrics');
   if(metricsEl){
     const active = all.filter(p=>p.status==='Active').length;
     const draft = all.filter(p=>p.status==='Draft').length;
@@ -507,7 +516,7 @@ function procRenderView(){
   }
 
   // Table (view-only — no edit/delete buttons)
-  const wrap = el('proc-view-table-wrap'); if(!wrap) return;
+  const wrap = el(P+'-table-wrap'); if(!wrap) return;
 
   if(list.length){
     const rows = list.map(p=>{
@@ -553,9 +562,10 @@ function procRenderView(){
 }
 
 function procClearViewFilters(){
-  const s = el('proc-view-search'); if(s) s.value = '';
-  const m = el('proc-view-f-method'); if(m) m.value = '';
-  const st = el('proc-view-f-status'); if(st) st.value = '';
+  const P = _procViewPfx || 'proc-view';
+  const s = el(P+'-search'); if(s) s.value = '';
+  const m = el(P+'-f-method'); if(m) m.value = '';
+  const st = el(P+'-f-status'); if(st) st.value = '';
   procRenderView();
 }
 
@@ -576,9 +586,10 @@ function procViewFileView(idx){
     blobUrl = URL.createObjectURL(new Blob([arr], {type: mime}));
   } catch(e) { blobUrl = fileData; }
 
-  const viewerWrap = el('proc-view-viewer-wrap');
-  const viewerTitle = el('proc-view-viewer-title');
-  const viewerFrame = el('proc-view-viewer-frame');
+  const P = _procViewPfx || 'proc-view';
+  const viewerWrap = el(P+'-viewer-wrap');
+  const viewerTitle = el(P+'-viewer-title');
+  const viewerFrame = el(P+'-viewer-frame');
   if(!viewerWrap || !viewerFrame){ window.open(blobUrl); return; }
 
   if(viewerTitle) viewerTitle.textContent = (p.procNo||'') + ' — ' + (p.fileName||'Document');
@@ -588,8 +599,9 @@ function procViewFileView(idx){
 }
 
 function procCloseViewViewer(){
-  const wrap = el('proc-view-viewer-wrap');
-  const frame = el('proc-view-viewer-frame');
+  const P = _procViewPfx || 'proc-view';
+  const wrap = el(P+'-viewer-wrap');
+  const frame = el(P+'-viewer-frame');
   if(frame && frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
   if(wrap) wrap.style.display = 'none';
   if(frame) frame.src = 'about:blank';

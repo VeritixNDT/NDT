@@ -1755,7 +1755,8 @@ function showPage(id, btn) {
   if(id === 'planner') { if(typeof plInit === 'function') plInit(); }
   if(id === 'billing') { if(typeof billingInit === 'function') billingInit(); }
   if(id === 'defects') defInit();
-  if(id === 'inbox') inboxRender();
+  if(id === 'inbox') inboxRender('inbox');   // pin the top-nav host (Inspector workspace uses 'insp-inbox')
+  if(id === 'inspector') { if(typeof inspInit === 'function') inspInit(); }
   // V12: re-wire any newly-rendered labels on this page
   if(typeof a11yWireLabels === 'function') a11yWireLabels(pg || document);
   closeProfilePanel();

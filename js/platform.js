@@ -3056,7 +3056,7 @@ function vxRenderSidebarOrgBlock(name){
   // identifier (and the empty-logo slot collapses so it doesn't leave a
   // 78px gap). Click target stays the same — the whole block routes to
   // Settings → Company in both modes.
-  var blockIds = ['ov-snav-org-block', 'stg-snav-org-block'];
+  var blockIds = ['ov-snav-org-block', 'stg-snav-org-block', 'insp-snav-org-block', 'admin-snav-org-block'];
   for(var i = 0; i < blockIds.length; i++){
     var block = document.getElementById(blockIds[i]);
     if(!block) continue;

@@ -885,7 +885,7 @@ function _plInjectStyles() {
        from it so it still adapts per theme. Scoped to the planner roots; if
        color-mix is unsupported the rules below no-op and the normal border
        shows. Applies to the day grid only (month/week/day/team), not the toolbar. */
-    #page-planner,#insp-planner-root{--pl-line:color-mix(in srgb,var(--border) 60%,transparent)}
+    #page-planner,#insp-planner-root{--pl-line:color-mix(in srgb,var(--border) 45%,transparent)}
     .pl-mhead{background:var(--pl-line);border-color:var(--pl-line)}
     .pl-mwrap{border-color:var(--pl-line)}
     .pl-mrow{border-top-color:var(--pl-line)}

@@ -17,9 +17,21 @@ function htAvg(r){
   if(!v.length) return null;
   return Math.round(v.reduce(function(s,x){ return s+x; }, 0) / v.length * 10) / 10;
 }
+// Site clock positions: a ≤6" pipe is a single 12 o'clock traverse; a >6" pipe
+// adds 4 and 8 o'clock. The reported value per point is the average of these.
+function htSiteClocks(survey){ return (survey && survey.bore === 'small') ? ['12H'] : ['12H','04H','08H']; }
+function htSiteAvg(pt, clocks){
+  var c = clocks || ['12H','04H','08H'];
+  var v = c.map(function(k){ return pt.clock ? pt.clock[k] : null; }).map(function(x){ return parseFloat(x); }).filter(function(x){ return !isNaN(x); });
+  if(!v.length) return null;
+  return Math.round(v.reduce(function(s,x){ return s+x; }, 0) / v.length * 10) / 10;
+}
 function _htAll(survey){
   if(!survey) return [];
-  if(survey.mode === 'site-piping') return (survey.zones || []).map(function(z){ return { label:z.label, kind:z.kind, avg:htAvg(z.r) }; });
+  if(survey.mode === 'site-piping'){
+    if(survey.points){ var ck = htSiteClocks(survey); return survey.points.map(function(p){ return { label:p.label, kind:p.kind, avg:htSiteAvg(p, ck) }; }); }
+    return (survey.zones || []).map(function(z){ return { label:z.label, kind:z.kind, avg:htAvg(z.r) }; });  // legacy shape
+  }
   var out = [];
   (survey.rows || []).forEach(function(row){ (row.points || []).forEach(function(p){ out.push({ label:row.label, kind:p.zone, avg:htAvg(p.r) }); }); });
   return out;
@@ -34,15 +46,16 @@ var HT_SAMPLE_WELD = { mode:'weld-traverse', scale:'HV10', limitMax:248, rows:[
   { label:'Mid',  points:[_pt('PM',-15,178,181,176),_pt('HAZ',-8,221,224,219),_pt('HAZ',-7,238,241,236),_pt('Weld',0,210,213,208),_pt('HAZ',7,236,233,239),_pt('HAZ',8,223,226,221),_pt('PM',15,177,180,175)] },
   { label:'Root', points:[_pt('PM',-15,180,177,183),_pt('HAZ',-8,225,228,223),_pt('HAZ',-7,243,246,241),_pt('Weld',0,214,217,212),_pt('HAZ',7,240,237,243),_pt('HAZ',8,226,229,224),_pt('PM',15,181,184,179)] },
 ]};
-function _z(label,kind,a,b,c){ return { label:label, kind:kind, r:[a,b,c] }; }
-var HT_SAMPLE_SITE = { mode:'site-piping', scale:'HV10', limitMax:248, zones:[
-  _z('Material','PM',185,182,188), _z('HAZ','HAZ',242,247,245), _z('Weld','Weld',221,224,219), _z('HAZ','HAZ',250,254,252), _z('Material','PM',187,184,190),
+var HT_SITE_ZONES = [['Material','PM'],['HAZ','HAZ'],['Weld','Weld'],['HAZ','HAZ'],['Material','PM']];
+function _sp(n,a,b,c){ var z = HT_SITE_ZONES[n-1]; return { n:n, label:z[0], kind:z[1], clock:{ '12H':a, '04H':b, '08H':c } }; }
+var HT_SAMPLE_SITE = { mode:'site-piping', scale:'HV10', limitMax:248, bore:'large', points:[
+  _sp(1,160,170,147), _sp(2,165,170,170), _sp(3,185,187,180), _sp(4,147,143,148), _sp(5,149,146,152),
 ]};
 
 // ── default (empty) survey for a new report ──────────────────────────────────
 function htDefault(mode){
-  if(mode === 'site-piping') return { mode:'site-piping', scale:'HV10', limitMax:248, zones:[
-    _z('Material','PM','','',''), _z('HAZ','HAZ','','',''), _z('Weld','Weld','','',''), _z('HAZ','HAZ','','',''), _z('Material','PM','','','') ] };
+  if(mode === 'site-piping') return { mode:'site-piping', scale:'HV10', limitMax:248, bore:'large',
+    points: HT_SITE_ZONES.map(function(z,i){ return { n:i+1, label:z[0], kind:z[1], clock:{ '12H':'', '04H':'', '08H':'' } }; }) };
   var tmpl = [['PM',-15],['PM',-12],['HAZ',-9],['HAZ',-7],['Weld',-4],['Weld',0],['Weld',4],['HAZ',7],['HAZ',9],['PM',12],['PM',15]];
   function row(label){ return { label:label, points: tmpl.map(function(t){ return { zone:t[0], pos:t[1], r:['','',''] }; }) }; }
   return { mode:'weld-traverse', scale:'HV10', limitMax:248, rows:[ row('Cap'), row('Mid'), row('Root') ] };
@@ -60,7 +73,7 @@ function _htRowColors(){ return ['#0e7fa6','#3a6db5','#2f9e63']; }   // Cap / Mi
 // table can be sliced for auto-pagination across printed sheets.
 function htFlatRows(survey){
   if(!survey) return [];
-  if(survey.mode === 'site-piping') return (survey.zones || []).map(function(z){ return { line:'', zone:z.label, pos:null, r:z.r }; });
+  if(survey.mode === 'site-piping') return [];   // site has its own (small) table; never paginated
   var out = [];
   (survey.rows || []).forEach(function(row){ (row.points || []).forEach(function(p){ out.push({ line:row.label, zone:p.zone, pos:p.pos, r:p.r }); }); });
   return out;
@@ -71,21 +84,28 @@ function htRowsOf(survey){ return htFlatRows(survey).length; }
 // continuation sheet — render only the (sliced) readings table, no chart.
 function htRenderSurvey(survey, opts){
   opts = opts || {};
-  if((!survey || (!survey.rows && !survey.zones)) && opts.sample) survey = HT_SAMPLE_WELD;
-  if(!survey || (!survey.rows && !survey.zones)) return '<div style="padding:18px;color:#9aa6b5;font-size:11px;text-align:center">No hardness survey recorded.</div>';
+  var hasData = function(s){ return s && (s.rows || s.zones || s.points); };
+  if(!hasData(survey) && opts.sample) survey = HT_SAMPLE_WELD;
+  if(!hasData(survey)) return '<div style="padding:18px;color:#9aa6b5;font-size:11px;text-align:center">No hardness survey recorded.</div>';
   var P = HT_P, scale = survey.scale || 'HV10', limit = parseFloat(survey.limitMax) || 0;
+  var site = survey.mode === 'site-piping';
   var slice = opts.slice || null;
-  var continued = !!(slice && slice.start > 0);
+  var continued = !!(slice && slice.start > 0) && !site;   // site table is small — never paginated
   var head;
   if(continued){
     head = '<div style="font-family:\'Geist Mono\',monospace;font-size:10px;color:'+P.mut+';margin-bottom:6px">Hardness survey · '+escapeHtml(scale)+' — readings (continued)</div>';
   } else {
     var peak = htPeak(survey), v = htVerdict(survey);
+    var sub = site ? ('site · 5 points across the weld · '+(survey.bore==='small'?'12 o’clock':'12 / 4 / 8 o’clock')+' · avg per point') : 'weld traverse · avg of 3 per point';
     head = '<div style="display:flex;justify-content:space-between;align-items:baseline;font-family:\'Geist Mono\',monospace;font-size:10px;color:'+P.mut+';margin-bottom:6px">'
-      + '<span>Hardness survey · '+escapeHtml(scale)+' · '+(survey.mode==='site-piping'?'site (surface, 5 zones)':'weld traverse')+' · avg of 3 per point</span>'
+      + '<span>Hardness survey · '+escapeHtml(scale)+' · '+sub+'</span>'
       + '<span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(limit?(' · '+(v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')'):'')+'</span></div>';
   }
-  var visual = continued ? '' : (survey.mode === 'site-piping' ? _htSiteSvgs(survey, P, limit, scale) : _htWeldSvgs(survey, P, limit, scale));
+  if(site){
+    var sVisual = continued ? '' : (_htSiteMethod(survey, P) + '<div style="height:8px"></div>' + _htSiteProfile(survey, P, limit));
+    return '<div style="font-family:\'Geist\',system-ui,sans-serif">' + head + sVisual + _htSiteTable(survey, P, limit) + '</div>';
+  }
+  var visual = continued ? '' : _htWeldSvgs(survey, P, limit, scale);
   var rows = htFlatRows(survey);
   var start = slice ? slice.start : 0;
   var count = slice ? slice.count : rows.length;
@@ -145,31 +165,73 @@ function _htWeldSvgs(survey, P, limit, scale){
   return sec + '<div style="height:8px"></div>' + prof;
 }
 
-function _htSiteSvgs(survey, P, limit, scale){
-  var zones=survey.zones||[], n=zones.length||5, PL=46, PR=748, dom=_htYDomain(survey,limit), YMIN=dom[0], YMAX=dom[1];
-  function kf(k){ return k==='HAZ'?P.hazFill:k==='Weld'?P.weldFill:P.pmFill; }
-  function kc(k){ return k==='HAZ'?P.amber:k==='Weld'?P.cyan:P.mut; }
-  function zx(i){ return PL + (i+0.5)/n*(PR-PL); }
-  // strip
-  var top=22, h=54, segW=(PR-PL)/n, s1='';
-  zones.forEach(function(z,i){ var x=PL+i*segW, a=htAvg(z.r), over=limit&&a!=null&&a>limit;
-    s1+='<rect x="'+(x+3)+'" y="'+top+'" width="'+(segW-6)+'" height="'+h+'" rx="5" fill="'+kf(z.kind)+'" stroke="'+(over?P.red:P.line)+'" stroke-width="'+(over?'1.6':'1')+'"/>';
-    s1+='<text x="'+(x+segW/2)+'" y="'+(top-6)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+kc(z.kind)+'">'+escapeHtml(z.label.toUpperCase())+'</text>';
-    s1+='<text x="'+(x+segW/2)+'" y="'+(top+h/2+2)+'" text-anchor="middle" font-family="\'Funnel Display\',sans-serif" font-weight="700" font-size="19" fill="'+(over?P.red:P.ink)+'">'+(a!=null?a:'—')+'</text>';
-    s1+='<text x="'+(x+segW/2)+'" y="'+(top+h/2+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.mut+'">HV avg</text>'; });
-  s1+='<text x="'+PL+'" y="'+(top+h+18)+'" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.mut+'">▲ measured on the outer surface, across the weld cap</text>';
-  var strip='<svg viewBox="0 0 794 104" style="width:100%;height:auto;display:block">'+s1+'</svg>';
-  // profile
-  var CT=14, CB=168; function ys(v){ return CT+(1-(v-YMIN)/(YMAX-YMIN))*(CB-CT); }
-  var s2='';
-  zones.forEach(function(z,i){ var bw=(PR-PL)/n; s2+='<rect x="'+(zx(i)-bw/2)+'" y="'+CT+'" width="'+bw+'" height="'+(CB-CT)+'" fill="'+kf(z.kind)+'" opacity=".55"/>'; s2+='<text x="'+zx(i)+'" y="'+(CB+13)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+kc(z.kind)+'">'+escapeHtml(z.label)+'</text>'; });
-  for(var hh=YMIN; hh<=YMAX; hh+=25){ s2+='<line x1="'+PL+'" y1="'+ys(hh)+'" x2="'+PR+'" y2="'+ys(hh)+'" stroke="'+P.grid+'"/><text x="'+(PL-6)+'" y="'+(ys(hh)+3)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.mut+'">'+hh+'</text>'; }
-  if(limit>=YMIN&&limit<=YMAX){ s2+='<line x1="'+PL+'" y1="'+ys(limit)+'" x2="'+PR+'" y2="'+ys(limit)+'" stroke="'+P.red+'" stroke-width="1.3" stroke-dasharray="6 4"/><text x="'+(PR-3)+'" y="'+(ys(limit)-4)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.red+'">max '+limit+'</text>'; }
-  var line=zones.map(function(z,i){ var a=htAvg(z.r); return a!=null?(zx(i)+','+ys(a)):null; }).filter(Boolean).join(' ');
-  if(line) s2+='<polyline points="'+line+'" fill="none" stroke="'+P.cyan+'" stroke-width="1.8" stroke-opacity=".85"/>';
-  zones.forEach(function(z,i){ var a=htAvg(z.r); if(a==null) return; var over=limit&&a>limit; s2+='<circle cx="'+zx(i)+'" cy="'+ys(a)+'" r="'+(over?4:3.2)+'" fill="'+(over?P.red:P.cyan)+'" stroke="#fff" stroke-width="1"/><text x="'+zx(i)+'" y="'+(ys(a)-9)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+(over?P.red:P.ink)+'">'+a+'</text>'; });
-  var prof='<svg viewBox="0 0 794 196" style="width:100%;height:auto;display:block">'+s2+'</svg>';
-  return strip + '<div style="height:8px"></div>' + prof;
+function _htKc(P,k){ return k==='HAZ'?P.amber:k==='Weld'?P.cyan:P.mut; }
+
+// "How measurements are taken" — pipe side-view + 5 points + section A-A + clock end-view.
+function _htSiteMethod(survey, P){
+  var pts = survey.points || [];
+  var pipeL=60, pipeR=470, top=110, bot=190, cx=(pipeL+pipeR)/2, midY=(top+bot)/2;
+  var steel='rgba(20,30,55,.05)';
+  var s='';
+  s+='<text x="'+pipeL+'" y="22" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">HOW MEASUREMENTS ARE TAKEN · '+(survey.bore==='small'?'Ø ≤ 6″ · 12 o’clock':'Ø > 6″ · 12 / 4 / 8 o’clock')+'</text>';
+  // pipe + weld
+  s+='<rect x="'+pipeL+'" y="'+top+'" width="'+(pipeR-pipeL)+'" height="'+(bot-top)+'" fill="'+steel+'" stroke="'+P.line+'"/>';
+  s+='<rect x="'+(cx-8)+'" y="'+top+'" width="16" height="'+(bot-top)+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".55"/>';
+  s+='<path d="M'+(cx-11)+' '+top+' Q '+cx+' '+(top-7)+' '+(cx+11)+' '+top+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
+  // flow arrow
+  s+='<line x1="'+(pipeL+24)+'" y1="'+midY+'" x2="'+(cx-34)+'" y2="'+midY+'" stroke="'+P.mut+'" stroke-width="1.3"/><path d="M'+(cx-34)+' '+(midY-4)+' L '+(cx-27)+' '+midY+' L '+(cx-34)+' '+(midY+4)+'" fill="'+P.mut+'"/>';
+  s+='<text x="'+(pipeL+24)+'" y="'+(midY-7)+'" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.mut+'">Direction of flow</text>';
+  // 5 points (2,3,4 clustered at the weld)
+  var px=[cx-104, cx-16, cx, cx+16, cx+104], callTop=60;
+  px.forEach(function(x,i){ var c=(i===2)?P.cyan:(i===1||i===3)?P.amber:P.mut;
+    s+='<line x1="'+x+'" y1="'+callTop+'" x2="'+x+'" y2="'+(top-2)+'" stroke="'+c+'" stroke-width="1" stroke-dasharray="2 2" opacity=".75"/>';
+    s+='<circle cx="'+x+'" cy="'+top+'" r="3" fill="'+c+'"/>';
+    s+='<circle cx="'+x+'" cy="'+callTop+'" r="9" fill="#fff" stroke="'+c+'"/><text x="'+x+'" y="'+(callTop+3.5)+'" text-anchor="middle" font-family="\'Funnel Display\',sans-serif" font-weight="700" font-size="11" fill="'+c+'">'+(i+1)+'</text>'; });
+  function dim(x1,x2,y,lbl){ return '<line x1="'+x1+'" y1="'+y+'" x2="'+x2+'" y2="'+y+'" stroke="'+P.mut+'"/><path d="M'+x1+' '+(y-3)+' L '+(x1+6)+' '+y+' L '+x1+' '+(y+3)+'" fill="'+P.mut+'"/><path d="M'+x2+' '+(y-3)+' L '+(x2-6)+' '+y+' L '+x2+' '+(y+3)+'" fill="'+P.mut+'"/><text x="'+((x1+x2)/2)+'" y="'+(y-5)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.mut+'">'+lbl+'</text>'; }
+  s+=dim(px[0],px[1],bot+22,'20 mm')+dim(px[3],px[4],bot+22,'20 mm');
+  // section A-A
+  s+='<line x1="'+cx+'" y1="'+(top-26)+'" x2="'+cx+'" y2="'+(bot+40)+'" stroke="'+P.cyan+'" stroke-dasharray="4 3" opacity=".7"/>';
+  s+='<text x="'+(cx+5)+'" y="'+(top-28)+'" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.cyan+'">A</text><text x="'+(cx+5)+'" y="'+(bot+52)+'" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.cyan+'">A</text>';
+  // View A-A end ring + clock positions
+  var ex=648, ey=150, rO=56, rI=42, clk = survey.bore==='small' ? [[12,'12H']] : [[12,'12H'],[4,'04H'],[8,'08H']];
+  s+='<text x="'+ex+'" y="'+(ey-rO-22)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">VIEW A–A</text>';
+  s+='<circle cx="'+ex+'" cy="'+ey+'" r="'+rO+'" fill="'+steel+'" stroke="'+P.line+'"/><circle cx="'+ex+'" cy="'+ey+'" r="'+rI+'" fill="#fff" stroke="'+P.line+'"/>';
+  clk.forEach(function(c){ var ang=(c[0]/12)*2*Math.PI-Math.PI/2, rr=(rO+rI)/2, dx=ex+rr*Math.cos(ang), dy=ey+rr*Math.sin(ang), lx=ex+(rO+13)*Math.cos(ang), ly=ey+(rO+13)*Math.sin(ang);
+    s+='<circle cx="'+dx+'" cy="'+dy+'" r="4.2" fill="'+P.cyan+'" stroke="#fff" stroke-width=".7"/><text x="'+lx+'" y="'+(ly+3)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.cyan+'">'+c[1]+'</text>'; });
+  // legend
+  ['1 Base material','2 HAZ','3 Weld','4 HAZ','5 Base material'].forEach(function(z,i){ var k=(i===2)?'Weld':(i===1||i===3)?'HAZ':'PM'; s+='<text x="'+(pipeL+i*128)+'" y="285" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+_htKc(P,k)+'">'+z+'</text>'; });
+  return '<svg viewBox="0 0 794 296" style="width:100%;height:auto;display:block">'+s+'</svg>';
+}
+
+// 5-point hardness profile with the weld V cross-section motif.
+function _htSiteProfile(survey, P, limit){
+  var pts=survey.points||[], n=pts.length||5, clocks=htSiteClocks(survey);
+  var PL=46, PR=748, CT=14, CB=176, dom=_htYDomain(survey,limit), YMIN=dom[0], YMAX=dom[1];
+  function ys(v){ return CT+(1-(v-YMIN)/(YMAX-YMIN))*(CB-CT); }
+  function zx(i){ return PL+(i+0.5)/n*(PR-PL); }
+  var s='';
+  for(var hh=YMIN; hh<=YMAX; hh+=25){ s+='<line x1="'+PL+'" y1="'+ys(hh)+'" x2="'+PR+'" y2="'+ys(hh)+'" stroke="'+P.grid+'"/><text x="'+(PL-6)+'" y="'+(ys(hh)+3)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.mut+'">'+hh+'</text>'; }
+  // weld V motif under points 2-3-4
+  var vx0=zx(1), vx1=zx(3), vm=zx(2);
+  s+='<polygon points="'+vx0+','+CB+' '+vx1+','+CB+' '+(vm+9)+','+ys(YMIN+30)+' '+(vm-9)+','+ys(YMIN+30)+'" fill="'+P.hazFill+'" stroke="'+P.amber+'" stroke-opacity=".4"/>';
+  pts.forEach(function(p,i){ s+='<text x="'+zx(i)+'" y="'+(CB+14)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+_htKc(P,p.kind)+'">'+p.n+'. '+escapeHtml(p.label)+'</text>'; });
+  if(limit>=YMIN&&limit<=YMAX){ s+='<line x1="'+PL+'" y1="'+ys(limit)+'" x2="'+PR+'" y2="'+ys(limit)+'" stroke="'+P.red+'" stroke-width="1.3" stroke-dasharray="6 4"/><text x="'+(PR-3)+'" y="'+(ys(limit)-4)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.red+'">max '+limit+'</text>'; }
+  var line=pts.map(function(p,i){ var a=htSiteAvg(p,clocks); return a!=null?(zx(i)+','+ys(a)):null; }).filter(Boolean).join(' ');
+  if(line) s+='<polyline points="'+line+'" fill="none" stroke="'+P.cyan+'" stroke-width="1.8" stroke-opacity=".85"/>';
+  pts.forEach(function(p,i){ var a=htSiteAvg(p,clocks); if(a==null) return; var over=limit&&a>limit; s+='<circle cx="'+zx(i)+'" cy="'+ys(a)+'" r="'+(over?4:3.2)+'" fill="'+(over?P.red:P.cyan)+'" stroke="#fff" stroke-width="1"/><text x="'+zx(i)+'" y="'+(ys(a)-9)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+(over?P.red:P.ink)+'">'+a+'</text>'; });
+  s+='<text x="'+(PL-38)+'" y="'+((CT+CB)/2)+'" transform="rotate(-90 '+(PL-38)+' '+((CT+CB)/2)+')" text-anchor="middle" font-size="9.5" fill="'+P.mut+'">Hardness HV</text>';
+  return '<svg viewBox="0 0 794 196" style="width:100%;height:auto;display:block">'+s+'</svg>';
+}
+
+// Site readings: clock-position rows × point columns + AVG row.
+function _htSiteTable(survey, P, limit){
+  var pts=survey.points||[], clocks=htSiteClocks(survey);
+  var th='style="text-align:left;padding:5px 8px;border-bottom:1px solid '+P.line+';font:600 9px \'Geist Mono\',monospace;color:'+P.mut+';text-transform:uppercase;letter-spacing:.04em"';
+  function td(extra){ return 'style="padding:5px 8px;border-bottom:1px solid '+P.grid+';font-family:\'Geist Mono\',monospace;font-size:11px;color:'+P.ink+';'+(extra||'')+'"'; }
+  var head='<th '+th+'>Location / point</th>'+pts.map(function(p){ return '<th '+th+'>'+escapeHtml(p.label)+' ('+p.n+')</th>'; }).join('');
+  var body=clocks.map(function(c){ return '<tr><td '+td('color:'+P.mut)+'>'+c+'</td>'+pts.map(function(p){ var x=p.clock?p.clock[c]:''; return '<td '+td()+'>'+(x===''||x==null?'—':escapeHtml(x))+'</td>'; }).join('')+'</tr>'; }).join('');
+  var avg='<tr><td '+td('font-weight:700;background:'+P.hazFill)+'>AVG</td>'+pts.map(function(p){ var a=htSiteAvg(p,clocks), over=limit&&a!=null&&a>limit; return '<td '+td('font-weight:700;background:'+P.hazFill+';'+(over?'color:'+P.red:''))+'>'+(a!=null?a:'—')+'</td>'; }).join('')+'</tr>';
+  return '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr>'+head+'</tr></thead><tbody>'+body+avg+'</tbody></table>';
 }
 
 // Render the readings table for a (possibly sliced) flat row list. Flat Line
@@ -197,9 +259,7 @@ function _htTable(survey, P, limit, flat){
 var _htSurvey = null;
 
 function htRenderEntrySection(existing){
-  _htSurvey = (existing && (existing.rows || existing.zones)) ? JSON.parse(JSON.stringify(existing)) : htDefault('weld-traverse');
-  var ZONES = ['PM','HAZ','Weld'];
-  void ZONES;
+  _htSurvey = (existing && (existing.rows || existing.zones || existing.points)) ? JSON.parse(JSON.stringify(existing)) : htDefault('weld-traverse');
   return '<div class="sc" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">Hardness survey</span></div><div class="sc-body" style="padding:14px 16px">'
     + '<div class="fg form-row" style="margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap">'
       + '<div class="fld" style="width:200px"><label>Survey type</label><select id="ht-mode" data-on-change="htSetMode">'
@@ -221,17 +281,26 @@ function _htZoneSel(val, row, pt){
 function _htNum(val, row, pt, field, ph, w){
   return '<input type="number" step="any" data-ht-row="'+row+'" data-ht-pt="'+pt+'" data-ht-field="'+field+'" data-on-input="htEntryChanged" value="'+(val===''||val==null?'':escapeHtml(val))+'" placeholder="'+(ph||'')+'" style="width:'+(w||60)+'px"/>';
 }
+function _htClk(val, ptIdx, clock){
+  return '<input type="number" step="any" data-ht-row="'+ptIdx+'" data-ht-clock="'+clock+'" data-on-input="htEntryChanged" value="'+(val===''||val==null?'':escapeHtml(val))+'" placeholder="HV" style="width:62px"/>';
+}
 
 function htGridHtml(){
   var s = _htSurvey;
   if(s.mode === 'site-piping'){
-    var rows = (s.zones||[]).map(function(z,i){
-      var a = htAvg(z.r);
-      return '<tr><td style="padding:5px 8px;font-weight:600;color:var(--t1)">'+escapeHtml(z.label)+'</td>'
-        + '<td style="padding:4px 6px">'+_htNum(z.r[0],i,0,'r0','#1')+'</td><td style="padding:4px 6px">'+_htNum(z.r[1],i,1,'r1','#2')+'</td><td style="padding:4px 6px">'+_htNum(z.r[2],i,2,'r2','#3')+'</td>'
+    var clocks = htSiteClocks(s);
+    var bore = '<div class="fld" style="width:230px;margin-bottom:12px"><label>Pipe size</label><select id="ht-bore" data-on-change="htBoreChange">'
+      + '<option value="large"'+(s.bore!=='small'?' selected':'')+'>&gt; 6″ — 12 / 4 / 8 o’clock</option>'
+      + '<option value="small"'+(s.bore==='small'?' selected':'')+'>≤ 6″ — 12 o’clock only</option></select></div>';
+    var head = '<th>Pt</th><th>Zone</th>' + clocks.map(function(c){ return '<th>'+c+'</th>'; }).join('') + '<th>Avg</th>';
+    var rows = (s.points||[]).map(function(p,i){
+      var a = htSiteAvg(p, clocks);
+      return '<tr><td style="padding:5px 8px;font-family:var(--mono);color:var(--t3)">'+p.n+'</td>'
+        + '<td style="padding:5px 8px;font-weight:600;color:var(--t1)">'+escapeHtml(p.label)+'</td>'
+        + clocks.map(function(c){ return '<td style="padding:4px 6px">'+_htClk(p.clock?p.clock[c]:'', i, c)+'</td>'; }).join('')
         + '<td style="padding:5px 8px;font-family:var(--mono);color:var(--cyan)">'+(a!=null?a:'—')+'</td></tr>';
     }).join('');
-    return '<table class="tbl" style="width:auto"><thead><tr><th>Zone</th><th>HV #1</th><th>HV #2</th><th>HV #3</th><th>Avg</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    return bore + '<table class="tbl" style="width:auto"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table>';
   }
   // weld traverse — one sub-table per row
   return (s.rows||[]).map(function(row, ri){
@@ -256,8 +325,9 @@ function htReadGrid(){
   var lm = el('ht-limit'); if(lm) _htSurvey.limitMax = parseFloat(lm.value) || 0;
   var grid = el('ht-grid'); if(!grid) return;
   if(_htSurvey.mode === 'site-piping'){
-    (_htSurvey.zones||[]).forEach(function(z, i){
-      ['r0','r1','r2'].forEach(function(f, k){ var inp = grid.querySelector('[data-ht-row="'+i+'"][data-ht-pt="'+k+'"][data-ht-field="'+f+'"]'); if(inp) z.r[k] = inp.value; });
+    (_htSurvey.points||[]).forEach(function(p, i){
+      if(!p.clock) p.clock = {};
+      ['12H','04H','08H'].forEach(function(c){ var inp = grid.querySelector('[data-ht-row="'+i+'"][data-ht-clock="'+c+'"]'); if(inp) p.clock[c] = inp.value; });
     });
   } else {
     (_htSurvey.rows||[]).forEach(function(row, ri){
@@ -274,6 +344,7 @@ function htRebuildGrid(){ var g = el('ht-grid'); if(g) g.innerHTML = htGridHtml(
 
 function htEntryChanged(){ htReadGrid(); htRenderPreview(); }
 function htSetMode(sel){ htReadGrid(); var m = sel.value; if(m !== _htSurvey.mode) _htSurvey = Object.assign(htDefault(m), { scale:_htSurvey.scale, limitMax:_htSurvey.limitMax }); htRebuildGrid(); }
+function htBoreChange(sel){ htReadGrid(); _htSurvey.bore = sel.value; htRebuildGrid(); }
 function htAddPoint(ri){ htReadGrid(); var row = _htSurvey.rows[ri]; if(row){ row.points.push({ zone:'HAZ', pos:'', r:['','',''] }); htRebuildGrid(); } }
 function htRemovePoint(ri, pi){ htReadGrid(); var row = _htSurvey.rows[ri]; if(row){ row.points.splice(pi,1); htRebuildGrid(); } }
 

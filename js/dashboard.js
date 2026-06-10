@@ -1880,6 +1880,11 @@ function ovItemFieldHtml(rowIdx, col, row) {
     // Verdict gets a colour-coded background that tracks the selected
     // value. ovItemsCapture restyles the element on change.
     const extra = (col.id === 'verdict') ? ovVerdictStyle(val) : '';
+    // HT: the Result is automatic — computed from the hardness-survey readings
+    // (peak vs acceptance max) — so the cell is locked (disabled) here.
+    if(col.id === 'verdict' && _ovMethod === 'HT'){
+      return `<select id="${fid}" disabled title="Automatic — set by the hardness survey readings" style="${ctrlStyle};${extra};opacity:.9;cursor:not-allowed">${html}</select>`;
+    }
     return `<select id="${fid}" style="${ctrlStyle};${extra}"${onChange}>${html}</select>`;
   }
   const type = col.type || 'text';

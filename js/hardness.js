@@ -655,6 +655,28 @@ function htCollect(){ htReadGrid(); htSyncWelds(); htAutoVerdicts(); return _htS
 //   • has ht-survey but no ht-method (the v2 seed)  → insert a method card above
 //     each survey card so the drawing isn't lost when ht-survey went results-only
 function _htNid(){ return (typeof _cvBlockId === 'function') ? _cvBlockId() : ('ht-' + Math.random().toString(36).slice(2,9)); }
+// Swap the single-value Subject-information field cards (they only show the
+// first weld) for an Examination-details items-table so a multi-weld HT report
+// lists every weld. Returns a new blocks array; shifts lower blocks to fit.
+function _htReplaceSubjectWithItems(blocks){
+  if(!Array.isArray(blocks) || !blocks.length) return blocks;
+  if(blocks.some(function(b){ return b && b.key === 'items-table'; })) return blocks;   // already has one
+  var subj = {'subject':1,'drawing-no':1,'subject-no':1,'welders':1,'material':1,'weld-prep':1,'heat-treat':1,'thickness':1,'surf-cond':1,'temperature':1,'weld-pos':1};
+  var isSubjHdr = function(b){ return b && b.key === 'section-header' && /subject/i.test(b.text || ''); };
+  var rm = blocks.filter(function(b){ return b && (subj[b.key] || isSubjHdr(b)); });
+  if(!rm.length) return blocks;
+  var top = Math.min.apply(null, rm.map(function(b){ return b.y || 0; }));
+  var bot = Math.max.apply(null, rm.map(function(b){ return (b.y || 0) + (b.h || 0); }));
+  var kept = blocks.filter(function(b){ return !(b && (subj[b.key] || isSubjHdr(b))); });
+  var itH = 150, delta = (top + itH) - bot;
+  kept.forEach(function(b){ if((b.y || 0) >= bot - 0.5) b.y = (b.y || 0) + delta; });
+  kept.push({ id:_htNid(), key:'items-table', isLayout:true, x:20, y:top, w:754, h:itH, showBorder:false, fontSize:'8.5px' });
+  kept.sort(function(a,b){ return (a.y || 0) - (b.y || 0); });
+  return kept;
+}
+function _htPage1Blocks(){
+  return _htReplaceSubjectWithItems((typeof cvDefaultLayoutBlocks === 'function') ? cvDefaultLayoutBlocks() : []);
+}
 function _htSurveyPage(){
   return { label:'Hardness survey', blocks:[
     { id:_htNid(), key:'ht-method', isLayout:true, x:20, y:20,  w:754, h:330, showBorder:true, borderColor:'#dddddd' },   // methodology drawing
@@ -665,28 +687,36 @@ function htSeedTemplateBlock(){
   try {
     var PFX = (typeof CV_METHOD_TPL_PREFIX !== 'undefined') ? CV_METHOD_TPL_PREFIX : 'vx-method-tpl-';
     var KEY = PFX + 'HT';
-    var FLAG = 'vx-ht-tpl-seeded-v4';
+    var FLAG = 'vx-ht-tpl-seeded-v5';
     if(localStorage.getItem(FLAG)) return;
     var tpl = ls(KEY, null);
     var pages = (tpl && Array.isArray(tpl.pages)) ? tpl.pages : [];
     var allBlocks = pages.reduce(function(a,p){ return a.concat(p.blocks||[]); }, []);
     var hasSurvey = allBlocks.some(function(b){ return b && b.key === 'ht-survey'; });
     var hasMethod = allBlocks.some(function(b){ return b && b.key === 'ht-method'; });
+    var hasItems  = allBlocks.some(function(b){ return b && b.key === 'items-table'; });
     var nonSurvey = allBlocks.filter(function(b){ return b && b.key !== 'ht-survey' && b.key !== 'ht-method'; }).length;
 
-    // v4: the results card now stacks per-weld blocks — give existing split
-    // templates more height so a few welds fit before the MAIN CONT page.
+    // v5: existing split templates — give the results card height for per-weld
+    // blocks, and swap the single subject cards for an examination-details table.
     if(hasSurvey && hasMethod){
-      var bumped = false;
-      allBlocks.forEach(function(b){ if(b && b.key === 'ht-survey' && (b.h || 0) < 740){ b.h = 740; bumped = true; } });
-      if(bumped) lss(KEY, tpl);
+      var changed = false;
+      allBlocks.forEach(function(b){ if(b && b.key === 'ht-survey' && (b.h || 0) < 740){ b.h = 740; changed = true; } });
+      if(!hasItems){
+        pages.forEach(function(p){
+          if((p.blocks||[]).some(function(b){ return b && (b.key === 'subject' || b.key === 'material'); })){
+            p.blocks = _htReplaceSubjectWithItems(p.blocks); changed = true;
+          }
+        });
+      }
+      if(changed) lss(KEY, tpl);
       localStorage.setItem(FLAG, '1');
       return;
     }
 
     if(nonSurvey === 0){
       // Fresh, or the old survey-only seed → build a full report + survey page.
-      var page1 = (typeof cvDefaultLayoutBlocks === 'function') ? cvDefaultLayoutBlocks() : [];
+      var page1 = _htPage1Blocks();
       var newPages = page1.length ? [ { label:'Report', blocks:page1 }, _htSurveyPage() ] : [ _htSurveyPage() ];
       lss(KEY, { pages:newPages, nextId: (allBlocks.length + page1.length + 6), savedAt: new Date().toISOString() });
     } else if(!hasSurvey && !hasMethod){

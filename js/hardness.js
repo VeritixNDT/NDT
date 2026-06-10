@@ -261,7 +261,11 @@ function _htSiteMethod(survey, P){
   var pipeL=60, pipeR=470, top=110, bot=190, cx=(pipeL+pipeR)/2, midY=(top+bot)/2;
   var steel='rgba(20,30,55,.05)';
   var s='';
-  s+='<text x="'+pipeL+'" y="22" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">HOW MEASUREMENTS ARE TAKEN · '+htBoreSizeText(survey)+' · '+htBoreClocksText(survey)+'</text>';
+  s+='<text x="'+pipeL+'" y="13" font-family="\'Geist Mono\',monospace" font-size="9.5" font-weight="700" fill="'+P.ink+'">HOW MEASUREMENTS ARE TAKEN</text>';
+  // one line per pipe-size rule; the survey's active size is highlighted
+  var _sz=[['small','≤ 6″','12 o’clock'],['medium','6–12″','4 / 8 o’clock'],['large','&gt; 12″','12 / 4 / 8 o’clock']];
+  var _act=survey.bore||'large';
+  _sz.forEach(function(z,i){ var on=(z[0]===_act); s+='<text x="'+pipeL+'" y="'+(26+i*11)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+(on?P.cyan:P.mut)+'"'+(on?' font-weight="700"':'')+'>'+(on?'▸ ':'  ')+z[1]+' — '+z[2]+'</text>'; });
   // pipe + weld
   s+='<rect x="'+pipeL+'" y="'+top+'" width="'+(pipeR-pipeL)+'" height="'+(bot-top)+'" fill="'+steel+'" stroke="'+P.line+'"/>';
   s+='<rect x="'+(cx-8)+'" y="'+top+'" width="16" height="'+(bot-top)+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".55"/>';
@@ -270,7 +274,7 @@ function _htSiteMethod(survey, P){
   s+='<line x1="'+(pipeL+24)+'" y1="'+midY+'" x2="'+(cx-34)+'" y2="'+midY+'" stroke="'+P.mut+'" stroke-width="1.3"/><path d="M'+(cx-34)+' '+(midY-4)+' L '+(cx-27)+' '+midY+' L '+(cx-34)+' '+(midY+4)+'" fill="'+P.mut+'"/>';
   s+='<text x="'+(pipeL+24)+'" y="'+(midY-7)+'" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.mut+'">Direction of flow</text>';
   // 5 points (2,3,4 clustered at the weld)
-  var px=[cx-104, cx-16, cx, cx+16, cx+104], callTop=60;
+  var px=[cx-104, cx-16, cx, cx+16, cx+104], callTop=72;
   px.forEach(function(x,i){ var c=(i===2)?P.cyan:(i===1||i===3)?P.amber:P.mut;
     s+='<line x1="'+x+'" y1="'+callTop+'" x2="'+x+'" y2="'+(top-2)+'" stroke="'+c+'" stroke-width="1" stroke-dasharray="2 2" opacity=".75"/>';
     s+='<circle cx="'+x+'" cy="'+top+'" r="3" fill="'+c+'"/>';
@@ -304,7 +308,7 @@ function _htSiteProfile(survey, P, limit){
   function ys(v){ return CT+(1-v/YMAX)*(CB-CT); }
   // x-positions cluster points 2-3-4 at the weld and push 1/5 out (20 mm each
   // side), mirroring the pipe methodology drawing rather than even spacing.
-  var XPOS=[-104,-26,0,26,104], xm=28;
+  var XPOS=[-62,-26,0,26,62], xm=28;
   function zx(i){ return (n===5) ? (PL+xm+(XPOS[i]+104)/208*(PR-PL-2*xm)) : (PL+(i+0.5)/n*(PR-PL)); }
   var WELD='#a9cbee', WELDST='#2c5b96', GREY='#cacaca', BLUE='#3f6fb5';
   var s='';
@@ -501,24 +505,37 @@ function htRemovePoint(ri, pi){ htReadGrid(); var row = _htSurvey.rows[ri]; if(r
 function htCollect(){ htReadGrid(); return _htSurvey ? JSON.parse(JSON.stringify(_htSurvey)) : null; }
 
 // ── default template seeding ─────────────────────────────────────────────────
-// Ensure the HT report template carries a hardness-survey block out of the box,
-// so HT reports get the visual in their PDF with zero manual layout work. Adds
-// the block on its OWN page (never overlaps an existing layout) and only if the
-// template doesn't already have one. A one-time flag means a deliberate later
-// removal isn't undone on the next load. Idempotent.
+// Ensure the HT report template is a COMPLETE report — the standard header/
+// fields/result layout (same as every other method) plus a dedicated hardness-
+// survey page — so HT reports aren't just a bare survey with no report chrome.
+//
+// Migration: an earlier version seeded a survey-only template (no header). If we
+// find a template whose only content is ht-survey block(s) we rebuild it as a
+// full report. A real custom layout (any non-survey blocks) is left untouched;
+// we only append a survey page if it lacks one. v2 flag so this runs once.
+function _htSurveyPage(id){ return { label:'Hardness survey', blocks:[ { id:id, key:'ht-survey', isLayout:true, x:20, y:20, w:754, h:1040 } ] }; }
 function htSeedTemplateBlock(){
   try {
     var PFX = (typeof CV_METHOD_TPL_PREFIX !== 'undefined') ? CV_METHOD_TPL_PREFIX : 'vx-method-tpl-';
     var KEY = PFX + 'HT';
-    var FLAG = 'vx-ht-tpl-seeded-v1';
+    var FLAG = 'vx-ht-tpl-seeded-v2';
     if(localStorage.getItem(FLAG)) return;
     var tpl = ls(KEY, null);
-    var has = tpl && Array.isArray(tpl.pages) && tpl.pages.some(function(p){ return (p.blocks||[]).some(function(b){ return b && b.key === 'ht-survey'; }); });
-    if(!has){
-      var nid = (tpl && tpl.nextId) || 1;
-      var page = { label:'Hardness survey', blocks:[ { id: nid, key:'ht-survey', isLayout:true, x:20, y:20, w:754, h:1040 } ] };
-      if(tpl && Array.isArray(tpl.pages)){ tpl.pages.push(page); tpl.nextId = nid + 1; }
-      else { tpl = { pages:[ page ], nextId: nid + 1, savedAt: new Date().toISOString() }; }
+    var pages = (tpl && Array.isArray(tpl.pages)) ? tpl.pages : [];
+    var allBlocks = pages.reduce(function(a,p){ return a.concat(p.blocks||[]); }, []);
+    var hasSurvey = allBlocks.some(function(b){ return b && b.key === 'ht-survey'; });
+    var nonSurvey = allBlocks.filter(function(b){ return b && b.key !== 'ht-survey'; }).length;
+    var sid = (typeof _cvBlockId === 'function') ? _cvBlockId() : ('ht-' + Date.now());
+
+    if(nonSurvey === 0){
+      // Fresh, or the old survey-only seed → build a full report + survey page.
+      var page1 = (typeof cvDefaultLayoutBlocks === 'function') ? cvDefaultLayoutBlocks() : [];
+      var newPages = page1.length ? [ { label:'Report', blocks:page1 }, _htSurveyPage(sid) ] : [ _htSurveyPage(sid) ];
+      lss(KEY, { pages:newPages, nextId: (allBlocks.length + page1.length + 4), savedAt: new Date().toISOString() });
+    } else if(!hasSurvey){
+      // Real custom layout but no survey → append a survey page, leave the rest.
+      tpl.pages.push(_htSurveyPage(sid));
+      tpl.nextId = (tpl.nextId || allBlocks.length) + 2;
       lss(KEY, tpl);
     }
     localStorage.setItem(FLAG, '1');

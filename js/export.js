@@ -728,24 +728,24 @@ function ovViewReport(idx){
 function cvOpenInTab(){ cvPrintOrExport({ openInTab:true }); }
 
 // ── Default layout ───────────────────────────────────────────────────
-async function cvLoadDefaultLayout(){
-  if(cvBlocks.length && !(await vxConfirm({ message: 'Are you sure you want to replace the current page with the default NDT layout? Any custom blocks on this page will be removed.', okLabel: t('vxc.replace','Replace'), danger: true }))) return;
-  cvAutoSnapshot('Before default layout');
-  cvPushUndo();
-  cvPages[cvCurrentPage].blocks=[]; cvSync(); cvNextId=1; cvSelectedId=null; cvSelectedIds=[];
-  const cc=cvTplCfg.sectionColor||cvGetCompanyColor();
+// Pure builder: returns the standard report layout as an array of block
+// objects (header, client/subject/criteria/equipment fields, method block,
+// result). Shared by the editor's "default layout" button AND the HT template
+// seeder so an HT report gets the same report chrome as every other method.
+function cvDefaultLayoutBlocks(cc){
+  cc = cc || (typeof cvTplCfg!=='undefined' && cvTplCfg.sectionColor) || (typeof cvGetCompanyColor==='function' ? cvGetCompanyColor() : '#404040');
+  const blocks=[];
   const add=(key,isLayout,x,y,w,h,extra={})=>{
     const def=isLayout?CV_LAYOUT_ITEMS.find(i=>i.key===key):CV_FIELD_DEFS[key];
-    const block={
-      id:_cvBlockId(), key, isLayout,
+    blocks.push({
+      id:(typeof _cvBlockId==='function'?_cvBlockId():('blk-'+blocks.length)), key, isLayout,
       x,y, w:w||(def?.w)||160, h:h||(def?.h)||38,
       text:extra.text||(isLayout?(def?.label||key):(def?.label||key)),
       fontSize:extra.fontSize||'8.5px', bold:extra.bold||false, italic:false,
       color:extra.color||'#000', bgColor:extra.bgColor||'transparent',
       borderColor:'#cccccc', showBorder:extra.showBorder!==false,
-      align:extra.align||'left', zIndex:cvBlocks.length+1, locked:false,
-    };
-    cvBlocks.push(block);
+      align:extra.align||'left', zIndex:blocks.length+1, locked:false,
+    });
   };
   const M=20, W=754;
   const col4=Math.floor((W-3)/4), col3=Math.floor((W-2)/3), col2=Math.floor((W-1)/2);
@@ -797,7 +797,16 @@ async function cvLoadDefaultLayout(){
   // page-footer block removed — the Header/Footer zone designer + auto-setup
   // covers everything this block did, and dual sources of footer truth
   // confuse users. The footer for a default layout comes from the zone.
+  return blocks;
+}
 
+async function cvLoadDefaultLayout(){
+  if(cvBlocks.length && !(await vxConfirm({ message: 'Are you sure you want to replace the current page with the default NDT layout? Any custom blocks on this page will be removed.', okLabel: t('vxc.replace','Replace'), danger: true }))) return;
+  cvAutoSnapshot('Before default layout');
+  cvPushUndo();
+  cvPages[cvCurrentPage].blocks=[]; cvSync(); cvNextId=1; cvSelectedId=null; cvSelectedIds=[];
+  const cc=cvTplCfg.sectionColor||cvGetCompanyColor();
+  cvDefaultLayoutBlocks(cc).forEach(b => cvBlocks.push(b));
   cvSaveLayout(); cvRenderPageTabs(); cvRenderCanvas(); cvFitToView();
   toast(t('toast.layout_loaded','Default NDT layout loaded — customise freely.'));
 }

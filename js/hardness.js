@@ -299,21 +299,29 @@ function _htSiteProfile(survey, P, limit){
   function zx(i){ return PL+(i+0.5)/n*(PR-PL); }
   var s='';
   for(var hh=YMIN; hh<=YMAX; hh+=25){ s+='<line x1="'+PL+'" y1="'+ys(hh)+'" x2="'+PR+'" y2="'+ys(hh)+'" stroke="'+P.grid+'"/><text x="'+(PL-6)+'" y="'+(ys(hh)+3)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.mut+'">'+hh+'</text>'; }
-  // single-V weld groove beneath points 2-3-4 — same section as the pipe drawing:
-  // wide cap at the top tapering to a narrow root, bevel faces + weld-pass beads.
-  var wcx=zx(2), capHW=(zx(3)-zx(1))/2, rootHW=Math.max(4, capHW*0.22), capY=CB-46, rootY=CB-2;
-  s+='<polygon points="'+(wcx-capHW)+','+capY+' '+(wcx+capHW)+','+capY+' '+(wcx+rootHW)+','+rootY+' '+(wcx-rootHW)+','+rootY+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".45"/>';
-  s+='<line x1="'+(wcx-capHW)+'" y1="'+capY+'" x2="'+(wcx-rootHW)+'" y2="'+rootY+'" stroke="'+P.cyan+'" stroke-opacity=".4"/>';
-  s+='<line x1="'+(wcx+capHW)+'" y1="'+capY+'" x2="'+(wcx+rootHW)+'" y2="'+rootY+'" stroke="'+P.cyan+'" stroke-opacity=".4"/>';
-  [0.36,0.66].forEach(function(f){ var yy=capY+(rootY-capY)*f, hw=capHW-(capHW-rootHW)*f; s+='<path d="M'+(wcx-hw)+' '+yy+' Q '+wcx+' '+(yy+3)+' '+(wcx+hw)+' '+yy+'" fill="none" stroke="'+P.cyan+'" stroke-opacity=".22"/>'; });
-  s+='<path d="M'+(wcx-capHW)+' '+capY+' Q '+wcx+' '+(capY-5)+' '+(wcx+capHW)+' '+capY+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".45"/>';
-  pts.forEach(function(p,i){ s+='<text x="'+zx(i)+'" y="'+(CB+14)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+_htKc(P,p.kind)+'">'+p.n+'. '+escapeHtml(p.label)+'</text>'; });
+  // ── base = plate cross-section with a single-V butt weld ──────────────────
+  // A parent plate strip below the plot, HAZ flanking each weld toe, a V-groove
+  // weld metal (wide cap → narrow root) with bevel faces, weld-pass beads, a
+  // proud cap crown and a root bead — aligned under the 5 measurement points.
+  var plTop=CB+12, plBot=CB+46, wcx=zx(2);
+  var capHW=(zx(3)-zx(1))/2, rootHW=Math.max(4.5, capHW*0.2), hazW=9;
+  s+='<rect x="'+PL+'" y="'+plTop+'" width="'+(PR-PL)+'" height="'+(plBot-plTop)+'" fill="'+P.pmFill+'" stroke="'+P.line+'"/>';
+  s+='<rect x="'+(wcx-capHW-hazW)+'" y="'+plTop+'" width="'+hazW+'" height="'+(plBot-plTop)+'" fill="'+P.hazFill+'"/>';
+  s+='<rect x="'+(wcx+capHW)+'" y="'+plTop+'" width="'+hazW+'" height="'+(plBot-plTop)+'" fill="'+P.hazFill+'"/>';
+  s+='<polygon points="'+(wcx-capHW)+','+plTop+' '+(wcx+capHW)+','+plTop+' '+(wcx+rootHW)+','+plBot+' '+(wcx-rootHW)+','+plBot+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".55"/>';
+  s+='<line x1="'+(wcx-capHW)+'" y1="'+plTop+'" x2="'+(wcx-rootHW)+'" y2="'+plBot+'" stroke="'+P.cyan+'" stroke-opacity=".45"/>';
+  s+='<line x1="'+(wcx+capHW)+'" y1="'+plTop+'" x2="'+(wcx+rootHW)+'" y2="'+plBot+'" stroke="'+P.cyan+'" stroke-opacity=".45"/>';
+  [0.4,0.72].forEach(function(f){ var yy=plTop+(plBot-plTop)*f, hw=capHW-(capHW-rootHW)*f; s+='<path d="M'+(wcx-hw)+' '+yy+' Q '+wcx+' '+(yy+3)+' '+(wcx+hw)+' '+yy+'" fill="none" stroke="'+P.cyan+'" stroke-opacity=".25"/>'; });
+  s+='<path d="M'+(wcx-capHW)+' '+plTop+' Q '+wcx+' '+(plTop-6)+' '+(wcx+capHW)+' '+plTop+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".55"/>';
+  s+='<path d="M'+(wcx-rootHW-1.5)+' '+plBot+' Q '+wcx+' '+(plBot+5)+' '+(wcx+rootHW+1.5)+' '+plBot+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".45"/>';
+  // zone labels beneath the plate, aligned to each point
+  pts.forEach(function(p,i){ s+='<text x="'+zx(i)+'" y="'+(plBot+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+_htKc(P,p.kind)+'">'+p.n+'. '+escapeHtml(p.label)+'</text>'; });
   if(limit>=YMIN&&limit<=YMAX){ s+='<line x1="'+PL+'" y1="'+ys(limit)+'" x2="'+PR+'" y2="'+ys(limit)+'" stroke="'+P.red+'" stroke-width="1.3" stroke-dasharray="6 4"/><text x="'+(PR-3)+'" y="'+(ys(limit)-4)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.red+'">max '+limit+'</text>'; }
   var line=pts.map(function(p,i){ var a=htSiteAvg(p,clocks); return a!=null?(zx(i)+','+ys(a)):null; }).filter(Boolean).join(' ');
   if(line) s+='<polyline points="'+line+'" fill="none" stroke="'+P.cyan+'" stroke-width="1.8" stroke-opacity=".85"/>';
   pts.forEach(function(p,i){ var a=htSiteAvg(p,clocks); if(a==null) return; var over=limit&&a>limit; s+='<circle cx="'+zx(i)+'" cy="'+ys(a)+'" r="'+(over?4:3.2)+'" fill="'+(over?P.red:P.cyan)+'" stroke="#fff" stroke-width="1"/><text x="'+zx(i)+'" y="'+(ys(a)-9)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+(over?P.red:P.ink)+'">'+a+'</text>'; });
   s+='<text x="'+(PL-38)+'" y="'+((CT+CB)/2)+'" transform="rotate(-90 '+(PL-38)+' '+((CT+CB)/2)+')" text-anchor="middle" font-size="9.5" fill="'+P.mut+'">Hardness HV</text>';
-  return '<svg viewBox="0 0 794 196" style="width:100%;height:auto;display:block">'+s+'</svg>';
+  return '<svg viewBox="0 0 794 240" style="width:100%;height:auto;display:block">'+s+'</svg>';
 }
 
 // Site readings: clock-position rows × point columns + AVG row (report style).

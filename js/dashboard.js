@@ -1998,6 +1998,10 @@ function ovItemsRemoveRow(idx) {
 // HT survey ↔ items-table coupling. Each examination line is one weld; the
 // hardness-survey grids track the item rows, and traverse mode is 1 weld only.
 function _ovHtSync(){ if(_ovMethod === 'HT' && typeof htSyncToItems === 'function'){ try { htSyncToItems(); } catch(e){} } }
+// Add / remove an Examination-details line from the survey side (the survey's
+// + Add weld / − Remove weld buttons), keeping the items table in sync.
+function ovHtAddItem(){ if(_ovMethod !== 'HT') return; ovItemsSync(); _ovItems.push({}); ovItemsRerender(); }
+function ovHtRemoveItem(idx){ if(_ovMethod !== 'HT' || !Array.isArray(_ovItems) || _ovItems.length <= 1) return; ovItemsSync(); _ovItems.splice(idx, 1); ovItemsRerender(); }
 function _ovHtPreview(){ if(_ovMethod === 'HT' && typeof htRenderPreview === 'function'){ try { htRenderPreview(); } catch(e){} } }
 function ovHtModeChanged(mode){
   if(mode === 'weld-traverse'){

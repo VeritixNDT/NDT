@@ -229,9 +229,12 @@ function _htWeldUnit(weldView, item, idx, P, limit, bar, scale){
 // Examination-details row — sourced from the report's items table (one item per
 // weld), styled like the report items-table. Result is the item's verdict chip,
 // falling back to the computed pass/fail from the weld's own readings.
+// Result is computed automatically from the weld's HV readings vs the acceptance
+// max (peak ≤ limit → Acceptable). Not taken from the item's verdict column.
 function _htItemResultChip(item, weldView, limit){
-  var verdict = item && item.verdict;
-  if(!verdict){ var v = htVerdict(weldView); if(!limit || !v.total) return '<span style="color:#6b7280">—</span>'; verdict = v.passed ? 'Acceptable' : 'Not acceptable'; }
+  var v = htVerdict(weldView);
+  if(!limit || !v.total) return '<span style="color:#6b7280">—</span>';
+  var verdict = v.passed ? 'Acceptable' : 'Not acceptable';
   var c = (typeof OV_VERDICT_COLORS !== 'undefined' && OV_VERDICT_COLORS[verdict]) ? OV_VERDICT_COLORS[verdict] : null;
   if(!c) return escapeHtml(verdict);
   return '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:'+c.bg+';color:'+c.fg+';font-weight:700">'+escapeHtml(verdict)+'</span>';
@@ -525,8 +528,10 @@ function htGridHtml(){
       + '<option value="medium"'+(s.bore==='medium'?' selected':'')+'>6–12″ — 4 / 8 o’clock</option>'
       + '<option value="large"'+(s.bore!=='small'&&s.bore!=='medium'?' selected':'')+'>&gt; 12″ — 12 / 4 / 8 o’clock</option></select></div>';
     var head = '<th>Pt</th><th>Zone</th>' + clocks.map(function(c){ return '<th>'+c+'</th>'; }).join('') + '<th>Avg</th>';
+    var multi = (s.welds||[]).length > 1;
     var grids = (s.welds||[]).map(function(weld, wi){
       var lbl = _htWeldLabel(wi);
+      var del = multi ? '<button class="btn btn-sm btn-danger" data-action="htRemoveWeld" data-args="'+wi+'" title="Remove this weld" style="padding:2px 9px;font-size:11px;margin-left:10px">− Remove weld</button>' : '';
       var rows = (weld.points||[]).map(function(p,i){
         var a = htSiteAvg(p, clocks);
         return '<tr><td style="padding:5px 8px;font-family:var(--mono);color:var(--t3)">'+p.n+'</td>'
@@ -534,10 +539,12 @@ function htGridHtml(){
           + clocks.map(function(c){ return '<td style="padding:4px 6px">'+_htClk(p.clock?p.clock[c]:'', wi, i, c)+'</td>'; }).join('')
           + '<td style="padding:5px 8px;font-family:var(--mono);color:var(--cyan)">'+(a!=null?a:'—')+'</td></tr>';
       }).join('');
-      return '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;color:var(--t1);margin-bottom:5px">Weld '+(wi+1)+(lbl?' — '+escapeHtml(lbl):'')+'</div>'
+      return '<div style="margin-bottom:14px"><div style="display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--t1);margin-bottom:5px">Weld '+(wi+1)+(lbl?' — '+escapeHtml(lbl):'')+del+'</div>'
         + '<table class="tbl" style="width:auto"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
     }).join('');
-    return bore + grids + '<div style="font-size:11px;color:var(--t3)">Add or remove welds with the <b>+ Add row</b> button on the Examination details table.</div>';
+    return bore + grids
+      + '<button class="btn btn-sm" data-action="htAddWeld" style="margin-top:2px">+ Add weld</button>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:6px">Each weld is one line in the Examination details table above — adding/removing here keeps them in sync.</div>';
   }
   // weld traverse — single weld (welds[0]), one sub-table per row
   var w0 = (s.welds && s.welds[0]) || { rows:[] };
@@ -584,7 +591,41 @@ function htReadGrid(){
 function htRenderPreview(){ var pv = el('ht-preview'); if(pv) pv.innerHTML = htRenderSurvey(_htSurvey, { print:true, items:_htItems() }); }
 function htRebuildGrid(){ var g = el('ht-grid'); if(g) g.innerHTML = htGridHtml(); htRenderPreview(); }
 
-function htEntryChanged(){ htReadGrid(); htRenderPreview(); }
+function htEntryChanged(){ htReadGrid(); htAutoVerdicts(); htRenderPreview(); }
+// Each weld's pass/fail is derived from its HV readings and written back to the
+// matching Examination-details item verdict (so the report's Result column +
+// overall verdict track the measurements). Updates the select in place.
+function htAutoVerdicts(){
+  if(!_htSurvey || typeof _ovItems === 'undefined' || !Array.isArray(_ovItems)) return;
+  var limit = parseFloat(_htSurvey.limitMax) || 0;
+  (_htSurvey.welds || []).forEach(function(w, i){
+    var v = htVerdict(_htWeldView(_htSurvey, w));
+    var verdict = (!limit || !v.total) ? '' : (v.passed ? 'Acceptable' : 'Not acceptable');
+    if(_ovItems[i]) _ovItems[i].verdict = verdict;
+    var sel = el('it-' + i + '-verdict');
+    if(sel && sel.value !== verdict){
+      sel.value = verdict;
+      if(typeof ovVerdictStyle === 'function'){ sel.style.cssText = 'width:100%;height:32px;box-sizing:border-box;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font);' + ovVerdictStyle(verdict); }
+    }
+  });
+}
+// Add a weld (and a matching Examination-details line) from the survey side.
+function htAddWeld(){
+  htReadGrid();
+  if(typeof ovHtAddItem === 'function') ovHtAddItem();
+  else if(_htSurvey && _htSurvey.welds) _htSurvey.welds.push(_htBlankSiteWeld());
+  htSyncWelds();
+  htRebuildGrid();
+}
+// Remove a weld (and its Examination-details line) — for a mis-added row.
+function htRemoveWeld(wi){
+  htReadGrid();
+  if(!_htSurvey || !_htSurvey.welds || _htSurvey.welds.length <= 1) return;
+  _htSurvey.welds.splice(wi, 1);
+  if(typeof ovHtRemoveItem === 'function') ovHtRemoveItem(wi);
+  htSyncWelds();
+  htRebuildGrid();
+}
 function htSetMode(sel){
   htReadGrid();
   var m = sel.value;
@@ -600,7 +641,7 @@ function htRemovePoint(ri, pi){ htReadGrid(); var w0 = _htSurvey.welds && _htSur
 function htIsTraverse(){ return !!(_htSurvey && _htSurvey.mode === 'weld-traverse'); }
 
 // called by ovSaveReport for HT reports
-function htCollect(){ htReadGrid(); htSyncWelds(); return _htSurvey ? JSON.parse(JSON.stringify(_htSurvey)) : null; }
+function htCollect(){ htReadGrid(); htSyncWelds(); htAutoVerdicts(); return _htSurvey ? JSON.parse(JSON.stringify(_htSurvey)) : null; }
 
 // ── default template seeding ─────────────────────────────────────────────────
 // Ensure the HT report template is a COMPLETE report — the standard header/

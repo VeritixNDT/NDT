@@ -3028,8 +3028,13 @@ function cvRenderBlockContent(block, report, preview){
         // Same renderer as the report form preview, so screen and PDF match.
         if(report && report.method && report.method !== 'HT')
           return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Hardness survey — HT reports only</div>`;
+        // In the template editor (canvas + preview) show example details so the
+        // designer sees the page layout. Only a REAL print (here _cvPrintPageNum
+        // is > 0) uses the report's actual survey — and an empty one is skipped
+        // by the page planner, so sample data never leaks into a real PDF.
+        var _htPrinting = (typeof _cvPrintPageNum !== 'undefined' && _cvPrintPageNum > 0);
         return (typeof htRenderSurvey === 'function')
-          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample:preview, slice: (typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
+          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample: !_htPrinting, slice: (typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
           : '';
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;

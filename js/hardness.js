@@ -41,24 +41,28 @@ function htVerdict(survey){ var lim=(survey&&survey.limitMax)||0; var over=_htAl
 
 // ── sample surveys (editor preview / starter) ────────────────────────────────
 function _pt(zone,pos,a,b,c){ return { zone:zone, pos:pos, r:[a,b,c] }; }
-var HT_SAMPLE_WELD = { mode:'weld-traverse', scale:'HV10', limitMax:248, rows:[
+var HT_SAMPLE_WELD = { mode:'weld-traverse', scale:'HV10', limitMax:248,
+  details:{ weldNo:'W-014', drawing:'DRG-2207-A', material:'P355NL1', process:'SMAW', thickness:'25.0' },
+  rows:[
   { label:'Cap',  points:[_pt('PM',-15,182,179,184),_pt('PM',-12,185,188,183),_pt('HAZ',-9,228,231,226),_pt('HAZ',-7,252,258,255),_pt('Weld',-4,221,224,219),_pt('Weld',0,215,218,213),_pt('Weld',4,223,220,226),_pt('HAZ',7,246,243,249),_pt('HAZ',9,229,232,227),_pt('PM',12,186,189,184),_pt('PM',15,180,183,178)] },
   { label:'Mid',  points:[_pt('PM',-15,178,181,176),_pt('HAZ',-8,221,224,219),_pt('HAZ',-7,238,241,236),_pt('Weld',0,210,213,208),_pt('HAZ',7,236,233,239),_pt('HAZ',8,223,226,221),_pt('PM',15,177,180,175)] },
   { label:'Root', points:[_pt('PM',-15,180,177,183),_pt('HAZ',-8,225,228,223),_pt('HAZ',-7,243,246,241),_pt('Weld',0,214,217,212),_pt('HAZ',7,240,237,243),_pt('HAZ',8,226,229,224),_pt('PM',15,181,184,179)] },
 ]};
 var HT_SITE_ZONES = [['Material','PM'],['HAZ','HAZ'],['Weld','Weld'],['HAZ','HAZ'],['Material','PM']];
 function _sp(n,a,b,c){ var z = HT_SITE_ZONES[n-1]; return { n:n, label:z[0], kind:z[1], clock:{ '12H':a, '04H':b, '08H':c } }; }
-var HT_SAMPLE_SITE = { mode:'site-piping', scale:'HV10', limitMax:248, bore:'large', points:[
+var HT_SAMPLE_SITE = { mode:'site-piping', scale:'HV10', limitMax:248, bore:'large',
+  details:{ weldNo:'001 · MNT0431-P1', drawing:'ISO-P1-014', material:'P235GH', process:'GTAW + SMAW', thickness:'14.2' },
+  points:[
   _sp(1,160,170,147), _sp(2,165,170,170), _sp(3,185,187,180), _sp(4,147,143,148), _sp(5,149,146,152),
 ]};
 
 // ── default (empty) survey for a new report ──────────────────────────────────
 function htDefault(mode){
-  if(mode === 'site-piping') return { mode:'site-piping', scale:'HV10', limitMax:248, bore:'large',
+  if(mode === 'site-piping') return { mode:'site-piping', scale:'HV10', limitMax:248, bore:'large', details:{},
     points: HT_SITE_ZONES.map(function(z,i){ return { n:i+1, label:z[0], kind:z[1], clock:{ '12H':'', '04H':'', '08H':'' } }; }) };
   var tmpl = [['PM',-15],['PM',-12],['HAZ',-9],['HAZ',-7],['Weld',-4],['Weld',0],['Weld',4],['HAZ',7],['HAZ',9],['PM',12],['PM',15]];
   function row(label){ return { label:label, points: tmpl.map(function(t){ return { zone:t[0], pos:t[1], r:['','',''] }; }) }; }
-  return { mode:'weld-traverse', scale:'HV10', limitMax:248, rows:[ row('Cap'), row('Mid'), row('Root') ] };
+  return { mode:'weld-traverse', scale:'HV10', limitMax:248, details:{}, rows:[ row('Cap'), row('Mid'), row('Root') ] };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -108,6 +112,10 @@ function htRenderSurvey(survey, opts){
     var verdict = limit ? ((v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')') : '';
     capRow = '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 8px;font:400 8px \'Geist Mono\',monospace;color:'+P.mut+';border-bottom:0.5px solid '+P.grid+'"><span>'+escapeHtml(scale)+' · '+sub+'</span><span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(verdict?(' · '+verdict):'')+'</span></div>';
   }
+  // Examination-details table (weld/item identification + auto Pass/Fail) — the
+  // same kind of objects-examined table the other report templates carry. First
+  // sheet only; continuation sheets repeat just the readings.
+  var details = continued ? '' : _htDetailsTable(survey, P, limit, bar);
   var visual = '';
   if(!continued){
     visual = '<div style="padding:6px 8px">' + (site ? (_htSiteMethod(survey, P) + '<div style="height:6px"></div>' + _htSiteProfile(survey, P, limit)) : _htWeldSvgs(survey, P, limit, scale)) + '</div>';
@@ -119,7 +127,31 @@ function htRenderSurvey(survey, opts){
     var start = slice ? slice.start : 0, count = slice ? slice.count : rows.length;
     table = _htTable(survey, P, limit, rows.slice(start, start + count), bar);
   }
-  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + visual + table + '</div>';
+  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + details + visual + table + '</div>';
+}
+
+// Examination-details table — one row of weld/item identification cells plus an
+// auto Pass/Fail Result cell (verdict chip), styled like the report items-table.
+function _htResultChip(survey, limit){
+  var v = htVerdict(survey);
+  if(!limit || !v.total) return '<span style="color:#6b7280">—</span>';
+  return v.passed
+    ? '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:#d1fae5;color:#065f46;font-weight:700">Acceptable</span>'
+    : '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:700">Not acceptable</span>';
+}
+function _htDetailsTable(survey, P, limit, bar){
+  var d = survey.details || {};
+  function val(x){ return (x === '' || x == null) ? '<span style="color:#9aa6b5">—</span>' : escapeHtml(x); }
+  var heads = ['Weld / Item No.', 'Drawing / ISO', 'Material', 'Welding process', 'Thickness', 'Result'];
+  var cells = [
+    { v:val(d.weldNo), extra:'font-weight:600' },
+    { v:val(d.drawing) },
+    { v:val(d.material) },
+    { v:val(d.process) },
+    { v:val(d.thickness), extra:'font-family:\'Geist Mono\',monospace' },
+    { v:_htResultChip(survey, limit) }
+  ];
+  return _htTableEl(heads, [{ cells:cells }], bar, P);
 }
 
 // Shared table builder — mirrors the report items-table look: coloured header
@@ -293,10 +325,26 @@ function htRenderEntrySection(existing){
       + '<div class="fld" style="width:120px"><label>Scale</label><input id="ht-scale" value="'+escapeHtml(_htSurvey.scale||'HV10')+'" data-on-input="htEntryChanged"/></div>'
       + '<div class="fld" style="width:150px"><label>Acceptance max (HV)</label><input id="ht-limit" type="number" value="'+escapeHtml(_htSurvey.limitMax||248)+'" data-on-input="htEntryChanged"/></div>'
     + '</div>'
+    + _htDetailsEntry()
     + '<div id="ht-grid">'+htGridHtml()+'</div>'
     + '<div style="font-size:11px;color:var(--t3);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.05em">Live preview</div>'
     + '<div id="ht-preview" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 16px">'+htRenderSurvey(_htSurvey,{print:true})+'</div>'
     + '</div></div>';
+}
+
+// Examination-details entry row — feeds the details/Result table in the render.
+function _htDetailsEntry(){
+  var d = (_htSurvey && _htSurvey.details) || {};
+  function fld(label, id, val, w){
+    return '<div class="fld" style="width:'+(w||160)+'px"><label>'+label+'</label><input id="'+id+'" value="'+escapeHtml(val||'')+'" data-on-input="htEntryChanged"/></div>';
+  }
+  return '<div class="fg form-row" style="margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap">'
+    + fld('Weld / Item No.', 'ht-d-weldNo', d.weldNo, 170)
+    + fld('Drawing / ISO', 'ht-d-drawing', d.drawing, 150)
+    + fld('Material', 'ht-d-material', d.material, 150)
+    + fld('Welding process', 'ht-d-process', d.process, 160)
+    + fld('Thickness (mm)', 'ht-d-thickness', d.thickness, 120)
+    + '</div>';
 }
 
 function _htZoneSel(val, row, pt){
@@ -348,6 +396,8 @@ function htReadGrid(){
   if(!_htSurvey) return;
   var sc = el('ht-scale'); if(sc) _htSurvey.scale = sc.value || 'HV10';
   var lm = el('ht-limit'); if(lm) _htSurvey.limitMax = parseFloat(lm.value) || 0;
+  if(!_htSurvey.details) _htSurvey.details = {};
+  ['weldNo','drawing','material','process','thickness'].forEach(function(k){ var inp = el('ht-d-' + k); if(inp) _htSurvey.details[k] = inp.value; });
   var grid = el('ht-grid'); if(!grid) return;
   if(_htSurvey.mode === 'site-piping'){
     (_htSurvey.points||[]).forEach(function(p, i){

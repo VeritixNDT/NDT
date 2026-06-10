@@ -303,7 +303,7 @@ function _htSiteProfile(survey, P, limit){
   var YMAX=Math.max(200, Math.ceil((Math.max(dmax, limit||0)+1)/50)*50);
   function ys(v){ return CT+(1-v/YMAX)*(CB-CT); }
   function zx(i){ return PL+(i+0.5)/n*(PR-PL); }
-  var YEL='#fbf3a8', YELST='#9a8a1c', GREY='#cacaca', BLUE='#3f6fb5';
+  var WELD='#a9cbee', WELDST='#2c5b96', GREY='#cacaca', BLUE='#3f6fb5';
   var s='';
   // title
   s+='<text x="'+((PL+PR)/2)+'" y="26" text-anchor="middle" font-family="\'Geist\',sans-serif" font-weight="700" font-size="15" fill="#222">HV</text>';
@@ -320,16 +320,23 @@ function _htSiteProfile(survey, P, limit){
   // base-metal plates (left + right of the groove), bevelled inner edge + root face
   s+='<path d="M'+PL+' '+plY+' L '+capL+' '+plY+' L '+rgL+' '+rfTop+' L '+rgL+' '+CB+' L '+PL+' '+CB+' Z" fill="'+GREY+'" stroke="#9a9a9a" stroke-width=".6"/>';
   s+='<path d="M'+PR+' '+plY+' L '+capR+' '+plY+' L '+rgR+' '+rfTop+' L '+rgR+' '+CB+' L '+PR+' '+CB+' Z" fill="'+GREY+'" stroke="#9a9a9a" stroke-width=".6"/>';
-  // weld metal filling the V-groove (bevel faces → root face → root gap)
-  var weldD='M'+capL+' '+plY+' L '+capR+' '+plY+' L '+rgR+' '+rfTop+' L '+rgR+' '+CB+' L '+rgL+' '+CB+' L '+rgL+' '+rfTop+' Z';
-  s+='<path d="'+weldD+'" fill="'+YEL+'" stroke="'+YELST+'" stroke-width="1"/>';
-  // cap reinforcement (weld face crown, proud of the plate top surface)
-  s+='<path d="M'+capL+' '+plY+' Q '+wcx+' '+(plY-capReinf)+' '+capR+' '+plY+' Z" fill="'+YEL+'" stroke="'+YELST+'" stroke-width="1"/>';
+  // original bevel prep (faint dashed) — the weld fuses BEYOND this line
+  s+='<path d="M'+capL+' '+plY+' L '+rgL+' '+rfTop+' M '+capR+' '+plY+' L '+rgR+' '+rfTop+'" fill="none" stroke="#7d7d7d" stroke-width=".7" stroke-dasharray="3 2"/>';
+  // weld bead: toes spread onto the plate, a convex fusion boundary penetrating
+  // into the parent metal on each sidewall, and a root penetration bead proud of
+  // the underside — drawn as one bead like a real single-V weld macro.
+  var toeL=capL-11, toeR=capR+11, midY=plY+(CB-plY)*0.5, rootPenet=5;
+  var weldD='M'+toeL+' '+plY
+    +' Q '+wcx+' '+(plY-capReinf)+' '+toeR+' '+plY
+    +' Q '+(capR+8)+' '+midY+' '+rgR+' '+CB
+    +' Q '+wcx+' '+(CB+rootPenet)+' '+rgL+' '+CB
+    +' Q '+(capL-8)+' '+midY+' '+toeL+' '+plY+' Z';
+  s+='<path d="'+weldD+'" fill="'+WELD+'" stroke="'+WELDST+'" stroke-width="1"/>';
   // weld-pass contour lines (subtle), narrowing toward the root
-  [0.42,0.72].forEach(function(f){ var yy=plY+(rfTop-plY)*f, hw=capHW-(capHW-rootGap)*f; s+='<path d="M'+(wcx-hw)+' '+yy+' Q '+wcx+' '+(yy+3)+' '+(wcx+hw)+' '+yy+'" fill="none" stroke="'+YELST+'" stroke-opacity=".4"/>'; });
-  // plate top surface line (interrupted by the weld cap)
-  s+='<line x1="'+PL+'" y1="'+plY+'" x2="'+capL+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
-  s+='<line x1="'+capR+'" y1="'+plY+'" x2="'+PR+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
+  [0.42,0.72].forEach(function(f){ var yy=plY+(rfTop-plY)*f, hw=(capHW+9)-((capHW+9)-rootGap)*f; s+='<path d="M'+(wcx-hw)+' '+yy+' Q '+wcx+' '+(yy+3)+' '+(wcx+hw)+' '+yy+'" fill="none" stroke="'+WELDST+'" stroke-opacity=".35"/>'; });
+  // plate top surface line (interrupted by the weld toes)
+  s+='<line x1="'+PL+'" y1="'+plY+'" x2="'+toeL+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
+  s+='<line x1="'+toeR+'" y1="'+plY+'" x2="'+PR+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
   // acceptance-max line (kept for pass/fail context)
   if(limit && limit<=YMAX){ var ly=ys(limit); s+='<line x1="'+PL+'" y1="'+ly+'" x2="'+PR+'" y2="'+ly+'" stroke="'+P.red+'" stroke-width="1.2" stroke-dasharray="6 4"/><text x="'+(PR-3)+'" y="'+(ly-4)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.red+'">max '+limit+'</text>'; }
   // data line + diamond markers + value labels
@@ -338,8 +345,9 @@ function _htSiteProfile(survey, P, limit){
   pts.forEach(function(p,i){ var a=htSiteAvg(p,clocks); if(a==null) return; var over=limit&&a>limit, mx=zx(i), my=ys(a), c=over?P.red:BLUE;
     s+='<polygon points="'+mx+','+(my-5)+' '+(mx+5)+','+my+' '+mx+','+(my+5)+' '+(mx-5)+','+my+'" fill="'+c+'" stroke="#fff" stroke-width=".8"/>';
     s+='<text x="'+mx+'" y="'+(my-10)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+(over?P.red:'#222')+'">'+a+'</text>'; });
-  // x-axis baseline + point/zone labels
-  s+='<line x1="'+PL+'" y1="'+CB+'" x2="'+PR+'" y2="'+CB+'" stroke="#333" stroke-width="1"/>';
+  // x-axis baseline (= plate underside, interrupted by the root penetration bead)
+  s+='<line x1="'+PL+'" y1="'+CB+'" x2="'+rgL+'" y2="'+CB+'" stroke="#333" stroke-width="1"/>';
+  s+='<line x1="'+rgR+'" y1="'+CB+'" x2="'+PR+'" y2="'+CB+'" stroke="#333" stroke-width="1"/>';
   pts.forEach(function(p,i){ s+='<text x="'+zx(i)+'" y="'+(CB+16)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+_htKc(P,p.kind)+'">'+p.n+'. '+escapeHtml(p.label)+'</text>'; });
   // Y-axis title
   s+='<text x="22" y="'+((CT+CB)/2)+'" transform="rotate(-90 22 '+((CT+CB)/2)+')" text-anchor="middle" font-family="\'Geist\',sans-serif" font-size="10" fill="#555">Hardness HV</text>';

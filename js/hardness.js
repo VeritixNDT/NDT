@@ -140,8 +140,9 @@ function htRenderSurvey(survey, opts){
   var diagram = '', profile = '', details = '';
   if(!continued){
     diagram = '<div style="padding:6px 8px 2px">' + (site ? _htSiteMethod(survey, P) : _htWeldDiagram(survey, P, limit, scale)) + '</div>';
-    profile = '<div style="padding:2px 8px 6px">' + (site ? _htSiteProfile(survey, P, limit) : _htWeldProfile(survey, P, limit, scale)) + '</div>';
     details = _htDetailsTable(survey, P, limit, bar);
+    // profile sits flush on top of the readings table — one combined data element
+    profile = '<div style="padding:6px 8px 0">' + (site ? _htSiteProfile(survey, P, limit) : _htWeldProfile(survey, P, limit, scale)) + '</div>';
   }
   var table;
   if(site){ table = _htSiteTable(survey, P, limit, bar); }
@@ -150,7 +151,7 @@ function htRenderSurvey(survey, opts){
     var start = slice ? slice.start : 0, count = slice ? slice.count : rows.length;
     table = _htTable(survey, P, limit, rows.slice(start, start + count), bar);
   }
-  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + diagram + profile + details + table + '</div>';
+  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + diagram + details + profile + table + '</div>';
 }
 
 // Examination-details table — one row of weld/item identification cells plus an
@@ -309,9 +310,14 @@ function _htSiteProfile(survey, P, limit){
   function zx(i){ return PL+(i+0.5)/n*(PR-PL); }
   var s='';
   for(var hh=YMIN; hh<=YMAX; hh+=25){ s+='<line x1="'+PL+'" y1="'+ys(hh)+'" x2="'+PR+'" y2="'+ys(hh)+'" stroke="'+P.grid+'"/><text x="'+(PL-6)+'" y="'+(ys(hh)+3)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.mut+'">'+hh+'</text>'; }
-  // weld V motif under points 2-3-4
-  var vx0=zx(1), vx1=zx(3), vm=zx(2);
-  s+='<polygon points="'+vx0+','+CB+' '+vx1+','+CB+' '+(vm+9)+','+ys(YMIN+30)+' '+(vm-9)+','+ys(YMIN+30)+'" fill="'+P.hazFill+'" stroke="'+P.amber+'" stroke-opacity=".4"/>';
+  // single-V weld groove beneath points 2-3-4 — same section as the pipe drawing:
+  // wide cap at the top tapering to a narrow root, bevel faces + weld-pass beads.
+  var wcx=zx(2), capHW=(zx(3)-zx(1))/2, rootHW=Math.max(4, capHW*0.22), capY=CB-46, rootY=CB-2;
+  s+='<polygon points="'+(wcx-capHW)+','+capY+' '+(wcx+capHW)+','+capY+' '+(wcx+rootHW)+','+rootY+' '+(wcx-rootHW)+','+rootY+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".45"/>';
+  s+='<line x1="'+(wcx-capHW)+'" y1="'+capY+'" x2="'+(wcx-rootHW)+'" y2="'+rootY+'" stroke="'+P.cyan+'" stroke-opacity=".4"/>';
+  s+='<line x1="'+(wcx+capHW)+'" y1="'+capY+'" x2="'+(wcx+rootHW)+'" y2="'+rootY+'" stroke="'+P.cyan+'" stroke-opacity=".4"/>';
+  [0.36,0.66].forEach(function(f){ var yy=capY+(rootY-capY)*f, hw=capHW-(capHW-rootHW)*f; s+='<path d="M'+(wcx-hw)+' '+yy+' Q '+wcx+' '+(yy+3)+' '+(wcx+hw)+' '+yy+'" fill="none" stroke="'+P.cyan+'" stroke-opacity=".22"/>'; });
+  s+='<path d="M'+(wcx-capHW)+' '+capY+' Q '+wcx+' '+(capY-5)+' '+(wcx+capHW)+' '+capY+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".45"/>';
   pts.forEach(function(p,i){ s+='<text x="'+zx(i)+'" y="'+(CB+14)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+_htKc(P,p.kind)+'">'+p.n+'. '+escapeHtml(p.label)+'</text>'; });
   if(limit>=YMIN&&limit<=YMAX){ s+='<line x1="'+PL+'" y1="'+ys(limit)+'" x2="'+PR+'" y2="'+ys(limit)+'" stroke="'+P.red+'" stroke-width="1.3" stroke-dasharray="6 4"/><text x="'+(PR-3)+'" y="'+(ys(limit)-4)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.red+'">max '+limit+'</text>'; }
   var line=pts.map(function(p,i){ var a=htSiteAvg(p,clocks); return a!=null?(zx(i)+','+ys(a)):null; }).filter(Boolean).join(' ');

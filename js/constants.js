@@ -8,7 +8,7 @@
 // Build stamp — BUMP THIS ON EVERY DEPLOY. Shown in the footer so a glance
 // confirms which build a browser is actually running (catches a stale
 // service-worker / HTTP cache serving old JS). Format: YYYY-MM-DD.<n>.
-var VX_BUILD = '2026-06-10.11';
+var VX_BUILD = '2026-06-10.12';
 
 /**
  * @typedef {'Draft'|'Submitted'|'Reviewed'|'Approved'|'Archived'} ReportStage

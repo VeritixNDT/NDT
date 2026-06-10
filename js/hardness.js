@@ -313,15 +313,13 @@ function _htSiteProfile(survey, P, limit){
   //    the chart base: two base-metal plates with bevelled edges (~60° included
   //    angle), a root face + root gap, the weld metal filling the groove and a
   //    cap reinforcement proud of the plate surface, with fusion/pass lines. ──
-  var plateHV=110, plY=ys(plateHV), T=CB-plY, wcx=zx(2);
-  var rootGap=4, rootFace=Math.max(8, T*0.10), capReinf=11;
+  var plateHV=70, plY=ys(plateHV), T=CB-plY, wcx=zx(2);
+  var rootGap=4, rootFace=Math.max(7, T*0.10), capReinf=8;
   var capHW=rootGap + (T-rootFace)*0.62;                 // ≈ 63° included groove
   var capL=wcx-capHW, capR=wcx+capHW, rgL=wcx-rootGap, rgR=wcx+rootGap, rfTop=CB-rootFace;
   // base-metal plates (left + right of the groove), bevelled inner edge + root face
   s+='<path d="M'+PL+' '+plY+' L '+capL+' '+plY+' L '+rgL+' '+rfTop+' L '+rgL+' '+CB+' L '+PL+' '+CB+' Z" fill="'+GREY+'" stroke="#9a9a9a" stroke-width=".6"/>';
   s+='<path d="M'+PR+' '+plY+' L '+capR+' '+plY+' L '+rgR+' '+rfTop+' L '+rgR+' '+CB+' L '+PR+' '+CB+' Z" fill="'+GREY+'" stroke="#9a9a9a" stroke-width=".6"/>';
-  // original bevel prep (faint dashed) — the weld fuses BEYOND this line
-  s+='<path d="M'+capL+' '+plY+' L '+rgL+' '+rfTop+' M '+capR+' '+plY+' L '+rgR+' '+rfTop+'" fill="none" stroke="#7d7d7d" stroke-width=".7" stroke-dasharray="3 2"/>';
   // weld bead: toes spread onto the plate, a convex fusion boundary penetrating
   // into the parent metal on each sidewall, and a root penetration bead proud of
   // the underside — drawn as one bead like a real single-V weld macro.
@@ -332,8 +330,8 @@ function _htSiteProfile(survey, P, limit){
     +' Q '+wcx+' '+(CB+rootPenet)+' '+rgL+' '+CB
     +' Q '+(capL-8)+' '+midY+' '+toeL+' '+plY+' Z';
   s+='<path d="'+weldD+'" fill="'+WELD+'" stroke="'+WELDST+'" stroke-width="1"/>';
-  // weld-pass contour lines (subtle), narrowing toward the root
-  [0.42,0.72].forEach(function(f){ var yy=plY+(rfTop-plY)*f, hw=(capHW+9)-((capHW+9)-rootGap)*f; s+='<path d="M'+(wcx-hw)+' '+yy+' Q '+wcx+' '+(yy+3)+' '+(wcx+hw)+' '+yy+'" fill="none" stroke="'+WELDST+'" stroke-opacity=".35"/>'; });
+  // original bevel prep, drawn on top of the bead — the weld fuses BEYOND it
+  s+='<path d="M'+capL+' '+plY+' L '+rgL+' '+rfTop+' M '+capR+' '+plY+' L '+rgR+' '+rfTop+'" fill="none" stroke="'+WELDST+'" stroke-width=".8" stroke-dasharray="3 2" stroke-opacity=".7"/>';
   // plate top surface line (interrupted by the weld toes)
   s+='<line x1="'+PL+'" y1="'+plY+'" x2="'+toeL+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
   s+='<line x1="'+toeR+'" y1="'+plY+'" x2="'+PR+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';

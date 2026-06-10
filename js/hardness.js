@@ -17,9 +17,30 @@ function htAvg(r){
   if(!v.length) return null;
   return Math.round(v.reduce(function(s,x){ return s+x; }, 0) / v.length * 10) / 10;
 }
-// Site clock positions: a ≤6" pipe is a single 12 o'clock traverse; a >6" pipe
-// adds 4 and 8 o'clock. The reported value per point is the average of these.
-function htSiteClocks(survey){ return (survey && survey.bore === 'small') ? ['12H'] : ['12H','04H','08H']; }
+// Site clock positions by pipe diameter (the survey is repeated at each clock
+// position around the bore; the reported value per point is their average):
+//   ≤ 6"   → 12 o'clock only
+//   6–12"  → 4 and 8 o'clock
+//   > 12"  → 12, 4 and 8 o'clock
+function htSiteClocks(survey){
+  var b = survey && survey.bore;
+  if(b === 'small') return ['12H'];
+  if(b === 'medium') return ['04H','08H'];
+  return ['12H','04H','08H'];   // large (> 12")
+}
+// Human labels for the active clock set — reused by caption + drawing.
+function htBoreClocksText(survey){
+  var b = survey && survey.bore;
+  if(b === 'small') return '12 o’clock';
+  if(b === 'medium') return '4 / 8 o’clock';
+  return '12 / 4 / 8 o’clock';
+}
+function htBoreSizeText(survey){
+  var b = survey && survey.bore;
+  if(b === 'small') return 'Ø ≤ 6″';
+  if(b === 'medium') return 'Ø 6–12″';
+  return 'Ø > 12″';
+}
 function htSiteAvg(pt, clocks){
   var c = clocks || ['12H','04H','08H'];
   var v = c.map(function(k){ return pt.clock ? pt.clock[k] : null; }).map(function(x){ return parseFloat(x); }).filter(function(x){ return !isNaN(x); });
@@ -108,17 +129,19 @@ function htRenderSurvey(survey, opts){
   var capRow = '';
   if(!continued){
     var peak = htPeak(survey), v = htVerdict(survey);
-    var sub = site ? ('Site · 5 points across the weld · '+(survey.bore==='small'?'12 o’clock':'12 / 4 / 8 o’clock')+' · avg per point') : 'Weld traverse · avg of 3 per point';
+    var sub = site ? ('Site · 5 points across the weld · '+htBoreClocksText(survey)+' · avg per point') : 'Weld traverse · avg of 3 per point';
     var verdict = limit ? ((v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')') : '';
     capRow = '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 8px;font:400 8px \'Geist Mono\',monospace;color:'+P.mut+';border-bottom:0.5px solid '+P.grid+'"><span>'+escapeHtml(scale)+' · '+sub+'</span><span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(verdict?(' · '+verdict):'')+'</span></div>';
   }
-  // Examination-details table (weld/item identification + auto Pass/Fail) — the
-  // same kind of objects-examined table the other report templates carry. First
-  // sheet only; continuation sheets repeat just the readings.
-  var details = continued ? '' : _htDetailsTable(survey, P, limit, bar);
-  var visual = '';
+  // Layout (first sheet): the schematic DRAWING is referenced once at the top,
+  // then the data follows below it — hardness profile, the examination-details
+  // table (weld id + auto Pass/Fail) and the readings table. Continuation sheets
+  // repeat only the (sliced) readings table.
+  var diagram = '', profile = '', details = '';
   if(!continued){
-    visual = '<div style="padding:6px 8px">' + (site ? (_htSiteMethod(survey, P) + '<div style="height:6px"></div>' + _htSiteProfile(survey, P, limit)) : _htWeldSvgs(survey, P, limit, scale)) + '</div>';
+    diagram = '<div style="padding:6px 8px 2px">' + (site ? _htSiteMethod(survey, P) : _htWeldDiagram(survey, P, limit, scale)) + '</div>';
+    profile = '<div style="padding:2px 8px 6px">' + (site ? _htSiteProfile(survey, P, limit) : _htWeldProfile(survey, P, limit, scale)) + '</div>';
+    details = _htDetailsTable(survey, P, limit, bar);
   }
   var table;
   if(site){ table = _htSiteTable(survey, P, limit, bar); }
@@ -127,7 +150,7 @@ function htRenderSurvey(survey, opts){
     var start = slice ? slice.start : 0, count = slice ? slice.count : rows.length;
     table = _htTable(survey, P, limit, rows.slice(start, start + count), bar);
   }
-  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + details + visual + table + '</div>';
+  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + diagram + profile + details + table + '</div>';
 }
 
 // Examination-details table — one row of weld/item identification cells plus an
@@ -182,10 +205,10 @@ function _htYDomain(survey, limit){
   return [ Math.floor((lo-15)/25)*25, Math.ceil((hi+15)/25)*25 ];
 }
 
-function _htWeldSvgs(survey, P, limit, scale){
-  var XMIN=-18, XMAX=18, PL=46, PR=748, dom=_htYDomain(survey, limit), YMIN=dom[0], YMAX=dom[1];
+// Weld-traverse cross-section schematic (the diagram, referenced once at top).
+function _htWeldDiagram(survey, P, limit, scale){
+  var XMIN=-18, XMAX=18, PL=46, PR=748;
   function xs(p){ return PL + (p-XMIN)/(XMAX-XMIN)*(PR-PL); }
-  // ── cross-section ──
   var topY=22, botY=104, capH=8, rootH=1.6, hazW=2.4;
   function pl(a){ return a.map(function(q){return q[0].toFixed(1)+','+q[1].toFixed(1);}).join(' '); }
   var weld=[[xs(-capH),topY],[xs(capH),topY],[xs(rootH),botY],[xs(-rootH),botY]];
@@ -203,8 +226,13 @@ function _htWeldSvgs(survey, P, limit, scale){
     (row.points||[]).forEach(function(p){ var a=htAvg(p.r); if(a==null) return; var over=limit&&a>limit;
       s1+='<circle cx="'+xs(p.pos)+'" cy="'+dy+'" r="3" fill="'+(over?P.red:c)+'" stroke="#fff" stroke-width=".7"/>'; }); });
   ['PARENT,-14','HAZ,-8','WELD,0','HAZ,8','PARENT,14'].forEach(function(z){ var a=z.split(','); s1+='<text x="'+xs(+a[1])+'" y="'+(botY+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+(a[0]==='HAZ'?P.amber:a[0]==='WELD'?P.cyan:P.mut)+'">'+a[0]+'</text>'; });
-  var sec='<svg viewBox="0 0 794 128" style="width:100%;height:auto;display:block">'+s1+'</svg>';
-  // ── profile ──
+  return '<svg viewBox="0 0 794 128" style="width:100%;height:auto;display:block">'+s1+'</svg>';
+}
+
+// Weld-traverse hardness profile (the data chart, below the diagram).
+function _htWeldProfile(survey, P, limit, scale){
+  var XMIN=-18, XMAX=18, PL=46, PR=748, dom=_htYDomain(survey, limit), YMIN=dom[0], YMAX=dom[1];
+  function xs(p){ return PL + (p-XMIN)/(XMAX-XMIN)*(PR-PL); }
   var CT=14, CB=176; function ys(h){ return CT+(1-(h-YMIN)/(YMAX-YMIN))*(CB-CT); }
   var bands=[[XMIN,-10,P.pmFill,'Parent'],[-10,-6,P.hazFill,'HAZ'],[-6,6,P.weldFill,'Weld'],[6,10,P.hazFill,'HAZ'],[10,XMAX,P.pmFill,'Parent']];
   var s2='';
@@ -221,8 +249,7 @@ function _htWeldSvgs(survey, P, limit, scale){
     pts.forEach(function(p){ var a=htAvg(p.r), over=limit&&a>limit; s2+='<circle cx="'+xs(p.pos)+'" cy="'+ys(a)+'" r="'+(over?3.8:2.8)+'" fill="'+(over?P.red:c)+'" stroke="#fff" stroke-width="1"/>'; }); });
   // legend
   var leg=(survey.rows||[]).map(function(row,ri){ return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:13px;height:3px;background:'+cols2[ri%3]+';display:inline-block;border-radius:2px"></span>'+escapeHtml(row.label)+'</span>'; }).join('');
-  var prof='<svg viewBox="0 0 794 204" style="width:100%;height:auto;display:block">'+s2+'</svg><div style="font-family:\'Geist\',sans-serif;font-size:10px;color:'+P.mut+';margin-top:2px">'+leg+'</div>';
-  return sec + '<div style="height:8px"></div>' + prof;
+  return '<svg viewBox="0 0 794 204" style="width:100%;height:auto;display:block">'+s2+'</svg><div style="font-family:\'Geist\',sans-serif;font-size:10px;color:'+P.mut+';margin-top:2px">'+leg+'</div>';
 }
 
 function _htKc(P,k){ return k==='HAZ'?P.amber:k==='Weld'?P.cyan:P.mut; }
@@ -233,11 +260,22 @@ function _htSiteMethod(survey, P){
   var pipeL=60, pipeR=470, top=110, bot=190, cx=(pipeL+pipeR)/2, midY=(top+bot)/2;
   var steel='rgba(20,30,55,.05)';
   var s='';
-  s+='<text x="'+pipeL+'" y="22" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">HOW MEASUREMENTS ARE TAKEN · '+(survey.bore==='small'?'Ø ≤ 6″ · 12 o’clock':'Ø > 6″ · 12 / 4 / 8 o’clock')+'</text>';
-  // pipe + weld
+  s+='<text x="'+pipeL+'" y="22" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">HOW MEASUREMENTS ARE TAKEN · '+htBoreSizeText(survey)+' · '+htBoreClocksText(survey)+'</text>';
+  // pipe wall
   s+='<rect x="'+pipeL+'" y="'+top+'" width="'+(pipeR-pipeL)+'" height="'+(bot-top)+'" fill="'+steel+'" stroke="'+P.line+'"/>';
-  s+='<rect x="'+(cx-8)+'" y="'+top+'" width="16" height="'+(bot-top)+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".55"/>';
-  s+='<path d="M'+(cx-11)+' '+top+' Q '+cx+' '+(top-7)+' '+(cx+11)+' '+top+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
+  // single-V butt weld cross-section — wide cap at the (top) outer surface,
+  // narrowing through the wall to the root. HAZ flanks each weld toe.
+  var capHW=16, rootHW=4.5;
+  s+='<rect x="'+(cx-capHW-7)+'" y="'+top+'" width="7" height="'+(bot-top)+'" fill="'+P.hazFill+'"/>';
+  s+='<rect x="'+(cx+capHW)+'" y="'+top+'" width="7" height="'+(bot-top)+'" fill="'+P.hazFill+'"/>';
+  s+='<polygon points="'+(cx-capHW)+','+top+' '+(cx+capHW)+','+top+' '+(cx+rootHW)+','+bot+' '+(cx-rootHW)+','+bot+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".6"/>';
+  // bevel fusion faces + stacked weld-pass beads (narrowing to the root)
+  s+='<line x1="'+(cx-capHW)+'" y1="'+top+'" x2="'+(cx-rootHW)+'" y2="'+bot+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
+  s+='<line x1="'+(cx+capHW)+'" y1="'+top+'" x2="'+(cx+rootHW)+'" y2="'+bot+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
+  [0.30,0.55,0.80].forEach(function(f){ var yy=top+(bot-top)*f, hw=capHW-(capHW-rootHW)*f; s+='<path d="M'+(cx-hw)+' '+yy+' Q '+cx+' '+(yy+4)+' '+(cx+hw)+' '+yy+'" fill="none" stroke="'+P.cyan+'" stroke-opacity=".3"/>'; });
+  // cap crown (proud weld face) + root bead
+  s+='<path d="M'+(cx-capHW)+' '+top+' Q '+cx+' '+(top-9)+' '+(cx+capHW)+' '+top+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".6"/>';
+  s+='<path d="M'+(cx-rootHW-1.5)+' '+bot+' Q '+cx+' '+(bot+6)+' '+(cx+rootHW+1.5)+' '+bot+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
   // flow arrow
   s+='<line x1="'+(pipeL+24)+'" y1="'+midY+'" x2="'+(cx-34)+'" y2="'+midY+'" stroke="'+P.mut+'" stroke-width="1.3"/><path d="M'+(cx-34)+' '+(midY-4)+' L '+(cx-27)+' '+midY+' L '+(cx-34)+' '+(midY+4)+'" fill="'+P.mut+'"/>';
   s+='<text x="'+(pipeL+24)+'" y="'+(midY-7)+'" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.mut+'">Direction of flow</text>';
@@ -253,7 +291,7 @@ function _htSiteMethod(survey, P){
   s+='<line x1="'+cx+'" y1="'+(top-26)+'" x2="'+cx+'" y2="'+(bot+40)+'" stroke="'+P.cyan+'" stroke-dasharray="4 3" opacity=".7"/>';
   s+='<text x="'+(cx+5)+'" y="'+(top-28)+'" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.cyan+'">A</text><text x="'+(cx+5)+'" y="'+(bot+52)+'" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.cyan+'">A</text>';
   // View A-A end ring + clock positions
-  var ex=648, ey=150, rO=56, rI=42, clk = survey.bore==='small' ? [[12,'12H']] : [[12,'12H'],[4,'04H'],[8,'08H']];
+  var ex=648, ey=150, rO=56, rI=42, clk = survey.bore==='small' ? [[12,'12H']] : survey.bore==='medium' ? [[4,'04H'],[8,'08H']] : [[12,'12H'],[4,'04H'],[8,'08H']];
   s+='<text x="'+ex+'" y="'+(ey-rO-22)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">VIEW A–A</text>';
   s+='<circle cx="'+ex+'" cy="'+ey+'" r="'+rO+'" fill="'+steel+'" stroke="'+P.line+'"/><circle cx="'+ex+'" cy="'+ey+'" r="'+rI+'" fill="#fff" stroke="'+P.line+'"/>';
   clk.forEach(function(c){ var ang=(c[0]/12)*2*Math.PI-Math.PI/2, rr=(rO+rI)/2, dx=ex+rr*Math.cos(ang), dy=ey+rr*Math.sin(ang), lx=ex+(rO+13)*Math.cos(ang), ly=ey+(rO+13)*Math.sin(ang);
@@ -362,9 +400,10 @@ function htGridHtml(){
   var s = _htSurvey;
   if(s.mode === 'site-piping'){
     var clocks = htSiteClocks(s);
-    var bore = '<div class="fld" style="width:230px;margin-bottom:12px"><label>Pipe size</label><select id="ht-bore" data-on-change="htBoreChange">'
-      + '<option value="large"'+(s.bore!=='small'?' selected':'')+'>&gt; 6″ — 12 / 4 / 8 o’clock</option>'
-      + '<option value="small"'+(s.bore==='small'?' selected':'')+'>≤ 6″ — 12 o’clock only</option></select></div>';
+    var bore = '<div class="fld" style="width:260px;margin-bottom:12px"><label>Pipe size</label><select id="ht-bore" data-on-change="htBoreChange">'
+      + '<option value="small"'+(s.bore==='small'?' selected':'')+'>≤ 6″ — 12 o’clock</option>'
+      + '<option value="medium"'+(s.bore==='medium'?' selected':'')+'>6–12″ — 4 / 8 o’clock</option>'
+      + '<option value="large"'+(s.bore!=='small'&&s.bore!=='medium'?' selected':'')+'>&gt; 12″ — 12 / 4 / 8 o’clock</option></select></div>';
     var head = '<th>Pt</th><th>Zone</th>' + clocks.map(function(c){ return '<th>'+c+'</th>'; }).join('') + '<th>Avg</th>';
     var rows = (s.points||[]).map(function(p,i){
       var a = htSiteAvg(p, clocks);

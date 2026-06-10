@@ -262,21 +262,10 @@ function _htSiteMethod(survey, P){
   var steel='rgba(20,30,55,.05)';
   var s='';
   s+='<text x="'+pipeL+'" y="22" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">HOW MEASUREMENTS ARE TAKEN · '+htBoreSizeText(survey)+' · '+htBoreClocksText(survey)+'</text>';
-  // pipe wall
+  // pipe + weld
   s+='<rect x="'+pipeL+'" y="'+top+'" width="'+(pipeR-pipeL)+'" height="'+(bot-top)+'" fill="'+steel+'" stroke="'+P.line+'"/>';
-  // single-V butt weld cross-section — wide cap at the (top) outer surface,
-  // narrowing through the wall to the root. HAZ flanks each weld toe.
-  var capHW=16, rootHW=4.5;
-  s+='<rect x="'+(cx-capHW-7)+'" y="'+top+'" width="7" height="'+(bot-top)+'" fill="'+P.hazFill+'"/>';
-  s+='<rect x="'+(cx+capHW)+'" y="'+top+'" width="7" height="'+(bot-top)+'" fill="'+P.hazFill+'"/>';
-  s+='<polygon points="'+(cx-capHW)+','+top+' '+(cx+capHW)+','+top+' '+(cx+rootHW)+','+bot+' '+(cx-rootHW)+','+bot+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".6"/>';
-  // bevel fusion faces + stacked weld-pass beads (narrowing to the root)
-  s+='<line x1="'+(cx-capHW)+'" y1="'+top+'" x2="'+(cx-rootHW)+'" y2="'+bot+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
-  s+='<line x1="'+(cx+capHW)+'" y1="'+top+'" x2="'+(cx+rootHW)+'" y2="'+bot+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
-  [0.30,0.55,0.80].forEach(function(f){ var yy=top+(bot-top)*f, hw=capHW-(capHW-rootHW)*f; s+='<path d="M'+(cx-hw)+' '+yy+' Q '+cx+' '+(yy+4)+' '+(cx+hw)+' '+yy+'" fill="none" stroke="'+P.cyan+'" stroke-opacity=".3"/>'; });
-  // cap crown (proud weld face) + root bead
-  s+='<path d="M'+(cx-capHW)+' '+top+' Q '+cx+' '+(top-9)+' '+(cx+capHW)+' '+top+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".6"/>';
-  s+='<path d="M'+(cx-rootHW-1.5)+' '+bot+' Q '+cx+' '+(bot+6)+' '+(cx+rootHW+1.5)+' '+bot+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
+  s+='<rect x="'+(cx-8)+'" y="'+top+'" width="16" height="'+(bot-top)+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".55"/>';
+  s+='<path d="M'+(cx-11)+' '+top+' Q '+cx+' '+(top-7)+' '+(cx+11)+' '+top+'" fill="'+P.weldFill+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
   // flow arrow
   s+='<line x1="'+(pipeL+24)+'" y1="'+midY+'" x2="'+(cx-34)+'" y2="'+midY+'" stroke="'+P.mut+'" stroke-width="1.3"/><path d="M'+(cx-34)+' '+(midY-4)+' L '+(cx-27)+' '+midY+' L '+(cx-34)+' '+(midY+4)+'" fill="'+P.mut+'"/>';
   s+='<text x="'+(pipeL+24)+'" y="'+(midY-7)+'" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.mut+'">Direction of flow</text>';

@@ -284,13 +284,28 @@ function cvBuildPrintHTML(report){
   // sheet (table only). Capacity estimated from the block height (chart +
   // header reserved on sheet 1; full height for the table on continuations).
   const _htSurvey = report && report.hardnessSurvey;
-  const _htRows = (typeof htRowsOf === 'function') ? htRowsOf(_htSurvey) : 0;
+  const _htSite   = !!(_htSurvey && _htSurvey.mode === 'site-piping');
+  const _htRows   = (typeof htRowsOf === 'function') ? htRowsOf(_htSurvey) : 0;
+  const _htWelds  = (typeof htWeldCount === 'function') ? htWeldCount(_htSurvey) : 0;
   const _planHt = [];
   _planFinal.forEach(entry => {
     const _hb = (entry.page.blocks || []).find(b => b.key === 'ht-survey');
-    if(!_hb || !_htSurvey || _htRows === 0){ _planHt.push(entry); return; }
-    const _bh = (typeof _hb.h === 'number' && _hb.h > 0) ? _hb.h : 520;
-    const _rowH = 26, _reserve = (_htSurvey.mode === 'site-piping') ? 330 : 390;
+    if(!_hb || !_htSurvey){ _planHt.push(entry); return; }
+    const _bh = (typeof _hb.h === 'number' && _hb.h > 0) ? _hb.h : 740;
+    if(_htSite){
+      // site: paginate by WELD block (each ≈ details + compact chart + clock table)
+      if(_htWelds <= 1){ _planHt.push(Object.assign({}, entry, { htSlice: { start:0, count:Math.max(1,_htWelds) } })); return; }
+      const _unitH = 300;
+      const _cap0 = Math.max(1, Math.floor((_bh - 30) / _unitH));
+      if(_htWelds <= _cap0){ _planHt.push(Object.assign({}, entry, { htSlice: { start:0, count:_htWelds } })); return; }
+      _planHt.push(Object.assign({}, entry, { htSlice: { start:0, count:_cap0 } }));
+      let _wp = _cap0;
+      while(_wp < _htWelds && _planHt.length < 300){ const _wc = Math.min(_cap0, _htWelds - _wp); _planHt.push(Object.assign({}, entry, { htSlice: { start:_wp, count:_wc } })); _wp += _wc; }
+      return;
+    }
+    // weld-traverse: paginate the readings table by ROWS (single weld)
+    if(_htRows === 0){ _planHt.push(entry); return; }
+    const _rowH = 26, _reserve = 390;
     const _cap0 = Math.max(1, Math.floor((_bh - _reserve) / _rowH));
     if(_htRows <= _cap0){ _planHt.push(Object.assign({}, entry, { htSlice: { start:0, count:_htRows } })); return; }
     const _capC = Math.max(1, Math.floor((_bh - 30) / _rowH));

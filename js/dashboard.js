@@ -1800,9 +1800,12 @@ function ovRenderItemsTable(methodId, items, remarks) {
     const rm = `<td style="padding:4px 4px;vertical-align:middle;text-align:center">${items.length > 1 ? `<button class="btn btn-sm btn-danger" data-action="ovItemsRemoveRow" data-args="${ri}" title="Remove row" style="padding:4px 8px;font-size:11px">−</button>` : ''}</td>`;
     return `<tr>${cells}${rm}</tr>`;
   }).join('');
+  const _htLock = methodId === 'HT' && typeof htIsTraverse === 'function' && htIsTraverse();
   return `<div class="sc" style="margin:0 14px 14px"><div class="sc-head" style="display:flex;align-items:center;justify-content:space-between">
       <span class="sc-title">Examination details</span>
-      <button class="btn btn-sm" data-action="ovItemsAddRow" style="font-size:11px;padding:4px 10px">+ Add row</button>
+      ${_htLock
+        ? `<span style="font-size:11px;color:var(--t3)">Weld traverse — 1 weld per report</span>`
+        : `<button class="btn btn-sm" data-action="ovItemsAddRow" style="font-size:11px;padding:4px 10px">+ Add row</button>`}
     </div>
     <div class="sc-body" style="padding:14px 18px 18px">
       <table style="width:100%;border-collapse:collapse;table-layout:fixed">
@@ -1912,6 +1915,9 @@ function ovItemsFormatDimensions(rowIdx, fieldId, target) {
 function ovItemsCapture(rowIdx, fieldId, target) {
   if(!_ovItems[rowIdx]) _ovItems[rowIdx] = {};
   _ovItems[rowIdx][fieldId] = target.value;
+  // HT survey details (weld no / drawing / material / result) read from the
+  // items table — refresh the live survey preview so the headers track typing.
+  _ovHtPreview();
   // Verdict swatch follows the selected value live — without this the
   // background freezes at whatever colour the cell rendered with. Uses
   // the same base ctrlStyle as the initial render so the cell keeps its
@@ -1939,6 +1945,7 @@ function ovItemsCapture(rowIdx, fieldId, target) {
 // the user's caret stays where it is). Also reveals the "−" button on the
 // previously-only row, which is hidden when the table has just one row.
 function ovItemsAppendBlankRow() {
+  if(_ovMethod === 'HT' && typeof htIsTraverse === 'function' && htIsTraverse()) return;  // traverse = 1 weld
   _ovItems.push({});
   const tbody = document.getElementById('ov-items-tbody');
   if(!tbody) { ovItemsRerender(); return; }
@@ -1956,6 +1963,7 @@ function ovItemsAppendBlankRow() {
       lastCell.innerHTML = `<button class="btn btn-sm btn-danger" data-action="ovItemsRemoveRow" data-args="0" title="Remove row" style="padding:4px 8px;font-size:11px">−</button>`;
     }
   }
+  _ovHtSync();   // grow the hardness-survey grids to match (HT site)
 }
 
 // Read the current DOM values back into _ovItems. Used before re-rendering
@@ -1972,9 +1980,11 @@ function ovItemsSync() {
 }
 
 function ovItemsAddRow() {
+  if(_ovMethod === 'HT' && typeof htIsTraverse === 'function' && htIsTraverse()) return;  // traverse = 1 weld
   ovItemsSync();
   _ovItems.push({});
   ovItemsRerender();
+  _ovHtSync();
 }
 
 function ovItemsRemoveRow(idx) {
@@ -1982,6 +1992,18 @@ function ovItemsRemoveRow(idx) {
   if(_ovItems.length <= 1) return;
   _ovItems.splice(idx, 1);
   ovItemsRerender();
+  _ovHtSync();
+}
+
+// HT survey ↔ items-table coupling. Each examination line is one weld; the
+// hardness-survey grids track the item rows, and traverse mode is 1 weld only.
+function _ovHtSync(){ if(_ovMethod === 'HT' && typeof htSyncToItems === 'function'){ try { htSyncToItems(); } catch(e){} } }
+function _ovHtPreview(){ if(_ovMethod === 'HT' && typeof htRenderPreview === 'function'){ try { htRenderPreview(); } catch(e){} } }
+function ovHtModeChanged(mode){
+  if(mode === 'weld-traverse'){
+    if(Array.isArray(_ovItems) && _ovItems.length > 1){ ovItemsSync(); _ovItems = [_ovItems[0]]; }
+  }
+  ovItemsRerender();   // re-renders the items table (hides/shows + Add row)
 }
 
 // ── Defects (auto-built from rejected items) ───────────────────────────

@@ -3039,7 +3039,7 @@ function cvRenderBlockContent(block, report, preview){
         // don't reprint the methodology drawing on readings continuation sheets
         if(key === 'ht-method' && typeof _cvHtSlice !== 'undefined' && _cvHtSlice && _cvHtSlice.start > 0) return '';
         return (typeof htRenderSurvey === 'function')
-          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample: !_htPrinting, part: (key === 'ht-method' ? 'method' : 'results'), slice: (key === 'ht-survey' && typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
+          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample: !_htPrinting, items: (report && report.items) || null, part: (key === 'ht-method' ? 'method' : 'results'), slice: (key === 'ht-survey' && typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
           : '';
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;

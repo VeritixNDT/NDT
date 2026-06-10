@@ -64,9 +64,11 @@ function htDefault(mode){
 // ══════════════════════════════════════════════════════════════════════════
 // RENDERER — returns an HTML string (SVG + readings table). Print/light palette.
 // ══════════════════════════════════════════════════════════════════════════
-var HT_P = { ink:'#222a36', mut:'#6b7686', grid:'#dde3ec', line:'#c3ccd8',
-  cyan:'#0e7fa6', amber:'#b8841c', green:'#2f9e63', red:'#cf3b3b',
-  pmFill:'rgba(0,0,0,.022)', hazFill:'rgba(184,132,28,.10)', weldFill:'rgba(14,127,166,.08)' };
+// Palette aligned to the report/PDF tables: black ink, #ddd hairlines, the
+// report's verdict-chip tones for accents (blue = weld, amber = HAZ, red = over).
+var HT_P = { ink:'#111', mut:'#6b7280', grid:'#ddd', line:'#cbcbcb',
+  cyan:'#1e40af', amber:'#92400e', green:'#065f46', red:'#991b1b',
+  pmFill:'rgba(0,0,0,.03)', hazFill:'rgba(146,64,14,.09)', weldFill:'rgba(30,64,175,.06)' };
 function _htRowColors(){ return ['#0e7fa6','#3a6db5','#2f9e63']; }   // Cap / Mid / Root
 
 // Flatten the survey into table rows (one per point/zone) so the readings
@@ -91,29 +93,52 @@ function htRenderSurvey(survey, opts){
   if(!hasData(survey) && opts.sample) survey = (opts.sampleMode === 'weld') ? HT_SAMPLE_WELD : HT_SAMPLE_SITE;
   if(!hasData(survey)) return '<div style="padding:18px;color:#9aa6b5;font-size:11px;text-align:center">No hardness survey recorded.</div>';
   var P = HT_P, scale = survey.scale || 'HV10', limit = parseFloat(survey.limitMax) || 0;
+  var bar = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
   var site = survey.mode === 'site-piping';
   var slice = opts.slice || null;
   var continued = !!(slice && slice.start > 0) && !site;   // site table is small — never paginated
-  var head;
-  if(continued){
-    head = '<div style="font-family:\'Geist Mono\',monospace;font-size:10px;color:'+P.mut+';margin-bottom:6px">Hardness survey · '+escapeHtml(scale)+' — readings (continued)</div>';
-  } else {
+
+  // Section title bar — same look as the report's items-table heading strip.
+  var title = continued ? 'HARDNESS SURVEY — READINGS (CONTINUED)' : 'HARDNESS SURVEY';
+  var titleBar = '<div style="background:'+bar+';color:#fff;font:700 11px \'Geist\',system-ui,sans-serif;letter-spacing:.06em;text-align:center;padding:4px 8px">'+title+'</div>';
+  var capRow = '';
+  if(!continued){
     var peak = htPeak(survey), v = htVerdict(survey);
-    var sub = site ? ('site · 5 points across the weld · '+(survey.bore==='small'?'12 o’clock':'12 / 4 / 8 o’clock')+' · avg per point') : 'weld traverse · avg of 3 per point';
-    head = '<div style="display:flex;justify-content:space-between;align-items:baseline;font-family:\'Geist Mono\',monospace;font-size:10px;color:'+P.mut+';margin-bottom:6px">'
-      + '<span>Hardness survey · '+escapeHtml(scale)+' · '+sub+'</span>'
-      + '<span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(limit?(' · '+(v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')'):'')+'</span></div>';
+    var sub = site ? ('Site · 5 points across the weld · '+(survey.bore==='small'?'12 o’clock':'12 / 4 / 8 o’clock')+' · avg per point') : 'Weld traverse · avg of 3 per point';
+    var verdict = limit ? ((v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')') : '';
+    capRow = '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 8px;font:400 8px \'Geist Mono\',monospace;color:'+P.mut+';border-bottom:0.5px solid '+P.grid+'"><span>'+escapeHtml(scale)+' · '+sub+'</span><span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(verdict?(' · '+verdict):'')+'</span></div>';
   }
-  if(site){
-    var sVisual = continued ? '' : (_htSiteMethod(survey, P) + '<div style="height:8px"></div>' + _htSiteProfile(survey, P, limit));
-    return '<div style="font-family:\'Geist\',system-ui,sans-serif">' + head + sVisual + _htSiteTable(survey, P, limit) + '</div>';
+  var visual = '';
+  if(!continued){
+    visual = '<div style="padding:6px 8px">' + (site ? (_htSiteMethod(survey, P) + '<div style="height:6px"></div>' + _htSiteProfile(survey, P, limit)) : _htWeldSvgs(survey, P, limit, scale)) + '</div>';
   }
-  var visual = continued ? '' : _htWeldSvgs(survey, P, limit, scale);
-  var rows = htFlatRows(survey);
-  var start = slice ? slice.start : 0;
-  var count = slice ? slice.count : rows.length;
-  var table = _htTable(survey, P, limit, rows.slice(start, start + count));
-  return '<div style="font-family:\'Geist\',system-ui,sans-serif">' + head + visual + table + '</div>';
+  var table;
+  if(site){ table = _htSiteTable(survey, P, limit, bar); }
+  else {
+    var rows = htFlatRows(survey);
+    var start = slice ? slice.start : 0, count = slice ? slice.count : rows.length;
+    table = _htTable(survey, P, limit, rows.slice(start, start + count), bar);
+  }
+  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + visual + table + '</div>';
+}
+
+// Shared table builder — mirrors the report items-table look: coloured header
+// bar with white column labels, black cells on white with #ddd hairlines.
+function _htAvgCell(a, over){
+  if(a == null) return '—';
+  return over ? '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600">'+a+'</span>' : String(a);
+}
+function _htTableEl(headLabels, rowsData, bar, P){
+  var head = headLabels.map(function(c){ return '<th style="padding:3px 6px;text-align:left;font:600 7.5px \'Geist Mono\',monospace;color:#fff;letter-spacing:.03em">'+escapeHtml(c)+'</th>'; }).join('');
+  var n = headLabels.length;
+  var body = rowsData.map(function(r){
+    var cells = r.cells.map(function(cell, ci){
+      var br = (ci === n-1) ? '' : ('border-right:0.5px solid '+P.grid+';');
+      return '<td style="padding:3px 6px;'+br+'border-bottom:0.5px solid '+P.grid+';font-size:8.5px;line-height:1.3;color:#000;vertical-align:middle;'+(cell.extra||'')+'">'+cell.v+'</td>';
+    }).join('');
+    return '<tr'+(r.rowStyle?(' style="'+r.rowStyle+'"'):'')+'>'+cells+'</tr>';
+  }).join('');
+  return '<table style="width:100%;border-collapse:separate;border-spacing:0;border-top:1px solid '+P.grid+'"><thead style="background:'+bar+'"><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
 }
 
 // dynamic Y domain from data + limit
@@ -226,34 +251,31 @@ function _htSiteProfile(survey, P, limit){
   return '<svg viewBox="0 0 794 196" style="width:100%;height:auto;display:block">'+s+'</svg>';
 }
 
-// Site readings: clock-position rows × point columns + AVG row.
-function _htSiteTable(survey, P, limit){
+// Site readings: clock-position rows × point columns + AVG row (report style).
+function _htSiteTable(survey, P, limit, bar){
   var pts=survey.points||[], clocks=htSiteClocks(survey);
-  var th='style="text-align:left;padding:5px 8px;border-bottom:1px solid '+P.line+';font:600 9px \'Geist Mono\',monospace;color:'+P.mut+';text-transform:uppercase;letter-spacing:.04em"';
-  function td(extra){ return 'style="padding:5px 8px;border-bottom:1px solid '+P.grid+';font-family:\'Geist Mono\',monospace;font-size:11px;color:'+P.ink+';'+(extra||'')+'"'; }
-  var head='<th '+th+'>Location / point</th>'+pts.map(function(p){ return '<th '+th+'>'+escapeHtml(p.label)+' ('+p.n+')</th>'; }).join('');
-  var body=clocks.map(function(c){ return '<tr><td '+td('color:'+P.mut)+'>'+c+'</td>'+pts.map(function(p){ var x=p.clock?p.clock[c]:''; return '<td '+td()+'>'+(x===''||x==null?'—':escapeHtml(x))+'</td>'; }).join('')+'</tr>'; }).join('');
-  var avg='<tr><td '+td('font-weight:700;background:'+P.hazFill)+'>AVG</td>'+pts.map(function(p){ var a=htSiteAvg(p,clocks), over=limit&&a!=null&&a>limit; return '<td '+td('font-weight:700;background:'+P.hazFill+';'+(over?'color:'+P.red:''))+'>'+(a!=null?a:'—')+'</td>'; }).join('')+'</tr>';
-  return '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr>'+head+'</tr></thead><tbody>'+body+avg+'</tbody></table>';
+  var heads = ['Location / point'].concat(pts.map(function(p){ return p.label+' ('+p.n+')'; }));
+  var rows = clocks.map(function(c){
+    return { cells: [{ v:c, extra:'font-family:\'Geist Mono\',monospace;color:#555' }].concat(pts.map(function(p){ var x=p.clock?p.clock[c]:''; return { v:(x===''||x==null?'—':escapeHtml(x)), extra:'font-family:\'Geist Mono\',monospace' }; })) };
+  });
+  rows.push({ rowStyle:'background:#f3f4f6', cells: [{ v:'AVG', extra:'font-weight:700' }].concat(pts.map(function(p){ var a=htSiteAvg(p,clocks), over=limit&&a!=null&&a>limit; return { v:_htAvgCell(a, over), extra:'font-weight:700;font-family:\'Geist Mono\',monospace' }; })) });
+  return _htTableEl(heads, rows, bar, P);
 }
 
-// Render the readings table for a (possibly sliced) flat row list. Flat Line
-// column (no rowspan) so a slice can start/stop on any row across page breaks.
-function _htTable(survey, P, limit, flat){
-  var site = survey.mode === 'site-piping';
-  var th = 'style="text-align:left;padding:5px 8px;border-bottom:1px solid '+P.line+';font:600 9px \'Geist Mono\',monospace;color:'+P.mut+';text-transform:uppercase;letter-spacing:.04em"';
-  function td(extra){ return 'style="padding:5px 8px;border-bottom:1px solid '+P.grid+';font-family:\'Geist Mono\',monospace;font-size:11px;color:'+P.ink+';'+(extra||'')+'"'; }
-  var head = (site ? '' : '<th '+th+'>Line</th>') + '<th '+th+'>Zone</th>' + (site ? '' : '<th '+th+'>Pos</th>') + '<th '+th+'>HV #1</th><th '+th+'>HV #2</th><th '+th+'>HV #3</th><th '+th+'>Average</th>';
+// Weld readings: a (possibly sliced) flat row list. Flat Line column (no
+// rowspan) so a slice can start/stop on any row across page breaks.
+function _htTable(survey, P, limit, flat, bar){
+  var heads = ['Line','Zone','Pos','HV #1','HV #2','HV #3','Average'];
   var rows = (flat || []).map(function(p){
     var a = htAvg(p.r), over = limit && a != null && a > limit;
-    var c = site ? '' : '<td '+td('font-weight:600')+'>'+escapeHtml(p.line||'')+'</td>';
-    c += '<td '+td()+'>'+escapeHtml(p.zone||'')+'</td>';
-    if(!site) c += '<td '+td()+'>'+(p.pos==null||p.pos===''?'—':((p.pos>0?'+':'')+escapeHtml(p.pos)))+'</td>';
-    c += p.r.map(function(x){ return '<td '+td()+'>'+(x===''||x==null?'—':escapeHtml(x))+'</td>'; }).join('');
-    c += '<td '+td('font-weight:700;'+(over?'color:'+P.red:''))+'>'+(a!=null?a:'—')+'</td>';
-    return '<tr>'+c+'</tr>';
-  }).join('');
-  return '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table>';
+    return { cells: [
+      { v:escapeHtml(p.line||''), extra:'font-weight:600' },
+      { v:escapeHtml(p.zone||'') },
+      { v:(p.pos==null||p.pos===''?'—':((p.pos>0?'+':'')+escapeHtml(p.pos))), extra:'font-family:\'Geist Mono\',monospace' }
+    ].concat(p.r.map(function(x){ return { v:(x===''||x==null?'—':escapeHtml(x)), extra:'font-family:\'Geist Mono\',monospace' }; }))
+      .concat([{ v:_htAvgCell(a, over), extra:'font-weight:700;font-family:\'Geist Mono\',monospace' }]) };
+  });
+  return _htTableEl(heads, rows, bar, P);
 }
 
 // ══════════════════════════════════════════════════════════════════════════

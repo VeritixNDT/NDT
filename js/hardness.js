@@ -160,7 +160,10 @@ function htRenderSurvey(survey, opts){
       table = _htTable(survey, P, limit, rows.slice(start, start + count), bar);
     }
   }
-  return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + diagram + details + profile + table + '</div>';
+  // No own outline here — the editor block's border (when shown) is the frame,
+  // so the heading bars stay flush with it instead of sitting inside a second
+  // 1px outline (which made them look slightly inset when the border was on).
+  return '<div style="overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + diagram + details + profile + table + '</div>';
 }
 
 // Examination-details table — one row of weld/item identification cells plus an
@@ -527,8 +530,8 @@ function htCollect(){ htReadGrid(); return _htSurvey ? JSON.parse(JSON.stringify
 function _htNid(){ return (typeof _cvBlockId === 'function') ? _cvBlockId() : ('ht-' + Math.random().toString(36).slice(2,9)); }
 function _htSurveyPage(){
   return { label:'Hardness survey', blocks:[
-    { id:_htNid(), key:'ht-method', isLayout:true, x:20, y:20,  w:754, h:330 },   // methodology drawing
-    { id:_htNid(), key:'ht-survey', isLayout:true, x:20, y:360, w:754, h:620 },   // results (profile + tables)
+    { id:_htNid(), key:'ht-method', isLayout:true, x:20, y:20,  w:754, h:330, showBorder:true, borderColor:'#dddddd' },   // methodology drawing
+    { id:_htNid(), key:'ht-survey', isLayout:true, x:20, y:360, w:754, h:620, showBorder:true, borderColor:'#dddddd' },   // results (profile + tables)
   ] };
 }
 function htSeedTemplateBlock(){
@@ -562,7 +565,7 @@ function htSeedTemplateBlock(){
         for(var i = 0; i < blocks.length; i++){
           if(blocks[i] && blocks[i].key === 'ht-survey'){
             var sb = blocks[i];
-            var method = { id:_htNid(), key:'ht-method', isLayout:true, x:(sb.x||20), y:(sb.y||20), w:(sb.w||754), h:330 };
+            var method = { id:_htNid(), key:'ht-method', isLayout:true, x:(sb.x||20), y:(sb.y||20), w:(sb.w||754), h:330, showBorder:true, borderColor:'#dddddd' };
             sb.y = (sb.y || 20) + 340; sb.h = Math.max(560, (sb.h || 1040) - 340);
             blocks.splice(i, 0, method); i++;   // skip the inserted method card
           }

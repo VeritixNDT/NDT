@@ -503,7 +503,7 @@ function htRenderEntrySection(existing){
   htSyncWelds();
   return '<div class="sc" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">Hardness survey</span></div><div class="sc-body" style="padding:14px 16px">'
     + '<div class="fg form-row" style="margin-bottom:4px;display:flex;gap:12px;flex-wrap:wrap">'
-      + '<div class="fld" style="width:220px"><label>Survey type</label><select id="ht-mode" data-on-change="htSetMode">'
+      + '<div class="fld" style="width:220px"><label>Survey type</label><select id="ht-mode" data-on-change="htSetMode" data-pass-el="1">'
         + '<option value="site-piping"'+(_htSurvey.mode==='site-piping'?' selected':'')+'>Site piping (5-zone, multi-weld)</option>'
         + '<option value="weld-traverse"'+(_htSurvey.mode==='weld-traverse'?' selected':'')+'>Weld traverse (lab macro, 1 weld)</option></select></div>'
       + '<div class="fld" style="width:120px"><label>Scale</label><input id="ht-scale" value="'+escapeHtml(_htSurvey.scale||'HV10')+'" data-on-input="htEntryChanged"/></div>'
@@ -550,7 +550,7 @@ function htGridHtml(){
   var s = _htSurvey;
   if(s.mode === 'site-piping'){
     var clocks = htSiteClocks(s);
-    var bore = '<div class="fld" style="width:260px;margin-bottom:12px"><label>Pipe size</label><select id="ht-bore" data-on-change="htBoreChange">'
+    var bore = '<div class="fld" style="width:260px;margin-bottom:12px"><label>Pipe size</label><select id="ht-bore" data-on-change="htBoreChange" data-pass-el="1">'
       + '<option value="small"'+(s.bore==='small'?' selected':'')+'>≤ 6″ — 12 o’clock</option>'
       + '<option value="medium"'+(s.bore==='medium'?' selected':'')+'>6–12″ — 4 / 8 o’clock</option>'
       + '<option value="large"'+(s.bore!=='small'&&s.bore!=='medium'?' selected':'')+'>&gt; 12″ — 12 / 4 / 8 o’clock</option></select></div>';
@@ -654,6 +654,7 @@ function htRemoveWeld(wi){
   htRebuildGrid();
 }
 function htSetMode(sel){
+  sel = sel || el('ht-mode'); if(!sel) return;
   htReadGrid();
   var m = sel.value;
   if(m !== _htSurvey.mode){ _htSurvey = Object.assign(htDefault(m), { scale:_htSurvey.scale, limitMax:_htSurvey.limitMax, bore:_htSurvey.bore }); }
@@ -662,7 +663,7 @@ function htSetMode(sel){
   htSyncWelds();
   htRebuildGrid();
 }
-function htBoreChange(sel){ htReadGrid(); _htSurvey.bore = sel.value; htRebuildGrid(); }
+function htBoreChange(sel){ sel = sel || el('ht-bore'); if(!sel) return; htReadGrid(); _htSurvey.bore = sel.value; htRebuildGrid(); }
 function htAddPoint(ri){ htReadGrid(); var w0 = _htSurvey.welds && _htSurvey.welds[0]; var row = w0 && w0.rows && w0.rows[ri]; if(row){ row.points.push({ zone:'HAZ', pos:'', r:['','',''] }); htRebuildGrid(); } }
 function htRemovePoint(ri, pi){ htReadGrid(); var w0 = _htSurvey.welds && _htSurvey.welds[0]; var row = w0 && w0.rows && w0.rows[ri]; if(row){ row.points.splice(pi,1); htRebuildGrid(); } }
 function htIsTraverse(){ return !!(_htSurvey && _htSurvey.mode === 'weld-traverse'); }

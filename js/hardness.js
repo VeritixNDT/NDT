@@ -107,10 +107,14 @@ function htFlatRows(survey){
 }
 function htRowsOf(survey){ return htFlatRows(survey).length; }
 
-// opts: { print, sample, slice:{start,count} }. When slice.start>0 this is a
-// continuation sheet — render only the (sliced) readings table, no chart.
+// opts: { print, sample, slice:{start,count}, part }. part selects which place
+// card this is: 'method' = the methodology drawing only; 'results' = caption +
+// details + profile + readings table; 'all' (default) = everything stacked (used
+// by the form preview). When slice.start>0 this is a continuation sheet — render
+// only the (sliced) readings table.
 function htRenderSurvey(survey, opts){
   opts = opts || {};
+  var part = opts.part || 'all';
   var hasData = function(s){ return s && (s.rows || s.zones || s.points); };
   // Editor/preview fallback (no real survey): show the SITE methodology example
   // — the pipe + clock-position drawing — so the designer sees that layout. Pass
@@ -122,34 +126,39 @@ function htRenderSurvey(survey, opts){
   var site = survey.mode === 'site-piping';
   var slice = opts.slice || null;
   var continued = !!(slice && slice.start > 0) && !site;   // site table is small — never paginated
+  if(continued) part = 'results';                          // continuation sheets carry only the table
+  var wantMethod = (part === 'all' || part === 'method');
+  var wantResults = (part === 'all' || part === 'results');
 
   // Section title bar — same look as the report's items-table heading strip.
-  var title = continued ? 'HARDNESS SURVEY — READINGS (CONTINUED)' : 'HARDNESS SURVEY';
+  var title = continued ? 'HARDNESS SURVEY — READINGS (CONTINUED)' : (part === 'method' ? 'HARDNESS SURVEY — MEASUREMENT METHOD' : 'HARDNESS SURVEY');
   var titleBar = '<div style="background:'+bar+';color:#fff;font:700 11px \'Geist\',system-ui,sans-serif;letter-spacing:.06em;text-align:center;padding:4px 8px">'+title+'</div>';
   var capRow = '';
-  if(!continued){
+  if(wantResults && !continued){
     var peak = htPeak(survey), v = htVerdict(survey);
     var sub = site ? ('Site · 5 points across the weld · '+htBoreClocksText(survey)+' · avg per point') : 'Weld traverse · avg of 3 per point';
     var verdict = limit ? ((v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')') : '';
     capRow = '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 8px;font:400 8px \'Geist Mono\',monospace;color:'+P.mut+';border-bottom:0.5px solid '+P.grid+'"><span>'+escapeHtml(scale)+' · '+sub+'</span><span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(verdict?(' · '+verdict):'')+'</span></div>';
   }
-  // Layout (first sheet): the schematic DRAWING is referenced once at the top,
-  // then the data follows below it — hardness profile, the examination-details
-  // table (weld id + auto Pass/Fail) and the readings table. Continuation sheets
-  // repeat only the (sliced) readings table.
+  // 'method' = the schematic drawing place card. 'results' = the data place card
+  // (profile + examination-details + readings table).
   var diagram = '', profile = '', details = '';
-  if(!continued){
+  if(wantMethod && !continued){
     diagram = '<div style="padding:6px 8px 2px">' + (site ? _htSiteMethod(survey, P) : _htWeldDiagram(survey, P, limit, scale)) + '</div>';
+  }
+  if(wantResults && !continued){
     details = _htDetailsTable(survey, P, limit, bar);
     // profile sits flush on top of the readings table — one combined data element
     profile = '<div style="padding:6px 8px 0">' + (site ? _htSiteProfile(survey, P, limit) : _htWeldProfile(survey, P, limit, scale)) + '</div>';
   }
-  var table;
-  if(site){ table = _htSiteTable(survey, P, limit, bar); }
-  else {
-    var rows = htFlatRows(survey);
-    var start = slice ? slice.start : 0, count = slice ? slice.count : rows.length;
-    table = _htTable(survey, P, limit, rows.slice(start, start + count), bar);
+  var table = '';
+  if(wantResults){
+    if(site){ table = _htSiteTable(survey, P, limit, bar); }
+    else {
+      var rows = htFlatRows(survey);
+      var start = slice ? slice.start : 0, count = slice ? slice.count : rows.length;
+      table = _htTable(survey, P, limit, rows.slice(start, start + count), bar);
+    }
   }
   return '<div style="outline:1px solid '+P.grid+';overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + titleBar + capRow + diagram + details + profile + table + '</div>';
 }
@@ -509,33 +518,57 @@ function htCollect(){ htReadGrid(); return _htSurvey ? JSON.parse(JSON.stringify
 // fields/result layout (same as every other method) plus a dedicated hardness-
 // survey page — so HT reports aren't just a bare survey with no report chrome.
 //
-// Migration: an earlier version seeded a survey-only template (no header). If we
-// find a template whose only content is ht-survey block(s) we rebuild it as a
-// full report. A real custom layout (any non-survey blocks) is left untouched;
-// we only append a survey page if it lacks one. v2 flag so this runs once.
-function _htSurveyPage(id){ return { label:'Hardness survey', blocks:[ { id:id, key:'ht-survey', isLayout:true, x:20, y:20, w:754, h:1040 } ] }; }
+// Migration (v3): the HT survey is now TWO place cards — 'ht-method' (the
+// methodology drawing) and 'ht-survey' (the results). Cases handled once:
+//   • no real layout (fresh / old survey-only seed) → full report + survey page
+//   • real layout but no HT cards at all            → append a survey page
+//   • has ht-survey but no ht-method (the v2 seed)  → insert a method card above
+//     each survey card so the drawing isn't lost when ht-survey went results-only
+function _htNid(){ return (typeof _cvBlockId === 'function') ? _cvBlockId() : ('ht-' + Math.random().toString(36).slice(2,9)); }
+function _htSurveyPage(){
+  return { label:'Hardness survey', blocks:[
+    { id:_htNid(), key:'ht-method', isLayout:true, x:20, y:20,  w:754, h:330 },   // methodology drawing
+    { id:_htNid(), key:'ht-survey', isLayout:true, x:20, y:360, w:754, h:620 },   // results (profile + tables)
+  ] };
+}
 function htSeedTemplateBlock(){
   try {
     var PFX = (typeof CV_METHOD_TPL_PREFIX !== 'undefined') ? CV_METHOD_TPL_PREFIX : 'vx-method-tpl-';
     var KEY = PFX + 'HT';
-    var FLAG = 'vx-ht-tpl-seeded-v2';
+    var FLAG = 'vx-ht-tpl-seeded-v3';
     if(localStorage.getItem(FLAG)) return;
     var tpl = ls(KEY, null);
     var pages = (tpl && Array.isArray(tpl.pages)) ? tpl.pages : [];
     var allBlocks = pages.reduce(function(a,p){ return a.concat(p.blocks||[]); }, []);
     var hasSurvey = allBlocks.some(function(b){ return b && b.key === 'ht-survey'; });
-    var nonSurvey = allBlocks.filter(function(b){ return b && b.key !== 'ht-survey'; }).length;
-    var sid = (typeof _cvBlockId === 'function') ? _cvBlockId() : ('ht-' + Date.now());
+    var hasMethod = allBlocks.some(function(b){ return b && b.key === 'ht-method'; });
+    var nonSurvey = allBlocks.filter(function(b){ return b && b.key !== 'ht-survey' && b.key !== 'ht-method'; }).length;
 
     if(nonSurvey === 0){
       // Fresh, or the old survey-only seed → build a full report + survey page.
       var page1 = (typeof cvDefaultLayoutBlocks === 'function') ? cvDefaultLayoutBlocks() : [];
-      var newPages = page1.length ? [ { label:'Report', blocks:page1 }, _htSurveyPage(sid) ] : [ _htSurveyPage(sid) ];
-      lss(KEY, { pages:newPages, nextId: (allBlocks.length + page1.length + 4), savedAt: new Date().toISOString() });
-    } else if(!hasSurvey){
-      // Real custom layout but no survey → append a survey page, leave the rest.
-      tpl.pages.push(_htSurveyPage(sid));
-      tpl.nextId = (tpl.nextId || allBlocks.length) + 2;
+      var newPages = page1.length ? [ { label:'Report', blocks:page1 }, _htSurveyPage() ] : [ _htSurveyPage() ];
+      lss(KEY, { pages:newPages, nextId: (allBlocks.length + page1.length + 6), savedAt: new Date().toISOString() });
+    } else if(!hasSurvey && !hasMethod){
+      // Real custom layout but no HT cards → append a survey page, leave the rest.
+      tpl.pages.push(_htSurveyPage());
+      tpl.nextId = (tpl.nextId || allBlocks.length) + 3;
+      lss(KEY, tpl);
+    } else if(hasSurvey && !hasMethod){
+      // v2 single-card template → insert a method card above each survey card so
+      // the methodology drawing isn't lost (ht-survey now renders results-only).
+      pages.forEach(function(p){
+        var blocks = p.blocks || [];
+        for(var i = 0; i < blocks.length; i++){
+          if(blocks[i] && blocks[i].key === 'ht-survey'){
+            var sb = blocks[i];
+            var method = { id:_htNid(), key:'ht-method', isLayout:true, x:(sb.x||20), y:(sb.y||20), w:(sb.w||754), h:330 };
+            sb.y = (sb.y || 20) + 340; sb.h = Math.max(560, (sb.h || 1040) - 340);
+            blocks.splice(i, 0, method); i++;   // skip the inserted method card
+          }
+        }
+      });
+      tpl.nextId = (tpl.nextId || allBlocks.length) + 3;
       lss(KEY, tpl);
     }
     localStorage.setItem(FLAG, '1');

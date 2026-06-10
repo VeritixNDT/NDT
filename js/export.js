@@ -266,7 +266,7 @@ function cvBuildPrintHTML(report){
     // Hardness-survey block: the survey page is meaningful only when the report
     // actually carries recorded readings (an HT report with the seeded survey
     // page but no readings shouldn't print an empty "No survey" sheet).
-    if(b.key === 'ht-survey') return !(report && report.hardnessSurvey && typeof htVerdict === 'function' && htVerdict(report.hardnessSurvey).total > 0);
+    if(b.key === 'ht-survey' || b.key === 'ht-method') return !(report && report.hardnessSurvey && typeof htVerdict === 'function' && htVerdict(report.hardnessSurvey).total > 0);
     return false; // any other primary block is treated as content-bearing
   };
   // First page in the plan is always the main report — never skip it

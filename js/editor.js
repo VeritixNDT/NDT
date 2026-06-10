@@ -421,7 +421,8 @@ var CV_LAYOUT_ITEMS = [
   {key:'items-table',    label:'Examination details',        w:754,h:90},
   {key:'revision-history',label:'Revision history',           w:260,h:64},
   {key:'method-block',   label:'Method-specific data block', w:754,h:90},
-  {key:'ht-survey',      label:'Hardness survey (HT)',       w:754,h:520},
+  {key:'ht-method',      label:'Hardness method (HT)',       w:754,h:330},
+  {key:'ht-survey',      label:'Hardness survey (HT)',       w:754,h:560},
   {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
   // Billing (invoice/quote) layout blocks.
   {key:'bill-to',          label:'Bill to (customer)',        w:320,h:90},
@@ -3023,19 +3024,22 @@ function cvRenderBlockContent(block, report, preview){
       return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🖼</span>${_h(block.text||'Saved logo (removed)')}</div>`;
     }
     switch(key){
+      case 'ht-method':
       case 'ht-survey':
-        // Hardness survey visual (cross-section / zone strip + profile + readings).
-        // Same renderer as the report form preview, so screen and PDF match.
-        // In the template editor (design canvas + preview, any preview method)
-        // always show example details so the designer sees the page layout. The
-        // non-HT gate and the real survey only apply to an actual print pass
-        // (_cvPrintPageNum > 0); an empty survey's page is dropped by the planner,
-        // so sample data never leaks into a real PDF.
+        // Two HT place cards from one renderer: 'ht-method' = the measurement
+        // methodology drawing; 'ht-survey' = the results (profile + details +
+        // readings table). Same renderer as the report form preview, so screen
+        // and PDF match. In the template editor (design canvas + preview, any
+        // preview method) always show example details so the designer sees the
+        // layout. The non-HT gate + real survey only apply to a real print pass
+        // (_cvPrintPageNum > 0); an empty survey's page is dropped by the planner.
         var _htPrinting = (typeof _cvPrintPageNum !== 'undefined' && _cvPrintPageNum > 0);
         if(_htPrinting && report && report.method && report.method !== 'HT')
           return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Hardness survey — HT reports only</div>`;
+        // don't reprint the methodology drawing on readings continuation sheets
+        if(key === 'ht-method' && typeof _cvHtSlice !== 'undefined' && _cvHtSlice && _cvHtSlice.start > 0) return '';
         return (typeof htRenderSurvey === 'function')
-          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample: !_htPrinting, slice: (typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
+          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample: !_htPrinting, part: (key === 'ht-method' ? 'method' : 'results'), slice: (key === 'ht-survey' && typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
           : '';
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;

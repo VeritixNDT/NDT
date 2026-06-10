@@ -3026,13 +3026,14 @@ function cvRenderBlockContent(block, report, preview){
       case 'ht-survey':
         // Hardness survey visual (cross-section / zone strip + profile + readings).
         // Same renderer as the report form preview, so screen and PDF match.
-        if(report && report.method && report.method !== 'HT')
-          return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Hardness survey — HT reports only</div>`;
-        // In the template editor (canvas + preview) show example details so the
-        // designer sees the page layout. Only a REAL print (here _cvPrintPageNum
-        // is > 0) uses the report's actual survey — and an empty one is skipped
-        // by the page planner, so sample data never leaks into a real PDF.
+        // In the template editor (design canvas + preview, any preview method)
+        // always show example details so the designer sees the page layout. The
+        // non-HT gate and the real survey only apply to an actual print pass
+        // (_cvPrintPageNum > 0); an empty survey's page is dropped by the planner,
+        // so sample data never leaks into a real PDF.
         var _htPrinting = (typeof _cvPrintPageNum !== 'undefined' && _cvPrintPageNum > 0);
+        if(_htPrinting && report && report.method && report.method !== 'HT')
+          return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Hardness survey — HT reports only</div>`;
         return (typeof htRenderSurvey === 'function')
           ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample: !_htPrinting, slice: (typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
           : '';

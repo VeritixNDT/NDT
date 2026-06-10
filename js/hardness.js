@@ -164,7 +164,10 @@ function htRenderSurvey(survey, opts){
   survey = htNormalize(survey);
   var items = opts.items || (opts.sample ? HT_SAMPLE_ITEMS : []);
   var P = HT_P, scale = survey.scale || 'HV10', limit = parseFloat(survey.limitMax) || 0;
-  var bar = (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040';
+  // Heading bar colour is editable on the block (opts.barColor); falls back to
+  // the template section colour. Per-weld details column widths likewise.
+  var bar = opts.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040');
+  var detailWidths = (Array.isArray(opts.detailWidths) && opts.detailWidths.length === HT_DETAIL_COLS.length) ? opts.detailWidths : null;
   var site = survey.mode === 'site-piping';
   var welds = survey.welds || [];
   var slice = opts.slice || null;
@@ -197,13 +200,13 @@ function htRenderSurvey(survey, opts){
       var start = slice ? slice.start : 0, count = slice ? slice.count : welds.length;
       welds.slice(start, start + count).forEach(function(w, k){
         var idx = start + k;
-        html += _htWeldUnit(_htWeldView(survey, w), items[idx] || {}, idx, P, limit, bar, scale);
+        html += _htWeldUnit(_htWeldView(survey, w), items[idx] || {}, idx, P, limit, bar, scale, detailWidths);
       });
     } else {
       // traverse: single weld — details + profile (first sheet) then row-sliced table
       var w0 = _htWeldView(survey, welds[0] || {});
       if(!continued){
-        html += _htItemDetails(items[0] || {}, 0, P, limit, bar, w0);
+        html += _htItemDetails(items[0] || {}, 0, P, limit, bar, w0, detailWidths);
         html += '<div style="padding:6px 8px 0">' + _htWeldProfile(w0, P, limit, scale) + '</div>';
       }
       var rows = htFlatRows(survey);
@@ -217,10 +220,10 @@ function htRenderSurvey(survey, opts){
 
 // One site weld block: item-sourced details header + a compact HV chart + the
 // 12H/04H/08H clock table. Stacked by htRenderSurvey, paginated by weld.
-function _htWeldUnit(weldView, item, idx, P, limit, bar, scale){
+function _htWeldUnit(weldView, item, idx, P, limit, bar, scale, detailWidths){
   var sep = idx > 0 ? 'border-top:2px solid '+P.grid+';margin-top:8px;padding-top:2px;' : '';
   return '<div style="'+sep+'">'
-    + _htItemDetails(item, idx, P, limit, bar, weldView)
+    + _htItemDetails(item, idx, P, limit, bar, weldView, detailWidths)
     + '<div style="padding:4px 8px 0">' + _htSiteProfile(weldView, P, limit, { compact:true }) + '</div>'
     + _htSiteTable(weldView, P, limit, bar)
     + '</div>';
@@ -239,21 +242,40 @@ function _htItemResultChip(item, weldView, limit){
   if(!c) return escapeHtml(verdict);
   return '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:'+c.bg+';color:'+c.fg+';font-weight:700">'+escapeHtml(verdict)+'</span>';
 }
-function _htItemDetails(item, idx, P, limit, bar, weldView){
+// Per-weld details header — sources every Examination-details column from the
+// matching item. Column widths are editable on the ht-survey block (colWidths).
+var HT_DETAIL_COLS = [
+  { id:'weldNo',      label:'Weld / Item No.',  w:150 },
+  { id:'drawing',     label:'Drawing / ISO',    w:95  },
+  { id:'material',    label:'Material',          w:90  },
+  { id:'weldType',    label:'Weld type / prep',  w:80  },
+  { id:'weldProcess', label:'Welding process',   w:90  },
+  { id:'welders',     label:'Welder(s)',         w:90  },
+  { id:'examDate',    label:'Exam date',         w:80  },
+  { id:'dimensions',  label:'Thickness',         w:80  },
+  { id:'extent',      label:'Extent',            w:110 },
+  { id:'verdict',     label:'Result',            w:95  },
+];
+function _htItemDetails(item, idx, P, limit, bar, weldView, colWidths){
   item = item || {};
   function val(x){ return (x === '' || x == null) ? '<span style="color:#9aa6b5">—</span>' : escapeHtml(x); }
   var no = ('00' + (idx + 1)).slice(-3);
   var weldNo = no + (item.subject ? (' · ' + escapeHtml(item.subject)) : '');
-  var heads = ['Weld / Item No.', 'Drawing / ISO', 'Material', 'Welding process', 'Thickness', 'Result'];
+  var examDate = (item.examDate && typeof fmtDate === 'function') ? escapeHtml(fmtDate(item.examDate)) : val(item.examDate);
+  var heads = HT_DETAIL_COLS.map(function(c){ return c.label; });
   var cells = [
     { v:weldNo, extra:'font-weight:600' },
     { v:val(item.drawing) },
     { v:val(item.material) },
+    { v:val(item.weldType) },
     { v:val(item.weldProcess) },
+    { v:val(item.welders) },
+    { v:examDate, extra:'font-family:\'Geist Mono\',monospace' },
     { v:val(item.dimensions), extra:'font-family:\'Geist Mono\',monospace' },
+    { v:val(item.extent) },
     { v:_htItemResultChip(item, weldView, limit) }
   ];
-  return _htTableEl(heads, [{ cells:cells }], bar, P);
+  return _htTableEl(heads, [{ cells:cells }], bar, P, colWidths);
 }
 
 // Shared table builder — mirrors the report items-table look: coloured header
@@ -262,17 +284,22 @@ function _htAvgCell(a, over){
   if(a == null) return '—';
   return over ? '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600">'+a+'</span>' : String(a);
 }
-function _htTableEl(headLabels, rowsData, bar, P){
-  var head = headLabels.map(function(c){ return '<th style="padding:3px 6px;text-align:left;font:600 7.5px \'Geist Mono\',monospace;color:#fff;letter-spacing:.03em">'+escapeHtml(c)+'</th>'; }).join('');
+function _htTableEl(headLabels, rowsData, bar, P, colWidths){
+  var colgroup = '';
+  if(Array.isArray(colWidths) && colWidths.length === headLabels.length){
+    var tot = colWidths.reduce(function(s,w){ return s + (+w || 0); }, 0) || 1;
+    colgroup = '<colgroup>' + colWidths.map(function(w){ return '<col style="width:'+((+w||0)/tot*100).toFixed(3)+'%"/>'; }).join('') + '</colgroup>';
+  }
+  var head = headLabels.map(function(c){ return '<th style="padding:3px 6px;text-align:left;font:600 7.5px \'Geist Mono\',monospace;color:#fff;letter-spacing:.03em;word-break:break-word">'+escapeHtml(c)+'</th>'; }).join('');
   var n = headLabels.length;
   var body = rowsData.map(function(r){
     var cells = r.cells.map(function(cell, ci){
       var br = (ci === n-1) ? '' : ('border-right:0.5px solid '+P.grid+';');
-      return '<td style="padding:3px 6px;'+br+'border-bottom:0.5px solid '+P.grid+';font-size:8.5px;line-height:1.3;color:#000;vertical-align:middle;'+(cell.extra||'')+'">'+cell.v+'</td>';
+      return '<td style="padding:3px 6px;'+br+'border-bottom:0.5px solid '+P.grid+';font-size:8.5px;line-height:1.3;color:#000;vertical-align:middle;word-break:break-word;overflow:hidden;'+(cell.extra||'')+'">'+cell.v+'</td>';
     }).join('');
     return '<tr'+(r.rowStyle?(' style="'+r.rowStyle+'"'):'')+'>'+cells+'</tr>';
   }).join('');
-  return '<table style="width:100%;border-collapse:separate;border-spacing:0;border-top:1px solid '+P.grid+'"><thead style="background:'+bar+'"><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
+  return '<table style="width:100%;border-collapse:separate;border-spacing:0;border-top:1px solid '+P.grid+';table-layout:'+(colgroup?'fixed':'auto')+'">'+colgroup+'<thead style="background:'+bar+'"><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
 }
 
 // dynamic Y domain from data + limit

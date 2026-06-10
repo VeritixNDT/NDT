@@ -309,22 +309,27 @@ function _htSiteProfile(survey, P, limit){
   s+='<text x="'+((PL+PR)/2)+'" y="26" text-anchor="middle" font-family="\'Geist\',sans-serif" font-weight="700" font-size="15" fill="#222">HV</text>';
   // gridlines + Y labels (0 → YMAX, every 50)
   for(var hh=0; hh<=YMAX; hh+=50){ var gy=ys(hh); s+='<line x1="'+PL+'" y1="'+gy+'" x2="'+PR+'" y2="'+gy+'" stroke="'+P.grid+'"/><text x="'+(PL-8)+'" y="'+(gy+4)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="10" fill="#555">'+hh+'</text>'; }
-  // grey parent-plate base band (0 → 80 HV) with a dark top surface line
-  var plateHV=80, plY=ys(plateHV);
-  s+='<rect x="'+PL+'" y="'+plY+'" width="'+(PR-PL)+'" height="'+(CB-plY)+'" fill="'+GREY+'"/>';
-  s+='<line x1="'+PL+'" y1="'+plY+'" x2="'+PR+'" y2="'+plY+'" stroke="#333" stroke-width="1.4"/>';
-  // yellow single-V butt weld groove rising from the plate (crowned cap, bevel
-  // fusion faces converging to a narrow root gap), centred on point 3
-  var wcx=zx(2), capHW=(zx(3)-zx(1))/2, capHV=104, capY=ys(capHV), rTopY=ys(16), rootY=CB, rootHW=6;
-  var d='M'+(wcx-capHW)+' '+capY
-    +' Q '+wcx+' '+(capY-13)+' '+(wcx+capHW)+' '+capY
-    +' L '+(wcx+rootHW)+' '+rTopY
-    +' L '+(wcx+rootHW)+' '+rootY
-    +' L '+(wcx-rootHW)+' '+rootY
-    +' L '+(wcx-rootHW)+' '+rTopY+' Z';
-  s+='<path d="'+d+'" fill="'+YEL+'" stroke="'+YELST+'" stroke-width="1"/>';
-  s+='<line x1="'+(wcx-capHW+10)+'" y1="'+(capY+2)+'" x2="'+(wcx-rootHW)+'" y2="'+rTopY+'" stroke="'+YELST+'" stroke-opacity=".5"/>';
-  s+='<line x1="'+(wcx+capHW-10)+'" y1="'+(capY+2)+'" x2="'+(wcx+rootHW)+'" y2="'+rTopY+'" stroke="'+YELST+'" stroke-opacity=".5"/>';
+  // ── single-V groove butt weld detail (per ASME/TWI joint geometry) drawn as
+  //    the chart base: two base-metal plates with bevelled edges (~60° included
+  //    angle), a root face + root gap, the weld metal filling the groove and a
+  //    cap reinforcement proud of the plate surface, with fusion/pass lines. ──
+  var plateHV=110, plY=ys(plateHV), T=CB-plY, wcx=zx(2);
+  var rootGap=4, rootFace=Math.max(8, T*0.10), capReinf=11;
+  var capHW=rootGap + (T-rootFace)*0.62;                 // ≈ 63° included groove
+  var capL=wcx-capHW, capR=wcx+capHW, rgL=wcx-rootGap, rgR=wcx+rootGap, rfTop=CB-rootFace;
+  // base-metal plates (left + right of the groove), bevelled inner edge + root face
+  s+='<path d="M'+PL+' '+plY+' L '+capL+' '+plY+' L '+rgL+' '+rfTop+' L '+rgL+' '+CB+' L '+PL+' '+CB+' Z" fill="'+GREY+'" stroke="#9a9a9a" stroke-width=".6"/>';
+  s+='<path d="M'+PR+' '+plY+' L '+capR+' '+plY+' L '+rgR+' '+rfTop+' L '+rgR+' '+CB+' L '+PR+' '+CB+' Z" fill="'+GREY+'" stroke="#9a9a9a" stroke-width=".6"/>';
+  // weld metal filling the V-groove (bevel faces → root face → root gap)
+  var weldD='M'+capL+' '+plY+' L '+capR+' '+plY+' L '+rgR+' '+rfTop+' L '+rgR+' '+CB+' L '+rgL+' '+CB+' L '+rgL+' '+rfTop+' Z';
+  s+='<path d="'+weldD+'" fill="'+YEL+'" stroke="'+YELST+'" stroke-width="1"/>';
+  // cap reinforcement (weld face crown, proud of the plate top surface)
+  s+='<path d="M'+capL+' '+plY+' Q '+wcx+' '+(plY-capReinf)+' '+capR+' '+plY+' Z" fill="'+YEL+'" stroke="'+YELST+'" stroke-width="1"/>';
+  // weld-pass contour lines (subtle), narrowing toward the root
+  [0.42,0.72].forEach(function(f){ var yy=plY+(rfTop-plY)*f, hw=capHW-(capHW-rootGap)*f; s+='<path d="M'+(wcx-hw)+' '+yy+' Q '+wcx+' '+(yy+3)+' '+(wcx+hw)+' '+yy+'" fill="none" stroke="'+YELST+'" stroke-opacity=".4"/>'; });
+  // plate top surface line (interrupted by the weld cap)
+  s+='<line x1="'+PL+'" y1="'+plY+'" x2="'+capL+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
+  s+='<line x1="'+capR+'" y1="'+plY+'" x2="'+PR+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
   // acceptance-max line (kept for pass/fail context)
   if(limit && limit<=YMAX){ var ly=ys(limit); s+='<line x1="'+PL+'" y1="'+ly+'" x2="'+PR+'" y2="'+ly+'" stroke="'+P.red+'" stroke-width="1.2" stroke-dasharray="6 4"/><text x="'+(PR-3)+'" y="'+(ly-4)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.red+'">max '+limit+'</text>'; }
   // data line + diamond markers + value labels

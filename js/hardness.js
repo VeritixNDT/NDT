@@ -69,7 +69,7 @@ var HT_SAMPLE_WELD = { mode:'weld-traverse', scale:'HV10', limitMax:248,
   { label:'Mid',  points:[_pt('PM',-15,178,181,176),_pt('HAZ',-8,221,224,219),_pt('HAZ',-7,238,241,236),_pt('Weld',0,210,213,208),_pt('HAZ',7,236,233,239),_pt('HAZ',8,223,226,221),_pt('PM',15,177,180,175)] },
   { label:'Root', points:[_pt('PM',-15,180,177,183),_pt('HAZ',-8,225,228,223),_pt('HAZ',-7,243,246,241),_pt('Weld',0,214,217,212),_pt('HAZ',7,240,237,243),_pt('HAZ',8,226,229,224),_pt('PM',15,181,184,179)] },
 ]};
-var HT_SITE_ZONES = [['Material','PM'],['HAZ','HAZ'],['Weld','Weld'],['HAZ','HAZ'],['Material','PM']];
+var HT_SITE_ZONES = [['Base material','PM'],['HAZ','HAZ'],['Weld','Weld'],['HAZ','HAZ'],['Base material','PM']];
 function _sp(n,a,b,c){ var z = HT_SITE_ZONES[n-1]; return { n:n, label:z[0], kind:z[1], clock:{ '12H':a, '04H':b, '08H':c } }; }
 var HT_SAMPLE_SITE = { mode:'site-piping', scale:'HV10', limitMax:248, bore:'large',
   details:{ weldNo:'001 · MNT0431-P1', drawing:'ISO-P1-014', material:'P235GH', process:'GTAW + SMAW', thickness:'14.2' },
@@ -302,7 +302,10 @@ function _htSiteProfile(survey, P, limit){
   var dmax=avgs.length?Math.max.apply(null,avgs):200;
   var YMAX=Math.max(200, Math.ceil((Math.max(dmax, limit||0)+1)/50)*50);
   function ys(v){ return CT+(1-v/YMAX)*(CB-CT); }
-  function zx(i){ return PL+(i+0.5)/n*(PR-PL); }
+  // x-positions cluster points 2-3-4 at the weld and push 1/5 out (20 mm each
+  // side), mirroring the pipe methodology drawing rather than even spacing.
+  var XPOS=[-104,-16,0,16,104], xm=28;
+  function zx(i){ return (n===5) ? (PL+xm+(XPOS[i]+104)/208*(PR-PL-2*xm)) : (PL+(i+0.5)/n*(PR-PL)); }
   var WELD='#a9cbee', WELDST='#2c5b96', GREY='#cacaca', BLUE='#3f6fb5';
   var s='';
   // title
@@ -330,8 +333,9 @@ function _htSiteProfile(survey, P, limit){
     +' Q '+wcx+' '+(CB+rootPenet)+' '+rgL+' '+CB
     +' Q '+(capL-8)+' '+midY+' '+toeL+' '+plY+' Z';
   s+='<path d="'+weldD+'" fill="'+WELD+'" stroke="'+WELDST+'" stroke-width="1"/>';
-  // original bevel prep, drawn on top of the bead — the weld fuses BEYOND it
-  s+='<path d="M'+capL+' '+plY+' L '+rgL+' '+rfTop+' M '+capR+' '+plY+' L '+rgR+' '+rfTop+'" fill="none" stroke="'+WELDST+'" stroke-width=".8" stroke-dasharray="3 2" stroke-opacity=".7"/>';
+  // original groove prep, drawn on top of the bead — bevel faces plus the
+  // vertical root face (land) above the root gap; the weld fuses BEYOND it
+  s+='<path d="M'+capL+' '+plY+' L '+rgL+' '+rfTop+' L '+rgL+' '+CB+' M '+capR+' '+plY+' L '+rgR+' '+rfTop+' L '+rgR+' '+CB+'" fill="none" stroke="'+WELDST+'" stroke-width=".8" stroke-dasharray="3 2" stroke-opacity=".7"/>';
   // plate top surface line (interrupted by the weld toes)
   s+='<line x1="'+PL+'" y1="'+plY+'" x2="'+toeL+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';
   s+='<line x1="'+toeR+'" y1="'+plY+'" x2="'+PR+'" y2="'+plY+'" stroke="#333" stroke-width="1.2"/>';

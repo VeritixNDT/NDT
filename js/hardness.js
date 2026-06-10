@@ -304,7 +304,7 @@ function _htSiteProfile(survey, P, limit){
   function ys(v){ return CT+(1-v/YMAX)*(CB-CT); }
   // x-positions cluster points 2-3-4 at the weld and push 1/5 out (20 mm each
   // side), mirroring the pipe methodology drawing rather than even spacing.
-  var XPOS=[-104,-16,0,16,104], xm=28;
+  var XPOS=[-104,-26,0,26,104], xm=28;
   function zx(i){ return (n===5) ? (PL+xm+(XPOS[i]+104)/208*(PR-PL-2*xm)) : (PL+(i+0.5)/n*(PR-PL)); }
   var WELD='#a9cbee', WELDST='#2c5b96', GREY='#cacaca', BLUE='#3f6fb5';
   var s='';

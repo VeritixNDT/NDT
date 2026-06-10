@@ -85,7 +85,10 @@ function htRowsOf(survey){ return htFlatRows(survey).length; }
 function htRenderSurvey(survey, opts){
   opts = opts || {};
   var hasData = function(s){ return s && (s.rows || s.zones || s.points); };
-  if(!hasData(survey) && opts.sample) survey = HT_SAMPLE_WELD;
+  // Editor/preview fallback (no real survey): show the SITE methodology example
+  // — the pipe + clock-position drawing — so the designer sees that layout. Pass
+  // opts.sampleMode:'weld' to fall back to the weld traverse example instead.
+  if(!hasData(survey) && opts.sample) survey = (opts.sampleMode === 'weld') ? HT_SAMPLE_WELD : HT_SAMPLE_SITE;
   if(!hasData(survey)) return '<div style="padding:18px;color:#9aa6b5;font-size:11px;text-align:center">No hardness survey recorded.</div>';
   var P = HT_P, scale = survey.scale || 'HV10', limit = parseFloat(survey.limitMax) || 0;
   var site = survey.mode === 'site-piping';

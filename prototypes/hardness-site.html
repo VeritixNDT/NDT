@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Site HT (process piping) — prototype</title>
+<title>Site HT (process piping) — prototype v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -16,119 +16,153 @@
   .ht-controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
   svg.ht-svg{display:block;width:100%;height:auto}
   .tbl td.over{color:var(--red);font-weight:600}
+  .tbl tr.avg td{background:rgba(245,166,35,.07);font-weight:700}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="proto-banner">● PROTOTYPE · sample data · site HT for process piping</div>
+  <div class="proto-banner">● PROTOTYPE v2 · site HT · methodology + clock-position readings</div>
   <div class="sh" style="margin-bottom:18px"><div class="sh-left"><div class="sc-title" style="font-size:24px">Site hardness — process piping</div><div style="color:var(--t3);font-size:13px;margin-top:4px" id="ht-meta"></div></div></div>
 
   <div class="ht-controls">
-    <div class="fld" style="width:160px"><label>Method / scale</label><input id="ht-scale" value="UCI · HV10" readonly style="color:var(--t2)"/></div>
-    <div class="fld" style="width:170px"><label>Acceptance max (HV)</label><input id="ht-limit" type="number" value="248" data-on-input="render"/></div>
-    <div class="fld" style="flex:1;min-width:200px"><label>Acceptance basis</label><input value="ASME B31.3 / NACE MR0175" readonly style="color:var(--t2)"/></div>
+    <div class="fld" style="width:200px"><label>Pipe size</label><select id="ht-bore" data-on-change="render"><option value="large">&gt; 6″ — 12 / 4 / 8 o'clock</option><option value="small">≤ 6″ — 12 o'clock only</option></select></div>
+    <div class="fld" style="width:150px"><label>Method / scale</label><input id="ht-scale" value="UCI · HV10" readonly style="color:var(--t2)"/></div>
+    <div class="fld" style="width:150px"><label>Acceptance max (HV)</label><input id="ht-limit" type="number" value="248" data-on-input="render"/></div>
   </div>
 
   <div class="ht-grid3" id="ht-kpis"></div>
 
-  <!-- Top-of-weld zone strip -->
+  <!-- Methodology drawing -->
   <div class="sc" style="margin-bottom:18px">
-    <div class="sc-head"><span class="sc-title">Surface zones — measured from the top of the weld</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">5 zones · avg of 3 per zone</span></div>
-    <div class="sc-body"><svg id="ht-strip" class="ht-svg" viewBox="0 0 900 150" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div class="sc-head"><span class="sc-title">How measurements are taken</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)" id="ht-method-cap"></span></div>
+    <div class="sc-body"><svg id="ht-method" class="ht-svg" viewBox="0 0 900 330" preserveAspectRatio="xMidYMid meet"></svg></div>
   </div>
 
-  <!-- Zone profile -->
+  <!-- Profile -->
   <div class="sc" style="margin-bottom:18px">
-    <div class="sc-head"><span class="sc-title">Hardness across zones</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">average HV per zone</span></div>
+    <div class="sc-head"><span class="sc-title">Hardness across the weld</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">average per point (1–5)</span></div>
     <div class="sc-body"><svg id="ht-chart" class="ht-svg" viewBox="0 0 900 300" preserveAspectRatio="xMidYMid meet"></svg></div>
   </div>
 
   <!-- Readings -->
   <div class="sc">
-    <div class="sc-head"><span class="sc-title">Survey readings</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">3 indentations per zone · reported value = average</span></div>
+    <div class="sc-head"><span class="sc-title">Survey readings</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">clock positions → average per point</span></div>
     <div class="sc-body" style="padding:0;overflow-x:auto"><div id="ht-table"></div></div>
   </div>
 </div>
 
 <script>
-// 5 surface zones, left→right across the weld, each with 3 readings → 1 average.
-function Z(label, kind, a, b, c){ return { label:label, kind:kind, r:[a,b,c] }; }
-var SURVEY = {
-  scale: 'HV10 (UCI)',
-  zones: [
-    Z('Material','PM',  185,182,188),
-    Z('HAZ','HAZ',      242,247,245),
-    Z('Weld','Weld',    221,224,219),
-    Z('HAZ','HAZ',      250,254,252),   // peak — exceeds 248
-    Z('Material','PM',  187,184,190),
-  ],
-};
-function avg(r){ return Math.round((r.reduce(function(s,v){return s+v;},0)/r.length)*10)/10; }
-function kindFill(k){ return k==='HAZ' ? 'rgba(245,166,35,.16)' : k==='Weld' ? 'rgba(0,212,255,.16)' : 'rgba(255,255,255,.03)'; }
-function kindStroke(k){ return k==='HAZ' ? 'var(--amber)' : k==='Weld' ? 'var(--cyan)' : 'var(--border2)'; }
-
-var PL=58, PR=820, CT=16, CB=246, YMIN=150, YMAX=280;
-function ys(h){ return CT + (1-(h-YMIN)/(YMAX-YMIN))*(CB-CT); }
-function zx(i){ var n=SURVEY.zones.length; return PL + (i+0.5)/n * (PR-PL); }   // zone centre x
+// 5 points across the weld; each read at clock positions (12H always; 04H/08H on >6").
+var POINTS = [
+  { n:1, label:'Material', kind:'PM',   clock:{ '12H':160, '04H':170, '08H':147 } },
+  { n:2, label:'HAZ',      kind:'HAZ',  clock:{ '12H':165, '04H':170, '08H':170 } },
+  { n:3, label:'Weld',     kind:'Weld', clock:{ '12H':185, '04H':187, '08H':180 } },
+  { n:4, label:'HAZ',      kind:'HAZ',  clock:{ '12H':147, '04H':143, '08H':148 } },
+  { n:5, label:'Material', kind:'PM',   clock:{ '12H':149, '04H':146, '08H':152 } },
+];
+function clocksFor(bore){ return bore === 'small' ? ['12H'] : ['12H','04H','08H']; }
+function avgOf(pt, bore){ var cs=clocksFor(bore).map(function(c){return pt.clock[c];}).filter(function(v){return v!=null&&v!=='';}); if(!cs.length) return null; return Math.round(cs.reduce(function(s,v){return s+(+v);},0)/cs.length*10)/10; }
+function kc(k){ return k==='HAZ'?'var(--amber)':k==='Weld'?'var(--cyan)':'var(--t3)'; }
 
 function tile(c,l,v,s){ return '<div class="stat-tile '+c+'"><div class="stat-label">'+l+'</div><div class="stat-val" style="font-size:26px">'+v+'</div><div class="stat-sub">'+s+'</div></div>'; }
 
 function render(){
+  var bore = document.getElementById('ht-bore').value;
   var limit = parseFloat(document.getElementById('ht-limit').value) || 248;
-  document.getElementById('ht-meta').textContent = SURVEY.scale + ' · process pipe butt weld · readings from top surface · 3 per zone (reported = average)';
-  var peak=0, peakZone='', over=0;
-  SURVEY.zones.forEach(function(z){ var a=avg(z.r); if(a>peak){peak=a;peakZone=z.label;} if(a>limit) over++; });
+  var clocks = clocksFor(bore);
+  document.getElementById('ht-meta').textContent = 'UCI · HV10 · process pipe butt weld · 5 points across the weld · ' + (bore==='small'?'≤6″ → 12 o\'clock':'>6″ → 12/4/8 o\'clock') + ' (average per point)';
+  document.getElementById('ht-method-cap').textContent = bore==='small' ? 'Ø ≤ 6 inch · single traverse @ 12 o\'clock' : 'Ø > 6 inch · 3 traverses @ 12 / 4 / 8 o\'clock';
+  var peak=0, peakLbl='', over=0;
+  POINTS.forEach(function(p){ var a=avgOf(p,bore); if(a!=null&&a>peak){peak=a;peakLbl=p.label+' ('+p.n+')';} if(a!=null&&a>limit) over++; });
   var passed = over===0;
   document.getElementById('ht-kpis').innerHTML =
-    tile('cyan','Peak hardness', peak+' HV', peakZone+' zone') +
-    tile(passed?'green':'red','Result', passed?'PASS':'FAIL', over?(over+' zone(s) over '+limit):'all ≤ '+limit+' HV') +
-    tile('violet','Indentations', SURVEY.zones.length*3, SURVEY.zones.length+' zones × 3');
-  drawStrip(limit); drawChart(limit); drawTable(limit);
+    tile('cyan','Peak hardness', peak+' HV', peakLbl) +
+    tile(passed?'green':'red','Result', passed?'PASS':'FAIL', over?(over+' point(s) over '+limit):'all ≤ '+limit+' HV') +
+    tile('violet','Indentations', 5*clocks.length, '5 points × '+clocks.length+' position'+(clocks.length>1?'s':''));
+  drawMethod(bore); drawChart(limit, bore); drawTable(bore, limit);
 }
 
-function drawStrip(limit){
-  var n=SURVEY.zones.length, top=24, h=70, gap=6;
-  var segW=(PR-PL)/n;
-  var svg='';
-  SURVEY.zones.forEach(function(z,i){
-    var x=PL+i*segW, a=avg(z.r), o=a>limit;
-    svg+='<rect x="'+(x+gap/2)+'" y="'+top+'" width="'+(segW-gap)+'" height="'+h+'" rx="6" fill="'+kindFill(z.kind)+'" stroke="'+(o?'var(--red)':kindStroke(z.kind))+'" stroke-width="'+(o?'2':'1')+'"/>';
-    // weld ripples for the weld zone
-    if(z.kind==='Weld'){ var ry=top+h/2, rx=x+gap/2+10, rw=segW-gap-20; var path='M'+rx+' '+ry; for(var s=0;s<6;s++){ path+=' q '+(rw/12)+' -7 '+(rw/6)+' 0'; } svg+='<path d="'+path+'" fill="none" stroke="var(--cyan)" stroke-opacity=".5" stroke-width="1.4"/>'; }
-    svg+='<text x="'+(x+segW/2)+'" y="'+(top-7)+'" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="'+(z.kind==='HAZ'?'var(--amber)':z.kind==='Weld'?'var(--cyan)':'var(--t3)')+'">'+z.label.toUpperCase()+'</text>';
-    svg+='<text x="'+(x+segW/2)+'" y="'+(top+h/2-2)+'" text-anchor="middle" font-family="var(--font-display)" font-weight="700" font-size="22" fill="'+(o?'var(--red)':'var(--t1)')+'">'+a+'</text>';
-    svg+='<text x="'+(x+segW/2)+'" y="'+(top+h/2+16)+'" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="var(--t3)">HV avg</text>';
+// ── Methodology: pipe side-view + 5 points + section A-A + clock end-view ──
+function drawMethod(bore){
+  var P={ ink:'var(--t1)', mut:'var(--t3)', line:'var(--border3)', cyan:'var(--cyan)', amber:'var(--amber)', steel:'rgba(158,174,195,.16)', weld:'rgba(0,212,255,.18)' };
+  var pipeL=120, pipeR=620, top=120, bot=210, cx=(pipeL+pipeR)/2;  // weld centre
+  var s='';
+  // pipe body
+  s+='<rect x="'+pipeL+'" y="'+top+'" width="'+(pipeR-pipeL)+'" height="'+(bot-top)+'" fill="'+P.steel+'" stroke="'+P.line+'"/>';
+  // weld cap band (centre)
+  s+='<rect x="'+(cx-9)+'" y="'+top+'" width="18" height="'+(bot-top)+'" fill="'+P.weld+'" stroke="'+P.cyan+'" stroke-opacity=".55"/>';
+  // weld cap crown (top + bottom ripple)
+  s+='<path d="M'+(cx-12)+' '+top+' Q '+cx+' '+(top-8)+' '+(cx+12)+' '+top+'" fill="'+P.weld+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
+  s+='<path d="M'+(cx-12)+' '+bot+' Q '+cx+' '+(bot+8)+' '+(cx+12)+' '+bot+'" fill="'+P.weld+'" stroke="'+P.cyan+'" stroke-opacity=".5"/>';
+  // flow arrow
+  s+='<line x1="'+(pipeL+30)+'" y1="'+((top+bot)/2)+'" x2="'+(cx-40)+'" y2="'+((top+bot)/2)+'" stroke="'+P.mut+'" stroke-width="1.4"/>';
+  s+='<path d="M'+(cx-40)+' '+((top+bot)/2-4)+' L '+(cx-32)+' '+((top+bot)/2)+' L '+(cx-40)+' '+((top+bot)/2+4)+'" fill="'+P.mut+'"/>';
+  s+='<text x="'+(pipeL+30)+'" y="'+((top+bot)/2-8)+'" font-family="\'Geist Mono\',monospace" font-size="9.5" fill="'+P.mut+'">Direction of flow</text>';
+  // 5 measurement points (2,3,4 clustered at weld)
+  var px=[cx-120, cx-20, cx, cx+20, cx+120];
+  var callTop=64;
+  px.forEach(function(x,i){
+    var col = (i===2)?P.cyan:(i===1||i===3)?P.amber:P.mut;
+    s+='<line x1="'+x+'" y1="'+callTop+'" x2="'+x+'" y2="'+(top-2)+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="2 2" opacity=".8"/>';
+    s+='<circle cx="'+x+'" cy="'+top+'" r="3.4" fill="'+col+'"/>';
+    s+='<circle cx="'+x+'" cy="'+callTop+'" r="9" fill="none" stroke="'+col+'"/><text x="'+x+'" y="'+(callTop+3.5)+'" text-anchor="middle" font-family="\'Funnel Display\',sans-serif" font-weight="700" font-size="11" fill="'+col+'">'+(i+1)+'</text>';
   });
-  // "top of weld" caption + arrow
-  svg+='<text x="'+PL+'" y="'+(top+h+24)+'" font-family="var(--mono)" font-size="10" fill="var(--t3)">▲ measured on the outer surface, across the weld cap</text>';
-  document.getElementById('ht-strip').innerHTML=svg;
+  // dimension lines 20 mm (point1→weld cluster, weld cluster→point5)
+  function dim(x1,x2,y,lbl){ var s2=''; s2+='<line x1="'+x1+'" y1="'+y+'" x2="'+x2+'" y2="'+y+'" stroke="'+P.mut+'" stroke-width="1"/>'; s2+='<path d="M'+x1+' '+(y-3)+' L '+(x1+6)+' '+y+' L '+x1+' '+(y+3)+'" fill="'+P.mut+'"/><path d="M'+x2+' '+(y-3)+' L '+(x2-6)+' '+y+' L '+x2+' '+(y+3)+'" fill="'+P.mut+'"/>'; s2+='<text x="'+((x1+x2)/2)+'" y="'+(y-5)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.mut+'">'+lbl+'</text>'; return s2; }
+  s+=dim(px[0], px[1], top+(bot-top)+22, '20 mm');
+  s+=dim(px[3], px[4], top+(bot-top)+22, '20 mm');
+  // section A-A through the weld
+  s+='<line x1="'+cx+'" y1="'+(top-30)+'" x2="'+cx+'" y2="'+(bot+44)+'" stroke="'+P.cyan+'" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>';
+  s+='<text x="'+(cx+5)+'" y="'+(top-32)+'" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.cyan+'">A</text>';
+  s+='<text x="'+(cx+5)+'" y="'+(bot+56)+'" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.cyan+'">A</text>';
+  // View A-A — pipe end (ring) with clock positions
+  var ex=775, ey=165, rO=62, rI=46;
+  s+='<circle cx="'+ex+'" cy="'+ey+'" r="'+rO+'" fill="'+P.steel+'" stroke="'+P.line+'"/>';
+  s+='<circle cx="'+ex+'" cy="'+ey+'" r="'+rI+'" fill="var(--bg2)" stroke="'+P.line+'"/>';
+  s+='<text x="'+ex+'" y="'+(ey-rO-24)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+P.mut+'">VIEW A–A</text>';
+  var clk = bore==='small' ? [[12,'12H']] : [[12,'12H'],[4,'04H'],[8,'08H']];
+  clk.forEach(function(c){ var ang=(c[0]/12)*2*Math.PI - Math.PI/2; var rr=(rO+rI)/2; var dx=ex+rr*Math.cos(ang), dy=ey+rr*Math.sin(ang); var lx=ex+(rO+14)*Math.cos(ang), ly=ey+(rO+14)*Math.sin(ang);
+    s+='<circle cx="'+dx+'" cy="'+dy+'" r="4.5" fill="'+P.cyan+'" stroke="#fff" stroke-width=".8"/>';
+    s+='<text x="'+lx+'" y="'+(ly+3)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9.5" fill="'+P.cyan+'">'+c[1]+'</text>'; });
+  // legend
+  var leg=[[1,'Base material','PM'],[2,'Heat-affected zone','HAZ'],[3,'Weld','Weld'],[4,'Heat-affected zone','HAZ'],[5,'Base material','PM']];
+  leg.forEach(function(z,i){ var y=300+0; s+='<text x="'+(pipeL+i*120)+'" y="305" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+kc(z[2])+'">'+z[0]+'. '+z[1]+'</text>'; });
+  document.getElementById('ht-method').innerHTML=s;
 }
 
-function drawChart(limit){
-  var svg='';
-  for(var hh=150; hh<=280; hh+=25){ svg+='<line x1="'+PL+'" y1="'+ys(hh)+'" x2="'+PR+'" y2="'+ys(hh)+'" stroke="var(--border)"/>'; svg+='<text x="'+(PL-8)+'" y="'+(ys(hh)+3.5)+'" text-anchor="end" font-family="var(--mono)" font-size="10" fill="var(--t3)">'+hh+'</text>'; }
-  // zone x labels + guide bands
-  SURVEY.zones.forEach(function(z,i){
-    var cx=zx(i), bw=(PR-PL)/SURVEY.zones.length;
-    svg+='<rect x="'+(cx-bw/2)+'" y="'+CT+'" width="'+bw+'" height="'+(CB-CT)+'" fill="'+kindFill(z.kind)+'" opacity=".5"/>';
-    svg+='<text x="'+cx+'" y="'+(CB+17)+'" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="'+(z.kind==='HAZ'?'var(--amber)':z.kind==='Weld'?'var(--cyan)':'var(--t3)')+'">'+z.label+'</text>';
-  });
-  // limit
-  if(limit>=YMIN&&limit<=YMAX){ svg+='<line x1="'+PL+'" y1="'+ys(limit)+'" x2="'+PR+'" y2="'+ys(limit)+'" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6 4"/>'; svg+='<text x="'+(PR-4)+'" y="'+(ys(limit)-5)+'" text-anchor="end" font-family="var(--mono)" font-size="10" fill="var(--red)">max '+limit+' HV</text>'; }
-  // line + points
-  var line=SURVEY.zones.map(function(z,i){ return zx(i)+','+ys(avg(z.r)); }).join(' ');
-  svg+='<polyline points="'+line+'" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-opacity=".85"/>';
-  SURVEY.zones.forEach(function(z,i){ var a=avg(z.r), o=a>limit; svg+='<circle cx="'+zx(i)+'" cy="'+ys(a)+'" r="'+(o?5:3.6)+'" fill="'+(o?'var(--red)':'var(--cyan)')+'" stroke="'+(o?'#fff':'var(--bg)')+'" stroke-width="'+(o?'1.4':'1')+'"/>'; svg+='<text x="'+zx(i)+'" y="'+(ys(a)-10)+'" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="'+(o?'var(--red)':'var(--t2)')+'">'+a+'</text>'; });
-  document.getElementById('ht-chart').innerHTML=svg;
+// ── Profile: 5 points + weld V motif ──
+function drawChart(limit, bore){
+  var PL=58, PR=820, CT=16, CB=232, YMIN=100, YMAX=Math.max(260, Math.ceil((limit+20)/50)*50);
+  function ys(v){ return CT+(1-(v-YMIN)/(YMAX-YMIN))*(CB-CT); }
+  function zx(i){ return PL+(i+0.5)/5*(PR-PL); }
+  var s='';
+  for(var hh=YMIN; hh<=YMAX; hh+=50){ s+='<line x1="'+PL+'" y1="'+ys(hh)+'" x2="'+PR+'" y2="'+ys(hh)+'" stroke="var(--border)"/><text x="'+(PL-8)+'" y="'+(ys(hh)+3)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="9" fill="var(--t3)">'+hh+'</text>'; }
+  // weld V cross-section motif at points 2-3-4 (like the reference)
+  var vx0=zx(1), vx1=zx(3), vmid=zx(2);
+  s+='<polygon points="'+vx0+','+CB+' '+vx1+','+CB+' '+(vmid+10)+','+ys(140)+' '+(vmid-10)+','+ys(140)+'" fill="rgba(245,166,35,.16)" stroke="var(--amber)" stroke-opacity=".4"/>';
+  s+='<rect x="'+PL+'" y="'+ys(120)+'" width="'+(PR-PL)+'" height="'+(CB-ys(120))+'" fill="rgba(158,174,195,.05)"/>';
+  POINTS.forEach(function(p,i){ s+='<text x="'+zx(i)+'" y="'+(CB+16)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="9.5" fill="'+kc(p.kind)+'">'+p.n+'. '+p.label+'</text>'; });
+  if(limit>=YMIN&&limit<=YMAX){ s+='<line x1="'+PL+'" y1="'+ys(limit)+'" x2="'+PR+'" y2="'+ys(limit)+'" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6 4"/><text x="'+(PR-4)+'" y="'+(ys(limit)-5)+'" text-anchor="end" font-family="\'Geist Mono\',monospace" font-size="10" fill="var(--red)">max '+limit+' HV</text>'; }
+  var line=POINTS.map(function(p,i){ var a=avgOf(p,bore); return a!=null?(zx(i)+','+ys(a)):null; }).filter(Boolean).join(' ');
+  if(line) s+='<polyline points="'+line+'" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-opacity=".9"/>';
+  POINTS.forEach(function(p,i){ var a=avgOf(p,bore); if(a==null) return; var over=a>limit; s+='<circle cx="'+zx(i)+'" cy="'+ys(a)+'" r="'+(over?5:3.8)+'" fill="'+(over?'var(--red)':'var(--cyan)')+'" stroke="var(--bg)" stroke-width="1"/><text x="'+zx(i)+'" y="'+(ys(a)-10)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="10" fill="'+(over?'var(--red)':'var(--t1)')+'">'+a+'</text>'; });
+  s+='<text x="'+(PL-44)+'" y="'+((CT+CB)/2)+'" transform="rotate(-90 '+(PL-44)+' '+((CT+CB)/2)+')" text-anchor="middle" font-size="10" fill="var(--t2)">Hardness HV</text>';
+  document.getElementById('ht-chart').innerHTML=s;
 }
 
-function drawTable(limit){
-  var rows=SURVEY.zones.map(function(z){ var a=avg(z.r), o=a>limit; var badge=z.kind==='HAZ'?'badge-amber':z.kind==='Weld'?'badge-cyan':'badge-muted';
-    return '<tr><td><span class="badge '+badge+'" style="font-size:10px">'+z.label+'</span></td><td style="font-family:var(--mono)">'+z.r[0]+'</td><td style="font-family:var(--mono)">'+z.r[1]+'</td><td style="font-family:var(--mono)">'+z.r[2]+'</td><td class="'+(o?'over':'')+'" style="font-family:var(--mono);font-weight:600">'+a+'</td><td>'+(o?'<span class="badge badge-red" style="font-size:10px">over</span>':'<span style="color:var(--t3)">—</span>')+'</td></tr>'; }).join('');
-  document.getElementById('ht-table').innerHTML='<table class="tbl" style="width:100%"><thead><tr><th>Zone</th><th>HV #1</th><th>HV #2</th><th>HV #3</th><th>Average</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+// ── Readings table: clock rows → AVG per point ──
+function drawTable(bore, limit){
+  var clocks = clocksFor(bore);
+  var head = '<tr><th>Location / point</th>'+POINTS.map(function(p){ return '<th>'+p.label+' ('+p.n+')</th>'; }).join('')+'</tr>';
+  var body = clocks.map(function(c){
+    return '<tr><td style="font-family:var(--mono);color:var(--t2)">'+c+'</td>'+POINTS.map(function(p){ var v=p.clock[c]; return '<td style="font-family:var(--mono)">'+(v==null||v===''?'—':v)+'</td>'; }).join('')+'</tr>';
+  }).join('');
+  var avgRow = '<tr class="avg"><td style="font-family:var(--mono)">AVG</td>'+POINTS.map(function(p){ var a=avgOf(p,bore), over=limit&&a!=null&&a>limit; return '<td class="'+(over?'over':'')+'" style="font-family:var(--mono)">'+(a!=null?a:'—')+'</td>'; }).join('')+'</tr>';
+  document.getElementById('ht-table').innerHTML='<table class="tbl" style="width:100%"><thead>'+head+'</thead><tbody>'+body+avgRow+'</tbody></table>';
 }
 
 document.addEventListener('input', function(e){ if(e.target.closest('[data-on-input]')) render(); });
+document.addEventListener('change', function(e){ if(e.target.closest('[data-on-change]')) render(); });
 render();
 </script>
 </body>

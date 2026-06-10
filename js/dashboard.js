@@ -1639,6 +1639,10 @@ function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   // Subject is captured per-row in the items table (one row per weld /
   // object inspected under this report cover).
   html += ovRenderItemsTable(methodId, _ovItems, merged.examRemarks || '');
+  // Hardness survey — HT only. Structured traverse / site-zone entry with a
+  // live visual that also seals into the PDF (see js/hardness.js + the
+  // editor 'ht-survey' block).
+  if(methodId === 'HT' && typeof htRenderEntrySection === 'function') html += htRenderEntrySection(merged.hardnessSurvey);
   // Defects / indications — sits right after the items table so the
   // inspector captures defect details next to the verdicts that drive
   // them. Auto-built from items with verdict === 'Not acceptable'.
@@ -2820,6 +2824,12 @@ async function ovSaveReport(mode) {
   // nothing don't bloat the save (and print pipeline drops the page).
   if(Array.isArray(_ovDrawings) && _ovDrawings.length && _ovDrawings.some(d => !!d)){
     report.drawings = _ovDrawings.map(d => d || null);
+  }
+  // Hardness survey (HT) — capture the traverse/site survey from the form grid
+  // so the visual seals into the report's frozen PDF.
+  if(_ovMethod === 'HT' && typeof htCollect === 'function'){
+    const _hs = htCollect();
+    if(_hs) report.hardnessSurvey = _hs;
   }
   // Single-photo blocks — copy any filled slots over (keyed by block.id so
   // each single-photo block in the template lands on its own render branch).

@@ -421,6 +421,7 @@ var CV_LAYOUT_ITEMS = [
   {key:'items-table',    label:'Examination details',        w:754,h:90},
   {key:'revision-history',label:'Revision history',           w:260,h:64},
   {key:'method-block',   label:'Method-specific data block', w:754,h:90},
+  {key:'ht-survey',      label:'Hardness survey (HT)',       w:754,h:520},
   {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
   // Billing (invoice/quote) layout blocks.
   {key:'bill-to',          label:'Bill to (customer)',        w:320,h:90},
@@ -3018,6 +3019,14 @@ function cvRenderBlockContent(block, report, preview){
       return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;${block.showBorder?'border:1px dashed #ddd;':''}color:#bbb;font-size:9px;gap:2px"><span style="font-size:20px">🖼</span>${_h(block.text||'Saved logo (removed)')}</div>`;
     }
     switch(key){
+      case 'ht-survey':
+        // Hardness survey visual (cross-section / zone strip + profile + readings).
+        // Same renderer as the report form preview, so screen and PDF match.
+        if(report && report.method && report.method !== 'HT')
+          return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Hardness survey — HT reports only</div>`;
+        return (typeof htRenderSurvey === 'function')
+          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample:preview })
+          : '';
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;
       case 'bill-to':{

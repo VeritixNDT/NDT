@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hardness traverse — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/styles.css">
+<style>
+  body{overflow:auto}
+  .wrap{max-width:1040px;margin:0 auto;padding:26px 28px 60px}
+  .proto-banner{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--amber);background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.25);border-radius:6px;padding:5px 11px;margin-bottom:18px}
+  .ht-grid2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px}
+  .ht-controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+  .ht-legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--t2);margin-top:6px}
+  .ht-legend .k{display:inline-flex;align-items:center;gap:6px}
+  .ht-legend .sw{width:14px;height:3px;border-radius:2px;display:inline-block}
+  svg.ht-svg{display:block;width:100%;height:auto}
+  .tbl td.over{color:var(--red);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="proto-banner">● PROTOTYPE · sample data · not yet wired into the HT report</div>
+  <div class="sh" style="margin-bottom:18px"><div class="sh-left"><div class="sc-title" style="font-size:24px">Weld hardness traverse (HT)</div><div style="color:var(--t3);font-size:13px;margin-top:4px" id="ht-meta"></div></div></div>
+
+  <div class="ht-controls">
+    <div class="fld" style="width:150px"><label>Scale</label><input id="ht-scale" value="HV10" readonly style="color:var(--t2)"/></div>
+    <div class="fld" style="width:170px"><label>Acceptance max (HV)</label><input id="ht-limit" type="number" value="248" data-on-input="render"/></div>
+    <div class="fld" style="flex:1;min-width:200px"><label>Acceptance basis</label><input value="NACE MR0175 / ISO 15156-2" readonly style="color:var(--t2)"/></div>
+  </div>
+
+  <!-- KPI tiles -->
+  <div class="ht-grid2" id="ht-kpis"></div>
+
+  <!-- Weld cross-section + profile -->
+  <div class="sc" style="margin-bottom:18px">
+    <div class="sc-head"><span class="sc-title">Weld cross-section &amp; indentation map</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">single-V butt · ISO 9015-1</span></div>
+    <div class="sc-body"><svg id="ht-section" class="ht-svg" viewBox="0 0 900 170" preserveAspectRatio="xMidYMid meet"></svg></div>
+  </div>
+
+  <div class="sc" style="margin-bottom:18px">
+    <div class="sc-head"><span class="sc-title">Hardness profile</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">HV vs. position from weld centreline</span></div>
+    <div class="sc-body">
+      <svg id="ht-chart" class="ht-svg" viewBox="0 0 900 330" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="ht-legend" id="ht-legend"></div>
+    </div>
+  </div>
+
+  <!-- Data table -->
+  <div class="sc">
+    <div class="sc-head"><span class="sc-title">Survey readings</span><span style="font-family:var(--mono);font-size:11px;color:var(--t3)">3 indentations per point · reported value = average</span></div>
+    <div class="sc-body" style="padding:0;overflow-x:auto"><div id="ht-table"></div></div>
+  </div>
+</div>
+
+<script>
+// ── sample survey ────────────────────────────────────────────────────────────
+// Each point: { zone, pos (mm from weld CL), r:[3 readings] }. Reported = mean(r).
+function P(zone, pos, a, b, c){ return { zone:zone, pos:pos, r:[a,b,c] }; }
+var SURVEY = {
+  scale: 'HV10',
+  rows: [
+    { label:'Cap',  color:'var(--cyan)',  key:'cyan',  points:[
+      P('PM',-15,182,179,184), P('PM',-12,185,188,183), P('HAZ',-9,228,231,226), P('HAZ',-7,252,258,255),
+      P('Weld',-4,221,224,219), P('Weld',0,215,218,213), P('Weld',4,223,220,226),
+      P('HAZ',7,246,243,249), P('HAZ',9,229,232,227), P('PM',12,186,189,184), P('PM',15,180,183,178) ]},
+    { label:'Mid',  color:'var(--blue)',  key:'blue',  points:[
+      P('PM',-15,178,181,176), P('PM',-12,183,180,186), P('HAZ',-9,221,224,219), P('HAZ',-7,238,241,236),
+      P('Weld',-4,216,219,214), P('Weld',0,210,213,208), P('Weld',4,218,215,221),
+      P('HAZ',7,236,233,239), P('HAZ',9,223,226,221), P('PM',12,182,185,180), P('PM',15,177,180,175) ]},
+    { label:'Root', color:'var(--green)', key:'green', points:[
+      P('PM',-15,180,177,183), P('PM',-12,184,187,182), P('HAZ',-9,225,228,223), P('HAZ',-7,243,246,241),
+      P('Weld',-4,219,222,217), P('Weld',0,214,217,212), P('Weld',4,221,218,224),
+      P('HAZ',7,240,237,243), P('HAZ',9,226,229,224), P('PM',12,185,182,188), P('PM',15,181,184,179) ]},
+  ],
+};
+function avg(r){ return Math.round((r.reduce(function(s,v){return s+v;},0)/r.length) * 10) / 10; }
+
+// ── scales (shared X across section + chart) ─────────────────────────────────
+var XMIN=-18, XMAX=18, PL=58, PR=820;        // x domain + plot left/right (px)
+function xs(p){ return PL + (p - XMIN)/(XMAX - XMIN) * (PR - PL); }
+var YMIN=150, YMAX=280, CT=16, CB=276;        // chart y domain + top/bottom (px)
+function ys(h){ return CT + (1 - (h - YMIN)/(YMAX - YMIN)) * (CB - CT); }
+
+// Indicative metallurgical zone bands (widest = cap geometry); points carry
+// their own zone in the data — bands are the visual guide.
+var BANDS = [
+  { x0:XMIN, x1:-10, fill:'rgba(255,255,255,.018)', label:'Parent' },
+  { x0:-10,  x1:-6,  fill:'rgba(245,166,35,.08)',   label:'HAZ' },
+  { x0:-6,   x1:6,   fill:'rgba(0,212,255,.07)',    label:'Weld' },
+  { x0:6,    x1:10,  fill:'rgba(245,166,35,.08)',   label:'HAZ' },
+  { x0:10,   x1:XMAX,fill:'rgba(255,255,255,.018)', label:'Parent' },
+];
+
+function render(){
+  var limit = parseFloat(document.getElementById('ht-limit').value) || 248;
+  document.getElementById('ht-meta').textContent = 'Vickers ' + SURVEY.scale + ' · single-V butt weld · 3 indentations per point (reported value = average)';
+
+  // peak + verdict
+  var peak = 0, peakWhere = '', total = 0, overCount = 0;
+  SURVEY.rows.forEach(function(row){ row.points.forEach(function(p){ var a = avg(p.r); total++; if(a > peak){ peak = a; peakWhere = p.zone + ' · ' + row.label + ' row'; } if(a > limit) overCount++; }); });
+  var passed = overCount === 0;
+
+  document.getElementById('ht-kpis').innerHTML =
+    tile('cyan','Peak hardness', peak + ' ' + SURVEY.scale, peakWhere) +
+    tile(passed?'green':'red','Result', passed ? 'PASS' : 'FAIL', overCount ? (overCount + ' point(s) over ' + limit) : 'all ≤ ' + limit + ' HV') +
+    tile('violet','Indentations', total * 3, total + ' points × 3 readings');
+
+  drawSection(limit);
+  drawChart(limit);
+  drawTable(limit);
+}
+
+function tile(c,l,v,s){ return '<div class="stat-tile ' + c + '"><div class="stat-label">' + l + '</div><div class="stat-val" style="font-size:26px">' + v + '</div><div class="stat-sub">' + s + '</div></div>'; }
+
+// ── weld cross-section schematic + indentation dots ──────────────────────────
+function drawSection(limit){
+  var topY=30, botY=140;
+  var capHalf=8, rootHalf=1.6;
+  var weld = [ [xs(-capHalf),topY],[xs(capHalf),topY],[xs(rootHalf),botY],[xs(-rootHalf),botY] ];
+  var hazW = 2.4; // mm band along each fusion line
+  function poly(pts){ return pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' '); }
+  var hazL = [ [xs(-capHalf-hazW),topY],[xs(-capHalf),topY],[xs(-rootHalf),botY],[xs(-rootHalf-hazW),botY] ];
+  var hazR = [ [xs(capHalf+hazW),topY],[xs(capHalf),topY],[xs(rootHalf),botY],[xs(rootHalf+hazW),botY] ];
+  var depths = { Cap: topY+18, Mid:(topY+botY)/2, Root: botY-18 };
+  var svg = '';
+  // parent plate
+  svg += '<rect x="'+xs(XMIN)+'" y="'+topY+'" width="'+(xs(XMAX)-xs(XMIN))+'" height="'+(botY-topY)+'" fill="rgba(255,255,255,.02)" stroke="var(--border2)"/>';
+  // HAZ bands
+  svg += '<polygon points="'+poly(hazL)+'" fill="rgba(245,166,35,.14)"/>';
+  svg += '<polygon points="'+poly(hazR)+'" fill="rgba(245,166,35,.14)"/>';
+  // weld metal
+  svg += '<polygon points="'+poly(weld)+'" fill="rgba(0,212,255,.12)" stroke="var(--cyan)" stroke-opacity=".5"/>';
+  // cap reinforcement bump
+  svg += '<path d="M'+xs(-capHalf)+' '+topY+' Q '+xs(0)+' '+(topY-11)+' '+xs(capHalf)+' '+topY+'" fill="rgba(0,212,255,.12)" stroke="var(--cyan)" stroke-opacity=".5"/>';
+  // centreline
+  svg += '<line x1="'+xs(0)+'" y1="'+(topY-14)+'" x2="'+xs(0)+'" y2="'+(botY+6)+'" stroke="var(--t3)" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/>';
+  // row dots + labels
+  SURVEY.rows.forEach(function(row){
+    var dy = depths[row.label];
+    svg += '<text x="'+(PL-12)+'" y="'+(dy+4)+'" text-anchor="end" font-family="var(--mono)" font-size="10" fill="var(--t3)">'+row.label+'</text>';
+    row.points.forEach(function(p){
+      var a = avg(p.r); var over = a > limit;
+      svg += '<circle cx="'+xs(p.pos)+'" cy="'+dy+'" r="3.4" fill="'+(over?'var(--red)':row.color)+'" stroke="'+(over?'#fff':'rgba(0,0,0,.4)')+'" stroke-width="'+(over?'1.4':'.8')+'"/>';
+    });
+  });
+  // zone captions
+  svg += '<text x="'+xs(-13.5)+'" y="'+(botY+18)+'" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="var(--t3)">PARENT</text>';
+  svg += '<text x="'+xs(-8)+'" y="'+(botY+18)+'" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="var(--amber)">HAZ</text>';
+  svg += '<text x="'+xs(0)+'" y="'+(botY+18)+'" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="var(--cyan)">WELD</text>';
+  svg += '<text x="'+xs(8)+'" y="'+(botY+18)+'" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="var(--amber)">HAZ</text>';
+  svg += '<text x="'+xs(13.5)+'" y="'+(botY+18)+'" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="var(--t3)">PARENT</text>';
+  document.getElementById('ht-section').innerHTML = svg;
+}
+
+// ── hardness profile chart ───────────────────────────────────────────────────
+function drawChart(limit){
+  var svg = '';
+  // zone bands
+  BANDS.forEach(function(b){ svg += '<rect x="'+xs(b.x0)+'" y="'+CT+'" width="'+(xs(b.x1)-xs(b.x0))+'" height="'+(CB-CT)+'" fill="'+b.fill+'"/>'; });
+  // band labels (top)
+  [['Parent',-14],['HAZ',-8],['Weld',0],['HAZ',8],['Parent',14]].forEach(function(z){
+    svg += '<text x="'+xs(z[1])+'" y="'+(CT+13)+'" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="var(--t3)">'+z[0]+'</text>';
+  });
+  // y gridlines + labels
+  for(var h=150; h<=280; h+=25){
+    svg += '<line x1="'+PL+'" y1="'+ys(h)+'" x2="'+PR+'" y2="'+ys(h)+'" stroke="var(--border)" stroke-width="1"/>';
+    svg += '<text x="'+(PL-8)+'" y="'+(ys(h)+3.5)+'" text-anchor="end" font-family="var(--mono)" font-size="10" fill="var(--t3)">'+h+'</text>';
+  }
+  // x ticks
+  [-15,-10,-5,0,5,10,15].forEach(function(p){
+    svg += '<line x1="'+xs(p)+'" y1="'+CB+'" x2="'+xs(p)+'" y2="'+(CB+4)+'" stroke="var(--t3)"/>';
+    svg += '<text x="'+xs(p)+'" y="'+(CB+17)+'" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="var(--t3)">'+p+'</text>';
+  });
+  svg += '<text x="'+((PL+PR)/2)+'" y="'+(CB+31)+'" text-anchor="middle" font-size="11" fill="var(--t2)">Position from weld centreline (mm)</text>';
+  // centreline
+  svg += '<line x1="'+xs(0)+'" y1="'+CT+'" x2="'+xs(0)+'" y2="'+CB+'" stroke="var(--t3)" stroke-dasharray="3 3" opacity=".5"/>';
+  // acceptance limit
+  if(limit >= YMIN && limit <= YMAX){
+    svg += '<line x1="'+PL+'" y1="'+ys(limit)+'" x2="'+PR+'" y2="'+ys(limit)+'" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6 4"/>';
+    svg += '<text x="'+(PR-4)+'" y="'+(ys(limit)-5)+'" text-anchor="end" font-family="var(--mono)" font-size="10" fill="var(--red)">max '+limit+' '+SURVEY.scale+'</text>';
+  }
+  // series
+  SURVEY.rows.forEach(function(row){
+    var pts = row.points.slice().sort(function(a,b){return a.pos-b.pos;});
+    var line = pts.map(function(p){ return xs(p.pos).toFixed(1)+','+ys(avg(p.r)).toFixed(1); }).join(' ');
+    svg += '<polyline points="'+line+'" fill="none" stroke="'+row.color+'" stroke-width="1.8" stroke-opacity=".85"/>';
+    pts.forEach(function(p){ var a=avg(p.r); var over=a>limit;
+      svg += '<circle cx="'+xs(p.pos)+'" cy="'+ys(a)+'" r="'+(over?4.4:3.2)+'" fill="'+(over?'var(--red)':row.color)+'" stroke="'+(over?'#fff':'var(--bg)')+'" stroke-width="'+(over?'1.4':'1')+'"/>';
+    });
+  });
+  document.getElementById('ht-chart').innerHTML = svg;
+  // legend
+  document.getElementById('ht-legend').innerHTML = SURVEY.rows.map(function(r){
+    return '<span class="k"><span class="sw" style="background:'+r.color+'"></span>'+r.label+' row</span>';
+  }).join('') + '<span class="k"><span class="sw" style="background:var(--red)"></span>over limit</span>';
+}
+
+// ── readings table (3 indents + average) ─────────────────────────────────────
+function drawTable(limit){
+  var rows = '';
+  SURVEY.rows.forEach(function(row){
+    row.points.forEach(function(p, i){
+      var a = avg(p.r); var over = a > limit;
+      var zoneBadge = p.zone==='HAZ' ? 'badge-amber' : p.zone==='Weld' ? 'badge-cyan' : 'badge-muted';
+      rows += '<tr>' +
+        (i===0 ? '<td rowspan="'+row.points.length+'" style="font-weight:600;border-right:1px solid var(--border);vertical-align:top;color:'+row.color+'">'+row.label+'</td>' : '') +
+        '<td><span class="badge '+zoneBadge+'" style="font-size:10px">'+p.zone+'</span></td>' +
+        '<td style="font-family:var(--mono)">'+(p.pos>0?'+':'')+p.pos+'</td>' +
+        '<td style="font-family:var(--mono)">'+p.r[0]+'</td>' +
+        '<td style="font-family:var(--mono)">'+p.r[1]+'</td>' +
+        '<td style="font-family:var(--mono)">'+p.r[2]+'</td>' +
+        '<td class="'+(over?'over':'')+'" style="font-family:var(--mono);font-weight:600">'+a+'</td>' +
+        '<td>'+(over?'<span class="badge badge-red" style="font-size:10px">over</span>':'<span style="color:var(--t3)">—</span>')+'</td>' +
+      '</tr>';
+    });
+  });
+  document.getElementById('ht-table').innerHTML =
+    '<table class="tbl" style="width:100%"><thead><tr><th>Survey line</th><th>Zone</th><th>Pos (mm)</th><th>HV #1</th><th>HV #2</th><th>HV #3</th><th>Average</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+document.addEventListener('input', function(e){ if(e.target.closest('[data-on-input]')) render(); });
+render();
+</script>
+</body>
+</html>

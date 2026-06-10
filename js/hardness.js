@@ -56,17 +56,41 @@ var HT_P = { ink:'#222a36', mut:'#6b7686', grid:'#dde3ec', line:'#c3ccd8',
   pmFill:'rgba(0,0,0,.022)', hazFill:'rgba(184,132,28,.10)', weldFill:'rgba(14,127,166,.08)' };
 function _htRowColors(){ return ['#0e7fa6','#3a6db5','#2f9e63']; }   // Cap / Mid / Root
 
+// Flatten the survey into table rows (one per point/zone) so the readings
+// table can be sliced for auto-pagination across printed sheets.
+function htFlatRows(survey){
+  if(!survey) return [];
+  if(survey.mode === 'site-piping') return (survey.zones || []).map(function(z){ return { line:'', zone:z.label, pos:null, r:z.r }; });
+  var out = [];
+  (survey.rows || []).forEach(function(row){ (row.points || []).forEach(function(p){ out.push({ line:row.label, zone:p.zone, pos:p.pos, r:p.r }); }); });
+  return out;
+}
+function htRowsOf(survey){ return htFlatRows(survey).length; }
+
+// opts: { print, sample, slice:{start,count} }. When slice.start>0 this is a
+// continuation sheet — render only the (sliced) readings table, no chart.
 function htRenderSurvey(survey, opts){
   opts = opts || {};
   if((!survey || (!survey.rows && !survey.zones)) && opts.sample) survey = HT_SAMPLE_WELD;
   if(!survey || (!survey.rows && !survey.zones)) return '<div style="padding:18px;color:#9aa6b5;font-size:11px;text-align:center">No hardness survey recorded.</div>';
   var P = HT_P, scale = survey.scale || 'HV10', limit = parseFloat(survey.limitMax) || 0;
-  var peak = htPeak(survey), v = htVerdict(survey);
-  var head = '<div style="display:flex;justify-content:space-between;align-items:baseline;font-family:\'Geist Mono\',monospace;font-size:10px;color:'+P.mut+';margin-bottom:6px">'
-    + '<span>Hardness survey · '+escapeHtml(scale)+' · '+(survey.mode==='site-piping'?'site (surface, 5 zones)':'weld traverse')+' · avg of 3 per point</span>'
-    + '<span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(limit?(' · '+(v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')'):'')+'</span></div>';
-  var body = survey.mode === 'site-piping' ? _htSiteSvgs(survey, P, limit, scale) : _htWeldSvgs(survey, P, limit, scale);
-  return '<div style="font-family:\'Geist\',system-ui,sans-serif">' + head + body + _htTable(survey, P, limit) + '</div>';
+  var slice = opts.slice || null;
+  var continued = !!(slice && slice.start > 0);
+  var head;
+  if(continued){
+    head = '<div style="font-family:\'Geist Mono\',monospace;font-size:10px;color:'+P.mut+';margin-bottom:6px">Hardness survey · '+escapeHtml(scale)+' — readings (continued)</div>';
+  } else {
+    var peak = htPeak(survey), v = htVerdict(survey);
+    head = '<div style="display:flex;justify-content:space-between;align-items:baseline;font-family:\'Geist Mono\',monospace;font-size:10px;color:'+P.mut+';margin-bottom:6px">'
+      + '<span>Hardness survey · '+escapeHtml(scale)+' · '+(survey.mode==='site-piping'?'site (surface, 5 zones)':'weld traverse')+' · avg of 3 per point</span>'
+      + '<span>Peak '+(peak.value||'—')+' '+escapeHtml(scale)+(limit?(' · '+(v.passed?'<b style="color:'+P.green+'">PASS</b>':'<b style="color:'+P.red+'">FAIL</b>')+' (max '+limit+')'):'')+'</span></div>';
+  }
+  var visual = continued ? '' : (survey.mode === 'site-piping' ? _htSiteSvgs(survey, P, limit, scale) : _htWeldSvgs(survey, P, limit, scale));
+  var rows = htFlatRows(survey);
+  var start = slice ? slice.start : 0;
+  var count = slice ? slice.count : rows.length;
+  var table = _htTable(survey, P, limit, rows.slice(start, start + count));
+  return '<div style="font-family:\'Geist\',system-ui,sans-serif">' + head + visual + table + '</div>';
 }
 
 // dynamic Y domain from data + limit
@@ -148,21 +172,23 @@ function _htSiteSvgs(survey, P, limit, scale){
   return strip + '<div style="height:8px"></div>' + prof;
 }
 
-function _htTable(survey, P, limit){
-  var th='style="text-align:left;padding:5px 8px;border-bottom:1px solid '+P.line+';font:600 9px \'Geist Mono\',monospace;color:'+P.mut+';text-transform:uppercase;letter-spacing:.04em"';
+// Render the readings table for a (possibly sliced) flat row list. Flat Line
+// column (no rowspan) so a slice can start/stop on any row across page breaks.
+function _htTable(survey, P, limit, flat){
+  var site = survey.mode === 'site-piping';
+  var th = 'style="text-align:left;padding:5px 8px;border-bottom:1px solid '+P.line+';font:600 9px \'Geist Mono\',monospace;color:'+P.mut+';text-transform:uppercase;letter-spacing:.04em"';
   function td(extra){ return 'style="padding:5px 8px;border-bottom:1px solid '+P.grid+';font-family:\'Geist Mono\',monospace;font-size:11px;color:'+P.ink+';'+(extra||'')+'"'; }
-  var rows='';
-  if(survey.mode==='site-piping'){
-    (survey.zones||[]).forEach(function(z){ var a=htAvg(z.r), over=limit&&a!=null&&a>limit;
-      rows+='<tr><td '+td()+'>'+escapeHtml(z.label)+'</td>'+z.r.map(function(x){return '<td '+td()+'>'+(x===''||x==null?'—':escapeHtml(x))+'</td>';}).join('')+'<td '+td('font-weight:700;'+(over?'color:'+P.red:''))+'>'+(a!=null?a:'—')+'</td></tr>'; });
-    return '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr><th '+th+'>Zone</th><th '+th+'>HV #1</th><th '+th+'>HV #2</th><th '+th+'>HV #3</th><th '+th+'>Average</th></tr></thead><tbody>'+rows+'</tbody></table>';
-  }
-  (survey.rows||[]).forEach(function(row){ (row.points||[]).forEach(function(p,i){ var a=htAvg(p.r), over=limit&&a!=null&&a>limit;
-    rows+='<tr>'+(i===0?'<td '+td('font-weight:700;vertical-align:top;border-right:1px solid '+P.grid)+' rowspan="'+row.points.length+'">'+escapeHtml(row.label)+'</td>':'')
-      +'<td '+td()+'>'+escapeHtml(p.zone||'')+'</td><td '+td()+'>'+(p.pos>0?'+':'')+escapeHtml(p.pos)+'</td>'
-      +p.r.map(function(x){return '<td '+td()+'>'+(x===''||x==null?'—':escapeHtml(x))+'</td>';}).join('')
-      +'<td '+td('font-weight:700;'+(over?'color:'+P.red:''))+'>'+(a!=null?a:'—')+'</td></tr>'; }); });
-  return '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr><th '+th+'>Line</th><th '+th+'>Zone</th><th '+th+'>Pos</th><th '+th+'>HV #1</th><th '+th+'>HV #2</th><th '+th+'>HV #3</th><th '+th+'>Average</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  var head = (site ? '' : '<th '+th+'>Line</th>') + '<th '+th+'>Zone</th>' + (site ? '' : '<th '+th+'>Pos</th>') + '<th '+th+'>HV #1</th><th '+th+'>HV #2</th><th '+th+'>HV #3</th><th '+th+'>Average</th>';
+  var rows = (flat || []).map(function(p){
+    var a = htAvg(p.r), over = limit && a != null && a > limit;
+    var c = site ? '' : '<td '+td('font-weight:600')+'>'+escapeHtml(p.line||'')+'</td>';
+    c += '<td '+td()+'>'+escapeHtml(p.zone||'')+'</td>';
+    if(!site) c += '<td '+td()+'>'+(p.pos==null||p.pos===''?'—':((p.pos>0?'+':'')+escapeHtml(p.pos)))+'</td>';
+    c += p.r.map(function(x){ return '<td '+td()+'>'+(x===''||x==null?'—':escapeHtml(x))+'</td>'; }).join('');
+    c += '<td '+td('font-weight:700;'+(over?'color:'+P.red:''))+'>'+(a!=null?a:'—')+'</td>';
+    return '<tr>'+c+'</tr>';
+  }).join('');
+  return '<table style="width:100%;border-collapse:collapse;margin-top:10px"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table>';
 }
 
 // ══════════════════════════════════════════════════════════════════════════

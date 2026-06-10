@@ -580,6 +580,10 @@ var _cvPrintPageNum = 0;
 // (null = every row).
 var _cvPrintTotal = 0;
 var _cvItemsSlice = null;
+// Set per printed sheet by cvBuildPrintHTML to paginate the hardness-survey
+// readings table (chart on the first sheet, table rows flow onto continuation
+// sheets). null = render the whole survey (form preview / editor canvas).
+var _cvHtSlice = null;
 var cvPpvShowDefects = false;
 var cvUndoStack = [];
 var cvRedoStack = [];
@@ -3025,7 +3029,7 @@ function cvRenderBlockContent(block, report, preview){
         if(report && report.method && report.method !== 'HT')
           return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Hardness survey — HT reports only</div>`;
         return (typeof htRenderSurvey === 'function')
-          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample:preview })
+          ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample:preview, slice: (typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
           : '';
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;

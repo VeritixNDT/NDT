@@ -263,6 +263,10 @@ function cvBuildPrintHTML(report){
     // paints an empty header band, so treat it as empty and let the
     // page skip if that's all the page carries.
     if(b.key === 'items-table') return !_overflow;
+    // Hardness-survey block: the survey page is meaningful only when the report
+    // actually carries recorded readings (an HT report with the seeded survey
+    // page but no readings shouldn't print an empty "No survey" sheet).
+    if(b.key === 'ht-survey') return !(report && report.hardnessSurvey && typeof htVerdict === 'function' && htVerdict(report.hardnessSurvey).total > 0);
     return false; // any other primary block is treated as content-bearing
   };
   // First page in the plan is always the main report — never skip it
@@ -275,14 +279,34 @@ function cvBuildPrintHTML(report){
     if(_primary.every(_isBlockEmpty)) return false;     // every primary block has no content — skip
     return true;
   });
-  _cvPrintTotal = _planFinal.length;
+  // Hardness-survey readings auto-pagination: the chart sits on the survey
+  // block's first sheet; overflow readings flow onto synthesised copies of that
+  // sheet (table only). Capacity estimated from the block height (chart +
+  // header reserved on sheet 1; full height for the table on continuations).
+  const _htSurvey = report && report.hardnessSurvey;
+  const _htRows = (typeof htRowsOf === 'function') ? htRowsOf(_htSurvey) : 0;
+  const _planHt = [];
+  _planFinal.forEach(entry => {
+    const _hb = (entry.page.blocks || []).find(b => b.key === 'ht-survey');
+    if(!_hb || !_htSurvey || _htRows === 0){ _planHt.push(entry); return; }
+    const _bh = (typeof _hb.h === 'number' && _hb.h > 0) ? _hb.h : 520;
+    const _rowH = 26, _reserve = (_htSurvey.mode === 'site-piping') ? 330 : 390;
+    const _cap0 = Math.max(1, Math.floor((_bh - _reserve) / _rowH));
+    if(_htRows <= _cap0){ _planHt.push(Object.assign({}, entry, { htSlice: { start:0, count:_htRows } })); return; }
+    const _capC = Math.max(1, Math.floor((_bh - 30) / _rowH));
+    _planHt.push(Object.assign({}, entry, { htSlice: { start:0, count:_cap0 } }));
+    let _hp = _cap0;
+    while(_hp < _htRows && _planHt.length < 300){ const _hc = Math.min(_capC, _htRows - _hp); _planHt.push(Object.assign({}, entry, { htSlice: { start:_hp, count:_hc } })); _hp += _hc; }
+  });
+  _cvPrintTotal = _planHt.length;
 
   let pagesHtml = '';
-  _planFinal.forEach((entry, sheetIdx) => {
+  _planHt.forEach((entry, sheetIdx) => {
     // 1-based sheet number for the page-num field; the items-table row
     // slice for this sheet (null when the table isn't paginated).
     _cvPrintPageNum = sheetIdx + 1;
     _cvItemsSlice   = entry.slice;
+    _cvHtSlice      = entry.htSlice || null;
     const page = entry.page;
     // Body blocks only — zone-tagged blocks are in the header/footer
     // fragments. Filter before sort so sort never mutates page.blocks.
@@ -329,6 +353,7 @@ function cvBuildPrintHTML(report){
     </div>`;
   });
   _cvItemsSlice   = null;
+  _cvHtSlice      = null;
   _cvPrintPageNum = 0;
 
   // Cert annex — appended after the report's last page when any linked

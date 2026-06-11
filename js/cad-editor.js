@@ -46,6 +46,7 @@ function _cadNormEl(e){
   if(e.text != null) o.text = String(e.text);
   if(e.value != null) o.value = String(e.value);
   if(e.stencil) o.stencil = e.stencil;
+  if(e.dash) o.dash = e.dash;
   return o;
 }
 function cadIsEmpty(drawing){ var d = cadNormalize(drawing); return !d || !d.elements.length; }
@@ -80,15 +81,18 @@ function _cadBackground(d, w, h, uid){
   }
   return s;
 }
+// Line-style dash array (solid / dashed / dotted), scaled to the stroke width.
+function _cadDashArr(style, sw){ sw = sw || 2; if(style === 'dashed') return (sw*3.2).toFixed(1) + ' ' + (sw*2.2).toFixed(1); if(style === 'dotted') return (sw*0.6).toFixed(1) + ' ' + (sw*2).toFixed(1); return ''; }
 function _cadRenderEl(e){
   var col = e.stroke || '#1e293b', sw = (e.strokeWidth != null ? e.strokeWidth : 2), fill = e.fill || 'none';
-  var st = 'stroke="' + col + '" stroke-width="' + sw + '" fill="' + fill + '"';
+  var dash = _cadDashArr(e.dash, sw), dashA = dash ? ' stroke-dasharray="' + dash + '" stroke-linecap="round"' : '';
+  var st = 'stroke="' + col + '" stroke-width="' + sw + '" fill="' + fill + '"' + dashA;
   switch(e.type){
     case 'line':    return '<line x1="' + e.x1 + '" y1="' + e.y1 + '" x2="' + e.x2 + '" y2="' + e.y2 + '" ' + st + ' stroke-linecap="round"/>';
     case 'rect':    return '<rect x="' + Math.min(e.x, e.x + e.w) + '" y="' + Math.min(e.y, e.y + e.h) + '" width="' + Math.abs(e.w) + '" height="' + Math.abs(e.h) + '" ' + st + '/>';
     case 'ellipse': return '<ellipse cx="' + (e.x + e.w / 2) + '" cy="' + (e.y + e.h / 2) + '" rx="' + Math.abs(e.w / 2) + '" ry="' + Math.abs(e.h / 2) + '" ' + st + '/>';
     case 'arrow':   return _cadArrow(e);
-    case 'path':    return '<polyline points="' + (e.points || []).map(function(p){ return p[0] + ',' + p[1]; }).join(' ') + '" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linejoin="round" stroke-linecap="round"/>';
+    case 'path':    return '<polyline points="' + (e.points || []).map(function(p){ return p[0] + ',' + p[1]; }).join(' ') + '" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linejoin="round" stroke-linecap="round"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>';
     case 'text':    return '<text x="' + e.x + '" y="' + e.y + '" font-family="\'Geist\',system-ui,sans-serif" font-size="' + (e.fontSize || 20) + '" fill="' + col + '">' + escapeHtml(e.text || '') + '</text>';
     case 'dim':     return _cadDim(e);
     case 'stencil': return _cadStencil(e);
@@ -104,7 +108,8 @@ function _cadArrowHead(x, y, ang, col, dir){
 }
 function _cadArrow(e){
   var col = e.stroke || '#1e293b', sw = (e.strokeWidth != null ? e.strokeWidth : 2), ang = Math.atan2(e.y2 - e.y1, e.x2 - e.x1);
-  return '<line x1="' + e.x1 + '" y1="' + e.y1 + '" x2="' + e.x2 + '" y2="' + e.y2 + '" stroke="' + col + '" stroke-width="' + sw + '" stroke-linecap="round"/>' + _cadArrowHead(e.x2, e.y2, ang, col, 1);
+  var dash = _cadDashArr(e.dash, sw);
+  return '<line x1="' + e.x1 + '" y1="' + e.y1 + '" x2="' + e.x2 + '" y2="' + e.y2 + '" stroke="' + col + '" stroke-width="' + sw + '" stroke-linecap="round"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>' + _cadArrowHead(e.x2, e.y2, ang, col, 1);
 }
 function _cadDim(e){
   var col = e.stroke || '#475569', ang = Math.atan2(e.y2 - e.y1, e.x2 - e.x1);
@@ -182,8 +187,8 @@ function cadOpenEditor(cfg){
     onSave: cfg.onSave || function(){},
     drawings: JSON.parse(JSON.stringify(cfg.drawings || {})),   // working clone
     activeId: cfg.activeId || (cfg.slots[0] && cfg.slots[0].id) || '__d',
-    tool: 'select', stroke: '#1e293b', strokeWidth: 3, snap: false,
-    selIds: [], draft: null, drag: null, marquee: null,
+    tool: 'select', stroke: '#1e293b', strokeWidth: 3, dash: '', snap: false,
+    selIds: [], draft: null, drag: null, marquee: null, pan: null, space: false, dirty: false,
     undo: {}, redo: {},
   };
   _cadEnsure(_cadEd.activeId);
@@ -196,7 +201,9 @@ function _cadFind(id){ return (_cadActive().elements || []).filter(function(e){ 
 function _cadRemove(id){ var d = _cadActive(); d.elements = d.elements.filter(function(e){ return e.id !== id; }); }
 
 // ── undo / redo (per slot) ──
-function _cadPushUndo(){ var id = _cadEd.activeId; (_cadEd.undo[id] = _cadEd.undo[id] || []).push(JSON.stringify(_cadActive().elements)); if(_cadEd.undo[id].length > 60) _cadEd.undo[id].shift(); _cadEd.redo[id] = []; }
+function _cadPushUndo(){ var id = _cadEd.activeId; (_cadEd.undo[id] = _cadEd.undo[id] || []).push(JSON.stringify(_cadActive().elements)); if(_cadEd.undo[id].length > 60) _cadEd.undo[id].shift(); _cadEd.redo[id] = []; _cadEd.dirty = true; }
+// Apply a style (stroke/strokeWidth/dash/fill) to all selected elements.
+function _cadApplyToSel(prop, val){ var els = _cadSelEls(); if(!els.length) return; _cadPushUndo(); els.forEach(function(e){ e[prop] = val; }); _cadRender(); }
 function cadUndo(){ var id = _cadEd.activeId, st = _cadEd.undo[id] || []; if(!st.length) return; (_cadEd.redo[id] = _cadEd.redo[id] || []).push(JSON.stringify(_cadActive().elements)); _cadActive().elements = JSON.parse(st.pop()); _cadEd.selIds = []; _cadRender(); }
 function cadRedo(){ var id = _cadEd.activeId, st = _cadEd.redo[id] || []; if(!st.length) return; (_cadEd.undo[id] = _cadEd.undo[id] || []).push(JSON.stringify(_cadActive().elements)); _cadActive().elements = JSON.parse(st.pop()); _cadEd.selIds = []; _cadRender(); }
 
@@ -229,7 +236,10 @@ function _cadEditorSVG(d, selIds, marquee){
   var ov = selEls.map(_cadSelOutline).join('');
   if(marquee){ var m = _cadNormRect(marquee.start, marquee.cur); ov += '<rect x="'+m[0]+'" y="'+m[1]+'" width="'+m[2]+'" height="'+m[3]+'" fill="rgba(29,78,216,.08)" stroke="#1d4ed8" stroke-width="1" stroke-dasharray="5 3" pointer-events="none"/>'; }
   var handles = selEls.length === 1 ? _cadHandles(selEls[0]) : '';
-  return '<svg id="cad-svg" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block;background:#fff;touch-action:none" xmlns="http://www.w3.org/2000/svg">' + _cadBackground(d, w, h, uid) + body + ov + handles + '</svg>';
+  var hint = (!d.elements.length && !marquee)
+    ? '<text x="'+(w/2)+'" y="'+(h/2)+'" text-anchor="middle" font-family="system-ui,sans-serif" font-size="22" fill="#c3c9d4" pointer-events="none">Pick a tool above and start drawing — or drop a stencil from the left</text>'
+    : '';
+  return '<svg id="cad-svg" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block;background:#fff;touch-action:none" xmlns="http://www.w3.org/2000/svg">' + _cadBackground(d, w, h, uid) + hint + body + ov + handles + '</svg>';
 }
 // Resize handles: endpoints for linear elements (re-point), bbox corners for
 // shapes / stencils / text (text corner-resize scales its font size).
@@ -313,7 +323,8 @@ function _cadHitShape(e){
 function _cadSelOutline(e){ var b=_cadElBounds(e); return '<rect x="'+(b[0]-6)+'" y="'+(b[1]-6)+'" width="'+(b[2]+12)+'" height="'+(b[3]+12)+'" fill="none" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="6 4" pointer-events="none"/>'; }
 
 // ── overlay DOM ──
-var CAD_TOOLS = [['select','Select'],['line','Line'],['rect','Rect'],['ellipse','Ellipse'],['arrow','Arrow'],['pen','Pen'],['text','Text'],['dim','Dim']];
+var CAD_TOOLS = [['select','Select','V'],['line','Line','L'],['rect','Rect','R'],['ellipse','Ellipse','O'],['arrow','Arrow','A'],['pen','Pen','P'],['text','Text','T'],['dim','Dim','D']];
+var CAD_SWATCHES = ['#1e293b','#991b1b','#b45309','#047857','#1d4ed8','#7c3aed','#0e7490','#ffffff'];
 function _cadBuildOverlay(){
   var old = document.getElementById('cad-overlay'); if(old) old.remove();
   var o = document.createElement('div'); o.id = 'cad-overlay';
@@ -330,10 +341,25 @@ function _cadBuildOverlay(){
         + '<div id="cad-canvas-wrap" style="width:'+dw+'px;height:'+dh+'px;box-shadow:0 6px 30px rgba(0,0,0,.5);background:#fff;flex-shrink:0"></div>'
       + '</div>'
       + _cadPanelHtml()
+    + '</div>'
+    + '<div id="cad-status" style="display:flex;gap:18px;padding:4px 14px;background:#161a22;border-top:1px solid #262d39;font-size:11px;color:#9aa4b2">'
+      + '<span id="cad-st-sel">No selection</span>'
+      + '<span style="margin-left:auto;font-family:ui-monospace,monospace" id="cad-st-xy"></span>'
+      + '<span>Shift = constrain · Scroll = zoom · Space-drag / middle-drag = pan · double-click text to edit</span>'
     + '</div>';
   document.body.appendChild(o);
   _cadWire(o);
   _cadRenderPanel();
+  _cadSetCursor();
+  _cadStatus();
+}
+// Cursor feedback per mode (crosshair while drawing, grab while panning).
+function _cadSetCursor(){
+  var st = document.getElementById('cad-stage'); if(!st) return;
+  st.style.cursor = _cadEd.pan ? 'grabbing' : (_cadEd.space ? 'grab' : (_cadEd.tool === 'select' ? 'default' : 'crosshair'));
+}
+function _cadStatus(){
+  var s = document.getElementById('cad-st-sel'); if(s){ var n = (_cadEd.selIds||[]).length; s.textContent = n === 0 ? 'No selection' : n === 1 ? '1 element selected' : (n + ' elements selected'); }
 }
 function _cadStyle(){
   return '<style>'
@@ -345,26 +371,30 @@ function _cadStyle(){
     + '</style>';
 }
 function _cadToolbarHtml(){
-  var tools = CAD_TOOLS.map(function(t){ return '<button data-cad-tool="'+t[0]+'" class="'+(_cadEd.tool===t[0]?'on':'')+'">'+t[1]+'</button>'; }).join('');
+  var tools = CAD_TOOLS.map(function(t){ return '<button data-cad-tool="'+t[0]+'" class="'+(_cadEd.tool===t[0]?'on':'')+'" title="'+t[1]+' ('+t[2]+')">'+t[1]+'</button>'; }).join('');
   var widths = [2,3,5,8].map(function(w){ return '<option value="'+w+'"'+(_cadEd.strokeWidth===w?' selected':'')+'>'+w+' px</option>'; }).join('');
+  var dashes = [['','Solid'],['dashed','Dashed'],['dotted','Dotted']].map(function(x){ return '<option value="'+x[0]+'"'+((_cadEd.dash||'')===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('');
+  var swatches = CAD_SWATCHES.map(function(c){ return '<button data-cad-swatch="'+c+'" title="'+c+'" style="width:18px;height:18px;padding:0;border-radius:4px;background:'+c+';border:1px solid rgba(0,0,0,.35)"></button>'; }).join('');
   var slotSel = _cadEd.slots.length > 1
-    ? '<span class="cad-sep"></span><label style="font-size:11px;color:#9aa4b2">Drawing</label><select data-cad-slot>'+_cadEd.slots.map(function(s){ return '<option value="'+s.id+'"'+(s.id===_cadEd.activeId?' selected':'')+'>'+escapeHtml(s.label)+'</option>'; }).join('')+'</select>'
+    ? '<span class="cad-sep"></span><label style="font-size:11px;color:#9aa4b2">Drawing</label><select data-cad-slot data-vxsel-skip="1">'+_cadEd.slots.map(function(s){ return '<option value="'+s.id+'"'+(s.id===_cadEd.activeId?' selected':'')+'>'+escapeHtml(s.label)+'</option>'; }).join('')+'</select>'
     : '';
-  return '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#161a22;border-bottom:1px solid #262d39;flex-wrap:wrap">'
+  return '<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:#161a22;border-bottom:1px solid #262d39;flex-wrap:wrap">'
     + tools
     + '<span class="cad-sep"></span>'
-    + '<label style="font-size:11px;color:#9aa4b2">Colour</label><input type="color" data-cad-color value="'+_cadEd.stroke+'" style="width:36px"/>'
-    + '<select data-cad-width>'+widths+'</select>'
+    + '<input type="color" data-cad-color value="'+_cadEd.stroke+'" title="Stroke colour" style="width:32px;padding:2px"/>'
+    + '<span style="display:inline-flex;gap:3px;align-items:center">'+swatches+'</span>'
+    + '<select data-cad-width title="Line width" data-vxsel-skip="1">'+widths+'</select>'
+    + '<select data-cad-dash title="Line style" data-vxsel-skip="1">'+dashes+'</select>'
     + '<button data-cad-act="snap" class="'+(_cadEd.snap?'on':'')+'" title="Snap to grid">Snap</button>'
     + '<span class="cad-sep"></span>'
-    + '<button data-cad-act="undo" title="Undo">Undo</button><button data-cad-act="redo" title="Redo">Redo</button>'
-    + '<button data-cad-act="delete" title="Delete selected">Delete</button>'
+    + '<button data-cad-act="undo" title="Undo (Ctrl+Z)">Undo</button><button data-cad-act="redo" title="Redo (Ctrl+Y)">Redo</button>'
+    + '<button data-cad-act="delete" title="Delete selected (Del)">Delete</button>'
     + '<span class="cad-sep"></span>'
-    + '<button data-cad-act="zoomout" title="Zoom out">−</button><span id="cad-zoom" style="font-size:11px;color:#9aa4b2;min-width:38px;text-align:center">'+Math.round((_cadEd.zoom||1)*100)+'%</span><button data-cad-act="zoomin" title="Zoom in">+</button><button data-cad-act="zoomfit" title="Fit">Fit</button>'
+    + '<button data-cad-act="zoomout" title="Zoom out">−</button><span id="cad-zoom" style="font-size:11px;color:#9aa4b2;min-width:38px;text-align:center">'+Math.round((_cadEd.zoom||1)*100)+'%</span><button data-cad-act="zoomin" title="Zoom in (scroll)">+</button><button data-cad-act="zoomfit" title="Reset zoom">Fit</button>'
     + slotSel
     + '<div style="flex:1"></div>'
-    + '<button data-cad-act="save" style="background:#15803d;border-color:#15803d;color:#fff">Save</button>'
-    + '<button data-cad-act="close">Close</button>'
+    + '<button data-cad-act="save" title="Save &amp; close" style="background:#15803d;border-color:#15803d;color:#fff">Save</button>'
+    + '<button data-cad-act="close" title="Close (discard unsaved)">Close</button>'
     + '</div>';
 }
 function _cadSyncToolbar(){
@@ -372,9 +402,11 @@ function _cadSyncToolbar(){
   o.querySelectorAll('[data-cad-tool]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-cad-tool') === _cadEd.tool); });
   o.querySelectorAll('[data-cad-stencil]').forEach(function(b){ b.classList.toggle('on', _cadEd.tool === 'stencil' && b.getAttribute('data-cad-stencil') === _cadEd.stencilId); });
   var snap = o.querySelector('[data-cad-act="snap"]'); if(snap) snap.classList.toggle('on', !!_cadEd.snap);
+  _cadSetCursor();
 }
 function _cadWire(o){
   o.addEventListener('click', function(ev){
+    var sw = ev.target.closest('[data-cad-swatch]'); if(sw){ var c = sw.getAttribute('data-cad-swatch'); _cadEd.stroke = c; var ci = o.querySelector('[data-cad-color]'); if(ci) ci.value = c; _cadApplyToSel('stroke', c); return; }
     var sb = ev.target.closest('[data-cad-stencil]'); if(sb){ _cadEd.tool = 'stencil'; _cadEd.stencilId = sb.getAttribute('data-cad-stencil'); _cadEd.selIds = []; _cadSyncToolbar(); _cadRender(); _cadRenderPanel(); return; }
     var t = ev.target.closest('[data-cad-tool]'); if(t){ _cadEd.tool = t.getAttribute('data-cad-tool'); _cadEd.selIds = []; _cadSyncToolbar(); _cadRender(); _cadRenderPanel(); return; }
     var a = ev.target.closest('[data-cad-act]'); if(!a) return;
@@ -397,11 +429,12 @@ function _cadWire(o){
     else if(act==='zoomout') _cadZoom((_cadEd.zoom||1)-0.25);
     else if(act==='zoomfit') _cadZoom(1);
     else if(act==='save') cadSave();
-    else if(act==='close') cadCloseEditor();
+    else if(act==='close') _cadRequestClose();
   });
   o.addEventListener('change', function(ev){
-    if(ev.target.matches('[data-cad-color]')) _cadEd.stroke = ev.target.value;
-    else if(ev.target.matches('[data-cad-width]')) _cadEd.strokeWidth = +ev.target.value;
+    if(ev.target.matches('[data-cad-color]')){ _cadEd.stroke = ev.target.value; _cadApplyToSel('stroke', ev.target.value); }
+    else if(ev.target.matches('[data-cad-width]')){ _cadEd.strokeWidth = +ev.target.value; _cadApplyToSel('strokeWidth', +ev.target.value); }
+    else if(ev.target.matches('[data-cad-dash]')){ _cadEd.dash = ev.target.value; _cadApplyToSel('dash', ev.target.value); }
     else if(ev.target.matches('[data-cad-slot]')){ _cadEd.activeId = ev.target.value; _cadEnsure(_cadEd.activeId); _cadEd.selIds=[]; _cadResizeWrap(); _cadRender(); _cadRenderPanel(); }
     else if(ev.target.matches('[data-cad-fillon]') && _cadEd.selIds.length===1){ var fe = _cadFind(_cadEd.selIds[0]); if(fe){ _cadPushUndo(); fe.fill = ev.target.checked ? '#cbd5e1' : 'none'; _cadRender(); _cadRenderPanel(); } }
     else if(ev.target.matches('[data-cad-bgtype]')){ var dd = _cadActive(); _cadPushUndo(); if(!dd.background) dd.background = {}; dd.background.type = ev.target.value; if(ev.target.value === 'image' && !dd.background.image){ _cadUploadBg(); } _cadRender(); _cadRenderPanel(); }
@@ -425,10 +458,23 @@ function _cadWire(o){
     var e = _cadFind(g.getAttribute('data-cad-id'));
     if(e && e.type === 'text'){ _cadStartTextEdit([e.x, e.y], e); }
   });
+  // Wheel = zoom centred on the cursor (the position under the pointer stays put).
+  stage.addEventListener('wheel', function(ev){
+    ev.preventDefault();
+    var oldZ = _cadEd.zoom || 1, nz = Math.max(0.25, Math.min(4, oldZ * (ev.deltaY < 0 ? 1.12 : 1/1.12)));
+    if(nz === oldZ) return;
+    var wrap = document.getElementById('cad-canvas-wrap'); var wr = wrap.getBoundingClientRect();
+    var fx = (ev.clientX - wr.left) / wr.width, fy = (ev.clientY - wr.top) / wr.height;
+    _cadEd.zoom = nz; _cadResizeWrap();
+    var wr2 = wrap.getBoundingClientRect();
+    stage.scrollLeft += (wr2.left + fx * wr2.width) - ev.clientX;
+    stage.scrollTop += (wr2.top + fy * wr2.height) - ev.clientY;
+  }, { passive:false });
   _cadEd._keys = function(ev){
     if(ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;   // don't hijack field typing
+    if(ev.key === ' '){ if(!_cadEd.space){ _cadEd.space = true; _cadSetCursor(); } ev.preventDefault(); return; }   // space-drag pan
     var k = ev.key.toLowerCase(), mod = ev.ctrlKey || ev.metaKey;
-    if(ev.key === 'Escape'){ cadCloseEditor(); }
+    if(ev.key === 'Escape'){ if(_cadEd.draft){ _cadRemove(_cadEd.draft.id); _cadEd.draft = null; _cadRender(); } else if(_cadEd.selIds.length){ _cadEd.selIds = []; _cadRender(); _cadRenderPanel(); } else if(_cadEd.tool !== 'select'){ _cadEd.tool = 'select'; _cadSyncToolbar(); _cadRender(); } }
     else if((ev.key === 'Delete' || ev.key === 'Backspace') && _cadEd.selIds.length){ ev.preventDefault(); _cadDeleteSel(); }
     else if(mod && k === 'z'){ ev.preventDefault(); ev.shiftKey?cadRedo():cadUndo(); _cadRenderPanel(); }
     else if(mod && k === 'y'){ ev.preventDefault(); cadRedo(); _cadRenderPanel(); }
@@ -443,7 +489,9 @@ function _cadWire(o){
       if(map[k]){ _cadEd.tool = map[k]; _cadEd.selIds = []; _cadSyncToolbar(); _cadRender(); _cadRenderPanel(); }
     }
   };
+  _cadEd._keyup = function(ev){ if(ev.key === ' '){ _cadEd.space = false; if(!_cadEd.pan) _cadSetCursor(); } };
   document.addEventListener('keydown', _cadEd._keys);
+  document.addEventListener('keyup', _cadEd._keyup);
 }
 function _cadResizeWrap(){
   var wrap = document.getElementById('cad-canvas-wrap'); if(!wrap) return;
@@ -462,6 +510,13 @@ function _cadPoint(ev){
   return [Math.round(x), Math.round(y)];
 }
 function _cadDown(ev){
+  // Pan with middle-mouse or space-drag (doesn't need a doc point).
+  if(ev.button === 1 || _cadEd.space){
+    ev.preventDefault();
+    var st = document.getElementById('cad-stage');
+    _cadEd.pan = { sx:st.scrollLeft, sy:st.scrollTop, cx:ev.clientX, cy:ev.clientY };
+    _cadSetCursor(); return;
+  }
   var p = _cadPoint(ev); if(!p) return;
   if(_cadEd.tool === 'select'){
     // resize handle drag (only when exactly one element is selected)
@@ -497,27 +552,44 @@ function _cadDown(ev){
   else if(t==='rect' || t==='ellipse'){ ne.x=p[0]; ne.y=p[1]; ne.w=0; ne.h=0; }
   else if(t==='stencil'){ ne.type='stencil'; ne.stencil=_cadEd.stencilId; ne.x=p[0]; ne.y=p[1]; ne.w=0; ne.h=0; }
   else if(t==='pen'){ ne.type='path'; ne.points=[[p[0],p[1]]]; }
+  if(_cadEd.dash && t!=='dim') ne.dash = _cadEd.dash;
   _cadEd.draft = ne; _cadActive().elements.push(ne); _cadRender();
 }
+// Shift-constrain a free corner against an anchor: square box / 45° line.
+function _cadConstrainBox(dx, dy){ var s = Math.max(Math.abs(dx), Math.abs(dy)); return [(dx<0?-s:s), (dy<0?-s:s)]; }
+function _cadConstrainLine(x1, y1, x2, y2){ var dx=x2-x1, dy=y2-y1, a=Math.atan2(dy,dx), snap=Math.round(a/(Math.PI/4))*(Math.PI/4), len=Math.hypot(dx,dy); return [Math.round(x1+len*Math.cos(snap)), Math.round(y1+len*Math.sin(snap))]; }
 function _cadMove(ev){
+  if(_cadEd.pan){ var st = document.getElementById('cad-stage'); if(st){ st.scrollLeft = _cadEd.pan.sx - (ev.clientX - _cadEd.pan.cx); st.scrollTop = _cadEd.pan.sy - (ev.clientY - _cadEd.pan.cy); } return; }
+  var xy = _cadPoint(ev); if(xy){ var sx = document.getElementById('cad-st-xy'); if(sx) sx.textContent = xy[0] + ', ' + xy[1]; }
   if(_cadEd.resize){
-    var rp = _cadPoint(ev), re = _cadFind(_cadEd.resize.id); if(re){ _cadResizeEl(re, _cadEd.resize.orig, _cadEd.resize.handle, rp); _cadRender(); } return;
+    var rp = xy, re = _cadFind(_cadEd.resize.id);
+    if(re){ if(ev.shiftKey && /^(nw|ne|se|sw)$/.test(_cadEd.resize.handle) && re.type !== 'text'){ rp = _cadResizeAspect(_cadEd.resize.orig, _cadEd.resize.handle, xy); } _cadResizeEl(re, _cadEd.resize.orig, _cadEd.resize.handle, rp); _cadRender(); }
+    return;
   }
   if(_cadEd.drag){
-    var p = _cadPoint(ev), dx = p[0]-_cadEd.drag.start[0], dy = p[1]-_cadEd.drag.start[1];
+    var dx = xy[0]-_cadEd.drag.start[0], dy = xy[1]-_cadEd.drag.start[1];
     Object.keys(_cadEd.drag.origs).forEach(function(id){ var e = _cadFind(id); if(e) _cadTranslate(e, _cadEd.drag.origs[id], dx, dy); });
     _cadRender(); return;
   }
-  if(_cadEd.marquee){ _cadEd.marquee.cur = _cadPoint(ev); _cadRender(); return; }
+  if(_cadEd.marquee){ _cadEd.marquee.cur = xy; _cadRender(); return; }
   if(!_cadEd.draft) return;
-  var q = _cadPoint(ev), d = _cadEd.draft;
-  if(d.type==='line' || d.type==='arrow' || d.type==='dim'){ d.x2=q[0]; d.y2=q[1]; }
-  else if(d.type==='rect' || d.type==='ellipse' || d.type==='stencil'){ d.w=q[0]-d.x; d.h=q[1]-d.y; }
+  var q = xy, d = _cadEd.draft;
+  if(d.type==='line' || d.type==='arrow' || d.type==='dim'){ if(ev.shiftKey){ var c=_cadConstrainLine(d.x1,d.y1,q[0],q[1]); d.x2=c[0]; d.y2=c[1]; } else { d.x2=q[0]; d.y2=q[1]; } }
+  else if(d.type==='rect' || d.type==='ellipse' || d.type==='stencil'){ if(ev.shiftKey){ var b=_cadConstrainBox(q[0]-d.x, q[1]-d.y); d.w=b[0]; d.h=b[1]; } else { d.w=q[0]-d.x; d.h=q[1]-d.y; } }
   else if(d.type==='path'){ d.points.push([q[0],q[1]]); }
   _cadRender();
 }
+// Aspect-locked corner resize (keep the original w:h ratio).
+function _cadResizeAspect(o, handle, p){
+  var b = _cadElBounds(o), ar = b[2] / (b[3] || 1);
+  var ax = (handle === 'nw' || handle === 'sw') ? b[0]+b[2] : b[0];   // fixed (opposite) corner x
+  var ay = (handle === 'nw' || handle === 'ne') ? b[1]+b[3] : b[1];   // fixed corner y
+  var dw = Math.abs(p[0]-ax), dh = Math.abs(p[1]-ay), w = Math.max(dw, dh*ar), h = w/ar;
+  return [ax + (p[0] < ax ? -w : w), ay + (p[1] < ay ? -h : h)];
+}
 function _cadUp(){
   if(!_cadEd) return;
+  if(_cadEd.pan){ _cadEd.pan = null; _cadSetCursor(); return; }
   if(_cadEd.resize){ _cadEd.resize = null; _cadRenderPanel(); return; }
   if(_cadEd.drag){ _cadEd.drag = null; _cadRenderPanel(); return; }
   if(_cadEd.marquee){
@@ -601,7 +673,7 @@ function _cadDrawingPanelHtml(){
     + '<div style="color:#9aa4b2;font-size:11px;line-height:1.5;margin-bottom:12px">Pick a tool or drop a stencil from the left. Select an element to edit it; drag the blue handles to resize; double-click text to edit.</div>'
     + '<div style="font-size:11px;font-weight:700;color:#cbd5e1;margin:6px 0 8px">Background</div>'
     + '<label style="display:block;margin-bottom:8px"><span style="display:block;color:#9aa4b2;font-size:11px;margin-bottom:3px">Type</span>'
-    + '<select data-cad-bgtype style="' + sel + '"><option value="grid"' + (!isImg ? ' selected' : '') + '>Grid</option><option value="image"' + (isImg ? ' selected' : '') + '>Image underlay</option></select></label>'
+    + '<select data-cad-bgtype data-vxsel-skip="1" style="' + sel + '"><option value="grid"' + (!isImg ? ' selected' : '') + '>Grid</option><option value="image"' + (isImg ? ' selected' : '') + '>Image underlay</option></select></label>'
     + '<button data-cad-act="bgupload" style="width:100%;margin-bottom:8px">Upload image…</button>'
     + (isImg
         ? '<label style="display:block;margin-bottom:8px"><span style="display:block;color:#9aa4b2;font-size:11px;margin-bottom:3px">Opacity</span><input type="range" min="0.1" max="1" step="0.05" value="' + (bg.opacity != null ? bg.opacity : 0.6) + '" data-cad-bgop style="width:100%"/></label>'
@@ -649,7 +721,7 @@ function _cadRenderPanel(){
     + '<button data-cad-act="delete" style="width:100%">Delete element</button>';
   panel.innerHTML = rows;
 }
-function _cadRender(){ var wrap = document.getElementById('cad-canvas-wrap'); if(wrap) wrap.innerHTML = _cadEditorSVG(_cadActive(), _cadEd.selIds, _cadEd.marquee); }
+function _cadRender(){ var wrap = document.getElementById('cad-canvas-wrap'); if(wrap) wrap.innerHTML = _cadEditorSVG(_cadActive(), _cadEd.selIds, _cadEd.marquee); _cadStatus(); }
 
 function cadSave(){
   if(!_cadEd) return;
@@ -657,9 +729,15 @@ function cadSave(){
   cadCloseEditor();
   try { onSave(snapshot); } catch(e){}
 }
+// Close from the Close button — guard unsaved changes.
+function _cadRequestClose(){
+  if(_cadEd && _cadEd.dirty && typeof window !== 'undefined' && window.confirm && !window.confirm('Discard unsaved changes to this drawing?')) return;
+  cadCloseEditor();
+}
 function cadCloseEditor(){
   var o = document.getElementById('cad-overlay'); if(o) o.remove();
   if(_cadEd && _cadEd._keys) document.removeEventListener('keydown', _cadEd._keys);
+  if(_cadEd && _cadEd._keyup) document.removeEventListener('keyup', _cadEd._keyup);
   window.removeEventListener('pointerup', _cadUp);
   _cadEd = null;
 }

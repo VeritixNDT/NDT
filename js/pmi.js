@@ -174,7 +174,7 @@ var PMI_SAMPLE_ITEMS = [
 // ══════════════════════════════════════════════════════════════════════════
 var PMI_P = { ink:'#111', mut:'#6b7280', grid:'#ddd', line:'#cbcbcb',
   blue:'#1e40af', amber:'#b45309', green:'#065f46', red:'#991b1b',
-  bandFill:'rgba(6,95,70,.12)', bandStroke:'rgba(6,95,70,.45)',
+  bandFill:'#d1fae5', bandStroke:'rgba(6,95,70,.55)',
   edgeFill:'rgba(217,119,6,.20)', edgeStroke:'rgba(180,83,9,.45)',
   steel:'rgba(20,30,55,.05)' };
 
@@ -367,7 +367,7 @@ function _pmiCompTable(comp, mode, P, bar){
   var heads = ['Element','Measured (wt%)','Spec min','Spec max','Status'];
   var statusCell = function(st, near){
     if(st === 'in' && near) return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fef3c7;color:#b45309;font-weight:600">In band · near limit</span>';
-    if(st === 'in')   return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#dcfce7;color:#065f46;font-weight:600">In band</span>';
+    if(st === 'in')   return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#d1fae5;color:#065f46;font-weight:600">In band</span>';
     if(st === 'out')  return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600">Out of band</span>';
     if(st === 'na')   return '<span style="color:#6b7280">n/a (XRF)</span>';
     return '<span style="color:#9aa6b5">—</span>';

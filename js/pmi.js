@@ -327,17 +327,20 @@ function _pmiDomain(r){
   if(lo != null && hi != null && hi > lo){ var span = Math.max(hi - lo, hi * 0.05, 0.01); d0 = lo - span * 0.8; d1 = hi + span * 0.8; }
   else if(hi != null){ d0 = 0; d1 = (hi || 1) * 1.6; }                 // ≤ max
   else if(lo != null){ d0 = lo * 0.85; d1 = (lo || 1) * 1.25; }        // ≥ min
+  else if(!isNaN(v)){ d0 = 0; d1 = Math.max(v * 1.4, 0.01); }          // no band (informational) — frame the reading
   else { d0 = 0; d1 = 1; }
   if(!isNaN(v)){ var pad = (d1 - d0) * 0.12; d0 = Math.min(d0, v - pad); d1 = Math.max(d1, v + pad); }
   if(d0 < 0) d0 = 0;
   if(d1 <= d0) d1 = d0 + 1;
   return [d0, d1];
 }
-// Composition range chart — one row per controlled element: the acceptance band
-// (min→max) as a shaded bar with the measured value plotted as a diamond, green
-// inside the band / red outside / hollow-grey when not measurable (C on XRF).
+// Composition range chart — one row per reported element. Spec-controlled
+// elements show the acceptance band (green core + amber 10% caution strips) with
+// the measured value as a diamond (green in / amber near limit / red out).
+// Always-reported extras (Mn/Cu/Nb/Fe) have no band, so they plot a neutral
+// grey marker on a plain track and are labelled "report only".
 function _pmiCompChart(comp, mode, P){
-  var rows = pmiMatch(comp, mode).rows;
+  var rows = comp && comp.grade ? pmiReportRows(comp, mode) : [];
   if(!rows.length) return '<div style="padding:8px;color:#9aa6b5;font-size:10px;text-align:center">Select a specified grade to chart its composition bands.</div>';
   var W = 794, TX0 = 196, TX1 = 560, rowH = 22, top = 22, H = top + rows.length * rowH + 10;
   var s = '';
@@ -352,20 +355,26 @@ function _pmiCompChart(comp, mode, P){
     s += '<text x="30" y="'+(cy-1)+'" font-family="\'Geist\',sans-serif" font-size="8.5" fill="'+P.mut+'">'+escapeHtml(PMI_ELEMENT_NAMES[r.el]||'')+'</text>';
     // track baseline
     s += '<line x1="'+TX0+'" y1="'+cy+'" x2="'+TX1+'" y2="'+cy+'" stroke="'+P.grid+'" stroke-width="1"/>';
-    // acceptance band: amber 10% caution strips at the spec ends, green core
-    // between (draw the amber band full-width, overlay the green core on top).
-    var bandLo = r.min != null ? r.min : d0, bandHi = r.max != null ? r.max : d1;
-    var bx0 = sx(bandLo), bx1 = sx(bandHi), z = pmiBandZones(r.band);
-    s += '<rect x="'+bx0.toFixed(1)+'" y="'+(cy-6)+'" width="'+Math.max(1,(bx1-bx0)).toFixed(1)+'" height="12" fill="'+P.edgeFill+'" stroke="'+P.edgeStroke+'" stroke-width=".7"/>';
-    if(z){
-      var cLo = sx(z.core[0] != null ? z.core[0] : bandLo), cHi = sx(z.core[1] != null ? z.core[1] : bandHi);
-      if(cHi > cLo) s += '<rect x="'+cLo.toFixed(1)+'" y="'+(cy-6)+'" width="'+(cHi-cLo).toFixed(1)+'" height="12" fill="'+P.bandFill+'" stroke="none"/>';
+    if(r.band){
+      // acceptance band: amber 10% caution strips at the spec ends, green core
+      // between (draw the amber band full-width, overlay the green core on top).
+      var bandLo = r.min != null ? r.min : d0, bandHi = r.max != null ? r.max : d1;
+      var bx0 = sx(bandLo), bx1 = sx(bandHi), z = pmiBandZones(r.band);
+      s += '<rect x="'+bx0.toFixed(1)+'" y="'+(cy-6)+'" width="'+Math.max(1,(bx1-bx0)).toFixed(1)+'" height="12" fill="'+P.edgeFill+'" stroke="'+P.edgeStroke+'" stroke-width=".7"/>';
+      if(z){
+        var cLo = sx(z.core[0] != null ? z.core[0] : bandLo), cHi = sx(z.core[1] != null ? z.core[1] : bandHi);
+        if(cHi > cLo) s += '<rect x="'+cLo.toFixed(1)+'" y="'+(cy-6)+'" width="'+(cHi-cLo).toFixed(1)+'" height="12" fill="'+P.bandFill+'" stroke="none"/>';
+      }
+      // band edge labels
+      if(r.min != null && r.min > 0) s += '<text x="'+bx0.toFixed(1)+'" y="'+(cy+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">'+r.min+'</text>';
+      if(r.max != null) s += '<text x="'+bx1.toFixed(1)+'" y="'+(cy+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">'+r.max+'</text>';
+    } else {
+      // informational element — no acceptance band to evaluate against
+      s += '<text x="'+TX0+'" y="'+(cy+15)+'" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="#9aa6b5">report only</text>';
     }
-    // band edge labels
-    if(r.min != null && r.min > 0) s += '<text x="'+bx0.toFixed(1)+'" y="'+(cy+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">'+r.min+'</text>';
-    if(r.max != null) s += '<text x="'+bx1.toFixed(1)+'" y="'+(cy+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">'+r.max+'</text>';
-    // measured marker — red out of band, amber within the 10% edge, green core
-    var mcol = r.state === 'out' ? P.red : (edge === 'near' ? P.amber : P.green);
+    // measured marker — red out of band, amber within the 10% edge, green core,
+    // neutral grey for informational (no-band) elements.
+    var mcol = r.state === 'out' ? P.red : (!r.spec ? P.mut : (edge === 'near' ? P.amber : P.green));
     if(r.state === 'na'){
       s += '<text x="'+((TX0+TX1)/2)+'" y="'+(cy+3)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">not measurable (XRF)</text>';
     } else if(r.state !== 'blank'){
@@ -373,16 +382,16 @@ function _pmiCompChart(comp, mode, P){
       mx = Math.max(TX0-6, Math.min(TX1+6, mx));
       s += '<polygon points="'+mx.toFixed(1)+','+(cy-6)+' '+(mx+5).toFixed(1)+','+cy+' '+mx.toFixed(1)+','+(cy+6)+' '+(mx-5).toFixed(1)+','+cy+'" fill="'+mcol+'" stroke="#fff" stroke-width=".8"/>';
     }
-    // right column: measured value + spec range
+    // right column: measured value + spec range (or "report" for extras)
     var meas = (r.state === 'blank') ? '—' : (r.state === 'na' ? 'n/a' : r.val);
     var mc = (r.state === 'blank' || r.state === 'na') ? P.mut : mcol;
     s += '<text x="'+(TX1+12)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="9" font-weight="700" fill="'+mc+'">'+escapeHtml(String(meas))+'</text>';
-    s += '<text x="'+(TX1+70)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">('+escapeHtml(pmiRangeText(r.band))+')</text>';
+    s += '<text x="'+(TX1+70)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">'+(r.spec ? '('+escapeHtml(pmiRangeText(r.band))+')' : '(report)')+'</text>';
   });
   var legend = '<div style="font-family:\'Geist\',sans-serif;font-size:9px;color:'+P.mut+';margin-top:2px;display:flex;gap:14px;flex-wrap:wrap">'
     + '<span><span style="display:inline-block;width:18px;height:8px;vertical-align:middle;background:'+P.bandFill+';border:.5px solid '+P.bandStroke+'"></span> within spec</span>'
     + '<span><span style="display:inline-block;width:18px;height:8px;vertical-align:middle;background:'+P.edgeFill+';border:.5px solid '+P.edgeStroke+'"></span> within 10% of a limit</span>'
-    + '<span><span style="display:inline-block;width:9px;height:9px;vertical-align:middle;transform:rotate(45deg);background:'+P.green+'"></span> measured · <span style="color:'+P.amber+'">amber = near limit</span> · <span style="color:'+P.red+'">red = out</span></span>'
+    + '<span><span style="display:inline-block;width:9px;height:9px;vertical-align:middle;transform:rotate(45deg);background:'+P.green+'"></span> measured · <span style="color:'+P.amber+'">amber = near limit</span> · <span style="color:'+P.red+'">red = out</span> · <span style="color:'+P.mut+'">grey = report only</span></span>'
     + '</div>';
   return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+s+'</svg>'+legend;
 }

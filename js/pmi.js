@@ -84,18 +84,43 @@ function pmiReportElements(grade){
   PMI_REPORT_EXTRA.forEach(function(e){ set[e] = 1; });
   return PMI_ELEMENT_ORDER.filter(function(e){ return set[e]; });
 }
-// Full readings rows for the report (banded + informational extras). Banded
-// elements carry their spec band + in/near/out state; extras carry state
-// 'info' (measured, not spec-controlled), 'blank', or 'na' (carbon on XRF).
-function pmiReportRows(comp, mode){
-  comp = comp || {}; mode = mode || 'oes';
-  var grade = comp.grade, readings = comp.readings || {};
-  return pmiReportElements(grade).map(function(e){
-    var band = (PMI_GRADES[grade] && PMI_GRADES[grade].el[e]) || null;
-    if(band) return { el:e, val:readings[e], min:band[0], max:band[1], band:band, state:pmiElState(readings[e], band, e, mode), spec:true };
+// A user-entered custom limit [lo, hi] (strings) → a usable band, or null when
+// both bounds are blank. Either bound may be left open.
+function _pmiLimitBand(lim){
+  if(!lim) return null;
+  var lo = (lim[0] === '' || lim[0] == null || isNaN(parseFloat(lim[0]))) ? null : parseFloat(lim[0]);
+  var hi = (lim[1] === '' || lim[1] == null || isNaN(parseFloat(lim[1]))) ? null : parseFloat(lim[1]);
+  return (lo == null && hi == null) ? null : [lo, hi];
+}
+// Resolve the acceptance band for one element on a point: the grade's spec band
+// if it controls that element, else a user-entered custom limit (for the
+// otherwise report-only extras), else none. { band, spec, custom }.
+function pmiBandFor(point, el){
+  var g = point && point.grade, gb = (PMI_GRADES[g] && PMI_GRADES[g].el[el]) || null;
+  if(gb) return { band:gb, spec:true, custom:false };
+  var cb = _pmiLimitBand((point && point.limits || {})[el]);
+  if(cb) return { band:cb, spec:false, custom:true };
+  return { band:null, spec:false, custom:false };
+}
+// Elements that gate the verdict: grade-banded + any with a custom limit set.
+function pmiCheckElements(point){
+  var set = {}; pmiElementsOf(point && point.grade).forEach(function(e){ set[e] = 1; });
+  var lims = (point && point.limits) || {};
+  Object.keys(lims).forEach(function(e){ if(_pmiLimitBand(lims[e])) set[e] = 1; });
+  return PMI_ELEMENT_ORDER.filter(function(e){ return set[e]; });
+}
+// Full readings rows for the report (banded + informational extras). An element
+// with a grade band OR a user custom limit carries that band + in/near/out
+// state; the rest are informational ('info'/'blank'/'na').
+function pmiReportRows(point, mode){
+  point = point || {}; mode = mode || 'oes';
+  var readings = point.readings || {};
+  return pmiReportElements(point.grade).map(function(e){
+    var bf = pmiBandFor(point, e), band = bf.band;
+    if(band) return { el:e, val:readings[e], min:band[0], max:band[1], band:band, state:pmiElState(readings[e], band, e, mode), spec:bf.spec, custom:bf.custom };
     var v = readings[e];
     var st = (e === 'C' && mode === 'xrf') ? 'na' : ((v === '' || v == null || isNaN(parseFloat(v))) ? 'blank' : 'info');
-    return { el:e, val:v, min:null, max:null, band:null, state:st, spec:false };
+    return { el:e, val:v, min:null, max:null, band:null, state:st, spec:false, custom:false };
   });
 }
 function pmiRangeText(band){ if(!band) return '—'; var lo = band[0], hi = band[1];
@@ -144,15 +169,17 @@ function pmiElState(val, band, elSym, mode){
 function pmiPointMatch(point, mode){
   point = point || {}; mode = mode || 'oes';
   var grade = point.grade, readings = point.readings || {};
-  var rows = pmiElementsOf(grade).map(function(e){
-    var band = PMI_GRADES[grade].el[e];
+  var els = pmiCheckElements(point);   // grade-banded + custom-limited
+  var rows = els.map(function(e){
+    var band = pmiBandFor(point, e).band;
     return { el:e, val:readings[e], min:band[0], max:band[1], band:band, state:pmiElState(readings[e], band, e, mode) };
   });
   var checkable = rows.filter(function(r){ return r.state !== 'na'; });
   var anyOut = checkable.some(function(r){ return r.state === 'out'; });
   var anyBlank = checkable.some(function(r){ return r.state === 'blank'; });
   var complete = checkable.length > 0 && !anyBlank;
-  var result = !grade ? '' : (anyOut ? 'Not acceptable' : (complete ? 'Acceptable' : ''));
+  var hasCriteria = !!grade || els.length > 0;   // a grade, or at least one custom limit
+  var result = !hasCriteria ? '' : (anyOut ? 'Not acceptable' : (complete ? 'Acceptable' : ''));
   return { result:result, complete:complete, anyOut:anyOut, rows:rows, grade:grade };
 }
 // Component verdict — rolls up its measurement points (single → 1, 3-point → 3).
@@ -180,23 +207,21 @@ function pmiSurveyVerdict(survey){
 // (a plain component); '3point' = parent · weld · parent (a welded joint), each
 // point with its own specified grade.
 var PMI_3PT_LABELS = ['Parent material','Weld','Parent material'];
-function _pmiBlankPoint(label){ return { label: label || '', grade:'', readings:{} }; }
+function _pmiBlankPoint(label){ return { label: label || '', grade:'', readings:{}, limits:{} }; }
 function _pmiBlankComponent(){ return { measMode:'single', points:[ _pmiBlankPoint('Test point') ] }; }
 // Build a component's points for a mode, preserving overlapping data. 3pt→single
 // keeps the weld point's readings; single→3pt seeds the weld point from the
 // existing single reading (parents start blank).
 function _pmiClone(o){ return Object.assign({}, o || {}); }   // shallow copy — never share readings between points
+function _pmiCloneLimits(l){ var o = {}; Object.keys(l || {}).forEach(function(k){ o[k] = (l[k] || []).slice(); }); return o; }
+function _pmiPoint(label, src){ src = src || {}; return { label:label, grade:src.grade || '', readings:_pmiClone(src.readings), limits:_pmiCloneLimits(src.limits) }; }
 function _pmiPointsForMode(measMode, existing){
   existing = existing || [];
   if(measMode === '3point'){
     var weldSrc = existing.length > 1 ? existing[1] : existing[0];
-    return PMI_3PT_LABELS.map(function(lbl, i){
-      var src = (i === 1 ? weldSrc : existing[i]) || {};
-      return { label:lbl, grade:src.grade || '', readings:_pmiClone(src.readings) };
-    });
+    return PMI_3PT_LABELS.map(function(lbl, i){ return _pmiPoint(lbl, (i === 1 ? weldSrc : existing[i])); });
   }
-  var keep = existing[1] || existing[0] || {};   // collapse → keep the weld point
-  return [ { label:'Test point', grade:keep.grade || '', readings:_pmiClone(keep.readings) } ];
+  return [ _pmiPoint('Test point', existing[1] || existing[0]) ];   // collapse → keep the weld point
 }
 function pmiDefault(mode){ return { mode: mode || 'xrf', components:[ _pmiBlankComponent() ] }; }
 // Normalise to { mode, components:[{measMode, points:[{label,grade,readings}]}] }.
@@ -212,9 +237,9 @@ function pmiNormalize(survey){
     c = c || {};
     if(Array.isArray(c.points) && c.points.length){
       var mm = c.measMode === '3point' ? '3point' : 'single';
-      return { measMode:mm, points:c.points.map(function(p){ p = p || {}; return { label:p.label || '', grade:p.grade || '', readings:p.readings || {} }; }) };
+      return { measMode:mm, points:c.points.map(function(p){ p = p || {}; return { label:p.label || '', grade:p.grade || '', readings:p.readings || {}, limits:p.limits || {} }; }) };
     }
-    return { measMode:'single', points:[ { label:'Test point', grade:c.grade || '', readings:c.readings || {} } ] };
+    return { measMode:'single', points:[ { label:'Test point', grade:c.grade || '', readings:c.readings || {}, limits:{} } ] };
   });
   if(!survey.components.length) survey.components = [ _pmiBlankComponent() ];
   return survey;
@@ -449,8 +474,9 @@ function _pmiCompChart(comp, mode, P){
       s += '<text x="'+TX0+'" y="'+(cy+15)+'" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="#9aa6b5">report only</text>';
     }
     // measured marker — red out of band, amber within the 10% edge, green core,
-    // neutral grey for informational (no-band) elements.
-    var mcol = r.state === 'out' ? P.red : (!r.spec ? P.mut : (edge === 'near' ? P.amber : P.green));
+    // neutral grey for informational (no-band) elements. A custom user limit
+    // counts as a band, so those evaluate green/amber/red like spec elements.
+    var mcol = r.state === 'out' ? P.red : (!r.band ? P.mut : (edge === 'near' ? P.amber : P.green));
     if(r.state === 'na'){
       s += '<text x="'+((TX0+TX1)/2)+'" y="'+(cy+3)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">not measurable (XRF)</text>';
     } else if(r.state !== 'blank'){
@@ -462,7 +488,7 @@ function _pmiCompChart(comp, mode, P){
     var meas = (r.state === 'blank') ? '—' : (r.state === 'na' ? 'n/a' : r.val);
     var mc = (r.state === 'blank' || r.state === 'na') ? P.mut : mcol;
     s += '<text x="'+(TX1+12)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="9" font-weight="700" fill="'+mc+'">'+escapeHtml(String(meas))+'</text>';
-    s += '<text x="'+(TX1+70)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">'+(r.spec ? '('+escapeHtml(pmiRangeText(r.band))+')' : '(report)')+'</text>';
+    s += '<text x="'+(TX1+70)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+(r.custom?P.blue:P.mut)+'">'+(r.band ? '('+escapeHtml(pmiRangeText(r.band))+(r.custom?' set':'')+')' : '(report)')+'</text>';
   });
   var legend = '<div style="font-family:\'Geist\',sans-serif;font-size:9px;color:'+P.mut+';margin-top:2px;display:flex;gap:14px;flex-wrap:wrap">'
     + '<span><span style="display:inline-block;width:18px;height:8px;vertical-align:middle;background:'+P.bandFill+';border:.5px solid '+P.bandStroke+'"></span> within spec</span>'
@@ -488,8 +514,9 @@ function _pmiCompTable(comp, mode, P, bar){
   };
   var body = rows.map(function(r){
     var near = (r.state === 'in') && pmiEdgeState(r.val, r.band) === 'near';
+    var tag = r.spec ? '' : (r.custom ? ' <span style="color:#1e40af;font-size:7.5px">(custom limit)</span>' : ' <span style="color:#9aa6b5;font-size:7.5px">(report)</span>');
     return { cells: [
-      { v:'<b>'+r.el+'</b> <span style="color:#6b7280">'+escapeHtml(PMI_ELEMENT_NAMES[r.el]||'')+'</span>' + (r.spec ? '' : ' <span style="color:#9aa6b5;font-size:7.5px">(report)</span>') },
+      { v:'<b>'+r.el+'</b> <span style="color:#6b7280">'+escapeHtml(PMI_ELEMENT_NAMES[r.el]||'')+'</span>' + tag },
       { v:(r.state==='na'?'n/a':(r.val===''||r.val==null?'—':escapeHtml(r.val))), extra:'font-family:\'Geist Mono\',monospace;font-weight:600' },
       { v:(r.min!=null?escapeHtml(r.min):'—'), extra:'font-family:\'Geist Mono\',monospace' },
       { v:(r.max!=null?escapeHtml(r.max):'—'), extra:'font-family:\'Geist Mono\',monospace' },
@@ -612,6 +639,11 @@ function _pmiGradeSelect(wi, pi, grade){
 function _pmiElInput(wi, pi, elSym, val, disabled){
   return '<input type="number" step="any" data-pmi-comp="'+wi+'" data-pmi-pt="'+pi+'" data-pmi-el="'+elSym+'" data-on-input="pmiEntryChanged" value="'+(val===''||val==null?'':escapeHtml(val))+'" placeholder="wt%" '+(disabled?'disabled title="XRF cannot measure carbon"':'')+' style="width:74px'+(disabled?';background:var(--bg3,#f1f1f1);opacity:.6;cursor:not-allowed':'')+'"/>';
 }
+// Optional min/max acceptance limit for a report-only element → turns it into a
+// green/amber band on the chart (which='0' min, '1' max).
+function _pmiLimInput(wi, pi, elSym, which, val){
+  return '<input type="number" step="any" data-pmi-comp="'+wi+'" data-pmi-pt="'+pi+'" data-pmi-el="'+elSym+'" data-pmi-lim="'+which+'" data-on-input="pmiEntryChanged" value="'+(val===''||val==null?'':escapeHtml(val))+'" placeholder="'+(which==='0'?'min':'max')+'" title="'+(which==='0'?'Low':'High')+' acceptance limit (optional)" style="width:46px"/>';
+}
 // One measurement point's entry sub-block: label (3-point only), grade select +
 // live match chip, then an input per report element.
 function _pmiPointEntryHtml(wi, pi, point, mode, multi){
@@ -622,12 +654,20 @@ function _pmiPointEntryHtml(wi, pi, point, mode, multi){
     chip = '<span style="display:inline-block;padding:2px 9px;border-radius:4px;background:'+bg+';color:'+col+';font-weight:700;font-size:11px;margin-left:10px">'+(m.result==='Acceptable'?'✓ Grade match':'✗ No match')+'</span>'; }
   else if(grade){ chip = '<span style="color:var(--t3);font-size:11px;margin-left:10px">enter readings…</span>'; }
   var els = grade ? pmiReportElements(grade) : [];
+  var rd = point.readings || {}, lims = point.limits || {};
   var inputs = els.length
-    ? '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">' + els.map(function(e){
+    ? '<div style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:8px">' + els.map(function(e){
         var band = PMI_GRADES[grade].el[e];
-        var disabled = (e === 'C' && mode === 'xrf');
-        var hint = band ? escapeHtml(pmiRangeText(band)) : '<span style="font-style:italic">report</span>';
-        return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--t3)">'+e+' <span style="color:var(--t4,#9aa6b5)">'+hint+'</span></label>'+_pmiElInput(wi, pi, e, (point.readings||{})[e], disabled)+'</div>';
+        if(band){
+          var disabled = (e === 'C' && mode === 'xrf');
+          return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--t3)">'+e+' <span style="color:var(--t4,#9aa6b5)">'+escapeHtml(pmiRangeText(band))+'</span></label>'+_pmiElInput(wi, pi, e, rd[e], disabled)+'</div>';
+        }
+        // report-only element — measured value + optional low/high acceptance limit
+        var lim = lims[e] || ['',''];
+        return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--t3)">'+e+' <span style="color:var(--t4,#9aa6b5);font-style:italic">report</span></label>'
+          + '<div style="display:flex;align-items:flex-end;gap:4px">'+_pmiElInput(wi, pi, e, rd[e], false)
+          + '<div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:8px;color:var(--t4,#9aa6b5);text-align:center">limits</span><div style="display:flex;gap:3px">'+_pmiLimInput(wi, pi, e, '0', lim[0])+_pmiLimInput(wi, pi, e, '1', lim[1])+'</div></div>'
+          + '</div></div>';
       }).join('') + '</div>'
     : '<div style="font-size:11px;color:var(--t3);margin-top:6px">Select a specified grade to enter its controlled elements.</div>';
   var ptLabel = multi ? '<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:4px">'+escapeHtml(point.label || ('Point '+(pi+1)))+'</div>' : '';
@@ -671,8 +711,16 @@ function pmiReadGrid(){
       var gs = grid.querySelector('select[data-pmi-comp="'+wi+'"][data-pmi-pt="'+pi+'"][data-on-change="pmiGradeChange"]');
       if(gs) point.grade = gs.value;
       if(!point.readings) point.readings = {};
-      grid.querySelectorAll('input[data-pmi-comp="'+wi+'"][data-pmi-pt="'+pi+'"][data-pmi-el]').forEach(function(inp){
+      if(!point.limits) point.limits = {};
+      // measured readings (exclude the min/max limit inputs, which share data-pmi-el)
+      grid.querySelectorAll('input[data-pmi-comp="'+wi+'"][data-pmi-pt="'+pi+'"][data-pmi-el]:not([data-pmi-lim])').forEach(function(inp){
         point.readings[inp.getAttribute('data-pmi-el')] = inp.value;
+      });
+      // custom low/high acceptance limits for the report-only elements
+      grid.querySelectorAll('input[data-pmi-comp="'+wi+'"][data-pmi-pt="'+pi+'"][data-pmi-lim]').forEach(function(inp){
+        var e = inp.getAttribute('data-pmi-el'), which = parseInt(inp.getAttribute('data-pmi-lim'), 10) || 0;
+        if(!point.limits[e]) point.limits[e] = ['', ''];
+        point.limits[e][which] = inp.value;
       });
     });
   });

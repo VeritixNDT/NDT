@@ -77,7 +77,7 @@ function pmiElementsOf(grade){ var g = PMI_GRADES[grade]; if(!g) return []; retu
 // spec-control them — a PMI scan reports the full measured spectrum. Where a
 // grade has no band for one of these it is informational only (no in/out, no
 // effect on the verdict).
-var PMI_REPORT_EXTRA = ['Mn','Cu','Nb','Fe'];
+var PMI_REPORT_EXTRA = ['Mn','Cu','Fe'];
 // Ordered union of the grade's banded elements + the always-reported extras.
 function pmiReportElements(grade){
   var set = {}; pmiElementsOf(grade).forEach(function(e){ set[e] = 1; });
@@ -255,7 +255,7 @@ function pmiIsXrf(){ return !!(_pmiSurvey && _pmiSurvey.mode === 'xrf'); }
 // amber). Spec-controlled elements (e.g. Mn on P22, Fe on 625) keep their grade
 // band and need no limit.
 var PMI_SAMPLE = { mode:'oes', components:[
-  { measMode:'single', points:[ { label:'Test point', grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32', Mn:'1.52', Cu:'0.34', Nb:'0.02', Fe:'68.1' }, limits:{ Mn:['1.0','2.0'], Cu:['','0.35'], Fe:['64','70'] } } ] },
+  { measMode:'single', points:[ { label:'Test point', grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32', Mn:'1.52', Cu:'0.34', Fe:'68.1' }, limits:{ Mn:['1.0','2.0'], Cu:['','0.35'], Fe:['64','70'] } } ] },
   { measMode:'3point', points:[
     { label:'Parent material', grade:'316L', readings:{ C:'0.024', Cr:'16.9', Ni:'10.2', Mo:'2.28', Mn:'1.48', Fe:'68.3' }, limits:{ Mn:['1.0','2.0'], Fe:['60','70'] } },
     { label:'Weld',            grade:'316L', readings:{ C:'0.021', Cr:'17.1', Ni:'11.6', Mo:'2.41', Mn:'1.62', Fe:'67.0' }, limits:{ Mn:['1.0','2.0'], Fe:['60','70'] } },

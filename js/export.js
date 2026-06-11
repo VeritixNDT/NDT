@@ -257,6 +257,9 @@ function cvBuildPrintHTML(report){
     if(b.key === 'defect-table')   return !_hasDefects;
     if(b.key === 'single-photo')   return !_hasSingle(b.id);
     if(b.key === 'single-drawing') return !_hasSingle(b.id);
+    // CAD drawing: empty when the report carries no drawing (or an element-less
+    // one) for this block id — so an unfilled cad-drawing block skips its page.
+    if(b.key === 'cad-drawing')    return !(report && report.cadDrawings && report.cadDrawings[b.id] && typeof cadIsEmpty === 'function' && !cadIsEmpty(report.cadDrawings[b.id]));
     if(b.key === 'photo-details' && b.linkedPhotoId) return !_hasSingle(b.linkedPhotoId);
     // items-table on a non-page-1 page is only meaningful when item
     // overflow demands a continuation page — without overflow it just

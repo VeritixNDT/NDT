@@ -34,6 +34,12 @@ var _ovSinglePhotos = {};
 // single-photo upload tile (or as a standalone tile when no link is
 // set); persisted to report.photoDetails on save.
 var _ovPhotoDetails = {};
+// Per-report inspector-drawn CAD drawings. Map of cad-drawing block.id →
+// vector drawing model (see js/cad-editor.js). Each cad-drawing block in the
+// active template surfaces a tile in the new-report Drawings (CAD) section;
+// the drawing is authored in the full-screen editor and persisted to
+// report.cadDrawings on save (block.id keyed, like _ovSinglePhotos).
+var _ovCadDrawings = {};
 // Snapshot of the revision number when the new-report form opened. Used
 // to detect whether the user has bumped the revision so the save handler
 // can demand a reason (required) and append a row to report.revisions.
@@ -1572,6 +1578,9 @@ function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   _ovPhotoDetails = (sourceReport && sourceReport.photoDetails && typeof sourceReport.photoDetails === 'object')
     ? Object.assign({}, sourceReport.photoDetails)
     : {};
+  _ovCadDrawings = (sourceReport && sourceReport.cadDrawings && typeof sourceReport.cadDrawings === 'object')
+    ? JSON.parse(JSON.stringify(sourceReport.cadDrawings))
+    : {};
   RPT_ITEM_FIELD_IDS.forEach(fid => {
     if(_ovItems[0][fid] === undefined && merged[fid]) _ovItems[0][fid] = merged[fid];
   });
@@ -1658,6 +1667,7 @@ function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   // button when none has been added, or 6 photo slots + a "Remove photo
   // page" Cancel when the inspector has opted in.
   html += _ovPhotosSectionHtml();
+  html += _ovCadSectionHtml();
 
   // Save bar — at the foot of the form. Cancel closes the form without
   // saving; "Save" issues the report (Approved); "For review" sends it
@@ -2425,6 +2435,57 @@ function ovRenderPhotosSection(){
   cur.outerHTML = _ovPhotosSectionHtml();
 }
 
+// ── Drawings (CAD) — inspector-authored vector drawings ──────────────────────
+// Discover the cad-drawing blocks in the active method's template (each is one
+// drawing slot, keyed by block.id — mirrors _ovSinglePhotoBlocks).
+function _ovCadBlocks(){
+  if(!_ovMethod || typeof CV_METHOD_TPL_PREFIX === 'undefined' || typeof ls !== 'function') return [];
+  try {
+    const tpl = ls(CV_METHOD_TPL_PREFIX + _ovMethod, null);
+    if(!tpl || !Array.isArray(tpl.pages)) return [];
+    const out = [];
+    tpl.pages.forEach(pg => { if(pg && Array.isArray(pg.blocks)) pg.blocks.forEach(b => { if(b && b.id && b.key === 'cad-drawing') out.push({ id:b.id, label:(b.text || 'Drawing').toString() }); }); });
+    return out;
+  } catch(e){ return []; }
+}
+function _ovCadSectionHtml(){
+  const slots = _ovCadBlocks();
+  const tile = (s) => {
+    const d = _ovCadDrawings[s.id];
+    const filled = d && typeof cadIsEmpty === 'function' && !cadIsEmpty(d);
+    const thumb = filled
+      ? `<div style="aspect-ratio:16/10;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#fff">${cadRenderSVG(d, { fit:true, placeholder:false })}</div>`
+      : `<div style="aspect-ratio:16/10;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--t3);font-size:11px;background:var(--bg2)"><span style="font-size:22px">✏️</span>empty</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:5px">
+      <div style="font-size:11px;color:var(--t2);font-weight:600">${escapeHtml(s.label)}</div>
+      ${thumb}
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" data-action="ovOpenCadEditor" data-args="'${s.id}'" style="flex:1">${filled ? 'Edit drawing' : 'Create drawing'}</button>
+        ${filled ? `<button class="btn btn-sm btn-danger" data-action="ovClearCadDrawing" data-args="'${s.id}'" title="Clear drawing">✕</button>` : ''}
+      </div>
+    </div>`;
+  };
+  const body = slots.length
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">${slots.map(tile).join('')}</div>`
+    : `<div style="font-size:12px;color:var(--t3)">Add a <b>CAD drawing (editable)</b> block to this method's PDF template (Settings → PDF editor), then a drawing slot will appear here.</div>`;
+  return `<div class="sc" id="ov-cad-section" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">Drawings (CAD)</span></div><div class="sc-body" style="padding:14px 16px">`
+    + `<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Produce your own drawings — weld maps, sketches, defect-location diagrams. Each renders in its CAD-drawing block on the PDF.</div>`
+    + body + `</div></div>`;
+}
+function ovRenderCadSection(){ const cur = document.getElementById('ov-cad-section'); if(cur) cur.outerHTML = _ovCadSectionHtml(); }
+function ovOpenCadEditor(blockId){
+  if(typeof cadOpenEditor !== 'function'){ if(typeof toast === 'function') toast('Drawing editor unavailable.'); return; }
+  const slots = _ovCadBlocks();
+  if(!slots.length){ if(typeof toast === 'function') toast('Add a CAD drawing block to your PDF template first.'); return; }
+  cadOpenEditor({
+    slots,
+    drawings: _ovCadDrawings,
+    activeId: blockId || (slots[0] && slots[0].id),
+    onSave: (map) => { _ovCadDrawings = map || {}; ovRenderCadSection(); },
+  });
+}
+function ovClearCadDrawing(blockId){ if(_ovCadDrawings && blockId) delete _ovCadDrawings[blockId]; ovRenderCadSection(); }
+
 function ovAddPhotoPage(){
   _ovPhotos = new Array(6).fill(null);
   _ovPhotoCaptions = new Array(6).fill('');
@@ -2890,6 +2951,12 @@ async function ovSaveReport(mode) {
     const _kept = {};
     Object.keys(_ovSinglePhotos).forEach(k => { if(_ovSinglePhotos[k]) _kept[k] = _ovSinglePhotos[k]; });
     if(Object.keys(_kept).length) report.singlePhotos = _kept;
+  }
+  // CAD drawings — keep only non-empty drawings (block.id keyed, like single-photo).
+  if(_ovCadDrawings && typeof _ovCadDrawings === 'object'){
+    const _keptCad = {};
+    Object.keys(_ovCadDrawings).forEach(k => { const d = _ovCadDrawings[k]; if(d && typeof cadIsEmpty === 'function' && !cadIsEmpty(d)) _keptCad[k] = d; });
+    if(Object.keys(_keptCad).length) report.cadDrawings = _keptCad;
   }
   // Photo-details cards — copy typed text (trimmed of trailing whitespace)
   // for any details block that actually has content. Empty entries are

@@ -70,8 +70,34 @@ var PMI_GRADES = {
 // Dropdown order (preserves the family grouping above).
 var PMI_GRADE_ORDER = ['CS A106-B','A333-6','A516-70','P1','P11','P12','P22','P23','P5','P9','P91','304','304L','309S','310S','316','316L','316Ti','317L','321','347','904L','254 SMO','Alloy 020','2304','2205','2507','Zeron 100','Alloy 600','Alloy 625','Alloy 718','Alloy 800H','Alloy 825','Alloy 400','Alloy C276'];
 
-// Ordered list of band-controlled element symbols for a grade.
+// Ordered list of band-controlled element symbols for a grade (drive the
+// grade-match verdict + the composition band chart).
 function pmiElementsOf(grade){ var g = PMI_GRADES[grade]; if(!g) return []; return PMI_ELEMENT_ORDER.filter(function(e){ return g.el[e]; }); }
+// Elements always recorded on the report even when the specified grade doesn't
+// spec-control them — a PMI scan reports the full measured spectrum. Where a
+// grade has no band for one of these it is informational only (no in/out, no
+// effect on the verdict).
+var PMI_REPORT_EXTRA = ['Mn','Cu','Nb','Fe'];
+// Ordered union of the grade's banded elements + the always-reported extras.
+function pmiReportElements(grade){
+  var set = {}; pmiElementsOf(grade).forEach(function(e){ set[e] = 1; });
+  PMI_REPORT_EXTRA.forEach(function(e){ set[e] = 1; });
+  return PMI_ELEMENT_ORDER.filter(function(e){ return set[e]; });
+}
+// Full readings rows for the report (banded + informational extras). Banded
+// elements carry their spec band + in/near/out state; extras carry state
+// 'info' (measured, not spec-controlled), 'blank', or 'na' (carbon on XRF).
+function pmiReportRows(comp, mode){
+  comp = comp || {}; mode = mode || 'oes';
+  var grade = comp.grade, readings = comp.readings || {};
+  return pmiReportElements(grade).map(function(e){
+    var band = (PMI_GRADES[grade] && PMI_GRADES[grade].el[e]) || null;
+    if(band) return { el:e, val:readings[e], min:band[0], max:band[1], band:band, state:pmiElState(readings[e], band, e, mode), spec:true };
+    var v = readings[e];
+    var st = (e === 'C' && mode === 'xrf') ? 'na' : ((v === '' || v == null || isNaN(parseFloat(v))) ? 'blank' : 'info');
+    return { el:e, val:v, min:null, max:null, band:null, state:st, spec:false };
+  });
+}
 function pmiRangeText(band){ if(!band) return '—'; var lo = band[0], hi = band[1];
   if(lo != null && hi != null) return (lo===0 ? '≤ '+hi : lo+'–'+hi);
   if(hi != null) return '≤ '+hi; if(lo != null) return '≥ '+lo; return '—'; }
@@ -158,9 +184,9 @@ function pmiIsXrf(){ return !!(_pmiSurvey && _pmiSurvey.mode === 'xrf'); }
 
 // Sample survey / items for the editor preview (no real report attached).
 var PMI_SAMPLE = { mode:'oes', components:[
-  { grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32' } },
-  { grade:'P22',  readings:{ C:'0.11', Mn:'0.46', Si:'0.24', Cr:'2.21', Mo:'0.98' } },
-  { grade:'Alloy 625', readings:{ Ni:'61.2', Cr:'21.7', Mo:'8.9', Nb:'3.62', Fe:'3.1' } },
+  { grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32', Mn:'1.52', Cu:'0.34', Nb:'0.02', Fe:'68.1' } },
+  { grade:'P22',  readings:{ C:'0.11', Mn:'0.46', Si:'0.24', Cr:'2.21', Mo:'0.98', Cu:'0.13', Nb:'0.01', Fe:'95.8' } },
+  { grade:'Alloy 625', readings:{ Ni:'61.2', Cr:'21.7', Mo:'8.9', Nb:'3.62', Fe:'3.1', Mn:'0.18', Cu:'0.05' } },
 ]};
 var PMI_SAMPLE_ITEMS = [
   { subject:'6"-P-1201 elbow',     drawing:'ISO-P-1201', examDate:'', extent:'100%' },
@@ -361,21 +387,24 @@ function _pmiCompChart(comp, mode, P){
   return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+s+'</svg>'+legend;
 }
 
-// Readings table: Element | Measured | Spec min | Spec max | Status.
+// Readings table: the full measured spectrum (grade-controlled elements + the
+// always-reported extras Mn/Cu/Nb/Fe). Element | Measured | Spec min | Spec max
+// | Status. Informational (non-spec) elements show a neutral "reported" status.
 function _pmiCompTable(comp, mode, P, bar){
-  var rows = pmiMatch(comp, mode).rows;
+  var rows = comp && comp.grade ? pmiReportRows(comp, mode) : [];
   var heads = ['Element','Measured (wt%)','Spec min','Spec max','Status'];
   var statusCell = function(st, near){
     if(st === 'in' && near) return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fef3c7;color:#b45309;font-weight:600">In band · near limit</span>';
     if(st === 'in')   return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#d1fae5;color:#065f46;font-weight:600">In band</span>';
     if(st === 'out')  return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600">Out of band</span>';
+    if(st === 'info') return '<span style="color:#6b7280">Reported</span>';
     if(st === 'na')   return '<span style="color:#6b7280">n/a (XRF)</span>';
     return '<span style="color:#9aa6b5">—</span>';
   };
   var body = rows.map(function(r){
     var near = (r.state === 'in') && pmiEdgeState(r.val, r.band) === 'near';
     return { cells: [
-      { v:'<b>'+r.el+'</b> <span style="color:#6b7280">'+escapeHtml(PMI_ELEMENT_NAMES[r.el]||'')+'</span>' },
+      { v:'<b>'+r.el+'</b> <span style="color:#6b7280">'+escapeHtml(PMI_ELEMENT_NAMES[r.el]||'')+'</span>' + (r.spec ? '' : ' <span style="color:#9aa6b5;font-size:7.5px">(report)</span>') },
       { v:(r.state==='na'?'n/a':(r.val===''||r.val==null?'—':escapeHtml(r.val))), extra:'font-family:\'Geist Mono\',monospace;font-weight:600' },
       { v:(r.min!=null?escapeHtml(r.min):'—'), extra:'font-family:\'Geist Mono\',monospace' },
       { v:(r.max!=null?escapeHtml(r.max):'—'), extra:'font-family:\'Geist Mono\',monospace' },
@@ -490,16 +519,18 @@ function pmiGridHtml(){
   return (s.components||[]).map(function(comp, wi){
     var lbl = _pmiComponentLabel(wi);
     var del = multi ? '<button class="btn btn-sm btn-danger" data-action="pmiRemoveComponent" data-args="'+wi+'" title="Remove this component" style="padding:2px 9px;font-size:11px;margin-left:10px">− Remove component</button>' : '';
-    var els = pmiElementsOf(comp.grade);
+    var els = comp.grade ? pmiReportElements(comp.grade) : [];
     var m = comp.grade ? pmiMatch(comp, mode) : null;
     var chip = '';
-    if(m && m.result){ var col = m.result === 'Acceptable' ? '#065f46' : '#991b1b', bg = m.result === 'Acceptable' ? '#dcfce7' : '#fee2e2';
+    if(m && m.result){ var col = m.result === 'Acceptable' ? '#065f46' : '#991b1b', bg = m.result === 'Acceptable' ? '#d1fae5' : '#fee2e2';
       chip = '<span style="display:inline-block;padding:2px 9px;border-radius:4px;background:'+bg+';color:'+col+';font-weight:700;font-size:11px;margin-left:10px">'+(m.result==='Acceptable'?'✓ Grade match':'✗ No match')+'</span>'; }
     else if(comp.grade){ chip = '<span style="color:var(--t3);font-size:11px;margin-left:10px">enter readings…</span>'; }
     var inputs = els.length
       ? '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">' + els.map(function(e){
+          var band = PMI_GRADES[comp.grade].el[e];
           var disabled = (e === 'C' && mode === 'xrf');
-          return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--t3)">'+e+' <span style="color:var(--t4,#9aa6b5)">'+escapeHtml(pmiRangeText(PMI_GRADES[comp.grade].el[e]))+'</span></label>'+_pmiElInput(wi, e, (comp.readings||{})[e], disabled)+'</div>';
+          var hint = band ? escapeHtml(pmiRangeText(band)) : '<span style="font-style:italic">report</span>';
+          return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--t3)">'+e+' <span style="color:var(--t4,#9aa6b5)">'+hint+'</span></label>'+_pmiElInput(wi, e, (comp.readings||{})[e], disabled)+'</div>';
         }).join('') + '</div>'
       : '<div style="font-size:11px;color:var(--t3);margin-top:6px">Select a specified grade to enter its controlled elements.</div>';
     return '<div style="margin-bottom:14px;padding-bottom:12px'+(wi<(s.components.length-1)?';border-bottom:1px solid var(--border)':'')+'">'

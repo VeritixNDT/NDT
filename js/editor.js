@@ -415,6 +415,7 @@ var CV_LAYOUT_ITEMS = [
   {key:'drawing-page',   label:'Drawing page',                w:754,h:980},
   {key:'single-photo',   label:'Single image (photo / screenshot)', w:360,h:280},
   {key:'single-drawing', label:'Single drawing',             w:360,h:280},
+  {key:'cad-drawing',    label:'CAD drawing (editable)',      w:754,h:520},
   {key:'photo-details',  label:'Photo details / information', w:360,h:80},
   {key:'additional-page',label:'Additional page',            w:754,h:980},
   {key:'defect-table',   label:'Defect / indication table',  w:754,h:90},
@@ -1809,7 +1810,7 @@ function cvInitCanvas(){
 function cvGetLayoutIcon(k){
   if(k && k.startsWith('logo-lib:')) return '🖼';
   return {'section-header':'▬','text-block':'T','h-line':'—','logo-co':'🖼',
-    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','single-drawing':'📐','drawing-page':'📐','photo-details':'📝','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
+    'photo-box':'📷','photo-page':'📸','single-photo':'🖼','single-drawing':'📐','cad-drawing':'✏️','drawing-page':'📐','photo-details':'📝','additional-page':'📄','defect-table':'⊟','items-table':'☷','revision-history':'↻','method-block':'⚙',
     'accent-bar':'█'}[k]||'□';
 }
 
@@ -3264,6 +3265,26 @@ function cvRenderBlockContent(block, report, preview){
           ${slot}
         </div>`;
       }
+      case 'cad-drawing':{
+        // Inspector-authored vector drawing (js/cad-editor.js). The per-report
+        // drawing lives on report.cadDrawings keyed by block.id (mirrors
+        // single-drawing's singlePhotos). One renderer (cadRenderSVG) feeds this
+        // block and the editor canvas, so screen and PDF match. In the design
+        // canvas / any-method preview show the example so the layout is visible;
+        // a real print pass with no drawing shows the placeholder.
+        const _cadPrinting = (typeof _cvPrintPageNum !== 'undefined' && _cvPrintPageNum > 0);
+        const _cadHeadColor = _safeColor(block.barColor, (typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040');
+        const _draw = (report && report.cadDrawings && typeof report.cadDrawings === 'object') ? report.cadDrawings[block.id] : null;
+        const _cadBody = (typeof cadRenderSVG === 'function')
+          ? cadRenderSVG(_draw, { fit:true, sample: !_cadPrinting })
+          : '';
+        return `<div style="height:100%;display:flex;flex-direction:column;box-sizing:border-box">
+          <div style="padding:4px 8px;background:${_cadHeadColor};text-align:center">
+            <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em">${_h(block.text||'Drawing')}</span>
+          </div>
+          <div style="flex:1;margin:6px;border:1px solid #ddd;border-radius:3px;overflow:hidden;background:#fff;display:flex">${_cadBody}</div>
+        </div>`;
+      }
       case 'photo-details':{
         // Companion to single-photo: a section-header-styled card whose
         // body holds per-report typed text about the linked photo.
@@ -4419,7 +4440,7 @@ function cvRenderProps(id){
     ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'defect-table') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
-    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'drawing-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details' || block.key === 'defect-table' || block.key === 'ht-survey' || block.key === 'ht-method' || block.key === 'pmi-survey' || block.key === 'pmi-method')
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'drawing-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'cad-drawing' || block.key === 'photo-details' || block.key === 'defect-table' || block.key === 'ht-survey' || block.key === 'ht-method' || block.key === 'pmi-survey' || block.key === 'pmi-method')
       ? row('Heading colour', colorPick('barColor', block.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040')))
       : ''}
     ${block.key === 'ht-survey' && typeof HT_DETAIL_COLS !== 'undefined' && Array.isArray(HT_DETAIL_COLS) ? (() => {

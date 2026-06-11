@@ -319,13 +319,17 @@ function cvBuildPrintHTML(report){
   // so only one of the two passes ever expands; the other is a pass-through.
   const _pmiSrv   = report && report.pmiSurvey;
   const _pmiComps = (typeof pmiComponentCount === 'function') ? pmiComponentCount(_pmiSrv) : 0;
+  // Per-component height scales with its measurement points (single ≈ 1 block,
+  // 3-point ≈ 3 blocks of sub-header + chart + table) — estimate from the tallest
+  // component so whole components stay together on a sheet.
+  const _pmiMaxPts = (function(){ let m = 1; ((_pmiSrv && _pmiSrv.components) || []).forEach(c => { const n = (c && c.points && c.points.length) || 1; if(n > m) m = n; }); return m; })();
   const _planPmi  = [];
   _planHt.forEach(entry => {
     const _pb = (entry.page.blocks || []).find(b => b.key === 'pmi-survey');
     if(!_pb || !_pmiSrv){ _planPmi.push(entry); return; }
     const _bh = (typeof _pb.h === 'number' && _pb.h > 0) ? _pb.h : 760;
     if(_pmiComps <= 1){ _planPmi.push(Object.assign({}, entry, { pmiSlice: { start:0, count:Math.max(1,_pmiComps) } })); return; }
-    const _unitH = 300;
+    const _unitH = 60 + _pmiMaxPts * 240;
     const _cap0 = Math.max(1, Math.floor((_bh - 30) / _unitH));
     if(_pmiComps <= _cap0){ _planPmi.push(Object.assign({}, entry, { pmiSlice: { start:0, count:_pmiComps } })); return; }
     _planPmi.push(Object.assign({}, entry, { pmiSlice: { start:0, count:_cap0 } }));

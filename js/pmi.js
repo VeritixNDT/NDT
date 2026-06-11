@@ -250,17 +250,21 @@ function pmiIsXrf(){ return !!(_pmiSurvey && _pmiSurvey.mode === 'xrf'); }
 // Sample survey / items for the editor preview (no real report attached). One
 // single-point component, then a 3-point welded joint (parent 316L · weld 316L ·
 // parent 316L), then a dissimilar example (parent P22 · weld 625 · parent P22).
+// Custom limits on the otherwise report-only extras so the editor example also
+// demonstrates the green/amber bar on added elements (Fe/Mn green, Cu near-limit
+// amber). Spec-controlled elements (e.g. Mn on P22, Fe on 625) keep their grade
+// band and need no limit.
 var PMI_SAMPLE = { mode:'oes', components:[
-  { measMode:'single', points:[ { label:'Test point', grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32', Mn:'1.52', Cu:'0.34', Nb:'0.02', Fe:'68.1' } } ] },
+  { measMode:'single', points:[ { label:'Test point', grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32', Mn:'1.52', Cu:'0.34', Nb:'0.02', Fe:'68.1' }, limits:{ Mn:['1.0','2.0'], Cu:['','0.35'], Fe:['64','70'] } } ] },
   { measMode:'3point', points:[
-    { label:'Parent material', grade:'316L', readings:{ C:'0.024', Cr:'16.9', Ni:'10.2', Mo:'2.28', Mn:'1.48', Fe:'68.3' } },
-    { label:'Weld',            grade:'316L', readings:{ C:'0.021', Cr:'17.1', Ni:'11.6', Mo:'2.41', Mn:'1.62', Fe:'67.0' } },
-    { label:'Parent material', grade:'316L', readings:{ C:'0.023', Cr:'16.8', Ni:'10.3', Mo:'2.30', Mn:'1.50', Fe:'68.2' } },
+    { label:'Parent material', grade:'316L', readings:{ C:'0.024', Cr:'16.9', Ni:'10.2', Mo:'2.28', Mn:'1.48', Fe:'68.3' }, limits:{ Mn:['1.0','2.0'], Fe:['60','70'] } },
+    { label:'Weld',            grade:'316L', readings:{ C:'0.021', Cr:'17.1', Ni:'11.6', Mo:'2.41', Mn:'1.62', Fe:'67.0' }, limits:{ Mn:['1.0','2.0'], Fe:['60','70'] } },
+    { label:'Parent material', grade:'316L', readings:{ C:'0.023', Cr:'16.8', Ni:'10.3', Mo:'2.30', Mn:'1.50', Fe:'68.2' }, limits:{ Mn:['1.0','2.0'], Fe:['60','70'] } },
   ] },
   { measMode:'3point', points:[
-    { label:'Parent material', grade:'P22',       readings:{ C:'0.11', Mn:'0.46', Si:'0.24', Cr:'2.21', Mo:'0.98', Fe:'95.8' } },
-    { label:'Weld',            grade:'Alloy 625', readings:{ Ni:'61.2', Cr:'21.7', Mo:'8.9', Nb:'3.62', Fe:'3.1', Mn:'0.18' } },
-    { label:'Parent material', grade:'P22',       readings:{ C:'0.12', Mn:'0.48', Si:'0.26', Cr:'2.24', Mo:'1.01', Fe:'95.6' } },
+    { label:'Parent material', grade:'P22',       readings:{ C:'0.11', Mn:'0.46', Si:'0.24', Cr:'2.21', Mo:'0.98', Fe:'95.8' }, limits:{ Fe:['92','100'] } },
+    { label:'Weld',            grade:'Alloy 625', readings:{ Ni:'61.2', Cr:'21.7', Mo:'8.9', Nb:'3.62', Fe:'3.1', Mn:'0.18' }, limits:{ Mn:['','0.50'] } },
+    { label:'Parent material', grade:'P22',       readings:{ C:'0.12', Mn:'0.48', Si:'0.26', Cr:'2.24', Mo:'1.01', Fe:'95.6' }, limits:{ Fe:['92','100'] } },
   ] },
 ]};
 var PMI_SAMPLE_ITEMS = [

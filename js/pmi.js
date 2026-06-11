@@ -26,32 +26,82 @@ var PMI_ELEMENT_NAMES = { C:'Carbon', Si:'Silicon', Mn:'Manganese', P:'Phosphoru
 // specs; the listed elements are the composition-controlled ones used for the
 // grade-match decision (balance elements are not band-checked). Editable later.
 var PMI_GRADES = {
+  // ── Carbon & low-alloy steel — ASTM A106 / A333 / A516 / A335 P-grades ──
   'CS A106-B':  { name:'Carbon steel — A106 Gr B', uns:'K03006', family:'Carbon / low-alloy', el:{ C:[0,0.30], Mn:[0.29,1.06], Si:[0.10,null], Cr:[0,0.40], Mo:[0,0.15], Ni:[0,0.40], Cu:[0,0.40] } },
+  'A333-6':     { name:'Low-temp CS — A333 Gr 6',  uns:'K03006', family:'Carbon / low-alloy', el:{ C:[0,0.30], Mn:[0.29,1.06], Si:[0.10,null], Cr:[0,0.40], Mo:[0,0.12], Ni:[0,0.40] } },
+  'A516-70':    { name:'PV plate — A516 Gr 70',    uns:'K02700', family:'Carbon / low-alloy', el:{ C:[0,0.28], Mn:[0.85,1.20], Si:[0.15,0.40] } },
+  'P1':         { name:'C-½Mo — A335 P1',          uns:'K11522', family:'Carbon / low-alloy', el:{ C:[0,0.28], Mn:[0.30,0.90], Si:[0.10,0.50], Mo:[0.44,0.65] } },
   'P11':        { name:'1¼Cr-½Mo — A335 P11',      uns:'K11597', family:'Carbon / low-alloy', el:{ C:[0.05,0.15], Si:[0.50,1.00], Mn:[0.30,0.60], Cr:[1.00,1.50], Mo:[0.44,0.65] } },
+  'P12':        { name:'1Cr-½Mo — A335 P12',       uns:'K11562', family:'Carbon / low-alloy', el:{ C:[0.05,0.15], Mn:[0.30,0.61], Si:[0,0.50], Cr:[0.80,1.25], Mo:[0.44,0.65] } },
   'P22':        { name:'2¼Cr-1Mo — A335 P22',      uns:'K21590', family:'Carbon / low-alloy', el:{ C:[0.05,0.15], Mn:[0.30,0.60], Si:[0,0.50], Cr:[1.90,2.60], Mo:[0.87,1.13] } },
+  'P23':        { name:'2¼Cr-W-V — A335 P23',      uns:'K40712', family:'Carbon / low-alloy', el:{ C:[0.04,0.10], Mn:[0.10,0.60], Cr:[1.90,2.60], Mo:[0.05,0.30], W:[1.45,1.75], V:[0.20,0.30], Nb:[0.02,0.08] } },
   'P5':         { name:'5Cr-½Mo — A335 P5',        uns:'K41545', family:'Carbon / low-alloy', el:{ C:[0,0.15], Mn:[0.30,0.60], Si:[0,0.50], Cr:[4.00,6.00], Mo:[0.45,0.65] } },
+  'P9':         { name:'9Cr-1Mo — A335 P9',        uns:'K90941', family:'Carbon / low-alloy', el:{ C:[0,0.15], Mn:[0.30,0.60], Si:[0.25,1.00], Cr:[8.00,10.00], Mo:[0.90,1.10] } },
   'P91':        { name:'9Cr-1Mo-V — A335 P91',     uns:'K90901', family:'Carbon / low-alloy', el:{ C:[0.08,0.12], Mn:[0.30,0.60], Cr:[8.00,9.50], Mo:[0.85,1.05], V:[0.18,0.25], Nb:[0.06,0.10], Ni:[0,0.40] } },
+  // ── Austenitic stainless — ASTM A312 / A240 ──
   '304':        { name:'304 stainless',            uns:'S30400', family:'Austenitic stainless', el:{ C:[0,0.08],  Cr:[18.0,20.0], Ni:[8.0,10.5], Mn:[0,2.00] } },
   '304L':       { name:'304L stainless',           uns:'S30403', family:'Austenitic stainless', el:{ C:[0,0.030], Cr:[18.0,20.0], Ni:[8.0,12.0], Mn:[0,2.00] } },
+  '309S':       { name:'309S stainless',           uns:'S30908', family:'Austenitic stainless', el:{ C:[0,0.08],  Cr:[22.0,24.0], Ni:[12.0,15.0], Mn:[0,2.00] } },
+  '310S':       { name:'310S stainless',           uns:'S31008', family:'Austenitic stainless', el:{ C:[0,0.08],  Cr:[24.0,26.0], Ni:[19.0,22.0], Mn:[0,2.00] } },
   '316':        { name:'316 stainless',            uns:'S31600', family:'Austenitic stainless', el:{ C:[0,0.08],  Cr:[16.0,18.0], Ni:[10.0,14.0], Mo:[2.00,3.00] } },
   '316L':       { name:'316L stainless',           uns:'S31603', family:'Austenitic stainless', el:{ C:[0,0.030], Cr:[16.0,18.0], Ni:[10.0,14.0], Mo:[2.00,3.00] } },
+  '316Ti':      { name:'316Ti stainless',          uns:'S31635', family:'Austenitic stainless', el:{ C:[0,0.08],  Cr:[16.0,18.0], Ni:[10.0,14.0], Mo:[2.00,3.00], Ti:[0.30,0.70] } },
+  '317L':       { name:'317L stainless',           uns:'S31703', family:'Austenitic stainless', el:{ C:[0,0.035], Cr:[18.0,20.0], Ni:[11.0,15.0], Mo:[3.00,4.00] } },
   '321':        { name:'321 stainless',            uns:'S32100', family:'Austenitic stainless', el:{ C:[0,0.08],  Cr:[17.0,19.0], Ni:[9.0,12.0], Ti:[0.20,0.70] } },
   '347':        { name:'347 stainless',            uns:'S34700', family:'Austenitic stainless', el:{ C:[0,0.08],  Cr:[17.0,19.0], Ni:[9.0,13.0], Nb:[0.40,1.00] } },
+  // ── Super-austenitic (high-alloy) — ASTM A312 / B625 ──
+  '904L':       { name:'904L (N08904)',            uns:'N08904', family:'Super-austenitic', el:{ C:[0,0.020], Cr:[19.0,23.0], Ni:[23.0,28.0], Mo:[4.00,5.00], Cu:[1.00,2.00] } },
+  '254 SMO':    { name:'254 SMO / 6Mo (S31254)',   uns:'S31254', family:'Super-austenitic', el:{ C:[0,0.020], Cr:[19.5,20.5], Ni:[17.5,18.5], Mo:[6.00,6.50], Cu:[0.50,1.00], N:[0.18,0.22] } },
+  'Alloy 020':  { name:'Alloy 20 / 20Cb-3',        uns:'N08020', family:'Super-austenitic', el:{ C:[0,0.07],  Cr:[19.0,21.0], Ni:[32.0,38.0], Mo:[2.00,3.00], Cu:[3.00,4.00], Nb:[0,1.00] } },
+  // ── Duplex / super-duplex stainless — ASTM A790 / A240 ──
+  '2304':       { name:'Lean duplex 2304',         uns:'S32304', family:'Duplex stainless', el:{ C:[0,0.030], Cr:[21.5,24.5], Ni:[3.00,5.50], Mo:[0.05,0.60], N:[0.05,0.20] } },
   '2205':       { name:'Duplex 2205',              uns:'S32205', family:'Duplex stainless', el:{ C:[0,0.030], Cr:[22.0,23.0], Ni:[4.50,6.50], Mo:[3.00,3.50], N:[0.14,0.20] } },
   '2507':       { name:'Super duplex 2507',        uns:'S32750', family:'Duplex stainless', el:{ C:[0,0.030], Cr:[24.0,26.0], Ni:[6.0,8.0], Mo:[3.00,5.00], N:[0.24,0.32] } },
+  'Zeron 100':  { name:'Super duplex Zeron 100',   uns:'S32760', family:'Duplex stainless', el:{ C:[0,0.030], Cr:[24.0,26.0], Ni:[6.00,8.00], Mo:[3.00,4.00], Cu:[0.50,1.00], W:[0.50,1.00], N:[0.20,0.30] } },
+  // ── Nickel & nickel-iron alloys — ASTM B sheet (UNS) ──
+  'Alloy 600':  { name:'Alloy 600 (Inconel 600)',  uns:'N06600', family:'Nickel alloy', el:{ Ni:[72.0,null], Cr:[14.0,17.0], Fe:[6.00,10.00] } },
   'Alloy 625':  { name:'Alloy 625 (Inconel 625)',  uns:'N06625', family:'Nickel alloy', el:{ Ni:[58.0,null], Cr:[20.0,23.0], Mo:[8.0,10.0], Nb:[3.15,4.15], Fe:[0,5.0] } },
+  'Alloy 718':  { name:'Alloy 718 (Inconel 718)',  uns:'N07718', family:'Nickel alloy', el:{ Ni:[50.0,55.0], Cr:[17.0,21.0], Mo:[2.80,3.30], Nb:[4.75,5.50], Ti:[0.65,1.15], Co:[0,1.00] } },
+  'Alloy 800H': { name:'Alloy 800H (Incoloy 800H)',uns:'N08810', family:'Nickel alloy', el:{ Ni:[30.0,35.0], Cr:[19.0,23.0], Fe:[39.5,null], C:[0.05,0.10], Ti:[0.15,0.60] } },
   'Alloy 825':  { name:'Alloy 825 (Incoloy 825)',  uns:'N08825', family:'Nickel alloy', el:{ Ni:[38.0,46.0], Cr:[19.5,23.5], Mo:[2.50,3.50], Cu:[1.50,3.00], Ti:[0.60,1.20], Fe:[22.0,null] } },
   'Alloy 400':  { name:'Alloy 400 (Monel 400)',    uns:'N04400', family:'Nickel alloy', el:{ Ni:[63.0,null], Cu:[28.0,34.0], Fe:[0,2.50], Mn:[0,2.00] } },
   'Alloy C276': { name:'Alloy C276 (Hastelloy)',   uns:'N10276', family:'Nickel alloy', el:{ Ni:[50.0,null], Cr:[14.5,16.5], Mo:[15.0,17.0], W:[3.00,4.50], Fe:[4.00,7.00], Co:[0,2.50] } },
 };
 // Dropdown order (preserves the family grouping above).
-var PMI_GRADE_ORDER = ['CS A106-B','P11','P22','P5','P91','304','304L','316','316L','321','347','2205','2507','Alloy 625','Alloy 825','Alloy 400','Alloy C276'];
+var PMI_GRADE_ORDER = ['CS A106-B','A333-6','A516-70','P1','P11','P12','P22','P23','P5','P9','P91','304','304L','309S','310S','316','316L','316Ti','317L','321','347','904L','254 SMO','Alloy 020','2304','2205','2507','Zeron 100','Alloy 600','Alloy 625','Alloy 718','Alloy 800H','Alloy 825','Alloy 400','Alloy C276'];
 
 // Ordered list of band-controlled element symbols for a grade.
 function pmiElementsOf(grade){ var g = PMI_GRADES[grade]; if(!g) return []; return PMI_ELEMENT_ORDER.filter(function(e){ return g.el[e]; }); }
 function pmiRangeText(band){ if(!band) return '—'; var lo = band[0], hi = band[1];
   if(lo != null && hi != null) return (lo===0 ? '≤ '+hi : lo+'–'+hi);
   if(hi != null) return '≤ '+hi; if(lo != null) return '≥ '+lo; return '—'; }
+
+// Caution margin: a reading inside the band but within this fraction of a spec
+// limit is flagged amber ("near limit") — still acceptable, but close enough to
+// the edge to warrant a second look (instrument tolerance near the boundary).
+var PMI_EDGE_FRAC = 0.10;
+// Zones for one band: the amber edge strips (ylo near min, yhi near max) and the
+// green core between them, all in value space. Two-sided bands use 10% of the
+// band span at each end; one-sided limits use 10% of the limit value.
+function pmiBandZones(band){
+  if(!band) return null;
+  var lo = band[0], hi = band[1], F = PMI_EDGE_FRAC;
+  // A min of 0 means "no minimum" (a ≤ max limit), not a real lower bound — so
+  // it gets no lower caution strip. Only genuine spec limits are flagged.
+  var hasLo = (lo != null && lo > 0), hasHi = (hi != null);
+  if(hasLo && hasHi && hi > lo){ var e = (hi - lo) * F; return { lo:lo, hi:hi, ylo:[lo, lo+e], yhi:[hi-e, hi], core:[lo+e, hi-e] }; }
+  if(hasHi){ var eh = hi * F; return { lo:null, hi:hi, ylo:null, yhi:[hi-eh, hi], core:[null, hi-eh] }; }   // ≤ max
+  if(hasLo){ var el2 = lo * F; return { lo:lo, hi:null, ylo:[lo, lo+el2], yhi:null, core:[lo+el2, null] }; }  // ≥ min
+  return null;
+}
+// 'core' (comfortably in band) | 'near' (within a 10% edge strip) | null.
+function pmiEdgeState(val, band){
+  var z = pmiBandZones(band);
+  if(!z || val === '' || val == null || isNaN(parseFloat(val))) return null;
+  var v = parseFloat(val);
+  if((z.ylo && v >= z.ylo[0] && v <= z.ylo[1]) || (z.yhi && v >= z.yhi[0] && v <= z.yhi[1])) return 'near';
+  return 'core';
+}
 
 // Per-element pass/fail vs the grade's band. 'na' = not measurable (carbon on
 // XRF); 'blank' = not yet entered; 'in'/'out' = inside / outside the band.
@@ -123,8 +173,9 @@ var PMI_SAMPLE_ITEMS = [
 // aligned to the report tables (black ink, #ddd hairlines, verdict-chip tones).
 // ══════════════════════════════════════════════════════════════════════════
 var PMI_P = { ink:'#111', mut:'#6b7280', grid:'#ddd', line:'#cbcbcb',
-  blue:'#1e40af', amber:'#92400e', green:'#065f46', red:'#991b1b',
+  blue:'#1e40af', amber:'#b45309', green:'#065f46', red:'#991b1b',
   bandFill:'rgba(6,95,70,.12)', bandStroke:'rgba(6,95,70,.45)',
+  edgeFill:'rgba(217,119,6,.20)', edgeStroke:'rgba(180,83,9,.45)',
   steel:'rgba(20,30,55,.05)' };
 
 // Per-weld/component details header columns (editable widths on the block).
@@ -263,58 +314,72 @@ function _pmiCompChart(comp, mode, P){
   var rows = pmiMatch(comp, mode).rows;
   if(!rows.length) return '<div style="padding:8px;color:#9aa6b5;font-size:10px;text-align:center">Select a specified grade to chart its composition bands.</div>';
   var W = 794, TX0 = 196, TX1 = 560, rowH = 22, top = 22, H = top + rows.length * rowH + 10;
-  function color(st){ return st==='out' ? P.red : st==='in' ? P.green : P.mut; }
   var s = '';
   s += '<text x="6" y="13" font-family="\'Geist Mono\',monospace" font-size="9" fill="'+P.mut+'">CHEMICAL COMPOSITION (wt%) vs '+(comp.grade?escapeHtml(comp.grade):'grade')+' ACCEPTANCE BAND</text>';
   rows.forEach(function(r, i){
     var cy = top + i * rowH + rowH / 2;
     var dom = _pmiDomain(r), d0 = dom[0], d1 = dom[1];
     function sx(v){ return TX0 + (v - d0) / (d1 - d0) * (TX1 - TX0); }
+    var edge = (r.state === 'in') ? pmiEdgeState(r.val, r.band) : null;   // 'core' | 'near' | null
     // element label
     s += '<text x="8" y="'+(cy-1)+'" font-family="\'Geist\',sans-serif" font-weight="700" font-size="11" fill="'+P.ink+'">'+r.el+'</text>';
     s += '<text x="30" y="'+(cy-1)+'" font-family="\'Geist\',sans-serif" font-size="8.5" fill="'+P.mut+'">'+escapeHtml(PMI_ELEMENT_NAMES[r.el]||'')+'</text>';
     // track baseline
     s += '<line x1="'+TX0+'" y1="'+cy+'" x2="'+TX1+'" y2="'+cy+'" stroke="'+P.grid+'" stroke-width="1"/>';
-    // acceptance band rectangle
-    var bx0 = sx(r.min != null ? r.min : d0), bx1 = sx(r.max != null ? r.max : d1);
-    s += '<rect x="'+bx0.toFixed(1)+'" y="'+(cy-6)+'" width="'+Math.max(1,(bx1-bx0)).toFixed(1)+'" height="12" fill="'+P.bandFill+'" stroke="'+P.bandStroke+'" stroke-width=".7"/>';
+    // acceptance band: amber 10% caution strips at the spec ends, green core
+    // between (draw the amber band full-width, overlay the green core on top).
+    var bandLo = r.min != null ? r.min : d0, bandHi = r.max != null ? r.max : d1;
+    var bx0 = sx(bandLo), bx1 = sx(bandHi), z = pmiBandZones(r.band);
+    s += '<rect x="'+bx0.toFixed(1)+'" y="'+(cy-6)+'" width="'+Math.max(1,(bx1-bx0)).toFixed(1)+'" height="12" fill="'+P.edgeFill+'" stroke="'+P.edgeStroke+'" stroke-width=".7"/>';
+    if(z){
+      var cLo = sx(z.core[0] != null ? z.core[0] : bandLo), cHi = sx(z.core[1] != null ? z.core[1] : bandHi);
+      if(cHi > cLo) s += '<rect x="'+cLo.toFixed(1)+'" y="'+(cy-6)+'" width="'+(cHi-cLo).toFixed(1)+'" height="12" fill="'+P.bandFill+'" stroke="none"/>';
+    }
     // band edge labels
     if(r.min != null && r.min > 0) s += '<text x="'+bx0.toFixed(1)+'" y="'+(cy+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">'+r.min+'</text>';
     if(r.max != null) s += '<text x="'+bx1.toFixed(1)+'" y="'+(cy+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">'+r.max+'</text>';
-    // measured marker
+    // measured marker — red out of band, amber within the 10% edge, green core
+    var mcol = r.state === 'out' ? P.red : (edge === 'near' ? P.amber : P.green);
     if(r.state === 'na'){
       s += '<text x="'+((TX0+TX1)/2)+'" y="'+(cy+3)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">not measurable (XRF)</text>';
     } else if(r.state !== 'blank'){
-      var mx = sx(parseFloat(r.val)), c = color(r.state);
+      var mx = sx(parseFloat(r.val));
       mx = Math.max(TX0-6, Math.min(TX1+6, mx));
-      s += '<polygon points="'+mx.toFixed(1)+','+(cy-6)+' '+(mx+5).toFixed(1)+','+cy+' '+mx.toFixed(1)+','+(cy+6)+' '+(mx-5).toFixed(1)+','+cy+'" fill="'+c+'" stroke="#fff" stroke-width=".8"/>';
+      s += '<polygon points="'+mx.toFixed(1)+','+(cy-6)+' '+(mx+5).toFixed(1)+','+cy+' '+mx.toFixed(1)+','+(cy+6)+' '+(mx-5).toFixed(1)+','+cy+'" fill="'+mcol+'" stroke="#fff" stroke-width=".8"/>';
     }
     // right column: measured value + spec range
     var meas = (r.state === 'blank') ? '—' : (r.state === 'na' ? 'n/a' : r.val);
-    var mc = r.state === 'out' ? P.red : r.state === 'in' ? P.green : P.mut;
+    var mc = (r.state === 'blank' || r.state === 'na') ? P.mut : mcol;
     s += '<text x="'+(TX1+12)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="9" font-weight="700" fill="'+mc+'">'+escapeHtml(String(meas))+'</text>';
     s += '<text x="'+(TX1+70)+'" y="'+(cy+3)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">('+escapeHtml(pmiRangeText(r.band))+')</text>';
   });
-  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+s+'</svg>';
+  var legend = '<div style="font-family:\'Geist\',sans-serif;font-size:9px;color:'+P.mut+';margin-top:2px;display:flex;gap:14px;flex-wrap:wrap">'
+    + '<span><span style="display:inline-block;width:18px;height:8px;vertical-align:middle;background:'+P.bandFill+';border:.5px solid '+P.bandStroke+'"></span> within spec</span>'
+    + '<span><span style="display:inline-block;width:18px;height:8px;vertical-align:middle;background:'+P.edgeFill+';border:.5px solid '+P.edgeStroke+'"></span> within 10% of a limit</span>'
+    + '<span><span style="display:inline-block;width:9px;height:9px;vertical-align:middle;transform:rotate(45deg);background:'+P.green+'"></span> measured · <span style="color:'+P.amber+'">amber = near limit</span> · <span style="color:'+P.red+'">red = out</span></span>'
+    + '</div>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+s+'</svg>'+legend;
 }
 
 // Readings table: Element | Measured | Spec min | Spec max | Status.
 function _pmiCompTable(comp, mode, P, bar){
   var rows = pmiMatch(comp, mode).rows;
   var heads = ['Element','Measured (wt%)','Spec min','Spec max','Status'];
-  var statusCell = function(st){
+  var statusCell = function(st, near){
+    if(st === 'in' && near) return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fef3c7;color:#b45309;font-weight:600">In band · near limit</span>';
     if(st === 'in')   return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#dcfce7;color:#065f46;font-weight:600">In band</span>';
     if(st === 'out')  return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600">Out of band</span>';
     if(st === 'na')   return '<span style="color:#6b7280">n/a (XRF)</span>';
     return '<span style="color:#9aa6b5">—</span>';
   };
   var body = rows.map(function(r){
+    var near = (r.state === 'in') && pmiEdgeState(r.val, r.band) === 'near';
     return { cells: [
       { v:'<b>'+r.el+'</b> <span style="color:#6b7280">'+escapeHtml(PMI_ELEMENT_NAMES[r.el]||'')+'</span>' },
       { v:(r.state==='na'?'n/a':(r.val===''||r.val==null?'—':escapeHtml(r.val))), extra:'font-family:\'Geist Mono\',monospace;font-weight:600' },
       { v:(r.min!=null?escapeHtml(r.min):'—'), extra:'font-family:\'Geist Mono\',monospace' },
       { v:(r.max!=null?escapeHtml(r.max):'—'), extra:'font-family:\'Geist Mono\',monospace' },
-      { v:statusCell(r.state) },
+      { v:statusCell(r.state, near) },
     ] };
   });
   if(!body.length) body = [{ cells:[{ v:'<span style="color:#9aa6b5">No grade selected</span>' },{v:''},{v:''},{v:''},{v:''}] }];

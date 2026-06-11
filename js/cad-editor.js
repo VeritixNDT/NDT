@@ -119,19 +119,37 @@ function _cadStencil(e){
   var s = CAD_STENCILS[e.stencil]; if(!s) return '';
   var w = Math.abs(e.w || 80), h = Math.abs(e.h || 80), sx = w / 100, sy = h / 100;
   var col = e.stroke || '#1e293b', sw = ((e.strokeWidth != null ? e.strokeWidth : 2) / Math.max((sx + sy) / 2, 0.01)).toFixed(2);
-  return '<g transform="translate(' + Math.min(e.x, e.x + e.w) + ',' + Math.min(e.y, e.y + e.h) + ') scale(' + sx + ',' + sy + ')" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linecap="round" stroke-linejoin="round">' + s.draw() + '</g>';
+  // style color so any currentColor fill inside the stencil tracks the stroke.
+  return '<g transform="translate(' + Math.min(e.x, e.x + e.w) + ',' + Math.min(e.y, e.y + e.h) + ') scale(' + sx + ',' + sy + ')" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:' + col + '">' + s.draw() + '</g>';
 }
 
-// ── stencil registry (NDT symbols) — drawn in a 0..100 box. Grows in Phase 3. ──
+// ── stencil registry (NDT symbols) — drawn in a 0..100 box, grouped by cat ──
+var CAD_STENCIL_CATS = ['Welds','Fittings','Markers','Instruments'];
 var CAD_STENCILS = {
-  'weld-fillet': { name:'Fillet weld', draw:function(){ return '<path d="M10 90 V20 H80"/><path d="M10 90 L80 20"/>'; } },
-  'weld-butt':   { name:'Butt weld',   draw:function(){ return '<path d="M10 50 H40"/><path d="M60 50 H90"/><path d="M40 30 L50 70 L60 30"/>'; } },
-  'elbow':       { name:'Elbow',       draw:function(){ return '<path d="M20 90 V50 Q20 20 50 20 H90" /><path d="M20 90 H40 V50" stroke-dasharray="4 3"/>'; } },
-  'tee':         { name:'Tee',         draw:function(){ return '<path d="M10 60 H90"/><path d="M50 60 V15"/><circle cx="50" cy="60" r="4" fill="currentColor"/>'; } },
-  'flange':      { name:'Flange',      draw:function(){ return '<rect x="40" y="15" width="20" height="70"/><line x1="35" y1="20" x2="65" y2="20"/><line x1="35" y1="80" x2="65" y2="80"/>'; } },
-  'arrow-flow':  { name:'Flow arrow',  draw:function(){ return '<line x1="10" y1="50" x2="80" y2="50"/><path d="M80 40 L95 50 L80 60 Z" fill="currentColor"/>'; } },
-  'defect':      { name:'Defect mark', draw:function(){ return '<circle cx="50" cy="50" r="34"/><line x1="28" y1="28" x2="72" y2="72"/><line x1="72" y1="28" x2="28" y2="72"/>'; } },
-  'point':       { name:'Test point',  draw:function(){ return '<circle cx="50" cy="50" r="30"/><circle cx="50" cy="50" r="6" fill="currentColor"/>'; } },
+  // Welds
+  'weld-fillet': { name:'Fillet',   cat:'Welds', draw:function(){ return '<path d="M12 88 V22 H82"/><path d="M12 88 L82 22"/>'; } },
+  'weld-butt':   { name:'Butt',     cat:'Welds', draw:function(){ return '<path d="M10 50 H40"/><path d="M60 50 H90"/><path d="M40 30 L50 70 L60 30"/>'; } },
+  'weld-singlev':{ name:'Single-V', cat:'Welds', draw:function(){ return '<line x1="8" y1="80" x2="92" y2="80"/><path d="M22 80 L50 30 L78 80"/>'; } },
+  'weld-spot':   { name:'Spot',     cat:'Welds', draw:function(){ return '<circle cx="50" cy="50" r="24"/><circle cx="50" cy="50" r="7" fill="currentColor"/>'; } },
+  // Fittings
+  'elbow':       { name:'Elbow',    cat:'Fittings', draw:function(){ return '<path d="M22 90 V52 Q22 22 52 22 H90"/><path d="M44 90 V52 Q44 44 52 44 H90" stroke-dasharray="4 3"/>'; } },
+  'tee':         { name:'Tee',      cat:'Fittings', draw:function(){ return '<path d="M10 60 H90"/><path d="M50 60 V15"/><circle cx="50" cy="60" r="4" fill="currentColor"/>'; } },
+  'cross':       { name:'Cross',    cat:'Fittings', draw:function(){ return '<path d="M10 50 H90"/><path d="M50 10 V90"/><circle cx="50" cy="50" r="4" fill="currentColor"/>'; } },
+  'reducer':     { name:'Reducer',  cat:'Fittings', draw:function(){ return '<path d="M14 30 H46 L86 44 V56 L46 70 H14 Z"/>'; } },
+  'flange':      { name:'Flange',   cat:'Fittings', draw:function(){ return '<rect x="40" y="15" width="20" height="70"/><line x1="33" y1="20" x2="67" y2="20"/><line x1="33" y1="80" x2="67" y2="80"/>'; } },
+  'valve':       { name:'Valve',    cat:'Fittings', draw:function(){ return '<path d="M22 30 L50 50 L22 70 Z"/><path d="M78 30 L50 50 L78 70 Z"/><line x1="50" y1="50" x2="50" y2="22"/><line x1="38" y1="22" x2="62" y2="22"/>'; } },
+  'cap':         { name:'Cap',      cat:'Fittings', draw:function(){ return '<line x1="40" y1="18" x2="40" y2="82"/><path d="M40 18 Q72 18 72 50 Q72 82 40 82"/>'; } },
+  // Markers
+  'arrow-flow':  { name:'Flow',     cat:'Markers', draw:function(){ return '<line x1="10" y1="50" x2="78" y2="50"/><path d="M78 40 L95 50 L78 60 Z" fill="currentColor"/>'; } },
+  'north':       { name:'North',    cat:'Markers', draw:function(){ return '<path d="M50 12 L62 72 L50 60 L38 72 Z" fill="currentColor"/><text x="50" y="94" text-anchor="middle" font-size="22" fill="currentColor" stroke="none" font-family="sans-serif">N</text>'; } },
+  'point':       { name:'Test pt',  cat:'Markers', draw:function(){ return '<circle cx="50" cy="50" r="30"/><circle cx="50" cy="50" r="6" fill="currentColor"/>'; } },
+  'clock':       { name:'Clock',    cat:'Markers', draw:function(){ return '<circle cx="50" cy="50" r="38"/><line x1="50" y1="12" x2="50" y2="26"/><circle cx="50" cy="18" r="4" fill="currentColor"/>'; } },
+  'defect':      { name:'Defect',   cat:'Markers', draw:function(){ return '<circle cx="50" cy="50" r="34"/><line x1="28" y1="28" x2="72" y2="72"/><line x1="72" y1="28" x2="28" y2="72"/>'; } },
+  'crack':       { name:'Crack',    cat:'Markers', draw:function(){ return '<polyline points="14,52 30,40 44,62 60,36 76,58 92,46" fill="none"/>'; } },
+  'porosity':    { name:'Porosity', cat:'Markers', draw:function(){ return '<circle cx="36" cy="42" r="6" fill="currentColor"/><circle cx="58" cy="56" r="5" fill="currentColor"/><circle cx="70" cy="38" r="3.5" fill="currentColor"/><circle cx="46" cy="66" r="4" fill="currentColor"/>'; } },
+  // Instruments
+  'gauge':       { name:'Gauge',    cat:'Instruments', draw:function(){ return '<circle cx="50" cy="50" r="34"/><line x1="50" y1="50" x2="70" y2="32"/><circle cx="50" cy="50" r="4" fill="currentColor"/>'; } },
+  'instrument':  { name:'Instr.',   cat:'Instruments', draw:function(){ return '<circle cx="50" cy="50" r="34"/><line x1="16" y1="50" x2="84" y2="50"/>'; } },
 };
 
 // Editor-preview sample (used by the cad-drawing block in design mode): a pipe
@@ -250,13 +268,14 @@ function _cadBuildOverlay(){
   var old = document.getElementById('cad-overlay'); if(old) old.remove();
   var o = document.createElement('div'); o.id = 'cad-overlay';
   o.style.cssText = 'position:fixed;inset:0;z-index:100000;background:#0f1115;display:flex;flex-direction:column;font-family:system-ui,sans-serif;color:#e5e7eb';
-  var disp = Math.min((typeof window!=='undefined'?window.innerWidth:1200)-320, 1180);
+  var disp = Math.min((typeof window!=='undefined'?window.innerWidth:1200)-470, 1180);
   _cadEd.baseDisp = disp; if(!_cadEd.zoom) _cadEd.zoom = 1;
   var d = _cadActive(), dw = Math.round(disp * _cadEd.zoom), dh = Math.round(dw * d.h / d.w);
   o.innerHTML =
     _cadStyle()
     + _cadToolbarHtml()
     + '<div style="flex:1;display:flex;min-height:0">'
+      + _cadStencilPanelHtml()
       + '<div id="cad-stage" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:18px;background:#1b1f27">'
         + '<div id="cad-canvas-wrap" style="width:'+dw+'px;height:'+dh+'px;box-shadow:0 6px 30px rgba(0,0,0,.5);background:#fff;flex-shrink:0"></div>'
       + '</div>'
@@ -301,13 +320,17 @@ function _cadToolbarHtml(){
 function _cadSyncToolbar(){
   var o = document.getElementById('cad-overlay'); if(!o) return;
   o.querySelectorAll('[data-cad-tool]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-cad-tool') === _cadEd.tool); });
+  o.querySelectorAll('[data-cad-stencil]').forEach(function(b){ b.classList.toggle('on', _cadEd.tool === 'stencil' && b.getAttribute('data-cad-stencil') === _cadEd.stencilId); });
   var snap = o.querySelector('[data-cad-act="snap"]'); if(snap) snap.classList.toggle('on', !!_cadEd.snap);
 }
 function _cadWire(o){
   o.addEventListener('click', function(ev){
+    var sb = ev.target.closest('[data-cad-stencil]'); if(sb){ _cadEd.tool = 'stencil'; _cadEd.stencilId = sb.getAttribute('data-cad-stencil'); _cadEd.sel = null; _cadSyncToolbar(); _cadRender(); _cadRenderPanel(); return; }
     var t = ev.target.closest('[data-cad-tool]'); if(t){ _cadEd.tool = t.getAttribute('data-cad-tool'); _cadEd.sel = null; _cadSyncToolbar(); _cadRender(); _cadRenderPanel(); return; }
     var a = ev.target.closest('[data-cad-act]'); if(!a) return;
     var act = a.getAttribute('data-cad-act');
+    if(act==='bgupload'){ _cadUploadBg(); return; }
+    if(act==='bgremove'){ var d = _cadActive(); _cadPushUndo(); d.background = { type:'grid' }; _cadRender(); _cadRenderPanel(); return; }
     if(act==='undo'){ cadUndo(); _cadRenderPanel(); }
     else if(act==='redo'){ cadRedo(); _cadRenderPanel(); }
     else if(act==='delete'){ if(_cadEd.sel){ _cadPushUndo(); _cadRemove(_cadEd.sel); _cadEd.sel=null; _cadRender(); _cadRenderPanel(); } }
@@ -323,10 +346,12 @@ function _cadWire(o){
     else if(ev.target.matches('[data-cad-width]')) _cadEd.strokeWidth = +ev.target.value;
     else if(ev.target.matches('[data-cad-slot]')){ _cadEd.activeId = ev.target.value; _cadEnsure(_cadEd.activeId); _cadEd.sel=null; _cadResizeWrap(); _cadRender(); _cadRenderPanel(); }
     else if(ev.target.matches('[data-cad-fillon]') && _cadEd.sel){ var fe = _cadFind(_cadEd.sel); if(fe){ _cadPushUndo(); fe.fill = ev.target.checked ? '#cbd5e1' : 'none'; _cadRender(); _cadRenderPanel(); } }
+    else if(ev.target.matches('[data-cad-bgtype]')){ var dd = _cadActive(); _cadPushUndo(); if(!dd.background) dd.background = {}; dd.background.type = ev.target.value; if(ev.target.value === 'image' && !dd.background.image){ _cadUploadBg(); } _cadRender(); _cadRenderPanel(); }
   });
   // Live property edits from the panel (snapshot once per field on focus).
   o.addEventListener('focusin', function(ev){ if(ev.target.matches('[data-cad-prop]')) _cadPushUndo(); });
   o.addEventListener('input', function(ev){
+    if(ev.target.matches('[data-cad-bgop]')){ var d = _cadActive(); if(d.background){ d.background.opacity = +ev.target.value; _cadRender(); } return; }
     if(!ev.target.matches('[data-cad-prop]') || !_cadEd.sel) return;
     var pe = _cadFind(_cadEd.sel); if(!pe) return;
     var prop = ev.target.getAttribute('data-cad-prop'), v = ev.target.value;
@@ -386,6 +411,7 @@ function _cadDown(ev){
   var t = _cadEd.tool, ne = { id:_cadId(), type:t, stroke:_cadEd.stroke, strokeWidth:_cadEd.strokeWidth, fill:'none' };
   if(t==='line' || t==='arrow' || t==='dim'){ ne.x1=p[0]; ne.y1=p[1]; ne.x2=p[0]; ne.y2=p[1]; if(t==='dim') ne.value=''; }
   else if(t==='rect' || t==='ellipse'){ ne.x=p[0]; ne.y=p[1]; ne.w=0; ne.h=0; }
+  else if(t==='stencil'){ ne.type='stencil'; ne.stencil=_cadEd.stencilId; ne.x=p[0]; ne.y=p[1]; ne.w=0; ne.h=0; }
   else if(t==='pen'){ ne.type='path'; ne.points=[[p[0],p[1]]]; }
   _cadEd.draft = ne; _cadActive().elements.push(ne); _cadRender();
 }
@@ -400,7 +426,7 @@ function _cadMove(ev){
   if(!_cadEd.draft) return;
   var q = _cadPoint(ev), d = _cadEd.draft;
   if(d.type==='line' || d.type==='arrow' || d.type==='dim'){ d.x2=q[0]; d.y2=q[1]; }
-  else if(d.type==='rect' || d.type==='ellipse'){ d.w=q[0]-d.x; d.h=q[1]-d.y; }
+  else if(d.type==='rect' || d.type==='ellipse' || d.type==='stencil'){ d.w=q[0]-d.x; d.h=q[1]-d.y; }
   else if(d.type==='path'){ d.points.push([q[0],q[1]]); }
   _cadRender();
 }
@@ -410,8 +436,9 @@ function _cadUp(){
   if(_cadEd && _cadEd.draft){
     var e = _cadEd.draft; _cadEd.draft = null;
     var b = _cadElBounds(e);
-    if(e.type !== 'path' && b[2] < 4 && b[3] < 4){ _cadRemove(e.id); }   // discard accidental click
-    else { _cadEd.sel = e.id; if(_cadEd.tool !== 'pen') _cadEd.tool = 'select'; _cadSyncToolbar(); }
+    if(e.type === 'stencil' && Math.abs(e.w) < 10 && Math.abs(e.h) < 10){ e.w = 90; e.h = 90; }   // click = place at default size
+    if(e.type !== 'path' && e.type !== 'stencil' && b[2] < 4 && b[3] < 4){ _cadRemove(e.id); }   // discard accidental click
+    if(_cadFind(e.id)){ _cadEd.sel = e.id; if(_cadEd.tool !== 'pen') _cadEd.tool = 'select'; _cadSyncToolbar(); }
     _cadRender(); _cadRenderPanel();
   }
 }
@@ -440,6 +467,49 @@ function _cadStartTextEdit(p, existing){
 }
 var CAD_TYPE_LABELS = { line:'Line', rect:'Rectangle', ellipse:'Ellipse', arrow:'Arrow', path:'Freehand', text:'Text', dim:'Dimension', stencil:'Symbol' };
 function _cadPanelHtml(){ return '<div id="cad-panel" style="width:250px;flex-shrink:0;background:#161a22;border-left:1px solid #262d39;padding:14px;overflow:auto;font-size:12px"></div>'; }
+// Left palette of NDT stencils, grouped by category. Click → place mode.
+function _cadStencilPanelHtml(){
+  var byCat = {}; Object.keys(CAD_STENCILS).forEach(function(k){ var c = CAD_STENCILS[k].cat || 'Other'; (byCat[c] = byCat[c] || []).push(k); });
+  var cats = CAD_STENCIL_CATS.concat(Object.keys(byCat).filter(function(c){ return CAD_STENCIL_CATS.indexOf(c) < 0; }));
+  var html = '<div style="font-size:11px;font-weight:700;color:#cbd5e1;letter-spacing:.05em;margin-bottom:6px">STENCILS</div>';
+  cats.forEach(function(cat){
+    var items = byCat[cat]; if(!items || !items.length) return;
+    html += '<div style="font-size:9.5px;color:#9aa4b2;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">' + cat + '</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+    items.forEach(function(k){ var s = CAD_STENCILS[k];
+      html += '<button data-cad-stencil="' + k + '" title="' + escapeHtml(s.name) + '" style="background:#222834;border:1px solid #333b49;border-radius:6px;padding:5px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px">'
+        + '<svg viewBox="-8 -8 116 116" style="width:32px;height:32px"><g stroke="#cbd5e1" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#cbd5e1">' + s.draw() + '</g></svg>'
+        + '<span style="font-size:8px;color:#9aa4b2;line-height:1.1;text-align:center">' + escapeHtml(s.name) + '</span></button>';
+    });
+    html += '</div>';
+  });
+  return '<div id="cad-stencils" style="width:172px;flex-shrink:0;background:#161a22;border-right:1px solid #262d39;padding:12px;overflow:auto">' + html + '</div>';
+}
+// Drawing-level panel (shown when nothing is selected): background controls.
+function _cadDrawingPanelHtml(){
+  var bg = _cadActive().background || { type:'grid' }, isImg = bg.type === 'image' && bg.image;
+  var sel = 'width:100%;box-sizing:border-box;background:#222834;border:1px solid #333b49;color:#e5e7eb;border-radius:6px;padding:5px 7px;height:30px';
+  return '<div style="font-size:12px;font-weight:700;margin-bottom:10px;color:#cbd5e1">Drawing</div>'
+    + '<div style="color:#9aa4b2;font-size:11px;line-height:1.5;margin-bottom:12px">Pick a tool or drop a stencil from the left. Select an element to edit it; drag the blue handles to resize; double-click text to edit.</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#cbd5e1;margin:6px 0 8px">Background</div>'
+    + '<label style="display:block;margin-bottom:8px"><span style="display:block;color:#9aa4b2;font-size:11px;margin-bottom:3px">Type</span>'
+    + '<select data-cad-bgtype style="' + sel + '"><option value="grid"' + (!isImg ? ' selected' : '') + '>Grid</option><option value="image"' + (isImg ? ' selected' : '') + '>Image underlay</option></select></label>'
+    + '<button data-cad-act="bgupload" style="width:100%;margin-bottom:8px">Upload image…</button>'
+    + (isImg
+        ? '<label style="display:block;margin-bottom:8px"><span style="display:block;color:#9aa4b2;font-size:11px;margin-bottom:3px">Opacity</span><input type="range" min="0.1" max="1" step="0.05" value="' + (bg.opacity != null ? bg.opacity : 0.6) + '" data-cad-bgop style="width:100%"/></label>'
+          + '<button data-cad-act="bgremove" style="width:100%">Remove image</button>'
+        : '<div style="font-size:10px;color:#6b7280;line-height:1.4">Drop in a site photo or scanned sketch to trace / annotate over.</div>');
+}
+function _cadUploadBg(){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0]; if(!f) return;
+    if(f.size > 6 * 1024 * 1024){ if(typeof toast === 'function') toast('Image too large (max 6 MB).'); else alert('Image too large (max 6 MB).'); return; }
+    var rd = new FileReader();
+    rd.onload = function(){ var d = _cadActive(); _cadPushUndo(); d.background = { type:'image', image:rd.result, opacity:(d.background && d.background.opacity) || 0.6 }; _cadRender(); _cadRenderPanel(); };
+    rd.readAsDataURL(f);
+  };
+  inp.click();
+}
 function _cadField(label, type, prop, val){
   return '<label style="display:block;margin-bottom:9px"><span style="display:block;color:#9aa4b2;font-size:11px;margin-bottom:3px">' + label + '</span>'
     + '<input type="' + type + '" data-cad-prop="' + prop + '" value="' + (val == null ? '' : String(val).replace(/"/g, '&quot;')) + '" style="width:100%;box-sizing:border-box;background:#222834;border:1px solid #333b49;color:#e5e7eb;border-radius:6px;padding:5px 7px;height:30px"/></label>';
@@ -447,7 +517,7 @@ function _cadField(label, type, prop, val){
 function _cadRenderPanel(){
   var panel = document.getElementById('cad-panel'); if(!panel) return;
   var e = _cadEd.sel ? _cadFind(_cadEd.sel) : null;
-  if(!e){ panel.innerHTML = '<div style="color:#9aa4b2;line-height:1.5">Select an element to edit its properties.<br><br>Pick a tool above and draw on the canvas. Drag the blue handles to resize; double-click text to edit it.</div>'; return; }
+  if(!e){ panel.innerHTML = _cadDrawingPanelHtml(); return; }
   var rows = '<div style="font-size:12px;font-weight:700;margin-bottom:12px;color:#cbd5e1">' + (CAD_TYPE_LABELS[e.type] || 'Element') + '</div>';
   rows += _cadField('Colour', 'color', 'stroke', e.stroke || '#1e293b');
   if(e.type !== 'text') rows += _cadField('Line width', 'number', 'strokeWidth', e.strokeWidth != null ? e.strokeWidth : 2);

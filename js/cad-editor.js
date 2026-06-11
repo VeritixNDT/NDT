@@ -250,6 +250,29 @@ function _cadResizeEl(e, o, handle, p){
   if(e.type === 'text'){ e.x = nx; e.y = ny + nh; e.fontSize = Math.max(8, Math.round(nh - 8)); }
   else { e.x = nx; e.y = ny; e.w = nw; e.h = nh; }
 }
+// ── Phase 4: clipboard, layering, alignment, nudge ──
+function _cadOffset(e, dx, dy){ _cadTranslate(e, JSON.parse(JSON.stringify(e)), dx, dy); }
+function _cadCopy(){ if(_cadEd.sel){ var e = _cadFind(_cadEd.sel); if(e) _cadEd.clip = JSON.parse(JSON.stringify(e)); } }
+function _cadPasteClip(){
+  if(!_cadEd.clip) return;
+  _cadPushUndo();
+  var e = JSON.parse(JSON.stringify(_cadEd.clip)); e.id = _cadId(); _cadOffset(e, 22, 22);
+  _cadActive().elements.push(e); _cadEd.sel = e.id; _cadRender(); _cadRenderPanel();
+}
+function _cadDuplicate(){ if(_cadEd.sel){ _cadCopy(); _cadPasteClip(); } }
+function _cadReorder(id, dir){
+  var d = _cadActive(), i = -1; d.elements.forEach(function(e, k){ if(e.id === id) i = k; });
+  if(i < 0) return; _cadPushUndo();
+  var e = d.elements.splice(i, 1)[0]; if(dir === 'front') d.elements.push(e); else d.elements.unshift(e);
+  _cadRender();
+}
+function _cadAlign(id, axis){
+  var e = _cadFind(id); if(!e) return; var d = _cadActive(), b = _cadElBounds(e); _cadPushUndo();
+  if(axis === 'h') _cadOffset(e, d.w / 2 - (b[0] + b[2] / 2), 0);
+  else _cadOffset(e, 0, d.h / 2 - (b[1] + b[3] / 2));
+  _cadRender();
+}
+function _cadNudge(dx, dy){ if(!_cadEd.sel) return; var e = _cadFind(_cadEd.sel); if(e){ _cadPushUndo(); _cadOffset(e, dx, dy); _cadRender(); } }
 function _cadHitShape(e){
   switch(e.type){
     case 'line': case 'arrow': case 'dim': return '<line x1="'+e.x1+'" y1="'+e.y1+'" x2="'+e.x2+'" y2="'+e.y2+'" stroke="rgba(0,0,0,0.001)" stroke-width="18"/>';
@@ -334,6 +357,11 @@ function _cadWire(o){
     if(act==='undo'){ cadUndo(); _cadRenderPanel(); }
     else if(act==='redo'){ cadRedo(); _cadRenderPanel(); }
     else if(act==='delete'){ if(_cadEd.sel){ _cadPushUndo(); _cadRemove(_cadEd.sel); _cadEd.sel=null; _cadRender(); _cadRenderPanel(); } }
+    else if(act==='front'){ _cadReorder(_cadEd.sel, 'front'); }
+    else if(act==='back'){ _cadReorder(_cadEd.sel, 'back'); }
+    else if(act==='centerh'){ _cadAlign(_cadEd.sel, 'h'); }
+    else if(act==='centerv'){ _cadAlign(_cadEd.sel, 'v'); }
+    else if(act==='dup'){ _cadDuplicate(); }
     else if(act==='snap'){ _cadEd.snap=!_cadEd.snap; _cadSyncToolbar(); }
     else if(act==='zoomin') _cadZoom((_cadEd.zoom||1)+0.25);
     else if(act==='zoomout') _cadZoom((_cadEd.zoom||1)-0.25);
@@ -369,9 +397,20 @@ function _cadWire(o){
   });
   _cadEd._keys = function(ev){
     if(ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;   // don't hijack field typing
-    if(ev.key === 'Escape') cadCloseEditor();
+    var k = ev.key.toLowerCase(), mod = ev.ctrlKey || ev.metaKey;
+    if(ev.key === 'Escape'){ cadCloseEditor(); }
     else if((ev.key === 'Delete' || ev.key === 'Backspace') && _cadEd.sel){ ev.preventDefault(); _cadPushUndo(); _cadRemove(_cadEd.sel); _cadEd.sel=null; _cadRender(); _cadRenderPanel(); }
-    else if((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==='z'){ ev.preventDefault(); ev.shiftKey?cadRedo():cadUndo(); _cadRenderPanel(); }
+    else if(mod && k === 'z'){ ev.preventDefault(); ev.shiftKey?cadRedo():cadUndo(); _cadRenderPanel(); }
+    else if(mod && k === 'y'){ ev.preventDefault(); cadRedo(); _cadRenderPanel(); }
+    else if(mod && k === 'c'){ _cadCopy(); }
+    else if(mod && k === 'v'){ ev.preventDefault(); _cadPasteClip(); }
+    else if(mod && k === 'd'){ ev.preventDefault(); _cadDuplicate(); }
+    else if(mod){ /* leave other Ctrl combos to the browser */ }
+    else if(ev.key.indexOf('Arrow') === 0 && _cadEd.sel){ ev.preventDefault(); var s = ev.shiftKey ? 10 : 1; _cadNudge(ev.key==='ArrowLeft'?-s:ev.key==='ArrowRight'?s:0, ev.key==='ArrowUp'?-s:ev.key==='ArrowDown'?s:0); }
+    else { // tool hotkeys
+      var map = { v:'select', l:'line', r:'rect', o:'ellipse', a:'arrow', p:'pen', t:'text', d:'dim' };
+      if(map[k]){ _cadEd.tool = map[k]; _cadEd.sel = null; _cadSyncToolbar(); _cadRender(); _cadRenderPanel(); }
+    }
   };
   document.addEventListener('keydown', _cadEd._keys);
 }
@@ -528,7 +567,13 @@ function _cadRenderPanel(){
   }
   if(e.type === 'text'){ rows += _cadField('Text', 'text', 'text', e.text || ''); rows += _cadField('Font size', 'number', 'fontSize', e.fontSize || 20); }
   if(e.type === 'dim') rows += _cadField('Value (blank = auto length)', 'text', 'value', e.value != null ? e.value : '');
-  rows += '<button data-cad-act="delete" style="margin-top:8px;width:100%">Delete element</button>';
+  // Arrange / align
+  var two = 'style="flex:1"';
+  rows += '<div style="font-size:11px;color:#9aa4b2;margin:12px 0 6px">Arrange</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:6px"><button data-cad-act="front" ' + two + '>Bring front</button><button data-cad-act="back" ' + two + '>Send back</button></div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:6px"><button data-cad-act="centerh" ' + two + '>Center H</button><button data-cad-act="centerv" ' + two + '>Center V</button></div>'
+    + '<button data-cad-act="dup" style="width:100%;margin-bottom:6px">Duplicate</button>'
+    + '<button data-cad-act="delete" style="width:100%">Delete element</button>';
   panel.innerHTML = rows;
 }
 function _cadRender(){ var wrap = document.getElementById('cad-canvas-wrap'); if(wrap) wrap.innerHTML = _cadEditorSVG(_cadActive(), _cadEd.sel); }

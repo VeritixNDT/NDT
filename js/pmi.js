@@ -139,11 +139,11 @@ function pmiElState(val, band, elSym, mode){
   if(hi != null && v > hi + 1e-9) return 'out';
   return 'in';
 }
-// Grade-match verdict for ONE component (the analog of htVerdict). Returns the
-// per-element evaluation plus the rolled-up Result string.
-function pmiMatch(component, mode){
-  component = component || {}; mode = mode || 'oes';
-  var grade = component.grade, readings = component.readings || {};
+// Grade-match verdict for ONE measurement point { grade, readings } (the analog
+// of htVerdict). Returns the per-element evaluation plus the Result string.
+function pmiPointMatch(point, mode){
+  point = point || {}; mode = mode || 'oes';
+  var grade = point.grade, readings = point.readings || {};
   var rows = pmiElementsOf(grade).map(function(e){
     var band = PMI_GRADES[grade].el[e];
     return { el:e, val:readings[e], min:band[0], max:band[1], band:band, state:pmiElState(readings[e], band, e, mode) };
@@ -155,38 +155,88 @@ function pmiMatch(component, mode){
   var result = !grade ? '' : (anyOut ? 'Not acceptable' : (complete ? 'Acceptable' : ''));
   return { result:result, complete:complete, anyOut:anyOut, rows:rows, grade:grade };
 }
-// Whole-survey roll-up for the caption (matched / total, overall pass).
+// Component verdict — rolls up its measurement points (single → 1, 3-point → 3).
+// Not acceptable if any graded point fails; Acceptable only when every graded
+// point is complete & in spec; else '' (incomplete / no grade yet).
+function pmiComponentVerdict(comp, mode){
+  var graded = (comp && comp.points || []).filter(function(p){ return p && p.grade; });
+  if(!graded.length) return '';
+  var results = graded.map(function(p){ return pmiPointMatch(p, mode).result; });
+  if(results.indexOf('Not acceptable') >= 0) return 'Not acceptable';
+  return results.every(function(r){ return r === 'Acceptable'; }) ? 'Acceptable' : '';
+}
+// Whole-survey roll-up for the caption (matched / total components, overall pass).
 function pmiSurveyVerdict(survey){
   survey = pmiNormalize(survey); if(!survey) return { total:0, matched:0, anyFail:false };
   var total = 0, matched = 0, anyFail = false;
-  (survey.components || []).forEach(function(c){ var m = pmiMatch(c, survey.mode);
-    if(m.result === 'Acceptable'){ total++; matched++; }
-    else if(m.result === 'Not acceptable'){ total++; anyFail = true; } });
+  (survey.components || []).forEach(function(c){ var r = pmiComponentVerdict(c, survey.mode);
+    if(r === 'Acceptable'){ total++; matched++; }
+    else if(r === 'Not acceptable'){ total++; anyFail = true; } });
   return { total:total, matched:matched, anyFail:anyFail };
 }
 
 // ── model: defaults, normalise, sample ───────────────────────────────────────
-function _pmiBlankComponent(){ return { grade:'', readings:{} }; }
+// A component holds a measurement mode + its points. 'single' = one reading set
+// (a plain component); '3point' = parent · weld · parent (a welded joint), each
+// point with its own specified grade.
+var PMI_3PT_LABELS = ['Parent material','Weld','Parent material'];
+function _pmiBlankPoint(label){ return { label: label || '', grade:'', readings:{} }; }
+function _pmiBlankComponent(){ return { measMode:'single', points:[ _pmiBlankPoint('Test point') ] }; }
+// Build a component's points for a mode, preserving overlapping data. 3pt→single
+// keeps the weld point's readings; single→3pt seeds the weld point from the
+// existing single reading (parents start blank).
+function _pmiClone(o){ return Object.assign({}, o || {}); }   // shallow copy — never share readings between points
+function _pmiPointsForMode(measMode, existing){
+  existing = existing || [];
+  if(measMode === '3point'){
+    var weldSrc = existing.length > 1 ? existing[1] : existing[0];
+    return PMI_3PT_LABELS.map(function(lbl, i){
+      var src = (i === 1 ? weldSrc : existing[i]) || {};
+      return { label:lbl, grade:src.grade || '', readings:_pmiClone(src.readings) };
+    });
+  }
+  var keep = existing[1] || existing[0] || {};   // collapse → keep the weld point
+  return [ { label:'Test point', grade:keep.grade || '', readings:_pmiClone(keep.readings) } ];
+}
 function pmiDefault(mode){ return { mode: mode || 'xrf', components:[ _pmiBlankComponent() ] }; }
-// Normalise to { mode, components:[{grade, readings}] }. Idempotent.
+// Normalise to { mode, components:[{measMode, points:[{label,grade,readings}]}] }.
+// Migrates legacy shapes (a top-level {grade,readings} survey, or per-component
+// {grade,readings}) into a single-point component. Idempotent.
 function pmiNormalize(survey){
   if(!survey) return null;
   if(!Array.isArray(survey.components)){
     survey = { mode: survey.mode || 'xrf', components:[ { grade: survey.grade || '', readings: survey.readings || {} } ] };
   }
   if(survey.mode !== 'xrf' && survey.mode !== 'oes') survey.mode = 'xrf';
-  survey.components = (survey.components || []).map(function(c){ return { grade:(c && c.grade) || '', readings:(c && c.readings) || {} }; });
+  survey.components = (survey.components || []).map(function(c){
+    c = c || {};
+    if(Array.isArray(c.points) && c.points.length){
+      var mm = c.measMode === '3point' ? '3point' : 'single';
+      return { measMode:mm, points:c.points.map(function(p){ p = p || {}; return { label:p.label || '', grade:p.grade || '', readings:p.readings || {} }; }) };
+    }
+    return { measMode:'single', points:[ { label:'Test point', grade:c.grade || '', readings:c.readings || {} } ] };
+  });
   if(!survey.components.length) survey.components = [ _pmiBlankComponent() ];
   return survey;
 }
 function pmiComponentCount(survey){ survey = pmiNormalize(survey); return (survey && survey.components) ? survey.components.length : 0; }
 function pmiIsXrf(){ return !!(_pmiSurvey && _pmiSurvey.mode === 'xrf'); }
 
-// Sample survey / items for the editor preview (no real report attached).
+// Sample survey / items for the editor preview (no real report attached). One
+// single-point component, then a 3-point welded joint (parent 316L · weld 316L ·
+// parent 316L), then a dissimilar example (parent P22 · weld 625 · parent P22).
 var PMI_SAMPLE = { mode:'oes', components:[
-  { grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32', Mn:'1.52', Cu:'0.34', Nb:'0.02', Fe:'68.1' } },
-  { grade:'P22',  readings:{ C:'0.11', Mn:'0.46', Si:'0.24', Cr:'2.21', Mo:'0.98', Cu:'0.13', Nb:'0.01', Fe:'95.8' } },
-  { grade:'Alloy 625', readings:{ Ni:'61.2', Cr:'21.7', Mo:'8.9', Nb:'3.62', Fe:'3.1', Mn:'0.18', Cu:'0.05' } },
+  { measMode:'single', points:[ { label:'Test point', grade:'316L', readings:{ C:'0.022', Cr:'16.8', Ni:'10.4', Mo:'2.32', Mn:'1.52', Cu:'0.34', Nb:'0.02', Fe:'68.1' } } ] },
+  { measMode:'3point', points:[
+    { label:'Parent material', grade:'316L', readings:{ C:'0.024', Cr:'16.9', Ni:'10.2', Mo:'2.28', Mn:'1.48', Fe:'68.3' } },
+    { label:'Weld',            grade:'316L', readings:{ C:'0.021', Cr:'17.1', Ni:'11.6', Mo:'2.41', Mn:'1.62', Fe:'67.0' } },
+    { label:'Parent material', grade:'316L', readings:{ C:'0.023', Cr:'16.8', Ni:'10.3', Mo:'2.30', Mn:'1.50', Fe:'68.2' } },
+  ] },
+  { measMode:'3point', points:[
+    { label:'Parent material', grade:'P22',       readings:{ C:'0.11', Mn:'0.46', Si:'0.24', Cr:'2.21', Mo:'0.98', Fe:'95.8' } },
+    { label:'Weld',            grade:'Alloy 625', readings:{ Ni:'61.2', Cr:'21.7', Mo:'8.9', Nb:'3.62', Fe:'3.1', Mn:'0.18' } },
+    { label:'Parent material', grade:'P22',       readings:{ C:'0.12', Mn:'0.48', Si:'0.26', Cr:'2.24', Mo:'1.01', Fe:'95.6' } },
+  ] },
 ]};
 var PMI_SAMPLE_ITEMS = [
   { subject:'6"-P-1201 elbow',     drawing:'ISO-P-1201', examDate:'', extent:'100%' },
@@ -204,16 +254,18 @@ var PMI_P = { ink:'#111', mut:'#6b7280', grid:'#ddd', line:'#cbcbcb',
   edgeFill:'rgba(217,119,6,.20)', edgeStroke:'rgba(180,83,9,.45)',
   steel:'rgba(20,30,55,.05)' };
 
-// Per-weld/component details header columns (editable widths on the block).
+// Per-component details header columns (editable widths on the block). The
+// specified / identified grade lives in the per-point sub-headers (each point
+// has its own grade), so the component header carries the measurement mode and
+// the rolled-up Result instead.
 var PMI_DETAIL_COLS = [
-  { id:'compNo',    label:'Component / Item No.', w:160 },
-  { id:'drawing',   label:'Line / ISO',           w:100 },
-  { id:'material',  label:'Nominal grade',        w:115 },
-  { id:'examDate',  label:'Exam date',            w:80  },
-  { id:'grade',     label:'Identified grade',     w:105 },
-  { id:'extent',    label:'Extent',               w:85  },
-  { id:'technique', label:'Technique',            w:70  },
-  { id:'verdict',   label:'Result',               w:95  },
+  { id:'compNo',    label:'Component / Item No.', w:175 },
+  { id:'drawing',   label:'Line / ISO',           w:110 },
+  { id:'meas',      label:'Measurement',          w:135 },
+  { id:'examDate',  label:'Exam date',            w:85  },
+  { id:'extent',    label:'Extent',               w:90  },
+  { id:'technique', label:'Technique',            w:75  },
+  { id:'verdict',   label:'Result',               w:100 },
 ];
 
 // opts mirror htRenderSurvey: { print, sample, slice:{start,count}, part:
@@ -259,43 +311,67 @@ function pmiRenderSurvey(survey, opts){
   return '<div style="overflow:hidden;font-family:\'Geist\',system-ui,sans-serif">' + html + '</div>';
 }
 
-// One component block: details header + composition range chart + readings table.
+// One component block: details header + one point block per measurement point
+// (single → 1; 3-point → parent · weld · parent).
 function _pmiCompUnit(comp, item, idx, mode, P, bar, detailWidths){
+  comp = comp || {};
   var sep = idx > 0 ? 'border-top:2px solid '+P.grid+';margin-top:8px;padding-top:2px;' : '';
+  var pts = comp.points || [];
+  var multi = pts.length > 1;
+  var blocks = pts.map(function(pt, pi){ return _pmiPointBlock(pt, pi, mode, P, bar, multi); }).join('');
   return '<div style="'+sep+'">'
     + _pmiItemDetails(comp, item, idx, mode, P, bar, detailWidths)
-    + '<div style="padding:4px 8px 0">' + _pmiCompChart(comp, mode, P) + '</div>'
-    + _pmiCompTable(comp, mode, P, bar)
+    + blocks
     + '</div>';
 }
 
-// Computed Result chip for a component (peak/match logic, report verdict tones).
-function _pmiResultChip(comp, mode){
-  var m = pmiMatch(comp, mode);
-  if(!m.result) return '<span style="color:#6b7280">—</span>';
-  var c = (typeof OV_VERDICT_COLORS !== 'undefined' && OV_VERDICT_COLORS[m.result]) ? OV_VERDICT_COLORS[m.result] : null;
-  if(!c) return escapeHtml(m.result);
-  return '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:'+c.bg+';color:'+c.fg+';font-weight:700">'+escapeHtml(m.result)+'</span>';
+// Result chip for a result string (report verdict tones).
+function _pmiVerdictChip(result, P){
+  if(!result) return '<span style="color:#6b7280">—</span>';
+  var c = (typeof OV_VERDICT_COLORS !== 'undefined' && OV_VERDICT_COLORS[result]) ? OV_VERDICT_COLORS[result] : null;
+  if(!c) return escapeHtml(result);
+  return '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:'+c.bg+';color:'+c.fg+';font-weight:700">'+escapeHtml(result)+'</span>';
 }
+// Human label for a component's measurement mode.
+function _pmiMeasLabel(comp){ return (comp && comp.measMode === '3point') ? '3-point (parent · weld · parent)' : 'Single point'; }
+
+// One measurement point: a sub-header (label · specified grade · identified ·
+// result) then its composition chart + readings table. `multi` adds the header
+// (omitted for a single-point component, which reads as one block).
+function _pmiPointBlock(point, pi, mode, P, bar, multi){
+  point = point || {};
+  var m = pmiPointMatch(point, mode);
+  var head = '';
+  if(multi){
+    var nominal = point.grade && PMI_GRADES[point.grade] ? (point.grade + ' — ' + PMI_GRADES[point.grade].name) : '— no grade —';
+    var ident = !point.grade ? '' : (m.result === 'Acceptable' ? (' · found <b>'+escapeHtml(point.grade)+'</b>') : (m.result === 'Not acceptable' ? ' · <span style="color:'+P.red+'">Unidentified</span>' : ''));
+    head = '<div style="display:flex;align-items:center;gap:8px;padding:4px 8px 2px;font-family:\'Geist\',sans-serif;font-size:9.5px;color:'+P.ink+'">'
+      + '<span style="font-weight:700">'+escapeHtml(point.label || ('Point '+(pi+1)))+'</span>'
+      + '<span style="color:'+P.mut+'">spec: '+escapeHtml(nominal)+ident+'</span>'
+      + '<span style="margin-left:auto">'+_pmiVerdictChip(m.result, P)+'</span></div>';
+  }
+  return '<div style="'+(pi>0?'border-top:0.5px dashed '+P.grid+';margin-top:6px;':'')+'">'
+    + head
+    + '<div style="padding:4px 8px 0">' + _pmiCompChart(point, mode, P) + '</div>'
+    + _pmiCompTable(point, mode, P, bar)
+    + '</div>';
+}
+
 function _pmiItemDetails(comp, item, idx, mode, P, bar, colWidths){
   item = item || {}; comp = comp || {};
   function val(x){ return (x === '' || x == null) ? '<span style="color:#9aa6b5">—</span>' : escapeHtml(x); }
   var no = ('00' + (idx + 1)).slice(-3);
   var compNo = no + (item.subject ? (' · ' + escapeHtml(item.subject)) : '');
   var examDate = (item.examDate && typeof fmtDate === 'function') ? escapeHtml(fmtDate(item.examDate)) : val(item.examDate);
-  var nominal = comp.grade && PMI_GRADES[comp.grade] ? escapeHtml(PMI_GRADES[comp.grade].name) : val(item.material);
-  var m = pmiMatch(comp, mode);
-  var identified = !comp.grade ? val('') : (m.result === 'Acceptable' ? escapeHtml(comp.grade) : (m.result === 'Not acceptable' ? '<span style="color:'+P.red+';font-weight:600">Unidentified</span>' : val('')));
   var heads = PMI_DETAIL_COLS.map(function(c){ return c.label; });
   var cells = [
     { v:compNo, extra:'font-weight:600' },
     { v:val(item.drawing) },
-    { v:nominal },
+    { v:_pmiMeasLabel(comp) },
     { v:examDate, extra:'font-family:\'Geist Mono\',monospace' },
-    { v:identified, extra:'font-weight:600' },
     { v:val(item.extent) },
     { v:(mode === 'xrf' ? 'XRF' : 'OES'), extra:'font-family:\'Geist Mono\',monospace' },
-    { v:_pmiResultChip(comp, mode) },
+    { v:_pmiVerdictChip(pmiComponentVerdict(comp, mode), P) },
   ];
   return _pmiTableEl(heads, [{ cells:cells }], bar, P, colWidths);
 }
@@ -514,15 +590,15 @@ function pmiSeedGradesFromItems(){
   if(!_pmiSurvey) return;
   var items = _pmiItems();
   _pmiSurvey.components.forEach(function(c, i){
-    if(c.grade) return;
     var mat = items[i] && items[i].material;
-    if(mat && PMI_GRADES[mat]) c.grade = mat;
+    if(!mat || !PMI_GRADES[mat]) return;
+    (c.points || []).forEach(function(p){ if(!p.grade) p.grade = mat; });
   });
 }
 // Called from the items-table add/remove hooks so the grid tracks the rows.
 function pmiSyncToItems(){ if(!_pmiSurvey) return; pmiReadGrid(); pmiSyncComponents(); pmiRebuildGrid(); }
 
-function _pmiGradeSelect(wi, grade){
+function _pmiGradeSelect(wi, pi, grade){
   var groups = {}, order = [];
   PMI_GRADE_ORDER.forEach(function(k){ var fam = PMI_GRADES[k].family; if(!groups[fam]){ groups[fam] = []; order.push(fam); } groups[fam].push(k); });
   var opts = '<option value=""'+(!grade?' selected':'')+'>— select grade —</option>';
@@ -531,39 +607,58 @@ function _pmiGradeSelect(wi, grade){
     groups[fam].forEach(function(k){ opts += '<option value="'+escapeHtml(k)+'"'+(k===grade?' selected':'')+'>'+escapeHtml(k)+' — '+escapeHtml(PMI_GRADES[k].name)+'</option>'; });
     opts += '</optgroup>';
   });
-  return '<select data-pmi-comp="'+wi+'" data-on-change="pmiGradeChange" data-pass-el="1" style="width:300px">'+opts+'</select>';
+  return '<select data-pmi-comp="'+wi+'" data-pmi-pt="'+pi+'" data-on-change="pmiGradeChange" data-pass-el="1" style="width:290px">'+opts+'</select>';
 }
-function _pmiElInput(wi, elSym, val, disabled){
-  return '<input type="number" step="any" data-pmi-comp="'+wi+'" data-pmi-el="'+elSym+'" data-on-input="pmiEntryChanged" value="'+(val===''||val==null?'':escapeHtml(val))+'" placeholder="wt%" '+(disabled?'disabled title="XRF cannot measure carbon"':'')+' style="width:74px'+(disabled?';background:var(--bg3,#f1f1f1);opacity:.6;cursor:not-allowed':'')+'"/>';
+function _pmiElInput(wi, pi, elSym, val, disabled){
+  return '<input type="number" step="any" data-pmi-comp="'+wi+'" data-pmi-pt="'+pi+'" data-pmi-el="'+elSym+'" data-on-input="pmiEntryChanged" value="'+(val===''||val==null?'':escapeHtml(val))+'" placeholder="wt%" '+(disabled?'disabled title="XRF cannot measure carbon"':'')+' style="width:74px'+(disabled?';background:var(--bg3,#f1f1f1);opacity:.6;cursor:not-allowed':'')+'"/>';
+}
+// One measurement point's entry sub-block: label (3-point only), grade select +
+// live match chip, then an input per report element.
+function _pmiPointEntryHtml(wi, pi, point, mode, multi){
+  point = point || {}; var grade = point.grade;
+  var m = grade ? pmiPointMatch(point, mode) : null;
+  var chip = '';
+  if(m && m.result){ var col = m.result === 'Acceptable' ? '#065f46' : '#991b1b', bg = m.result === 'Acceptable' ? '#d1fae5' : '#fee2e2';
+    chip = '<span style="display:inline-block;padding:2px 9px;border-radius:4px;background:'+bg+';color:'+col+';font-weight:700;font-size:11px;margin-left:10px">'+(m.result==='Acceptable'?'✓ Grade match':'✗ No match')+'</span>'; }
+  else if(grade){ chip = '<span style="color:var(--t3);font-size:11px;margin-left:10px">enter readings…</span>'; }
+  var els = grade ? pmiReportElements(grade) : [];
+  var inputs = els.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">' + els.map(function(e){
+        var band = PMI_GRADES[grade].el[e];
+        var disabled = (e === 'C' && mode === 'xrf');
+        var hint = band ? escapeHtml(pmiRangeText(band)) : '<span style="font-style:italic">report</span>';
+        return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--t3)">'+e+' <span style="color:var(--t4,#9aa6b5)">'+hint+'</span></label>'+_pmiElInput(wi, pi, e, (point.readings||{})[e], disabled)+'</div>';
+      }).join('') + '</div>'
+    : '<div style="font-size:11px;color:var(--t3);margin-top:6px">Select a specified grade to enter its controlled elements.</div>';
+  var ptLabel = multi ? '<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:4px">'+escapeHtml(point.label || ('Point '+(pi+1)))+'</div>' : '';
+  return '<div style="'+(pi>0?'border-top:1px dashed var(--border);margin-top:10px;padding-top:8px;':'')+'">'
+    + ptLabel
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-size:11px;color:var(--t3)">Specified grade</label>'+_pmiGradeSelect(wi, pi, grade)+chip+'</div>'
+    + inputs
+    + '</div>';
 }
 
+function _pmiMeasSelect(wi, measMode){
+  return '<select data-pmi-comp="'+wi+'" data-on-change="pmiSetMeasMode" data-pass-el="1" style="width:280px">'
+    + '<option value="single"'+(measMode!=='3point'?' selected':'')+'>Single point</option>'
+    + '<option value="3point"'+(measMode==='3point'?' selected':'')+'>3-point (parent · weld · parent)</option></select>';
+}
 function pmiGridHtml(){
   var s = _pmiSurvey, mode = s.mode, multi = (s.components||[]).length > 1;
   return (s.components||[]).map(function(comp, wi){
     var lbl = _pmiComponentLabel(wi);
     var del = multi ? '<button class="btn btn-sm btn-danger" data-action="pmiRemoveComponent" data-args="'+wi+'" title="Remove this component" style="padding:2px 9px;font-size:11px;margin-left:10px">− Remove component</button>' : '';
-    var els = comp.grade ? pmiReportElements(comp.grade) : [];
-    var m = comp.grade ? pmiMatch(comp, mode) : null;
-    var chip = '';
-    if(m && m.result){ var col = m.result === 'Acceptable' ? '#065f46' : '#991b1b', bg = m.result === 'Acceptable' ? '#d1fae5' : '#fee2e2';
-      chip = '<span style="display:inline-block;padding:2px 9px;border-radius:4px;background:'+bg+';color:'+col+';font-weight:700;font-size:11px;margin-left:10px">'+(m.result==='Acceptable'?'✓ Grade match':'✗ No match')+'</span>'; }
-    else if(comp.grade){ chip = '<span style="color:var(--t3);font-size:11px;margin-left:10px">enter readings…</span>'; }
-    var inputs = els.length
-      ? '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">' + els.map(function(e){
-          var band = PMI_GRADES[comp.grade].el[e];
-          var disabled = (e === 'C' && mode === 'xrf');
-          var hint = band ? escapeHtml(pmiRangeText(band)) : '<span style="font-style:italic">report</span>';
-          return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--t3)">'+e+' <span style="color:var(--t4,#9aa6b5)">'+hint+'</span></label>'+_pmiElInput(wi, e, (comp.readings||{})[e], disabled)+'</div>';
-        }).join('') + '</div>'
-      : '<div style="font-size:11px;color:var(--t3);margin-top:6px">Select a specified grade to enter its controlled elements.</div>';
+    var pts = comp.points || [];
+    var multiPt = pts.length > 1;
+    var points = pts.map(function(pt, pi){ return _pmiPointEntryHtml(wi, pi, pt, mode, multiPt); }).join('');
     return '<div style="margin-bottom:14px;padding-bottom:12px'+(wi<(s.components.length-1)?';border-bottom:1px solid var(--border)':'')+'">'
       + '<div style="display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--t1);margin-bottom:6px">Component '+(wi+1)+(lbl?' — '+escapeHtml(lbl):'')+del+'</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-size:11px;color:var(--t3)">Specified grade</label>'+_pmiGradeSelect(wi, comp.grade)+chip+'</div>'
-      + inputs
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><label style="font-size:11px;color:var(--t3)">Measurement</label>'+_pmiMeasSelect(wi, comp.measMode)+'</div>'
+      + points
       + '</div>';
   }).join('')
     + '<button class="btn btn-sm" data-action="pmiAddComponent" style="margin-top:2px">+ Add component</button>'
-    + '<div style="font-size:11px;color:var(--t3);margin-top:6px">Each component is one line in the Examination details table above — adding/removing here keeps them in sync.</div>';
+    + '<div style="font-size:11px;color:var(--t3);margin-top:6px">Each component is one line in the Examination details table above — adding/removing here keeps them in sync. A 3-point measurement verifies the parent material each side of the weld and the weld deposit (API 578).</div>';
 }
 
 // read DOM grid → _pmiSurvey (without rebuilding the grid)
@@ -572,11 +667,13 @@ function pmiReadGrid(){
   var ms = el('pmi-mode'); if(ms) _pmiSurvey.mode = ms.value || 'xrf';
   var grid = el('pmi-grid'); if(!grid) return;
   (_pmiSurvey.components || []).forEach(function(comp, wi){
-    var gs = grid.querySelector('select[data-pmi-comp="'+wi+'"][data-on-change="pmiGradeChange"]');
-    if(gs) comp.grade = gs.value;
-    if(!comp.readings) comp.readings = {};
-    grid.querySelectorAll('input[data-pmi-comp="'+wi+'"][data-pmi-el]').forEach(function(inp){
-      comp.readings[inp.getAttribute('data-pmi-el')] = inp.value;
+    (comp.points || []).forEach(function(point, pi){
+      var gs = grid.querySelector('select[data-pmi-comp="'+wi+'"][data-pmi-pt="'+pi+'"][data-on-change="pmiGradeChange"]');
+      if(gs) point.grade = gs.value;
+      if(!point.readings) point.readings = {};
+      grid.querySelectorAll('input[data-pmi-comp="'+wi+'"][data-pmi-pt="'+pi+'"][data-pmi-el]').forEach(function(inp){
+        point.readings[inp.getAttribute('data-pmi-el')] = inp.value;
+      });
     });
   });
 }
@@ -591,7 +688,7 @@ function pmiAutoVerdicts(){
   if(!_pmiSurvey || typeof _ovItems === 'undefined' || !Array.isArray(_ovItems)) return;
   var mode = _pmiSurvey.mode;
   (_pmiSurvey.components || []).forEach(function(c, i){
-    var verdict = pmiMatch(c, mode).result || '';
+    var verdict = pmiComponentVerdict(c, mode) || '';
     if(_ovItems[i]) _ovItems[i].verdict = verdict;
     var sel = el('it-' + i + '-verdict');
     if(sel && sel.value !== verdict){
@@ -626,13 +723,26 @@ function pmiSetMode(sel){
   pmiRebuildGrid();
   pmiAutoVerdicts();
 }
-// Specified-grade change for one component → re-derive its element inputs,
+// Specified-grade change for one point → re-derive its element inputs,
 // preserving any readings for elements the new grade still controls.
 function pmiGradeChange(sel){
   if(!sel) return;
   var wi = parseInt(sel.getAttribute('data-pmi-comp'), 10) || 0;
+  var pi = parseInt(sel.getAttribute('data-pmi-pt'), 10) || 0;
   pmiReadGrid();
-  if(_pmiSurvey && _pmiSurvey.components[wi]) _pmiSurvey.components[wi].grade = sel.value;
+  var comp = _pmiSurvey && _pmiSurvey.components[wi];
+  if(comp && comp.points && comp.points[pi]) comp.points[pi].grade = sel.value;
+  pmiRebuildGrid();
+  pmiAutoVerdicts();
+}
+// Measurement-mode change for one component (single ↔ 3-point) → rebuild its
+// points, preserving overlapping readings (see _pmiPointsForMode).
+function pmiSetMeasMode(sel){
+  if(!sel) return;
+  var wi = parseInt(sel.getAttribute('data-pmi-comp'), 10) || 0;
+  pmiReadGrid();
+  var comp = _pmiSurvey && _pmiSurvey.components[wi];
+  if(comp){ var mm = sel.value === '3point' ? '3point' : 'single'; comp.measMode = mm; comp.points = _pmiPointsForMode(mm, comp.points); }
   pmiRebuildGrid();
   pmiAutoVerdicts();
 }

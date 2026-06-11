@@ -424,10 +424,13 @@ function _pmiCompTable(comp, mode, P, bar){
   return _pmiTableEl(heads, body, bar, P);
 }
 
-// "How the verification is done" — analyser → component + certified reference,
-// the API 578 standardisation note, and the XRF carbon caveat when relevant.
+// "How the material is verified" — a welded-pipe side view with the 3 PMI test
+// points (parent material · weld · parent material, per API 578: verify both
+// parent metals AND the weld deposit), alongside the single reference-standard
+// reading the instrument is standardised on. Plus the XRF carbon caveat.
 function _pmiMethodCard(mode, P){
   var xrf = mode === 'xrf';
+  var weldFill = 'rgba(30,64,175,.10)';
   var s = '';
   s += '<text x="6" y="13" font-family="\'Geist Mono\',monospace" font-size="9.5" font-weight="700" fill="'+P.ink+'">HOW THE MATERIAL IS VERIFIED</text>';
   // technique rules — active one highlighted
@@ -436,28 +439,39 @@ function _pmiMethodCard(mode, P){
     var on = (z[0] === mode);
     s += '<text x="6" y="'+(28+i*11)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+(on?P.blue:P.mut)+'"'+(on?' font-weight="700"':'')+'>'+(on?'▸ ':'  ')+z[1]+' — '+z[2]+'</text>';
   });
-  // component (pipe spool) + the analyser aimed at it
-  var pipeL=60, pipeR=300, top=92, bot=158, midY=(top+bot)/2;
-  s += '<rect x="'+pipeL+'" y="'+top+'" width="'+(pipeR-pipeL)+'" height="'+(bot-top)+'" rx="6" fill="'+P.steel+'" stroke="'+P.line+'"/>';
-  s += '<text x="'+((pipeL+pipeR)/2)+'" y="'+(bot+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.mut+'">Component under test</text>';
-  // analyser body + snout aimed at the spool
-  var ax=360, ay=midY;
-  s += '<rect x="'+ax+'" y="'+(ay-26)+'" width="78" height="52" rx="7" fill="#eef2f7" stroke="'+P.line+'"/>';
-  s += '<rect x="'+(ax+10)+'" y="'+(ay-16)+'" width="40" height="16" rx="2" fill="#fff" stroke="'+P.line+'"/>';
-  s += '<polygon points="'+ax+','+(ay-9)+' '+(ax-22)+','+ay+' '+ax+','+(ay+9)+'" fill="#dbe3ee" stroke="'+P.line+'"/>';
-  s += '<text x="'+(ax+39)+'" y="'+(ay+22)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">Analyser</text>';
-  // beam from snout to component
-  s += '<line x1="'+(ax-22)+'" y1="'+ay+'" x2="'+(pipeR+2)+'" y2="'+ay+'" stroke="'+P.blue+'" stroke-width="1.3" stroke-dasharray="5 3"/>';
-  s += '<path d="M'+(pipeR+2)+' '+(ay-4)+' L '+(pipeR-6)+' '+ay+' L '+(pipeR+2)+' '+(ay+4)+'" fill="'+P.blue+'"/>';
-  // certified reference standard block
-  var rx=470, ry=top;
-  s += '<rect x="'+rx+'" y="'+ry+'" width="120" height="'+(bot-top)+'" rx="4" fill="rgba(6,95,70,.06)" stroke="'+P.bandStroke+'"/>';
-  s += '<text x="'+(rx+60)+'" y="'+(ry+ (bot-top)/2 -2)+'" text-anchor="middle" font-family="\'Geist\',sans-serif" font-weight="700" font-size="10" fill="'+P.green+'">CRM</text>';
-  s += '<text x="'+(rx+60)+'" y="'+(ry+ (bot-top)/2 +11)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">certified reference</text>';
-  // standardisation note
-  s += '<text x="6" y="182" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">Instrument standardised against a certified reference (CRM) before &amp; after use — API 578.</text>';
-  if(xrf) s += '<text x="6" y="194" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.amber+'">✱ XRF cannot read carbon — grade vs low-carbon (L) grade not distinguishable; use OES where C is critical.</text>';
-  return '<svg viewBox="0 0 794 '+(xrf?202:190)+'" style="width:100%;height:auto;display:block">'+s+'</svg>';
+  // ── welded pipe side view + 3 test points ──
+  var pipeL=64, pipeR=452, top=108, bot=176, cx=258, callTop=80;
+  s += '<rect x="'+pipeL+'" y="'+top+'" width="'+(pipeR-pipeL)+'" height="'+(bot-top)+'" fill="'+P.steel+'" stroke="'+P.line+'"/>';
+  // weld bead at the centre (body + cap reinforcement)
+  s += '<rect x="'+(cx-9)+'" y="'+top+'" width="18" height="'+(bot-top)+'" fill="'+weldFill+'" stroke="'+P.blue+'" stroke-opacity=".55"/>';
+  s += '<path d="M'+(cx-12)+' '+top+' Q '+cx+' '+(top-7)+' '+(cx+12)+' '+top+'" fill="'+weldFill+'" stroke="'+P.blue+'" stroke-opacity=".5"/>';
+  // 3 callout points: parent (grey) · weld (blue) · parent (grey)
+  var p1=pipeL+58, p3=pipeR-58;
+  var pts = [[p1,P.mut,'1','Parent material'],[cx,P.blue,'2','Weld'],[p3,P.mut,'3','Parent material']];
+  pts.forEach(function(pt){ var x=pt[0], c=pt[1];
+    s += '<line x1="'+x+'" y1="'+(callTop+9)+'" x2="'+x+'" y2="'+(top-2)+'" stroke="'+c+'" stroke-width="1" stroke-dasharray="2 2" opacity=".75"/>';
+    s += '<circle cx="'+x+'" cy="'+top+'" r="3" fill="'+c+'"/>';
+    s += '<circle cx="'+x+'" cy="'+callTop+'" r="9" fill="#fff" stroke="'+c+'"/><text x="'+x+'" y="'+(callTop+3.5)+'" text-anchor="middle" font-family="\'Geist\',sans-serif" font-weight="700" font-size="11" fill="'+c+'">'+pt[2]+'</text>';
+    s += '<text x="'+x+'" y="'+(bot+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+c+'">'+pt[2]+' '+pt[3]+'</text>';
+  });
+  // faint divider, then the single reference-standard reading inset
+  s += '<line x1="498" y1="70" x2="498" y2="'+(bot+22)+'" stroke="'+P.grid+'" stroke-dasharray="3 3"/>';
+  var ax=520, ay=(top+bot)/2;
+  s += '<rect x="'+ax+'" y="'+(ay-20)+'" width="60" height="40" rx="6" fill="#eef2f7" stroke="'+P.line+'"/>';
+  s += '<rect x="'+(ax+9)+'" y="'+(ay-12)+'" width="32" height="13" rx="2" fill="#fff" stroke="'+P.line+'"/>';
+  s += '<polygon points="'+(ax+60)+','+(ay-8)+' '+(ax+82)+','+ay+' '+(ax+60)+','+(ay+8)+'" fill="#dbe3ee" stroke="'+P.line+'"/>';
+  s += '<text x="'+(ax+30)+'" y="'+(ay+33)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">Analyser</text>';
+  var rx=636;
+  s += '<line x1="'+(ax+82)+'" y1="'+ay+'" x2="'+(rx-2)+'" y2="'+ay+'" stroke="'+P.green+'" stroke-width="1.3" stroke-dasharray="5 3"/>';
+  s += '<path d="M'+(rx-2)+' '+(ay-4)+' L '+(rx-8)+' '+ay+' L '+(rx-2)+' '+(ay+4)+'" fill="'+P.green+'"/>';
+  s += '<rect x="'+rx+'" y="'+top+'" width="92" height="'+(bot-top)+'" rx="4" fill="rgba(6,95,70,.06)" stroke="'+P.bandStroke+'"/>';
+  s += '<text x="'+(rx+46)+'" y="'+(ay-2)+'" text-anchor="middle" font-family="\'Geist\',sans-serif" font-weight="700" font-size="11" fill="'+P.green+'">CRM</text>';
+  s += '<text x="'+(rx+46)+'" y="'+(ay+11)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="7.5" fill="'+P.mut+'">certified reference</text>';
+  s += '<text x="'+((ax+rx+92)/2)+'" y="'+(bot+15)+'" text-anchor="middle" font-family="\'Geist Mono\',monospace" font-size="8.5" fill="'+P.green+'">Single reference reading</text>';
+  // bottom notes
+  s += '<text x="6" y="'+(bot+33)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.mut+'">Verify the parent material each side of the weld and the weld deposit; standardise on the CRM before &amp; after use — API 578.</text>';
+  if(xrf) s += '<text x="6" y="'+(bot+45)+'" font-family="\'Geist Mono\',monospace" font-size="8" fill="'+P.amber+'">✱ XRF cannot read carbon — grade vs low-carbon (L) grade not distinguishable; use OES where C is critical.</text>';
+  return '<svg viewBox="0 0 794 '+(xrf?228:216)+'" style="width:100%;height:auto;display:block">'+s+'</svg>';
 }
 
 // ══════════════════════════════════════════════════════════════════════════

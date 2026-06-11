@@ -290,9 +290,9 @@ var TPL_FIELDS = {
     { id:'uvirr',      label:'UV-A irradiance (µW/cm²)',  placeholder:'e.g. 1000', options:['500','800','1000','1200','1500','2000','3000'], editable:true, numeric:true, minWarn:1000, minWarnMsg:'Below the 1000 µW/cm² minimum', gatedBy:'whitelight', gateMax:20 },
   ],
   PMI:[
-    { id:'spec',  label:'Specification',      placeholder:'e.g. ASTM E1476-20', options:['ASTM E1476-20','ASTM E322-20','API RP 578 (3rd Ed., 2018)','EN 10204:2004','ASME BPVC Sec. II Part A — 2025','ISO 9712:2021 (qualification)'] },
-    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. Material grade match', options:['Material grade match','Client specification','Project material list','API RP 578 PMI requirements','ASME Sec. II / project ITP','No deviation from WPS material'] },
-    { id:'ctrl',label:'System control',placeholder:'e.g. 316L Reference block',options:['316L Reference block','304 Reference block','Duplex reference block','Carbon steel reference block']},
+    { id:'spec',  label:'Specification',      placeholder:'e.g. API 578 (3rd Ed., 2018)', options:['API 578 (3rd Ed., 2018)','ASTM E1476-20','ASTM E572-21 (XRF)','ASTM E415-21 (OES)','ASTM E322-20','EN 10204:2004','ASME BPVC Sec. II Part A — 2025'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. API 578 — grade match to MTR', options:['API 578 — material grade match to MTR','Material grade match','Project material list / line list','Client specification','ASME Sec. II / project ITP','No deviation from WPS material'] },
+    { id:'ctrl',label:'System control',placeholder:'e.g. Certified reference (CRM)',options:['Certified reference (CRM)','316L reference block','304 reference block','Duplex reference block','Carbon steel reference block']},
     { id:'mode',label:'Analysis mode',placeholder:'e.g. Alloy ID',options:['Alloy ID','Grade ID','Residuals','Full quantitative']},
     // Primary PMI analyser — register-backed pick so the PDF resolves
     // the picked unit (X-MET / Vanta / TITAN / Niton XL3t etc.) with

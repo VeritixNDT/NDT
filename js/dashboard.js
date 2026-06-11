@@ -1643,6 +1643,10 @@ function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   // live visual that also seals into the PDF (see js/hardness.js + the
   // editor 'ht-survey' block).
   if(methodId === 'HT' && typeof htRenderEntrySection === 'function') html += htRenderEntrySection(merged.hardnessSurvey);
+  // Material verification — PMI only. Per-component composition entry vs alloy
+  // grade bands with a live visual that seals into the PDF (see js/pmi.js + the
+  // editor 'pmi-survey' block).
+  if(methodId === 'PMI' && typeof pmiRenderEntrySection === 'function') html += pmiRenderEntrySection(merged.pmiSurvey);
   // Defects / indications — sits right after the items table so the
   // inspector captures defect details next to the verdicts that drive
   // them. Auto-built from items with verdict === 'Not acceptable'.
@@ -1880,10 +1884,12 @@ function ovItemFieldHtml(rowIdx, col, row) {
     // Verdict gets a colour-coded background that tracks the selected
     // value. ovItemsCapture restyles the element on change.
     const extra = (col.id === 'verdict') ? ovVerdictStyle(val) : '';
-    // HT: the Result is automatic — computed from the hardness-survey readings
-    // (peak vs acceptance max) — so the cell is locked (disabled) here.
-    if(col.id === 'verdict' && _ovMethod === 'HT'){
-      return `<select id="${fid}" disabled title="Automatic — set by the hardness survey readings" style="${ctrlStyle};${extra};opacity:.9;cursor:not-allowed">${html}</select>`;
+    // HT / PMI: the Result is automatic — computed from the survey readings
+    // (HT: peak vs acceptance max; PMI: composition vs the grade's element
+    // bands) — so the cell is locked (disabled) here.
+    if(col.id === 'verdict' && (_ovMethod === 'HT' || _ovMethod === 'PMI')){
+      const _autoTitle = _ovMethod === 'PMI' ? 'Automatic — set by the material-verification readings' : 'Automatic — set by the hardness survey readings';
+      return `<select id="${fid}" disabled title="${_autoTitle}" style="${ctrlStyle};${extra};opacity:.9;cursor:not-allowed">${html}</select>`;
     }
     return `<select id="${fid}" style="${ctrlStyle};${extra}"${onChange}>${html}</select>`;
   }
@@ -1969,6 +1975,7 @@ function ovItemsAppendBlankRow() {
     }
   }
   _ovHtSync();   // grow the hardness-survey grids to match (HT site)
+  _ovPmiSync();  // grow the PMI per-component grids to match
 }
 
 // Read the current DOM values back into _ovItems. Used before re-rendering
@@ -1990,6 +1997,7 @@ function ovItemsAddRow() {
   _ovItems.push({});
   ovItemsRerender();
   _ovHtSync();
+  _ovPmiSync();
 }
 
 function ovItemsRemoveRow(idx) {
@@ -1998,6 +2006,7 @@ function ovItemsRemoveRow(idx) {
   _ovItems.splice(idx, 1);
   ovItemsRerender();
   _ovHtSync();
+  _ovPmiSync();
 }
 
 // HT survey ↔ items-table coupling. Each examination line is one weld; the
@@ -2014,6 +2023,13 @@ function ovHtModeChanged(mode){
   }
   ovItemsRerender();   // re-renders the items table (hides/shows + Add row)
 }
+
+// PMI survey ↔ items-table coupling (mirrors the HT trio). Each examination
+// line is one component; the material-verification grids track the item rows.
+// Both XRF and OES are multi-component, so there's no traverse-style 1-row cap.
+function _ovPmiSync(){ if(_ovMethod === 'PMI' && typeof pmiSyncToItems === 'function'){ try { pmiSyncToItems(); } catch(e){} } }
+function ovPmiAddItem(){ if(_ovMethod !== 'PMI') return; ovItemsSync(); _ovItems.push({}); ovItemsRerender(); }
+function ovPmiRemoveItem(idx){ if(_ovMethod !== 'PMI' || !Array.isArray(_ovItems) || _ovItems.length <= 1) return; ovItemsSync(); _ovItems.splice(idx, 1); ovItemsRerender(); }
 
 // ── Defects (auto-built from rejected items) ───────────────────────────
 // Lists every _ovItems entry with verdict==='Not acceptable' and gives
@@ -2861,6 +2877,12 @@ async function ovSaveReport(mode) {
   if(_ovMethod === 'HT' && typeof htCollect === 'function'){
     const _hs = htCollect();
     if(_hs) report.hardnessSurvey = _hs;
+  }
+  // Material verification (PMI) — capture the per-component composition survey
+  // from the form grid so the visual seals into the report's frozen PDF.
+  if(_ovMethod === 'PMI' && typeof pmiCollect === 'function'){
+    const _ps = pmiCollect();
+    if(_ps) report.pmiSurvey = _ps;
   }
   // Single-photo blocks — copy any filled slots over (keyed by block.id so
   // each single-photo block in the template lands on its own render branch).

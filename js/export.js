@@ -313,15 +313,35 @@ function cvBuildPrintHTML(report){
     let _hp = _cap0;
     while(_hp < _htRows && _planHt.length < 300){ const _hc = Math.min(_capC, _htRows - _hp); _planHt.push(Object.assign({}, entry, { htSlice: { start:_hp, count:_hc } })); _hp += _hc; }
   });
-  _cvPrintTotal = _planHt.length;
+  // Material-verification (PMI) auto-pagination: per-component results (details
+  // header + composition chart + readings table) flow onto synthesised copies of
+  // the survey sheet (mirrors the HT site-piping pass). A report is one method,
+  // so only one of the two passes ever expands; the other is a pass-through.
+  const _pmiSrv   = report && report.pmiSurvey;
+  const _pmiComps = (typeof pmiComponentCount === 'function') ? pmiComponentCount(_pmiSrv) : 0;
+  const _planPmi  = [];
+  _planHt.forEach(entry => {
+    const _pb = (entry.page.blocks || []).find(b => b.key === 'pmi-survey');
+    if(!_pb || !_pmiSrv){ _planPmi.push(entry); return; }
+    const _bh = (typeof _pb.h === 'number' && _pb.h > 0) ? _pb.h : 760;
+    if(_pmiComps <= 1){ _planPmi.push(Object.assign({}, entry, { pmiSlice: { start:0, count:Math.max(1,_pmiComps) } })); return; }
+    const _unitH = 300;
+    const _cap0 = Math.max(1, Math.floor((_bh - 30) / _unitH));
+    if(_pmiComps <= _cap0){ _planPmi.push(Object.assign({}, entry, { pmiSlice: { start:0, count:_pmiComps } })); return; }
+    _planPmi.push(Object.assign({}, entry, { pmiSlice: { start:0, count:_cap0 } }));
+    let _cp = _cap0;
+    while(_cp < _pmiComps && _planPmi.length < 300){ const _cc = Math.min(_cap0, _pmiComps - _cp); _planPmi.push(Object.assign({}, entry, { pmiSlice: { start:_cp, count:_cc } })); _cp += _cc; }
+  });
+  _cvPrintTotal = _planPmi.length;
 
   let pagesHtml = '';
-  _planHt.forEach((entry, sheetIdx) => {
+  _planPmi.forEach((entry, sheetIdx) => {
     // 1-based sheet number for the page-num field; the items-table row
     // slice for this sheet (null when the table isn't paginated).
     _cvPrintPageNum = sheetIdx + 1;
     _cvItemsSlice   = entry.slice;
     _cvHtSlice      = entry.htSlice || null;
+    _cvPmiSlice     = entry.pmiSlice || null;
     const page = entry.page;
     // Body blocks only — zone-tagged blocks are in the header/footer
     // fragments. Filter before sort so sort never mutates page.blocks.

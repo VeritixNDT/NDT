@@ -423,6 +423,8 @@ var CV_LAYOUT_ITEMS = [
   {key:'method-block',   label:'Method-specific data block', w:754,h:90},
   {key:'ht-method',      label:'Hardness method (HT)',       w:754,h:330},
   {key:'ht-survey',      label:'Hardness survey (HT)',       w:754,h:560},
+  {key:'pmi-method',     label:'Material method (PMI)',      w:754,h:300},
+  {key:'pmi-survey',     label:'Material verification (PMI)',w:754,h:560},
   {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
   // Billing (invoice/quote) layout blocks.
   {key:'bill-to',          label:'Bill to (customer)',        w:320,h:90},
@@ -585,6 +587,9 @@ var _cvItemsSlice = null;
 // readings table (chart on the first sheet, table rows flow onto continuation
 // sheets). null = render the whole survey (form preview / editor canvas).
 var _cvHtSlice = null;
+// PMI material-verification survey: set per printed sheet to paginate the
+// per-component results across continuation sheets (mirrors _cvHtSlice).
+var _cvPmiSlice = null;
 var cvPpvShowDefects = false;
 var cvUndoStack = [];
 var cvRedoStack = [];
@@ -3041,6 +3046,21 @@ function cvRenderBlockContent(block, report, preview){
         return (typeof htRenderSurvey === 'function')
           ? htRenderSurvey(report && report.hardnessSurvey, { print:true, sample: !_htPrinting, items: (report && report.items) || null, barColor: block.barColor, detailWidths: block.colWidths, part: (key === 'ht-method' ? 'method' : 'results'), slice: (key === 'ht-survey' && typeof _cvHtSlice !== 'undefined' ? _cvHtSlice : null) })
           : '';
+      case 'pmi-method':
+      case 'pmi-survey':
+        // Two PMI place cards from one renderer (mirrors HT): 'pmi-method' = the
+        // verification methodology drawing; 'pmi-survey' = the results (details +
+        // composition range chart + readings table). Same renderer as the report
+        // form preview, so screen and PDF match. Real survey + non-PMI gate only
+        // apply to a real print pass; an empty survey's page is dropped by the planner.
+        var _pmiPrinting = (typeof _cvPrintPageNum !== 'undefined' && _cvPrintPageNum > 0);
+        if(_pmiPrinting && report && report.method && report.method !== 'PMI')
+          return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Material verification — PMI reports only</div>`;
+        // don't reprint the methodology drawing on readings continuation sheets
+        if(key === 'pmi-method' && typeof _cvPmiSlice !== 'undefined' && _cvPmiSlice && _cvPmiSlice.start > 0) return '';
+        return (typeof pmiRenderSurvey === 'function')
+          ? pmiRenderSurvey(report && report.pmiSurvey, { print:true, sample: !_pmiPrinting, items: (report && report.items) || null, barColor: block.barColor, detailWidths: block.colWidths, part: (key === 'pmi-method' ? 'method' : 'results'), slice: (key === 'pmi-survey' && typeof _cvPmiSlice !== 'undefined' ? _cvPmiSlice : null) })
+          : '';
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;
       case 'bill-to':{
@@ -4399,11 +4419,32 @@ function cvRenderProps(id){
     ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'defect-table') ? row('Heading font size',`<select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;padding:4px 6px" data-on-change="_wCvUpdateBlockValue" data-pass-el="1" data-args="'${id}','titleFontSize'">
       ${['8px','9px','10px','11px','12px','13px','14px','16px','18px','20px'].map(s=>`<option value="${s}" ${(block.titleFontSize||'11px')===s?'selected':''}>${s}</option>`).join('')}
     </select>`) : ''}
-    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'drawing-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details' || block.key === 'defect-table' || block.key === 'ht-survey' || block.key === 'ht-method')
+    ${(block.key === 'items-table' || block.key === 'method-block' || block.key === 'photo-page' || block.key === 'drawing-page' || block.key === 'single-photo' || block.key === 'single-drawing' || block.key === 'photo-details' || block.key === 'defect-table' || block.key === 'ht-survey' || block.key === 'ht-method' || block.key === 'pmi-survey' || block.key === 'pmi-method')
       ? row('Heading colour', colorPick('barColor', block.barColor || ((typeof cvTplCfg !== 'undefined' && cvTplCfg.sectionColor) ? cvTplCfg.sectionColor : '#404040')))
       : ''}
     ${block.key === 'ht-survey' && typeof HT_DETAIL_COLS !== 'undefined' && Array.isArray(HT_DETAIL_COLS) ? (() => {
       const itemCols = HT_DETAIL_COLS;
+      const widths = (Array.isArray(block.colWidths) && block.colWidths.length === itemCols.length)
+        ? block.colWidths
+        : itemCols.map(c => c.w || 100);
+      return row('Details column widths', `<div style="display:flex;flex-direction:column;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:6px 8px">
+        ${itemCols.map((c, i) => `<div style="display:flex;align-items:center;gap:6px">
+          <span style="flex:1;font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.label)}</span>
+          <div style="display:flex;align-items:stretch;width:80px;flex-shrink:0">
+            <input type="number" min="20" max="500" step="5" value="${widths[i]}" data-colw="${i}" class="cv-num"
+              data-on-change="_wCvSetHtColWidth" data-on-input="_wCvSetHtColWidth" data-pass-el="1" data-args="'${id}',${i}"
+              style="flex:1;min-width:0;background:var(--panel);border:1px solid var(--border);border-right:none;border-radius:4px 0 0 4px;color:var(--t1);font-size:11px;padding:3px 5px;box-sizing:border-box;font-family:var(--mono)"/>
+            <div style="display:flex;flex-direction:column;width:22px;flex-shrink:0">
+              <button type="button" class="cv-step" data-action="cvStepHtColWidth" data-args="'${id}',${i},1"  style="border-radius:0 4px 0 0;border-bottom:none">▲</button>
+              <button type="button" class="cv-step" data-action="cvStepHtColWidth" data-args="'${id}',${i},-1" style="border-radius:0 0 4px 0">▼</button>
+            </div>
+          </div>
+        </div>`).join('')}
+        <button data-action="_wCvResetHtColWidths" data-args="'${id}'" style="margin-top:4px;background:none;border:1px dashed var(--border);color:var(--t3);font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer">Reset to defaults</button>
+      </div>`);
+    })() : ''}
+    ${block.key === 'pmi-survey' && typeof PMI_DETAIL_COLS !== 'undefined' && Array.isArray(PMI_DETAIL_COLS) ? (() => {
+      const itemCols = PMI_DETAIL_COLS;
       const widths = (Array.isArray(block.colWidths) && block.colWidths.length === itemCols.length)
         ? block.colWidths
         : itemCols.map(c => c.w || 100);
@@ -4933,12 +4974,18 @@ function _wCvResetItemsColWidths(id) {
   cvRenderProps(id);
 }
 
-// HT survey per-weld details-header column widths — mirror the items-table trio
-// but driven by HT_DETAIL_COLS (defined in js/hardness.js).
+// HT/PMI survey per-component details-header column widths — mirror the
+// items-table trio but driven by the matching survey's detail columns
+// (HT_DETAIL_COLS / PMI_DETAIL_COLS). The cols source is resolved from the
+// block key so the same handlers serve both survey blocks.
+function _wCvSurveyDetailCols(block){
+  if(block && block.key === 'pmi-survey' && typeof PMI_DETAIL_COLS !== 'undefined' && Array.isArray(PMI_DETAIL_COLS)) return PMI_DETAIL_COLS;
+  return (typeof HT_DETAIL_COLS !== 'undefined' && Array.isArray(HT_DETAIL_COLS)) ? HT_DETAIL_COLS : null;
+}
 function _wCvSetHtColWidth(id, colIdx, el) {
   const block = cvBlocks.find(b => b.id === id);
-  if(!block || typeof HT_DETAIL_COLS === 'undefined' || !Array.isArray(HT_DETAIL_COLS)) return;
-  const cols = HT_DETAIL_COLS;
+  const cols = _wCvSurveyDetailCols(block);
+  if(!block || !cols) return;
   const widths = (Array.isArray(block.colWidths) && block.colWidths.length === cols.length)
     ? block.colWidths.slice()
     : cols.map(c => c.w || 100);
@@ -4948,8 +4995,8 @@ function _wCvSetHtColWidth(id, colIdx, el) {
 }
 function cvStepHtColWidth(id, colIdx, delta){
   const block = cvBlocks.find(b => b.id === id);
-  if(!block || typeof HT_DETAIL_COLS === 'undefined' || !Array.isArray(HT_DETAIL_COLS)) return;
-  const cols = HT_DETAIL_COLS;
+  const cols = _wCvSurveyDetailCols(block);
+  if(!block || !cols) return;
   const widths = (Array.isArray(block.colWidths) && block.colWidths.length === cols.length)
     ? block.colWidths.slice()
     : cols.map(c => c.w || 100);

@@ -564,26 +564,10 @@
 [data-sidebar-collapsed="true"] .snav .snav-item { padding-left: 0; padding-right: 0; justify-content: center; gap: 0; }
 [data-sidebar-collapsed="true"] .snav .snav-item .si-icon { margin: 0; }
 [data-sidebar-collapsed="true"] .snav .snav-item span:not(.si-icon) { display: none; }
-[data-sidebar-collapsed="true"] .snav .snav-item:hover {
-  position: relative;
-}
-[data-sidebar-collapsed="true"] .snav .snav-item:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--panel2);
-  color: var(--t1);
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
-  box-shadow: var(--sh-md);
-  border: 1px solid var(--border);
-  z-index: 100;
-  pointer-events: none;
-}
+/* Collapsed-rail hover tooltip is rendered by JS as a floating element on
+   <body> (vxSetSnavTooltips / _vxSnavTipShow in reports.js). A CSS ::after
+   inside .snav can't be used: .snav has overflow-y:auto, which clips any
+   child positioned to the right of the 56px rail. */
 [data-sidebar-collapsed="true"] .snav-item.active::before {
   left: 0; top: 18%; height: 64%;
 }

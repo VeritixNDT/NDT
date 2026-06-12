@@ -3259,15 +3259,40 @@ function voiceToggle(fieldId, btn){
 
 // ── Sidebar collapse toggle ────────────────────────────────────
 // When the sidebar is collapsed to an icon-only rail, hovering a button shows
-// its name. The CSS draws the bubble from data-tooltip (see the
-// [data-sidebar-collapsed] .snav-item:hover::after rule in styles.css); this
-// mirrors each item's (localized) label into that attribute. Re-run on locale
-// change (from i18nApply) so the tooltip language tracks the UI.
+// its name. Each item's (localized) label is mirrored into data-tooltip (re-run
+// from i18nApply so the tooltip language tracks the UI). The bubble itself is a
+// single floating element on <body> — NOT a ::after inside the sidebar — because
+// the sidebar has overflow-y:auto, which clips any child positioned to the right
+// of the 56px rail. Rendering on body sidesteps the clip and keeps scrolling.
 function vxSetSnavTooltips(){
   document.querySelectorAll('.snav-item').forEach(function(it){
     const label = (it.textContent || '').replace(/\s+/g, ' ').trim();
     if(label) it.setAttribute('data-tooltip', label);
   });
+}
+var _vxSnavTip = null;
+function _vxSnavTipShow(item){
+  if(document.documentElement.getAttribute('data-sidebar-collapsed') !== 'true') return;
+  const label = item.getAttribute('data-tooltip');
+  if(!label) return;
+  if(!_vxSnavTip){
+    _vxSnavTip = document.createElement('div');
+    _vxSnavTip.className = 'vx-snav-tip';
+    _vxSnavTip.style.cssText = 'position:fixed;z-index:10000;pointer-events:none;background:var(--panel2);color:var(--t1);font-size:12px;padding:5px 10px;border-radius:6px;white-space:nowrap;box-shadow:var(--sh-md);border:1px solid var(--border);opacity:0;transition:opacity .08s';
+    document.body.appendChild(_vxSnavTip);
+  }
+  _vxSnavTip.textContent = label;
+  const r = item.getBoundingClientRect();
+  _vxSnavTip.style.left = (r.right + 8) + 'px';
+  _vxSnavTip.style.top = (r.top + r.height / 2) + 'px';
+  _vxSnavTip.style.transform = 'translateY(-50%)';
+  _vxSnavTip.style.opacity = '1';
+}
+function _vxSnavTipHide(){ if(_vxSnavTip) _vxSnavTip.style.opacity = '0'; }
+if(typeof document !== 'undefined' && !window._vxSnavTipWired){
+  window._vxSnavTipWired = true;
+  document.addEventListener('mouseover', function(e){ const it = e.target.closest && e.target.closest('.snav-item'); if(it) _vxSnavTipShow(it); });
+  document.addEventListener('mouseout', function(e){ const it = e.target.closest && e.target.closest('.snav-item'); if(it) _vxSnavTipHide(); });
 }
 function toggleSidebar(){
   const html = document.documentElement;

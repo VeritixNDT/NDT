@@ -1656,6 +1656,10 @@ function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   // grade bands with a live visual that seals into the PDF (see js/pmi.js + the
   // editor 'pmi-survey' block).
   if(methodId === 'PMI' && typeof pmiRenderEntrySection === 'function') html += pmiRenderEntrySection(merged.pmiSurvey);
+  // Ferrite survey — FN only. Per-weld FN readings vs a min–max acceptance band
+  // with a live visual that seals into the PDF (see js/ferrite.js + the editor
+  // 'fn-survey' block).
+  if(methodId === 'FN' && typeof fnRenderEntrySection === 'function') html += fnRenderEntrySection(merged.ferriteSurvey);
   // Defects / indications — sits right after the items table so the
   // inspector captures defect details next to the verdicts that drive
   // them. Auto-built from items with verdict === 'Not acceptable'.
@@ -2057,11 +2061,17 @@ function ovItemsRemoveRow(idx) {
 
 // HT survey ↔ items-table coupling. Each examination line is one weld; the
 // hardness-survey grids track the item rows, and traverse mode is 1 weld only.
-function _ovHtSync(){ if(_ovMethod === 'HT' && typeof htSyncToItems === 'function'){ try { htSyncToItems(); } catch(e){} } }
+function _ovHtSync(){
+  try {
+    if(_ovMethod === 'HT' && typeof htSyncToItems === 'function') htSyncToItems();
+    else if(_ovMethod === 'FN' && typeof fnSyncToItems === 'function') fnSyncToItems();
+  } catch(e){}
+}
 // Add / remove an Examination-details line from the survey side (the survey's
-// + Add weld / − Remove weld buttons), keeping the items table in sync.
-function ovHtAddItem(){ if(_ovMethod !== 'HT') return; ovItemsSync(); _ovItems.push({}); ovItemsRerender(); }
-function ovHtRemoveItem(idx){ if(_ovMethod !== 'HT' || !Array.isArray(_ovItems) || _ovItems.length <= 1) return; ovItemsSync(); _ovItems.splice(idx, 1); ovItemsRerender(); }
+// + Add weld / − Remove weld buttons), keeping the items table in sync. Shared
+// by the HT and FN per-weld survey grids.
+function ovHtAddItem(){ if(_ovMethod !== 'HT' && _ovMethod !== 'FN') return; ovItemsSync(); _ovItems.push({}); ovItemsRerender(); }
+function ovHtRemoveItem(idx){ if((_ovMethod !== 'HT' && _ovMethod !== 'FN') || !Array.isArray(_ovItems) || _ovItems.length <= 1) return; ovItemsSync(); _ovItems.splice(idx, 1); ovItemsRerender(); }
 function _ovHtPreview(){ if(_ovMethod === 'HT' && typeof htRenderPreview === 'function'){ try { htRenderPreview(); } catch(e){} } }
 function ovHtModeChanged(mode){
   if(mode === 'weld-traverse'){
@@ -2980,6 +2990,12 @@ async function ovSaveReport(mode) {
   if(_ovMethod === 'PMI' && typeof pmiCollect === 'function'){
     const _ps = pmiCollect();
     if(_ps) report.pmiSurvey = _ps;
+  }
+  // Ferrite survey (FN) — capture the per-weld FN readings from the form grid
+  // so the visual seals into the report's frozen PDF.
+  if(_ovMethod === 'FN' && typeof fnCollect === 'function'){
+    const _fs = fnCollect();
+    if(_fs) report.ferriteSurvey = _fs;
   }
   // Single-photo blocks — copy any filled slots over (keyed by block.id so
   // each single-photo block in the template lands on its own render branch).

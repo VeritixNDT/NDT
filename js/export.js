@@ -273,6 +273,9 @@ function cvBuildPrintHTML(report){
     // Material-verification (PMI) page: meaningful only when the report carries a
     // graded survey — an opted-in but unfilled PMI page shouldn't print.
     if(b.key === 'pmi-survey' || b.key === 'pmi-method') return !(report && report.pmiSurvey && typeof pmiIsEmpty === 'function' && !pmiIsEmpty(report.pmiSurvey));
+    // Ferrite (FN) survey page: meaningful only when the report carries recorded
+    // FN readings — an opted-in but unfilled page shouldn't print.
+    if(b.key === 'fn-survey') return !(report && report.ferriteSurvey && typeof fnVerdict === 'function' && fnVerdict(report.ferriteSurvey).total > 0);
     return false; // any other primary block is treated as content-bearing
   };
   // First page in the plan is always the main report — never skip it

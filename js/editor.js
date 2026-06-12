@@ -426,6 +426,7 @@ var CV_LAYOUT_ITEMS = [
   {key:'ht-survey',      label:'Hardness survey (HT)',       w:754,h:560},
   {key:'pmi-method',     label:'Material method (PMI)',      w:754,h:300},
   {key:'pmi-survey',     label:'Material verification (PMI)',w:754,h:560},
+  {key:'fn-survey',      label:'Ferrite survey (FN)',        w:754,h:620},
   {key:'accent-bar',     label:'Colour accent bar',          w:754,h:5},
   // Billing (invoice/quote) layout blocks.
   {key:'bill-to',          label:'Bill to (customer)',        w:320,h:90},
@@ -3061,6 +3062,16 @@ function cvRenderBlockContent(block, report, preview){
         if(key === 'pmi-method' && typeof _cvPmiSlice !== 'undefined' && _cvPmiSlice && _cvPmiSlice.start > 0) return '';
         return (typeof pmiRenderSurvey === 'function')
           ? pmiRenderSurvey(report && report.pmiSurvey, { print:true, sample: !_pmiPrinting, items: (report && report.items) || null, barColor: block.barColor, detailWidths: block.colWidths, part: (key === 'pmi-method' ? 'method' : 'results'), slice: (key === 'pmi-survey' && typeof _cvPmiSlice !== 'undefined' ? _cvPmiSlice : null) })
+          : '';
+      case 'fn-survey':
+        // Ferrite survey (FN) results — one renderer feeds the report-form
+        // preview and the sealed PDF. Real-survey + non-FN gate only apply to a
+        // real print pass; an empty survey's page is dropped by the planner.
+        var _fnPrinting = (typeof _cvPrintPageNum !== 'undefined' && _cvPrintPageNum > 0);
+        if(_fnPrinting && report && report.method && report.method !== 'FN')
+          return `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:10px">Ferrite survey — FN reports only</div>`;
+        return (typeof fnRenderSurvey === 'function')
+          ? fnRenderSurvey(report && report.ferriteSurvey, { print:true, sample: !_fnPrinting, items: (report && report.items) || null, barColor: block.barColor, detailWidths: block.colWidths })
           : '';
       case 'accent-bar':
         return `<div style="height:100%;background:${_safeColor(block.bgColor, cvGetCompanyColor())}"></div>`;

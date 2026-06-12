@@ -193,6 +193,7 @@ var NDT_METHODS = [
   { id:'HT',  name:'Hardness Testing Report',                color:'#fb923c' },
   { id:'RT',  name:'Radiographic Examination Report',        color:'#e879f9' },
   { id:'ET',  name:'Eddy Current Examination Report',        color:'#34d399' },
+  { id:'FN',  name:'Ferrite Examination Report',             color:'#14b8a6' },
 ];
 
 var ACCENT_COLORS = [

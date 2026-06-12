@@ -406,12 +406,12 @@ function _cadToolbarHtml(){
     + '<span style="display:inline-flex;gap:3px;align-items:center">'+swatches+'</span>'
     + '<select data-cad-width title="Line width" data-vxsel-skip="1">'+widths+'</select>'
     + '<select data-cad-dash title="Line style" data-vxsel-skip="1">'+dashes+'</select>'
-    + '<button data-cad-act="snap" class="'+(_cadEd.snap?'on':'')+'" title="Snap to grid">Snap</button>'
     + '<span class="cad-sep"></span>'
     + '<button data-cad-act="undo" title="Undo (Ctrl+Z)">Undo</button><button data-cad-act="redo" title="Redo (Ctrl+Y)">Redo</button>'
     + '<button data-cad-act="delete" title="Delete selected (Del)">Delete</button>'
     + '<span class="cad-sep"></span>'
     + '<button data-cad-act="zoomout" title="Zoom out">−</button><span id="cad-zoom" style="font-size:11px;color:#9aa4b2;min-width:38px;text-align:center">'+Math.round((_cadEd.zoom||1)*100)+'%</span><button data-cad-act="zoomin" title="Zoom in (scroll)">+</button><button data-cad-act="zoomfit" title="Reset zoom">Fit</button>'
+    + '<button data-cad-act="snap" class="'+(_cadEd.snap?'on':'')+'" title="Snap to grid">Snap</button>'
     + slotSel
     + '<div style="flex:1"></div>'
     + '<button data-cad-act="save" title="Save &amp; close" style="background:#15803d;border-color:#15803d;color:#fff">Save</button>'

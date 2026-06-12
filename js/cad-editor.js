@@ -64,7 +64,7 @@ function cadRenderSVG(drawing, opts){
   var w = d.w, h = d.h, uid = _cadId();
   var style = opts.fit ? 'width:100%;height:100%;display:block' : 'width:100%;height:auto;display:block';
   var bg = _cadBackground(d, w, h, uid);
-  var body = d.elements.map(_cadRenderEl).join('');
+  var body = d.elements.map(function(e){ return e.rotation ? '<g'+_cadRotAttr(e)+'>'+_cadRenderEl(e)+'</g>' : _cadRenderEl(e); }).join('');
   return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="xMidYMid meet" style="' + style + '" xmlns="http://www.w3.org/2000/svg">' + bg + body + '</svg>';
 }
 function _cadPlaceholder(){
@@ -228,14 +228,15 @@ function _cadEditorSVG(d, selIds, marquee){
   d = cadNormalize(d) || cadDefault(); selIds = selIds || [];
   var w = d.w, h = d.h, uid = _cadId();
   var body = d.elements.map(function(e){
-    return '<g data-cad-id="' + e.id + '" style="cursor:move">' + _cadRenderEl(e) + _cadHitShape(e) + '</g>';
+    return '<g data-cad-id="' + e.id + '" style="cursor:move"' + _cadRotAttr(e) + '>' + _cadRenderEl(e) + _cadHitShape(e) + '</g>';
   }).join('');
   // Selection outlines (one per selected element) + resize handles (only when a
   // single element is selected) + the live marquee rubber-band, on a top layer.
+  // Outlines/handles are wrapped in each element's rotation so they track it.
   var selEls = d.elements.filter(function(e){ return selIds.indexOf(e.id) >= 0; });
-  var ov = selEls.map(_cadSelOutline).join('');
+  var ov = selEls.map(function(e){ return '<g'+_cadRotAttr(e)+'>'+_cadSelOutline(e)+'</g>'; }).join('');
   if(marquee){ var m = _cadNormRect(marquee.start, marquee.cur); ov += '<rect x="'+m[0]+'" y="'+m[1]+'" width="'+m[2]+'" height="'+m[3]+'" fill="rgba(29,78,216,.08)" stroke="#1d4ed8" stroke-width="1" stroke-dasharray="5 3" pointer-events="none"/>'; }
-  var handles = selEls.length === 1 ? _cadHandles(selEls[0]) : '';
+  var handles = selEls.length === 1 ? ('<g'+_cadRotAttr(selEls[0])+'>'+_cadHandles(selEls[0])+'</g>') : '';
   var hint = (!d.elements.length && !marquee)
     ? '<text x="'+(w/2)+'" y="'+(h/2)+'" text-anchor="middle" font-family="system-ui,sans-serif" font-size="22" fill="#c3c9d4" pointer-events="none">Pick a tool above and start drawing — or drop a stencil from the left</text>'
     : '';
@@ -244,11 +245,18 @@ function _cadEditorSVG(d, selIds, marquee){
 // Resize handles: endpoints for linear elements (re-point), bbox corners for
 // shapes / stencils / text (text corner-resize scales its font size).
 function _cadHandles(e){
-  var hs;
-  if(e.type === 'line' || e.type === 'arrow' || e.type === 'dim'){ hs = [['p1', e.x1, e.y1], ['p2', e.x2, e.y2]]; }
-  else { var b = _cadElBounds(e); hs = [['nw', b[0], b[1]], ['ne', b[0]+b[2], b[1]], ['se', b[0]+b[2], b[1]+b[3]], ['sw', b[0], b[1]+b[3]]]; }
+  var linear = (e.type === 'line' || e.type === 'arrow' || e.type === 'dim');
+  var hs, rot = '';
+  if(linear){ hs = [['p1', e.x1, e.y1], ['p2', e.x2, e.y2]]; }
+  else {
+    var b = _cadElBounds(e); hs = [['nw', b[0], b[1]], ['ne', b[0]+b[2], b[1]], ['se', b[0]+b[2], b[1]+b[3]], ['sw', b[0], b[1]+b[3]]];
+    // rotate handle: a knob above the top-centre of the box
+    var cx = b[0]+b[2]/2, ty = b[1]-6, ry = b[1]-26;
+    rot = '<line x1="'+cx+'" y1="'+ty+'" x2="'+cx+'" y2="'+ry+'" stroke="#1d4ed8" stroke-width="1.2" pointer-events="none"/>'
+      + '<circle data-cad-handle="rot" cx="'+cx+'" cy="'+ry+'" r="6" fill="#fff" stroke="#1d4ed8" stroke-width="1.5" style="cursor:grab"/>';
+  }
   var S = 10;
-  return hs.map(function(h){ return '<rect data-cad-handle="' + h[0] + '" x="' + (h[1]-S/2) + '" y="' + (h[2]-S/2) + '" width="' + S + '" height="' + S + '" fill="#fff" stroke="#1d4ed8" stroke-width="1.5" style="cursor:nwse-resize"/>'; }).join('');
+  return hs.map(function(h){ return '<rect data-cad-handle="' + h[0] + '" x="' + (h[1]-S/2) + '" y="' + (h[2]-S/2) + '" width="' + S + '" height="' + S + '" fill="#fff" stroke="#1d4ed8" stroke-width="1.5" style="cursor:nwse-resize"/>'; }).join('') + rot;
 }
 function _cadResizeEl(e, o, handle, p){
   if(handle === 'p1'){ e.x1 = p[0]; e.y1 = p[1]; return; }
@@ -261,6 +269,19 @@ function _cadResizeEl(e, o, handle, p){
   var nx = Math.min(x0, x1), ny = Math.min(y0, y1), nw = Math.abs(x1-x0), nh = Math.abs(y1-y0);
   if(e.type === 'text'){ e.x = nx; e.y = ny + nh; e.fontSize = Math.max(8, Math.round(nh - 8)); }
   else { e.x = nx; e.y = ny; e.w = nw; e.h = nh; }
+}
+// ── rotation ──
+function _cadElCenter(e){ var b = _cadElBounds(e); return [b[0]+b[2]/2, b[1]+b[3]/2]; }
+function _cadRotAttr(e){ if(!e.rotation) return ''; var c = _cadElCenter(e); return ' transform="rotate(' + e.rotation + ' ' + c[0].toFixed(1) + ' ' + c[1].toFixed(1) + ')"'; }
+function _cadRotatePt(p, c, deg){ var r = deg*Math.PI/180, co = Math.cos(r), si = Math.sin(r), dx = p[0]-c[0], dy = p[1]-c[1]; return [c[0]+dx*co-dy*si, c[1]+dx*si+dy*co]; }
+function _cadOppositeCorner(b, handle){ var x0=b[0], y0=b[1], x1=b[0]+b[2], y1=b[1]+b[3]; if(handle==='nw') return [x1,y1]; if(handle==='ne') return [x0,y1]; if(handle==='se') return [x0,y0]; return [x1,y0]; }
+// Corner-resize a rotated element while keeping the opposite (world) corner put.
+function _cadResizeRotated(e, o, handle, pWorld){
+  var deg = o.rotation || 0, c0 = _cadElCenter(o);
+  _cadResizeEl(e, o, handle, _cadRotatePt(pWorld, c0, -deg));   // resize in the element's local frame
+  var opp = _cadOppositeCorner(_cadElBounds(o), handle);
+  var oldW = _cadRotatePt(opp, c0, deg), newW = _cadRotatePt(opp, _cadElCenter(e), deg);
+  _cadOffset(e, oldW[0]-newW[0], oldW[1]-newW[1]);
 }
 // ── selection helpers (multi-select) ──
 function _cadSelEls(){ return (_cadEd.selIds || []).map(_cadFind).filter(Boolean); }
@@ -446,7 +467,7 @@ function _cadWire(o){
     if(!ev.target.matches('[data-cad-prop]') || _cadEd.selIds.length!==1) return;
     var pe = _cadFind(_cadEd.selIds[0]); if(!pe) return;
     var prop = ev.target.getAttribute('data-cad-prop'), v = ev.target.value;
-    if(prop === 'strokeWidth' || prop === 'fontSize') v = +v || 0;
+    if(prop === 'strokeWidth' || prop === 'fontSize' || prop === 'rotation') v = +v || 0;
     pe[prop] = v; _cadRender();
   });
   var stage = o.querySelector('#cad-stage');
@@ -502,11 +523,11 @@ function _cadResizeWrap(){
 function _cadZoom(f){ _cadEd.zoom = Math.max(0.25, Math.min(4, f)); _cadResizeWrap(); }
 
 // ── pointer interaction ──
-function _cadPoint(ev){
+function _cadPoint(ev, raw){
   var svg = document.getElementById('cad-svg'); if(!svg) return null;
   var r = svg.getBoundingClientRect(), d = _cadActive();
   var x = (ev.clientX - r.left) / r.width * d.w, y = (ev.clientY - r.top) / r.height * d.h;
-  if(_cadEd.snap){ x = Math.round(x/10)*10; y = Math.round(y/10)*10; }
+  if(_cadEd.snap && !raw){ x = Math.round(x/10)*10; y = Math.round(y/10)*10; }
   return [Math.round(x), Math.round(y)];
 }
 function _cadDown(ev){
@@ -522,7 +543,11 @@ function _cadDown(ev){
     // resize handle drag (only when exactly one element is selected)
     var hh = ev.target.closest('[data-cad-handle]');
     if(hh && _cadEd.selIds.length === 1){
-      var se = _cadFind(_cadEd.selIds[0]); if(se){ _cadPushUndo(); _cadEd.resize = { id:se.id, handle:hh.getAttribute('data-cad-handle'), orig:JSON.parse(JSON.stringify(se)) }; }
+      var se = _cadFind(_cadEd.selIds[0]), handle = hh.getAttribute('data-cad-handle');
+      if(se){ _cadPushUndo();
+        if(handle === 'rot'){ var rc = _cadElCenter(se), pr = _cadPoint(ev, true); _cadEd.rotate = { id:se.id, center:rc, offset:(se.rotation||0) - Math.atan2(pr[1]-rc[1], pr[0]-rc[0])*180/Math.PI }; }
+        else { _cadEd.resize = { id:se.id, handle:handle, orig:JSON.parse(JSON.stringify(se)) }; }
+      }
       return;
     }
     var g = ev.target.closest('[data-cad-id]');
@@ -561,9 +586,18 @@ function _cadConstrainLine(x1, y1, x2, y2){ var dx=x2-x1, dy=y2-y1, a=Math.atan2
 function _cadMove(ev){
   if(_cadEd.pan){ var st = document.getElementById('cad-stage'); if(st){ st.scrollLeft = _cadEd.pan.sx - (ev.clientX - _cadEd.pan.cx); st.scrollTop = _cadEd.pan.sy - (ev.clientY - _cadEd.pan.cy); } return; }
   var xy = _cadPoint(ev); if(xy){ var sx = document.getElementById('cad-st-xy'); if(sx) sx.textContent = xy[0] + ', ' + xy[1]; }
+  if(_cadEd.rotate){
+    var rc = _cadEd.rotate, ro = _cadFind(rc.id), pr = _cadPoint(ev, true);
+    if(ro && pr){ var rot = Math.atan2(pr[1]-rc.center[1], pr[0]-rc.center[0])*180/Math.PI + rc.offset; if(ev.shiftKey) rot = Math.round(rot/15)*15; ro.rotation = ((Math.round(rot)%360)+360)%360; _cadRender(); }
+    return;
+  }
   if(_cadEd.resize){
     var rp = xy, re = _cadFind(_cadEd.resize.id);
-    if(re){ if(ev.shiftKey && /^(nw|ne|se|sw)$/.test(_cadEd.resize.handle) && re.type !== 'text'){ rp = _cadResizeAspect(_cadEd.resize.orig, _cadEd.resize.handle, xy); } _cadResizeEl(re, _cadEd.resize.orig, _cadEd.resize.handle, rp); _cadRender(); }
+    if(re){
+      if(_cadEd.resize.orig.rotation){ _cadResizeRotated(re, _cadEd.resize.orig, _cadEd.resize.handle, xy); }
+      else { if(ev.shiftKey && /^(nw|ne|se|sw)$/.test(_cadEd.resize.handle) && re.type !== 'text'){ rp = _cadResizeAspect(_cadEd.resize.orig, _cadEd.resize.handle, xy); } _cadResizeEl(re, _cadEd.resize.orig, _cadEd.resize.handle, rp); }
+      _cadRender();
+    }
     return;
   }
   if(_cadEd.drag){
@@ -590,6 +624,7 @@ function _cadResizeAspect(o, handle, p){
 function _cadUp(){
   if(!_cadEd) return;
   if(_cadEd.pan){ _cadEd.pan = null; _cadSetCursor(); return; }
+  if(_cadEd.rotate){ _cadEd.rotate = null; _cadRenderPanel(); return; }
   if(_cadEd.resize){ _cadEd.resize = null; _cadRenderPanel(); return; }
   if(_cadEd.drag){ _cadEd.drag = null; _cadRenderPanel(); return; }
   if(_cadEd.marquee){
@@ -712,6 +747,7 @@ function _cadRenderPanel(){
   }
   if(e.type === 'text'){ rows += _cadField('Text', 'text', 'text', e.text || ''); rows += _cadField('Font size', 'number', 'fontSize', e.fontSize || 20); }
   if(e.type === 'dim') rows += _cadField('Value (blank = auto length)', 'text', 'value', e.value != null ? e.value : '');
+  rows += _cadField('Rotation°', 'number', 'rotation', e.rotation || 0);
   // Arrange / align
   var two = 'style="flex:1"';
   rows += '<div style="font-size:11px;color:#9aa4b2;margin:12px 0 6px">Arrange</div>'

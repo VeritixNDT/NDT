@@ -392,7 +392,11 @@ function _cadStyle(){
     + '</style>';
 }
 function _cadToolbarHtml(){
-  var tools = CAD_TOOLS.map(function(t){ return '<button data-cad-tool="'+t[0]+'" class="'+(_cadEd.tool===t[0]?'on':'')+'" title="'+t[1]+' ('+t[2]+')">'+t[1]+'</button>'; }).join('');
+  var toolBtns = CAD_TOOLS.map(function(t){ return '<button data-cad-tool="'+t[0]+'" class="'+(_cadEd.tool===t[0]?'on':'')+'" title="'+t[1]+' ('+t[2]+')">'+t[1]+'</button>'; });
+  var snapBtn = '<button data-cad-act="snap" class="'+(_cadEd.snap?'on':'')+'" title="Snap to grid">Snap</button>';
+  // Snap sits right after Select (both are placement aids), then a separator
+  // before the drawing tools.
+  var tools = toolBtns[0] + snapBtn + '<span class="cad-sep"></span>' + toolBtns.slice(1).join('');
   var widths = [2,3,5,8].map(function(w){ return '<option value="'+w+'"'+(_cadEd.strokeWidth===w?' selected':'')+'>'+w+' px</option>'; }).join('');
   var dashes = [['','Solid'],['dashed','Dashed'],['dotted','Dotted']].map(function(x){ return '<option value="'+x[0]+'"'+((_cadEd.dash||'')===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('');
   var swatches = CAD_SWATCHES.map(function(c){ return '<button data-cad-swatch="'+c+'" title="'+c+'" style="width:18px;height:18px;padding:0;border-radius:4px;background:'+c+';border:1px solid rgba(0,0,0,.35)"></button>'; }).join('');
@@ -411,7 +415,6 @@ function _cadToolbarHtml(){
     + '<button data-cad-act="delete" title="Delete selected (Del)">Delete</button>'
     + '<span class="cad-sep"></span>'
     + '<button data-cad-act="zoomout" title="Zoom out">−</button><span id="cad-zoom" style="font-size:11px;color:#9aa4b2;min-width:38px;text-align:center">'+Math.round((_cadEd.zoom||1)*100)+'%</span><button data-cad-act="zoomin" title="Zoom in (scroll)">+</button><button data-cad-act="zoomfit" title="Reset zoom">Fit</button>'
-    + '<button data-cad-act="snap" class="'+(_cadEd.snap?'on':'')+'" title="Snap to grid">Snap</button>'
     + slotSel
     + '<div style="flex:1"></div>'
     + '<button data-cad-act="save" title="Save &amp; close" style="background:#15803d;border-color:#15803d;color:#fff">Save</button>'

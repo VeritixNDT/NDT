@@ -24,6 +24,10 @@ function _adminMap(){
                    if(typeof ovRenderGettingStarted === 'function') ovRenderGettingStarted();
                    if(typeof plRenderUpcoming === 'function') plRenderUpcoming();
                  } },
+    // New-report form host (relocated from the Overview page) — mounted so the
+    // admin side menu stays while a report is created. The form itself is
+    // rendered by ovNewReport once a method is picked (adminNewReport).
+    newreport: { sel: '#ov-newreport', render: () => {} },
     reports:   { sel: '#page-reports', render: () => { if(typeof rptInit === 'function') rptInit(); } },
     inbox:     { sel: '#page-inbox',   render: () => { if(typeof inboxRender === 'function') inboxRender('inbox'); } },
     defects:   { sel: '#page-defects', render: () => { if(typeof defInit === 'function') defInit(); } },
@@ -66,7 +70,7 @@ function adminShowSection(key, btn){
   }
   // The block-level sections (dashboard, customers) want the usual page padding;
   // the full .page sections manage their own padding/scroll, so the mount is bare.
-  mount.style.padding = (key === 'home' || key === 'customers') ? '20px 24px' : '0';
+  mount.style.padding = (key === 'home' || key === 'customers' || key === 'newreport') ? '20px 24px' : '0';
   // Side-menu active state.
   document.querySelectorAll('#admin-snav .snav-item').forEach(b => b.classList.remove('active'));
   const navBtn = btn || document.getElementById('admni-' + key);
@@ -81,11 +85,13 @@ function adminInit(){
   adminShowSection(_adminCurrent || 'home', document.getElementById('admni-' + (_adminCurrent || 'home')));
 }
 
-// New report from the admin side menu. The new-report FORM only has a host in
-// the Overview / Inspector pages (not the admin mount), so switch to Overview
-// first — otherwise ovNewReport activates the form inside the hidden
-// #page-overview and nothing appears. Then open the method picker there.
+// New report from the admin side menu. Mount the Overview new-report form host
+// INSIDE the admin workspace (so the admin side menu stays visible), then open
+// the method picker. Picking a method calls ovNewReport('ov'), which activates
+// #ov-newreport — now relocated into #admin-mount — and renders the form there.
 function adminNewReport(){
-  if(typeof showPage === 'function') showPage('overview', document.getElementById('tn-home'));
+  adminShowSection('newreport');
+  // A later return to the admin workspace lands on Home, not an empty form.
+  _adminCurrent = 'home';
   if(typeof ovNewReportPicker === 'function') ovNewReportPicker('ov');
 }

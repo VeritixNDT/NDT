@@ -1111,19 +1111,11 @@ function rptInit() {
   fm.innerHTML = '<option value="">All methods</option>' +
     getActiveMethods().map(m => `<option value="${m.id}">${m.id}</option>`).join('');
   fm.value = cur;
-  // Populate job filter — all jobs plus an "Unassigned" bucket for legacy /
-  // job-less reports. Rebuilt each init so newly-created jobs appear.
-  const fj = el('rpt-fj');
-  if(fj) {
-    const curJob = fj.value;
-    const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
-    const custName = (id) => (typeof jobCustomerName === 'function') ? jobCustomerName(id) : '';
-    const sorted = jobs.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-    fj.innerHTML = '<option value="">All jobs</option>'
-      + '<option value="__none__">Unassigned</option>'
-      + sorted.map(j => `<option value="${escapeHtml(j.id)}">${escapeHtml((j.title || '(untitled)') + ' — ' + custName(j.customerId))}</option>`).join('');
-    fj.value = curJob;
-  }
+  // Populate customer + job filters. The customer filter narrows the job
+  // dropdown (and the list) to one client; "Unassigned" stays available.
+  // Rebuilt each init so newly-created customers/jobs appear.
+  rptPopulateCustomerFilter();
+  rptPopulateJobFilter(el('rpt-fc')?.value || '');
   // V6: restore saved view preference
   try {
     const saved = localStorage.getItem(RPT_VIEW_PREF_KEY);
@@ -1133,6 +1125,38 @@ function rptInit() {
   document.getElementById('rpt-vtog-kanban')?.classList.toggle('active', _rptView === 'kanban');
   rptRender();
   rptUpdateBulkBar();
+}
+
+// Populate the reports customer filter from the customer register.
+function rptPopulateCustomerFilter(){
+  const fc = el('rpt-fc'); if(!fc) return;
+  const cur = fc.value;
+  const customers = (typeof custLoad === 'function') ? custLoad() : ls(KEYS.customers, []);
+  const sorted = customers.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  fc.innerHTML = '<option value="">All customers</option>'
+    + sorted.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name || '(unnamed)')}</option>`).join('');
+  fc.value = cur;
+}
+
+// Populate the job filter, optionally narrowed to one customer's jobs. Keeps
+// the prior selection only when it's still a valid option after narrowing.
+function rptPopulateJobFilter(customerId){
+  const fj = el('rpt-fj'); if(!fj) return;
+  const curJob = fj.value;
+  let jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
+  if(customerId) jobs = jobs.filter(j => j.customerId === customerId);
+  const custName = (id) => (typeof jobCustomerName === 'function') ? jobCustomerName(id) : '';
+  const sorted = jobs.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  fj.innerHTML = '<option value="">All jobs</option>'
+    + '<option value="__none__">Unassigned</option>'
+    + sorted.map(j => `<option value="${escapeHtml(j.id)}">${escapeHtml((j.title || '(untitled)') + ' — ' + custName(j.customerId))}</option>`).join('');
+  fj.value = Array.from(fj.options).some(o => o.value === curJob) ? curJob : '';
+}
+
+// Customer filter changed — re-narrow the job dropdown, then re-render.
+function rptCustomerFilterChanged(){
+  rptPopulateJobFilter(el('rpt-fc')?.value || '');
+  rptRender();
 }
 
 // V6: View state + selection + saved filters
@@ -1162,6 +1186,7 @@ function rptCollectFilters(){
   return {
     search:   el('rpt-search')?.value || '',
     method:   el('rpt-fm')?.value || '',
+    customer: el('rpt-fc')?.value || '',
     job:      el('rpt-fj')?.value || '',
     status:   _rptStatusFilter || '',
     dateFrom: el('rpt-f-datefrom')?.value || '',
@@ -1172,6 +1197,9 @@ function rptCollectFilters(){
 function rptApplyFilters(filters){
   if(el('rpt-search'))     el('rpt-search').value     = filters.search    || '';
   if(el('rpt-fm'))         el('rpt-fm').value         = filters.method    || '';
+  // Customer first, then re-narrow the job dropdown before restoring the job.
+  if(el('rpt-fc'))         el('rpt-fc').value         = filters.customer  || '';
+  if(typeof rptPopulateJobFilter === 'function') rptPopulateJobFilter(filters.customer || '');
   if(el('rpt-fj'))         el('rpt-fj').value         = filters.job       || '';
   _rptStatusFilter = filters.status || '';
   if(el('rpt-f-datefrom')) el('rpt-f-datefrom').value = filters.dateFrom  || '';
@@ -1591,13 +1619,24 @@ function rptRender() {
   const allReports = list.slice(); // keep original index reference for selection
   const search = (el('rpt-search')?.value || '').toLowerCase().trim();
   const fm = el('rpt-fm')?.value || '';
+  const fc = el('rpt-fc')?.value || '';
   const fj = el('rpt-fj')?.value || '';
   const fDateFrom = el('rpt-f-datefrom')?.value || '';
   const fDateTo = el('rpt-f-dateto')?.value || '';
 
+  // Customer filter works via job→customer linkage: build a jobId→customerId
+  // map once so a report matches a customer only when routed to one of its jobs.
+  let _jobCust = null;
+  if(fc){
+    _jobCust = {};
+    ((typeof jobLoad === 'function') ? jobLoad() : []).forEach(j => { _jobCust[j.id] = j.customerId || ''; });
+  }
+
   // Build filtered list while preserving the original index in `_origIdx`
   list = list.map((r, i) => ({ r, _origIdx: i })).filter(({r}) => {
     if(fm && r.method !== fm) return false;
+    // Customer filter — report's job must belong to the selected customer.
+    if(fc){ if(!r.jobId || _jobCust[r.jobId] !== fc) return false; }
     // Job filter — '__none__' = unassigned reports only, else exact jobId.
     if(fj){
       if(fj === '__none__'){ if(r.jobId) return false; }
@@ -1619,7 +1658,7 @@ function rptRender() {
     return true;
   });
 
-  const activeFilters = [fm, fj, search, _rptStatusFilter, fDateFrom, fDateTo].filter(Boolean).length;
+  const activeFilters = [fm, fc, fj, search, _rptStatusFilter, fDateFrom, fDateTo].filter(Boolean).length;
   // V31: translated subtitle. Plural-aware report count + "N filter(s) active"
   // when filters are in play. The {n} interpolation handles localization of
   // grammatical number for English / Dutch / German / French / Spanish.
@@ -2130,6 +2169,9 @@ function rptDelete(idx) {
 function rptClearFilters() {
   ['rpt-search','rpt-f-datefrom','rpt-f-dateto'].forEach(id => { const e=el(id); if(e) e.value=''; });
   const fm = el('rpt-fm'); if(fm) fm.value = '';
+  const fc = el('rpt-fc'); if(fc) fc.value = '';
+  // Re-open the job dropdown to all jobs (drop any customer narrowing).
+  if(typeof rptPopulateJobFilter === 'function') rptPopulateJobFilter('');
   const fj = el('rpt-fj'); if(fj) fj.value = '';
   _rptStatusFilter = '';
   rptRender();

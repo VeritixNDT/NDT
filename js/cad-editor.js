@@ -41,7 +41,7 @@ function _cadNormEl(e){
   e = e || {};
   var o = { id: e.id || _cadId(), type: e.type || 'line',
     stroke: e.stroke || '#1e293b', strokeWidth: (e.strokeWidth != null ? +e.strokeWidth : 2), fill: e.fill || 'none' };
-  ['x','y','w','h','x1','y1','x2','y2','fontSize','rotation'].forEach(function(k){ if(e[k] != null) o[k] = +e[k]; });
+  ['x','y','w','h','x1','y1','x2','y2','fontSize','rotation','radius'].forEach(function(k){ if(e[k] != null) o[k] = +e[k]; });
   if(e.points) o.points = e.points.map(function(p){ return [+p[0], +p[1]]; });
   if(e.text != null) o.text = String(e.text);
   if(e.value != null) o.value = String(e.value);
@@ -89,7 +89,7 @@ function _cadRenderEl(e){
   var st = 'stroke="' + col + '" stroke-width="' + sw + '" fill="' + fill + '"' + dashA;
   switch(e.type){
     case 'line':    return '<line x1="' + e.x1 + '" y1="' + e.y1 + '" x2="' + e.x2 + '" y2="' + e.y2 + '" ' + st + ' stroke-linecap="round"/>';
-    case 'rect':    return '<rect x="' + Math.min(e.x, e.x + e.w) + '" y="' + Math.min(e.y, e.y + e.h) + '" width="' + Math.abs(e.w) + '" height="' + Math.abs(e.h) + '" ' + st + '/>';
+    case 'rect':    return '<rect x="' + Math.min(e.x, e.x + e.w) + '" y="' + Math.min(e.y, e.y + e.h) + '" width="' + Math.abs(e.w) + '" height="' + Math.abs(e.h) + '"' + (e.radius > 0 ? ' rx="' + e.radius + '" ry="' + e.radius + '"' : '') + ' ' + st + '/>';
     case 'ellipse': return '<ellipse cx="' + (e.x + e.w / 2) + '" cy="' + (e.y + e.h / 2) + '" rx="' + Math.abs(e.w / 2) + '" ry="' + Math.abs(e.h / 2) + '" ' + st + '/>';
     case 'arrow':   return _cadArrow(e);
     case 'path':    return '<polyline points="' + (e.points || []).map(function(p){ return p[0] + ',' + p[1]; }).join(' ') + '" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linejoin="round" stroke-linecap="round"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>';
@@ -470,7 +470,7 @@ function _cadWire(o){
     if(!ev.target.matches('[data-cad-prop]') || _cadEd.selIds.length!==1) return;
     var pe = _cadFind(_cadEd.selIds[0]); if(!pe) return;
     var prop = ev.target.getAttribute('data-cad-prop'), v = ev.target.value;
-    if(prop === 'strokeWidth' || prop === 'fontSize' || prop === 'rotation') v = +v || 0;
+    if(prop === 'strokeWidth' || prop === 'fontSize' || prop === 'rotation' || prop === 'radius') v = Math.max(0, +v || 0);
     pe[prop] = v; _cadRender();
   });
   var stage = o.querySelector('#cad-stage');
@@ -748,6 +748,7 @@ function _cadRenderPanel(){
     rows += '<label style="display:flex;align-items:center;gap:7px;margin-bottom:9px;cursor:pointer"><input type="checkbox" data-cad-fillon ' + (filled ? 'checked' : '') + '/> <span style="color:#9aa4b2;font-size:11px">Filled</span></label>';
     if(filled) rows += _cadField('Fill colour', 'color', 'fill', e.fill);
   }
+  if(e.type === 'rect') rows += _cadField('Corner radius', 'number', 'radius', e.radius || 0);
   if(e.type === 'text'){ rows += _cadField('Text', 'text', 'text', e.text || ''); rows += _cadField('Font size', 'number', 'fontSize', e.fontSize || 20); }
   if(e.type === 'dim') rows += _cadField('Value (blank = auto length)', 'text', 'value', e.value != null ? e.value : '');
   rows += _cadField('Rotation°', 'number', 'rotation', e.rotation || 0);

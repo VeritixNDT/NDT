@@ -336,7 +336,7 @@ var TPL_FIELDS = {
   ],
   FN: [
     { id:'spec',  label:'Specification',      placeholder:'e.g. AWS A4.2M:2020', options:['AWS A4.2M:2020','ASTM A800/A800M-21','ISO 8249:2018','EN-ISO 8249:2018','DNV-OS-F101','Client specification'] },
-    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. 30–80 FN', options:['30–80 FN (duplex weld metal)','35–65 FN','NORSOK M-601','NORSOK M-630','ASME IX QW-Var.','Client specification','Project ITP / WPS'] },
+    { id:'acc',   label:'Acceptance criteria', placeholder:'e.g. Duplex 35–65% ferrite', options:['Duplex stainless: 35–65% ferrite','Austenitic stainless: 3–8% ferrite','NORSOK M-601','NORSOK M-630','ASME IX QW-Var.','Client specification','Project ITP / WPS'] },
     { id:'mode',  label:'Measurement method', placeholder:'e.g. Magnetic (Feritscope)', options:['Magnetic induction (Feritscope)','Magnetic attraction (Severn gauge)','Metallographic point count','Calculated (WRC-1992)'] },
     // Primary ferrite instrument — register-backed so the PDF resolves the
     // picked unit (Feritscope FMP30 / etc.) with its calibration record.

@@ -23,15 +23,16 @@ function fnAvg(r){
 // single weld's points with the shared scale/limits so per-weld renderers work.
 function _fnWeldView(base, weld){
   weld = weld || {};
-  return { scale:base.scale, limitMin:base.limitMin, limitMax:base.limitMax, points:weld.points };
+  return { scale:base.scale, limitMin:base.limitMin, limitMax:base.limitMax, componentType:weld.componentType, bore:weld.bore, points:weld.points };
 }
 // Normalise to { scale, limitMin, limitMax, welds:[{points:[…]}] }. A legacy
 // single-weld shape (top-level points) wraps into welds[0]. Idempotent.
 function fnNormalize(survey){
   if(!survey || Array.isArray(survey.welds)) return survey;
-  var base = { scale: survey.scale || 'FN',
-               limitMin: (survey.limitMin != null ? survey.limitMin : 30),
-               limitMax: (survey.limitMax != null ? survey.limitMax : 80) };
+  var base = { scale: survey.scale || '% ferrite',
+               material: survey.material || '',
+               limitMin: (survey.limitMin != null ? survey.limitMin : 35),
+               limitMax: (survey.limitMax != null ? survey.limitMax : 65) };
   base.welds = [ { points: survey.points || [] } ];
   return base;
 }
@@ -60,15 +61,66 @@ function fnVerdict(survey){
 }
 function fnIsEmpty(survey){ return fnVerdict(survey).total === 0; }
 
+// ── Acceptance presets + testing-parameter (sampling) tables ─────────────────
+// Material acceptance bands (% ferrite). Picking a material sets min/max + unit.
+var FN_MATERIAL_PRESETS = {
+  duplex:     { label:'Duplex stainless steel',     min:35, max:65, unit:'% ferrite' },
+  austenitic: { label:'Austenitic stainless steel', min:3,  max:8,  unit:'% ferrite' },
+  custom:     { label:'Custom / other',             min:null, max:null, unit:'% ferrite' },
+};
+function fnMaterialLabel(m){ var p = FN_MATERIAL_PRESETS[m]; return p ? p.label : ''; }
+// Nominal-bore / OD band sets, by table. Each entry: [key, label].
+var FN_BANDS = {
+  pipe:  [['s', 'D ≤ 6″'], ['m', '6″ < D ≤ 12″'], ['l', 'D > 12″']],
+  valve: [['a', 'D ≤ 2″'], ['b', '2″ < D ≤ 4″'], ['c', '4″ < D ≤ 12″'], ['d', 'D > 12″']],
+  weld:  [['ws', 'OD < 3″'], ['wl', 'OD ≥ 3″']],
+};
+// Required number of measurement points by component + bore (Tables 3 & 4). Each
+// point is the average of 3 readings. "Weld + base material" uses the OD pattern.
+var FN_SAMPLING = {
+  'Pipe':                 { bands:'pipe',  counts:{ s:3, m:3, l:3 } },
+  'Tee':                  { bands:'pipe',  counts:{ s:1, m:4, l:5 } },
+  'Flange & fitting':     { bands:'pipe',  counts:{ s:1, m:3, l:3 } },
+  "O'let":                { bands:'pipe',  counts:{ s:1, m:2, l:6 } },
+  'Forging':              { bands:'pipe',  counts:{ s:2, m:4, l:4 } },
+  'Bar / shape':          { bands:'pipe',  counts:{ s:1, m:2, l:4 } },
+  'Valve body':           { bands:'valve', counts:{ a:2, b:6, c:12, d:12 } },
+  'Bonnet':               { bands:'valve', counts:{ a:1, b:1, c:3,  d:3 } },
+  'Stem':                 { bands:'valve', counts:{ a:1, b:1, c:3,  d:3 } },
+  'Ball / wedge / plug':  { bands:'valve', counts:{ a:1, b:2, c:6,  d:6 } },
+  'Weld + base material': { bands:'weld' },
+};
+function fnBandsFor(componentType){ var c = FN_SAMPLING[componentType]; return c ? (FN_BANDS[c.bands] || []) : []; }
+function fnSampleCount(componentType, boreKey){
+  var c = FN_SAMPLING[componentType]; if(!c) return 0;
+  if(c.bands === 'weld') return boreKey === 'wl' ? 6 : 3;   // BM1 + Weld(1|4) + BM2
+  return (c.counts && c.counts[boreKey]) || 0;
+}
+// Build the measurement-point list a component + bore requires, per the tables.
+function fnSamplePoints(componentType, boreKey){
+  var c = FN_SAMPLING[componentType]; if(!c) return null;
+  var labels = [];
+  if(c.bands === 'weld'){
+    labels.push('Base material 1');
+    if(boreKey === 'wl'){ ['0°', '90°', '180°', '270°'].forEach(function(a){ labels.push('Weld ' + a); }); }
+    else labels.push('Weld');
+    labels.push('Base material 2');
+  } else {
+    var n = fnSampleCount(componentType, boreKey);
+    for(var i = 0; i < n; i++) labels.push('Point ' + (i + 1));
+  }
+  return labels.map(function(l, i){ return { n:i + 1, label:l, r:['', '', ''] }; });
+}
+
 // ── default + sample ─────────────────────────────────────────────────────────
 var FN_LOCATIONS = ['Cap', 'Mid-wall', 'Root'];
 function _fnBlankWeld(){ return { points: FN_LOCATIONS.map(function(l, i){ return { n:i + 1, label:l, r:['', '', ''] }; }) }; }
-function fnDefault(){ return { scale:'FN', limitMin:30, limitMax:80, welds:[ _fnBlankWeld() ] }; }
+function fnDefault(){ return { scale:'% ferrite', material:'duplex', limitMin:35, limitMax:65, welds:[ _fnBlankWeld() ] }; }
 
-function _fnSampleWeld(label, a){ return { points: FN_LOCATIONS.map(function(l, i){ return { n:i + 1, label:l, r:a[i] }; }) }; }
-var FN_SAMPLE = { scale:'FN', limitMin:30, limitMax:80, welds:[
-  _fnSampleWeld('w1', [[52, 55, 53], [48, 50, 49], [44, 46, 45]]),
-  _fnSampleWeld('w2', [[61, 63, 62], [58, 57, 59], [54, 55, 53]]),
+function _fnSampleWeld(comp, bore, a){ var pts = fnSamplePoints(comp, bore) || []; pts.forEach(function(p, i){ p.r = a[i] || ['', '', '']; }); return { componentType:comp, bore:bore, points:pts }; }
+var FN_SAMPLE = { scale:'% ferrite', material:'duplex', limitMin:35, limitMax:65, welds:[
+  _fnSampleWeld('Weld + base material', 'wl', [[52,55,53],[48,50,49],[58,56,57],[60,62,61],[55,54,56],[50,51,49]]),
+  _fnSampleWeld('Pipe', 'm', [[61,63,62],[58,57,59],[54,55,53]]),
 ]};
 var FN_SAMPLE_ITEMS = [
   { subject:'Duplex butt weld D1', drawing:'ISO-D1-001', material:'1.4462 (S32205)', weldProcess:'GTAW', dimensions:'Ø168.3 × 11.0', verdict:'Acceptable' },
@@ -185,10 +237,19 @@ function _fnTable(weldView, P, bar){
   return _fnTableEl(heads, rows, bar, P);
 }
 
+function _fnComponentLine(weldView, P){
+  if(!weldView.componentType) return '';
+  var bands = fnBandsFor(weldView.componentType);
+  var bb = bands.filter(function(b){ return b[0] === weldView.bore; })[0];
+  var boreLbl = bb ? bb[1] : '';
+  var npts = (weldView.points || []).length;
+  return '<div style="padding:3px 8px 0;font:400 8px \'Geist Mono\',monospace;color:' + P.mut + '">Sampling: ' + escapeHtml(weldView.componentType) + (boreLbl ? (' · ' + escapeHtml(boreLbl)) : '') + ' · ' + npts + ' point' + (npts === 1 ? '' : 's') + ' (avg of 3 readings each)</div>';
+}
 function _fnWeldUnit(weldView, item, idx, P, bar, detailWidths){
   var sep = idx > 0 ? 'border-top:2px solid ' + P.grid + ';margin-top:8px;padding-top:2px;' : '';
   return '<div style="' + sep + '">'
     + _fnItemDetails(item, idx, P, bar, weldView, detailWidths)
+    + _fnComponentLine(weldView, P)
     + '<div style="padding:6px 8px 0">' + _fnChart(weldView, P) + '</div>'
     + _fnTable(weldView, P, bar)
     + '</div>';
@@ -214,8 +275,9 @@ function fnRenderSurvey(survey, opts){
   var verdict = (lo || hi) ? ((v.passed ? '<b style="color:' + P.green + '">PASS</b>' : '<b style="color:' + P.red + '">FAIL</b>')) : '';
   var rangeTxt = (rng.lo != null) ? (rng.lo + '–' + rng.hi + ' ' + escapeHtml(scale)) : '—';
   var wc = welds.length;
+  var matTxt = fnMaterialLabel(survey.material);
   var caption = '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 8px;font:400 8px \'Geist Mono\',monospace;color:' + P.mut + ';border-bottom:0.5px solid ' + P.grid + '">'
-    + '<span>' + escapeHtml(scale) + ' · ' + wc + ' weld' + (wc === 1 ? '' : 's') + ' · avg of up to 3 per location · acceptance ' + band + '</span>'
+    + '<span>' + (matTxt ? (escapeHtml(matTxt) + ' · ') : '') + wc + ' weld' + (wc === 1 ? '' : 's') + ' · acceptance ' + band + '</span>'
     + '<span>Range ' + rangeTxt + (verdict ? (' · ' + verdict) : '') + '</span></div>';
 
   var html = titleBar + caption;
@@ -246,11 +308,12 @@ function fnRenderEntrySection(existing){
   fnSyncWelds();
   return '<div class="sc" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">Ferrite survey</span></div><div class="sc-body" style="padding:14px 16px">'
     + '<div class="fg form-row" style="margin-bottom:4px;display:flex;gap:12px;flex-wrap:wrap">'
-      + '<div class="fld" style="width:120px"><label>Unit</label><input id="fn-scale" value="' + escapeHtml(_fnSurvey.scale || 'FN') + '" data-on-input="fnEntryChanged"/></div>'
-      + '<div class="fld" style="width:150px"><label>Acceptance min</label><input id="fn-min" type="number" step="any" value="' + escapeHtml(_fnSurvey.limitMin != null ? _fnSurvey.limitMin : '') + '" data-on-input="fnEntryChanged"/></div>'
-      + '<div class="fld" style="width:150px"><label>Acceptance max</label><input id="fn-max" type="number" step="any" value="' + escapeHtml(_fnSurvey.limitMax != null ? _fnSurvey.limitMax : '') + '" data-on-input="fnEntryChanged"/></div>'
+      + '<div class="fld" style="width:210px"><label>Material / acceptance</label><select id="fn-material" data-on-change="fnSetMaterial">' + fnMaterialOptions(_fnSurvey.material) + '</select></div>'
+      + '<div class="fld" style="width:110px"><label>Unit</label><input id="fn-scale" value="' + escapeHtml(_fnSurvey.scale || '% ferrite') + '" data-on-input="fnEntryChanged"/></div>'
+      + '<div class="fld" style="width:130px"><label>Acceptance min</label><input id="fn-min" type="number" step="any" value="' + escapeHtml(_fnSurvey.limitMin != null ? _fnSurvey.limitMin : '') + '" data-on-input="fnEntryChanged"/></div>'
+      + '<div class="fld" style="width:130px"><label>Acceptance max</label><input id="fn-max" type="number" step="any" value="' + escapeHtml(_fnSurvey.limitMax != null ? _fnSurvey.limitMax : '') + '" data-on-input="fnEntryChanged"/></div>'
     + '</div>'
-    + '<div style="font-size:11px;color:var(--t3);margin:2px 0 12px">Weld identification (no., drawing, material, result) comes from the <b>Examination details</b> table above — one line per weld. Ferrite is in/out of the min–max band.</div>'
+    + '<div style="font-size:11px;color:var(--t3);margin:2px 0 12px">Pick a <b>material</b> to set the acceptance band (austenitic 3–8%, duplex 35–65%), and a <b>component type + bore</b> per weld to auto-set the required number of measurement points. Weld identification comes from the <b>Examination details</b> table above — one line per weld.</div>'
     + '<div id="fn-grid">' + fnGridHtml() + '</div>'
     + '<div style="font-size:11px;color:var(--t3);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.05em">Live preview</div>'
     + '<div id="fn-preview" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 16px">' + fnRenderSurvey(_fnSurvey, { print:true, items:_fnItems() }) + '</div>'
@@ -262,6 +325,31 @@ function _fnNum(val, wi, pt, field, ph, w){
 }
 function _fnTxt(val, wi, pt){
   return '<input type="text" data-fn-weld="' + wi + '" data-fn-pt="' + pt + '" data-fn-field="label" data-on-input="fnEntryChanged" value="' + escapeHtml(val == null ? '' : val) + '" placeholder="Location" style="width:120px"/>';
+}
+function fnMaterialOptions(sel){
+  return '<option value="">— Select material —</option>' + Object.keys(FN_MATERIAL_PRESETS).map(function(k){
+    var p = FN_MATERIAL_PRESETS[k];
+    var lab = p.label + (p.min != null ? ' (' + p.min + '–' + p.max + '%)' : '');
+    return '<option value="' + k + '"' + (sel === k ? ' selected' : '') + '>' + escapeHtml(lab) + '</option>';
+  }).join('');
+}
+// Per-weld component-type + nominal-bore selectors that drive the required
+// number of measurement points (Tables 3 & 4 + the weld OD pattern).
+function fnComponentBoreRow(weld, wi){
+  var ctype = weld.componentType || '';
+  var compOpts = '<option value="">— Component (optional) —</option>' + Object.keys(FN_SAMPLING).map(function(k){
+    return '<option value="' + escapeHtml(k) + '"' + (ctype === k ? ' selected' : '') + '>' + escapeHtml(k) + '</option>';
+  }).join('');
+  var bands = fnBandsFor(ctype);
+  var boreOpts = bands.length ? bands.map(function(b){ return '<option value="' + b[0] + '"' + (weld.bore === b[0] ? ' selected' : '') + '>' + escapeHtml(b[1]) + '</option>'; }).join('') : '<option value="">—</option>';
+  var n = fnSampleCount(ctype, weld.bore);
+  var hint = !ctype ? 'optional — sets the required number of points' : (n ? n + ' point' + (n === 1 ? '' : 's') + ' · avg of 3 readings each' : 'select a size');
+  var dis = bands.length ? '' : ' disabled';
+  return '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:7px">'
+    + '<div class="fld" style="width:190px"><label style="font-size:11px">Component type</label><select data-fn-weld="' + wi + '" data-fn-field="componentType" data-on-change="fnSetSampling" data-pass-el="1">' + compOpts + '</select></div>'
+    + '<div class="fld" style="width:160px"><label style="font-size:11px">Nominal bore / OD</label><select data-fn-weld="' + wi + '" data-fn-field="bore" data-on-change="fnSetSampling" data-pass-el="1"' + dis + '>' + boreOpts + '</select></div>'
+    + '<div style="font-size:11px;color:var(--t3);padding-bottom:7px">' + escapeHtml(hint) + '</div>'
+    + '</div>';
 }
 function fnGridHtml(){
   var s = _fnSurvey;
@@ -278,8 +366,9 @@ function fnGridHtml(){
         + '<td style="padding:5px 8px;font-family:var(--mono);color:var(--cyan)">' + (a != null ? a : '—') + '</td>'
         + '<td style="padding:4px 6px"><button class="btn btn-sm btn-danger" data-action="fnRemovePoint" data-args="' + wi + ',' + pi + '" title="Remove location" style="padding:2px 7px">×</button></td></tr>';
     }).join('');
-    return '<div style="margin-bottom:14px"><div style="display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--t1);margin-bottom:5px">Weld ' + (wi + 1) + (lbl ? ' — ' + escapeHtml(lbl) : '') + del + '</div>'
-      + '<table class="tbl" style="width:auto"><thead><tr><th>Location</th><th>FN #1</th><th>FN #2</th><th>FN #3</th><th>Avg</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+    return '<div style="margin-bottom:16px;border-left:2px solid var(--border);padding-left:10px"><div style="display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--t1);margin-bottom:6px">Weld ' + (wi + 1) + (lbl ? ' — ' + escapeHtml(lbl) : '') + del + '</div>'
+      + fnComponentBoreRow(weld, wi)
+      + '<table class="tbl" style="width:auto"><thead><tr><th>Location</th><th>#1</th><th>#2</th><th>#3</th><th>Avg</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
       + '<button class="btn btn-sm" data-action="fnAddPoint" data-args="' + wi + '" style="margin-top:6px">+ location</button></div>';
   }).join('');
   return grids
@@ -289,16 +378,52 @@ function fnGridHtml(){
 
 function fnReadGrid(){
   if(!_fnSurvey) return;
-  var sc = el('fn-scale'); if(sc) _fnSurvey.scale = sc.value || 'FN';
+  var sc = el('fn-scale'); if(sc) _fnSurvey.scale = sc.value || '% ferrite';
+  var mt = el('fn-material'); if(mt) _fnSurvey.material = mt.value;
   var mn = el('fn-min'); if(mn) _fnSurvey.limitMin = mn.value === '' ? '' : parseFloat(mn.value);
   var mx = el('fn-max'); if(mx) _fnSurvey.limitMax = mx.value === '' ? '' : parseFloat(mx.value);
   var grid = el('fn-grid'); if(!grid) return;
   (_fnSurvey.welds || []).forEach(function(weld, wi){
+    var cSel = grid.querySelector('[data-fn-weld="' + wi + '"][data-fn-field="componentType"]'); if(cSel) weld.componentType = cSel.value;
+    var bSel = grid.querySelector('[data-fn-weld="' + wi + '"][data-fn-field="bore"]'); if(bSel) weld.bore = bSel.value;
     (weld.points || []).forEach(function(p, pi){
       var lb = grid.querySelector('[data-fn-weld="' + wi + '"][data-fn-pt="' + pi + '"][data-fn-field="label"]'); if(lb) p.label = lb.value;
       ['r0', 'r1', 'r2'].forEach(function(f, k){ var inp = grid.querySelector('[data-fn-weld="' + wi + '"][data-fn-pt="' + pi + '"][data-fn-field="' + f + '"]'); if(inp) p.r[k] = inp.value; });
     });
   });
+}
+// Material preset → acceptance band + unit.
+function fnSetMaterial(){
+  fnReadGrid();
+  var m = el('fn-material') ? el('fn-material').value : '';
+  _fnSurvey.material = m;
+  var p = FN_MATERIAL_PRESETS[m];
+  if(p){
+    if(p.min != null) _fnSurvey.limitMin = p.min;
+    if(p.max != null) _fnSurvey.limitMax = p.max;
+    if(p.unit) _fnSurvey.scale = p.unit;
+  }
+  var sc = el('fn-scale'); if(sc) sc.value = _fnSurvey.scale || '% ferrite';
+  var mn = el('fn-min'); if(mn) mn.value = _fnSurvey.limitMin != null ? _fnSurvey.limitMin : '';
+  var mx = el('fn-max'); if(mx) mx.value = _fnSurvey.limitMax != null ? _fnSurvey.limitMax : '';
+  fnRebuildGrid();
+}
+// Component type / bore changed → regenerate that weld's measurement points.
+function fnSetSampling(elm){
+  fnReadGrid();
+  var wi = parseInt((elm && elm.getAttribute) ? elm.getAttribute('data-fn-weld') : elm, 10);
+  var weld = _fnSurvey.welds && _fnSurvey.welds[wi]; if(!weld) return;
+  var grid = el('fn-grid');
+  var cSel = grid && grid.querySelector('[data-fn-weld="' + wi + '"][data-fn-field="componentType"]');
+  var bSel = grid && grid.querySelector('[data-fn-weld="' + wi + '"][data-fn-field="bore"]');
+  var ctype = cSel ? cSel.value : '';
+  var bands = fnBandsFor(ctype);
+  var bkey = bSel ? bSel.value : '';
+  if(bands.length && !bands.some(function(b){ return b[0] === bkey; })) bkey = bands[0][0];   // first valid band for a newly-picked component
+  weld.componentType = ctype;
+  weld.bore = ctype ? bkey : '';
+  if(ctype && bkey){ var pts = fnSamplePoints(ctype, bkey); if(pts && pts.length) weld.points = pts; }
+  fnRebuildGrid();
 }
 function fnRenderPreview(){ var pv = el('fn-preview'); if(pv) pv.innerHTML = fnRenderSurvey(_fnSurvey, { print:true, items:_fnItems() }); }
 function fnRebuildGrid(){ var g = el('fn-grid'); if(g) g.innerHTML = fnGridHtml(); fnRenderPreview(); }

@@ -1694,7 +1694,7 @@ function rptRenderTable(list, allReports){
     wrap.innerHTML = `<div class="sc" style="margin-top:14px"><div class="sc-body np" style="overflow-x:auto">
       <table class="tbl" style="width:100%"><thead><tr>
         <th scope="col" style="width:34px;padding:8px 10px"><input type="checkbox" class="rpt-cb" aria-label="Select all visible reports" title="Select all visible"></th>
-        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col">Weld / object</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="text-align:right">Workflow</th>
+        <th scope="col" data-i18n="col.report_id">Report ID</th><th scope="col" data-i18n="col.method">Method</th><th scope="col" data-i18n="col.stage">Stage</th><th scope="col" data-i18n="col.client">Client</th><th scope="col">Job</th><th scope="col">Weld / object</th><th scope="col" data-i18n="col.drawing">Drawing</th><th scope="col" data-i18n="col.inspector">Inspector</th><th scope="col" data-i18n="col.date">Date</th><th scope="col" data-i18n="col.result">Result</th><th scope="col" style="text-align:right">Workflow</th>
       </tr></thead><tbody></tbody></table></div></div>`;
     table = wrap.querySelector('table.tbl');
     tbody = table.querySelector('tbody');
@@ -1709,7 +1709,7 @@ function rptRenderTable(list, allReports){
 
   // Empty state
   if(!list.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--t3)">No reports match these filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:28px;color:var(--t3)">No reports match these filters.</td></tr>';
     visibleIdxListLatest = [];
     return;
   }
@@ -1826,6 +1826,7 @@ function _rptRowSig(r, idx) {
     r.reportNo, r.method, getReportStage(r), r.verdict, r.client, r.subject,
     r.drawing, r.inspector, r.createdAt, r.stageUpdatedAt,
     r.sealedAt || '',
+    r.jobTitle || '', r.internalNoCustomer ? 'I' : '',
     _rptIsSuperseded(r) ? 'S' : '',
     _rptSelectedIdx.has(idx) ? '1' : '0',
   ].join('|');
@@ -1846,6 +1847,7 @@ function _rptRowInner(r, _origIdx) {
     <td><span style="font-family:var(--mono);font-weight:600;color:${md?.color||'var(--t2)'}">${escapeHtml(r.method||'—')}</span></td>
     <td><span class="badge" data-no-glyph style="background:${sc.bg};color:${sc.fg};box-shadow:inset 0 0 0 1px ${sc.accent}33;font-size:10px">${tStage(stage)}</span>${health!=='fresh'?` <span title="${fmtDuration(timeOnStage(r))} on this stage" style="font-size:10px;color:${health==='critical'?'var(--red)':'var(--amber)'};font-family:var(--mono)">·${fmtDuration(timeOnStage(r))}</span>`:''}</td>
     <td>${escapeHtml(r.client||'—')}</td>
+    <td style="font-size:12px"><span data-action="ovAssignJob" data-args="${_origIdx}" title="Assign this report to a job / customer" style="cursor:pointer;border-bottom:1px dashed var(--border);color:${r.internalNoCustomer?'var(--t3)':(r.jobId?'var(--t1)':'var(--t3)')}">${r.internalNoCustomer ? 'Internal' : (r.jobId ? escapeHtml(r.jobTitle||'(job)') : '— Assign')}</span></td>
     <td>${escapeHtml(r.subject||'—')}</td>
     <td style="font-size:12px;color:var(--t2)">${escapeHtml(r.drawing||'—')}</td>
     <td>${escapeHtml(r.inspector||'—')}</td>

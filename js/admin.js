@@ -80,3 +80,12 @@ function adminShowSection(key, btn){
 function adminInit(){
   adminShowSection(_adminCurrent || 'home', document.getElementById('admni-' + (_adminCurrent || 'home')));
 }
+
+// New report from the admin side menu. The new-report FORM only has a host in
+// the Overview / Inspector pages (not the admin mount), so switch to Overview
+// first — otherwise ovNewReport activates the form inside the hidden
+// #page-overview and nothing appears. Then open the method picker there.
+function adminNewReport(){
+  if(typeof showPage === 'function') showPage('overview', document.getElementById('tn-home'));
+  if(typeof ovNewReportPicker === 'function') ovNewReportPicker('ov');
+}

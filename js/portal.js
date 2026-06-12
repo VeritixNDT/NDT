@@ -118,6 +118,15 @@ function _portalDocStatusColor(s){ return (s==='Paid'||s==='Accepted')?'#16a34a'
 function vxPortalRender(root, data){
   const accent = (data.company && /^#[0-9A-Fa-f]{6}$/.test(data.company.color || '')) ? data.company.color : '#185FA5';
   const co = data.company || {};
+  // Online payment is only available from a live (server-signed) portal link —
+  // the local preview link has no token the payment function can verify.
+  const _tok = _vxPortalToken();
+  const canPay = !!_tok && _tok.indexOf('local-') !== 0;
+  // Stripe redirects back with ?paid=<invoiceId> after a successful checkout.
+  const paidParam = (location.hash.split('?')[1] || '').match(/(?:^|&)paid=([^&]+)/);
+  const paidNotice = paidParam
+    ? `<div style="background:#dcfce7;border:1px solid #86efac;color:#15803d;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:13px;font-weight:600">✓ Payment received — thank you. The invoice will show as paid shortly.</div>`
+    : '';
   const reportsByJob = {};
   (data.reports || []).forEach(r => { (reportsByJob[r.jobId] = reportsByJob[r.jobId] || []).push(r); });
 
@@ -168,7 +177,7 @@ function vxPortalRender(root, data){
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589">${_portalDate(d.issueDate)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4">${_portalBadge(status, _portalDocStatusColor(status))}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;font-family:monospace;font-size:12px">${_portalMoney(total, d.currency)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right"><button data-action="vxPortalOpenDoc" data-args="'${type}','${_portalEsc(d.id)}'" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">PDF</button></td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${(type==='invoice' && canPay && d.status!=='Paid') ? `<button data-action="vxPortalPayInvoice" data-args="'${_portalEsc(d.id)}'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">Pay online</button>` : ''}<button data-action="vxPortalOpenDoc" data-args="'${type}','${_portalEsc(d.id)}'" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">PDF</button></td>
       </tr>`;
     }).join('');
     return `<h2 style="font-size:15px;margin:24px 0 10px;color:#0b1220">${_portalEsc(title)}</h2>
@@ -178,11 +187,11 @@ function vxPortalRender(root, data){
   const quotesHtml   = docBlock('Quotes', data.quotes, 'quote');
 
   const payNote = (data.invoices && data.invoices.some(i => i.status !== 'Paid'))
-    ? `<div style="font-size:11px;color:#6b7589;margin-top:8px">To pay an invoice, please use the bank details on the invoice PDF and quote the invoice number.</div>` : '';
+    ? `<div style="font-size:11px;color:#6b7589;margin-top:8px">${canPay ? 'Pay securely online with the button beside each unpaid invoice, or use' : 'To pay an invoice, please use'} the bank details on the invoice PDF and quote the invoice number.</div>` : '';
 
   const footer = `<div style="text-align:center;color:#9aa5bd;font-size:11px;margin-top:30px">${_portalEsc(co.footer || co.name || '')}</div>`;
 
-  root.innerHTML = header + _portalShell(accent, jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
+  root.innerHTML = header + _portalShell(accent, paidNotice + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
 }
 
 // ── Downloads ────────────────────────────────────────────────────────────────
@@ -206,6 +215,27 @@ function vxPortalOpenDoc(type, id){
     ? billBuildDocHtml(type, doc, (_vxPortalData && _vxPortalData.company) || null)
     : '';
   _vxPortalOpenHtml(html);
+}
+
+// Pay an invoice online — asks the stripe-checkout Edge Function for a hosted
+// Stripe Checkout URL (the portal token is the credential), then redirects the
+// customer there. stripe-webhook flips the invoice to Paid on success.
+async function vxPortalPayInvoice(id){
+  const token = _vxPortalToken();
+  if(!token || token.indexOf('local-') === 0){ if(typeof toast === 'function') toast('Online payment needs a live portal link.', 'warn'); return; }
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.functions){ if(typeof toast === 'function') toast('Payments are not available right now.', 'error'); return; }
+  if(typeof toast === 'function') toast('Opening secure checkout…', 'info');
+  try {
+    const r = await sb.functions.invoke('stripe-checkout', { body: { token, invoiceId: id } });
+    if(r.error || !r.data || !r.data.url){
+      let msg = 'Could not start checkout.';
+      try { if(r.error && r.error.context && typeof r.error.context.json === 'function'){ const j = await r.error.context.json(); if(j && j.error) msg = j.error; } } catch(_){}
+      if(typeof toast === 'function') toast(msg, 'error');
+      return;
+    }
+    location.href = r.data.url;   // Stripe-hosted checkout page
+  } catch(e){ if(typeof toast === 'function') toast(String(e.message || e), 'error'); }
 }
 
 // Entering a portal link after the app already loaded — render the portal.

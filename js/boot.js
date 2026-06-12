@@ -55,8 +55,13 @@ function bootApp() {
   const isAdmin = typeof vxIsAdmin === 'function' ? vxIsAdmin() : CURRENT_USER?.role === 'Admin';
   const tnSettings = el('tn-settings');
   if(tnSettings) tnSettings.style.display = isAdmin ? '' : 'none';
-  // Everyone starts on overview
-  showPage('overview', document.querySelector('.tn'));
+  // Admins land in their own workspace on Home; everyone else on overview.
+  if(isAdmin){
+    if(typeof _adminCurrent !== 'undefined') _adminCurrent = 'home';   // open on Home, not a restored section
+    showPage('admin', el('tn-admin'));
+  } else {
+    showPage('overview', document.querySelector('.tn'));
+  }
   updateReportCount();
   // V6: inbox badge
   if(typeof updateInboxBadge === 'function') {

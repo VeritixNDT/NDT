@@ -741,3 +741,24 @@ function cadCloseEditor(){
   window.removeEventListener('pointerup', _cadUp);
   _cadEd = null;
 }
+
+// Standalone launcher (Settings → Drawing editor). Opens the editor on a local
+// scratch drawing so the tool can be tried without a report/template. The
+// scratch persists on this device; first open seeds the example so there's
+// something to play with.
+var CAD_SCRATCH_KEY = 'vx-cad-scratch-v1';
+function cadOpenStandalone(){
+  if(typeof cadOpenEditor !== 'function') return;
+  if(typeof vxIsDesktopClass === 'function' && !vxIsDesktopClass()){
+    if(typeof toast === 'function') toast('The drawing editor needs a desktop or laptop.');
+    return;
+  }
+  var saved = (typeof ls === 'function') ? ls(CAD_SCRATCH_KEY, null) : null;
+  var drawing = (saved && typeof saved === 'object') ? saved : JSON.parse(JSON.stringify(CAD_SAMPLE));
+  cadOpenEditor({
+    slots: [{ id:'scratch', label:'Scratch drawing' }],
+    drawings: { scratch: drawing },
+    activeId: 'scratch',
+    onSave: function(map){ try { if(typeof lss === 'function') lss(CAD_SCRATCH_KEY, map && map.scratch); } catch(e){} if(typeof toast === 'function') toast('Drawing saved to this device.'); },
+  });
+}

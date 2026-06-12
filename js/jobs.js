@@ -235,6 +235,10 @@ function jobOpenDetail(id) {
   const children = [];
   allReports.forEach((r, idx) => { if(r.jobId === id) children.push({ r, idx }); });
 
+  // Count exactly what the report pack would include (sealed, latest revision,
+  // non-internal) so the button's number never overstates the pack.
+  const sealedCount = (typeof jobSealedReports === 'function') ? jobSealedReports(id).length : 0;
+
   // Customer card
   let custCard = '';
   if(cust) {
@@ -325,6 +329,7 @@ function jobOpenDetail(id) {
     <div class="sc" style="margin-bottom:14px"><div class="sc-head" style="display:flex;align-items:center;gap:8px">
       <span class="sc-title">Reports</span>
       <span style="font-size:11px;color:var(--t3);font-family:var(--mono)">(${children.length})</span>
+      <button class="btn btn-sm" data-action="jobDownloadReportPack" data-args="'${escapeHtml(job.id)}'" style="margin-left:auto;font-size:11px"${sealedCount ? '' : ' disabled title="No approved reports to include yet"'}>⬇ Report pack${sealedCount ? ` (${sealedCount})` : ''}</button>
     </div>${reportsBlock}</div>
 
     ${typeof billJobSectionsHtml === 'function' ? billJobSectionsHtml(job) : ''}
@@ -333,6 +338,35 @@ function jobOpenDetail(id) {
   main.style.display = 'none';
   view.style.display = '';
   view.scrollTop = 0;
+}
+
+// The sealed (Approved/Sent, latest-revision, non-internal) reports under a
+// job — the exact set the consolidated report pack includes. Shared by the
+// detail view's button count and the pack builder so they never diverge.
+function jobSealedReports(jobId) {
+  let list = (ls(KEYS.reports, []) || []).filter(r => r.jobId === jobId && !r.internalNoCustomer);
+  if(typeof rptLatestRevisions === 'function') list = rptLatestRevisions(list);
+  return list.filter(r => {
+    const st = (typeof getReportStage === 'function') ? getReportStage(r) : r.stage;
+    return (st === 'Approved' || st === 'Sent') && (r.sealedHtml || r.frozenHtml);
+  });
+}
+
+// Build + print a consolidated client report pack for one job: a branded
+// cover page (job + customer + pass/fail tally + summary table) followed by
+// every sealed report under the job. Prints via the shared PDF pipeline.
+function jobDownloadReportPack(jobId) {
+  const job = jobLoad().find(j => j.id === jobId);
+  if(!job){ toast(t('toast.job_not_found','Job not found.'), 'error'); return; }
+  const cust = (typeof custLoad === 'function' ? custLoad() : []).find(c => c.id === job.customerId) || null;
+  const sealed = jobSealedReports(jobId);
+  if(!sealed.length){ toast(t('toast.no_sealed_reports','No approved reports to include in the pack yet.'), 'warn'); return; }
+  // Stable order: group by method, then report number.
+  sealed.sort((a, b) => (a.method || '').localeCompare(b.method || '') || (a.reportNo || '').localeCompare(b.reportNo || ''));
+  if(typeof vxBuildReportPackHtml !== 'function' || typeof _vxPrintHtml !== 'function'){
+    toast(t('toast.pack_unavailable','Report pack export is unavailable.'), 'error'); return;
+  }
+  _vxPrintHtml(vxBuildReportPackHtml(job, cust, sealed));
 }
 
 // Inline status change from the detail view's dropdown. The dispatcher

@@ -690,6 +690,101 @@ function _vxPrintHtml(html){
   }
 }
 
+// ── Job report pack (consolidated client deliverable) ─────────────────
+// Combine a job's sealed reports into ONE print/PDF: a branded cover page
+// (company header, job + customer, pass/fail tally, summary table) then each
+// report's sealed pages. Each report's sealedHtml is a standalone A4 document;
+// we reuse the exact shared page scaffolding and concatenate the <body> of
+// each (per-block styling is inline, so it travels with the body content).
+function vxBuildReportPackHtml(job, cust, reports){
+  const esc = (s) => escapeHtml(String(s == null ? '' : s));
+  const c = (typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {};
+  const accent = (c.color && /^#[0-9A-Fa-f]{6}$/.test(c.color)) ? c.color : '#185FA5';
+  const W = (typeof CV_PAGE_WIDTH_PX !== 'undefined') ? CV_PAGE_WIDTH_PX : 794;
+  const H = (typeof CV_PAGE_HEIGHT_PX !== 'undefined') ? CV_PAGE_HEIGHT_PX : 1123;
+  const fdate = (d) => (typeof fmtDate === 'function') ? fmtDate(d) : String(d || '');
+
+  // Pass/fail tally.
+  let nAcc = 0, nRej = 0, nOther = 0;
+  reports.forEach((r) => {
+    if(r.verdict === 'Acceptable') nAcc++;
+    else if(r.verdict === 'Not acceptable') nRej++;
+    else nOther++;
+  });
+  const vColor = (v) => v === 'Acceptable' ? '#1a8d4e' : v === 'Not acceptable' ? '#c0392b' : '#6b7589';
+
+  const summaryRows = reports.map((r) => `<tr>
+    <td style="font-family:monospace;font-weight:700">${esc(r.method || '—')}</td>
+    <td style="font-family:monospace">${esc(r.reportNo || '—')}</td>
+    <td style="font-family:monospace;text-align:center">${esc(r.revision || '00')}</td>
+    <td>${esc(r.subject || '—')}</td>
+    <td style="color:${vColor(r.verdict)};font-weight:600">${esc(r.verdict || '—')}</td>
+    <td style="font-family:monospace;white-space:nowrap">${r.createdAt ? esc(fdate(r.createdAt)) : '—'}</td>
+  </tr>`).join('');
+
+  const custAddr = [cust && cust.name, cust && cust.billingAddress, cust && cust.vatNo && ('VAT ' + cust.vatNo)].filter(Boolean);
+  const cover = `<div class="vx-print-page"><div class="vx-print-inner"><div class="vxpack-cover">
+    <div class="vxpack-head">
+      <div>${c.logo ? `<img class="vxpack-logo" src="${esc(c.logo)}" alt=""/>` : `<div style="font-size:22px;font-weight:800;color:${accent}">${esc(c.name || 'Your Company')}</div>`}</div>
+      <div style="text-align:right">
+        <div class="vxpack-title">Inspection Report Pack</div>
+        <div class="vxpack-sub">${esc(job.title || '—')}</div>
+      </div>
+    </div>
+    <div class="vxpack-blocks">
+      <div class="vxpack-block"><h4>Customer</h4>${custAddr.length ? custAddr.map(esc).join('<br>') : '<span style="color:#9aa5bd">—</span>'}</div>
+      <div class="vxpack-block"><h4>Job</h4>${esc(job.title || '—')}<br>${job.scope ? esc(job.scope) + '<br>' : ''}${job.startDate ? 'From ' + esc(fdate(job.startDate)) : ''}${job.endDate ? ' to ' + esc(fdate(job.endDate)) : ''}</div>
+      <div class="vxpack-block" style="text-align:right"><h4>Prepared</h4>${esc(fdate(new Date().toISOString()))}<br>${reports.length} report${reports.length === 1 ? '' : 's'}</div>
+    </div>
+    <div class="vxpack-tally">
+      <span class="vxpack-chip" style="--c:#1a8d4e">${nAcc} Acceptable</span>
+      <span class="vxpack-chip" style="--c:#c0392b">${nRej} Not acceptable</span>
+      ${nOther ? `<span class="vxpack-chip" style="--c:#6b7589">${nOther} Other</span>` : ''}
+    </div>
+    <table class="vxpack-tbl"><thead><tr><th>Method</th><th>Report no.</th><th>Rev</th><th>Subject</th><th>Verdict</th><th>Date</th></tr></thead><tbody>${summaryRows}</tbody></table>
+  </div></div></div>`;
+
+  // Concatenate each report's <body> content (the .vx-print-page set).
+  const bodies = reports.map((r) => {
+    let html = r.sealedHtml || r.frozenHtml;
+    if(!html && typeof ovBuildReportSnapshot === 'function') html = ovBuildReportSnapshot(r);
+    if(!html) return '';
+    const m = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    return m ? m[1] : '';
+  }).join('\n');
+
+  const lang = (typeof vxLocale === 'function' ? vxLocale() : 'en').split('-')[0];
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(job.title || 'Report pack')} — Report pack</title>
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin:0; padding:0; background:#fff; }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .vx-print-page { position: relative; width:${W}px; height:${H}px; background:#fff; overflow:hidden; page-break-after: always; break-after: page; }
+  .vx-print-page:last-child { page-break-after: auto; break-after: auto; }
+  .vx-print-inner { position: absolute; inset: 0; }
+  @media print { .vx-print-page { width:210mm; height:297mm; } .vx-print-inner { transform: scale(0.97); transform-origin: center center; } }
+  @media screen { body { background:#444; padding:20px; } .vx-print-page { box-shadow:0 4px 20px rgba(0,0,0,.5); margin:0 auto 20px; } }
+  div { cursor: default !important; }
+  .vxpack-cover { padding:48px 54px; color:#1c2333; font-size:12px; }
+  .vxpack-head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid ${accent}; padding-bottom:16px; margin-bottom:22px; }
+  .vxpack-logo { max-height:64px; max-width:220px; }
+  .vxpack-title { font-size:26px; font-weight:800; color:${accent}; text-transform:uppercase; letter-spacing:-.01em; }
+  .vxpack-sub { font-size:14px; color:#3a4660; margin-top:4px; }
+  .vxpack-blocks { display:flex; justify-content:space-between; gap:24px; margin-bottom:18px; }
+  .vxpack-block { font-size:11.5px; line-height:1.6; flex:1; }
+  .vxpack-block h4 { margin:0 0 4px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#9aa5bd; }
+  .vxpack-tally { display:flex; gap:10px; margin-bottom:18px; }
+  .vxpack-chip { font-size:12px; font-weight:700; color:var(--c); border:1.5px solid var(--c); border-radius:14px; padding:4px 12px; }
+  .vxpack-tbl { width:100%; border-collapse:collapse; font-size:11.5px; }
+  .vxpack-tbl th { background:${accent}; color:#fff; font-size:10px; text-transform:uppercase; letter-spacing:.04em; padding:7px 9px; text-align:left; }
+  .vxpack-tbl td { padding:6px 9px; border-bottom:1px solid #e6e9f0; }
+</style></head><body>
+${cover}
+${bodies}
+</body></html>`;
+}
+
 // ── Saved-report snapshot & reprint (Stage 2) ─────────────────────────
 // A report is frozen on save: cvBuildPrintHTML is rendered through the
 // method's saved template and the resulting self-contained HTML document

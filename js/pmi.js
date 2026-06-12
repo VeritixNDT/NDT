@@ -245,6 +245,9 @@ function pmiNormalize(survey){
   return survey;
 }
 function pmiComponentCount(survey){ survey = pmiNormalize(survey); return (survey && survey.components) ? survey.components.length : 0; }
+// Empty = no point in any component has a specified grade (so an opted-in but
+// unfilled PMI survey page is skipped on print, mirroring cadIsEmpty / HT).
+function pmiIsEmpty(survey){ survey = pmiNormalize(survey); if(!survey) return true; return !(survey.components || []).some(function(c){ return (c.points || []).some(function(p){ return p && p.grade; }); }); }
 function pmiIsXrf(){ return !!(_pmiSurvey && _pmiSurvey.mode === 'xrf'); }
 
 // Sample survey / items for the editor preview (no real report attached). One

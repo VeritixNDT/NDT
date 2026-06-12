@@ -1141,7 +1141,7 @@ function cvResolveSmartLink(block, report){
     if(et && (et.expiry || et.certNo || et.authority)){
       const expired = !!et.expiry && (typeof certStatus === 'function'
         ? certStatus(et.expiry) === 'expired'
-        : (!!new Date(et.expiry) && new Date() > new Date(et.expiry)));
+        : (!isNaN(+new Date(et.expiry)) && new Date() > new Date(et.expiry)));
       const lbl = expired ? '⚠ EXPIRED' : '✓ VALID';
       const certNo = et.certNo || et.authority || '—';
       return _cvSmartCardHtml(lbl,
@@ -6329,7 +6329,10 @@ async function cvResetBillingTemplate(){
 
 // ── Template config ──────────────────────────────────────────────────
 function _cvPersistTplCfg(){
-  try{ localStorage.setItem(CV_TPL_KEY, JSON.stringify(cvTplCfg)); }catch(e){}
+  // CV_TPL_KEY (vx-tpl-config-v1) is an IDB-backed entity key — persist via lss()
+  // so the template config reaches IndexedDB + sync (not LS-only, which can
+  // silently diverge when the blob is large).
+  try{ if(typeof lss === 'function') lss(CV_TPL_KEY, cvTplCfg); else localStorage.setItem(CV_TPL_KEY, JSON.stringify(cvTplCfg)); }catch(e){}
 }
 function cvSaveTplConfig(){
   _cvPersistTplCfg();
@@ -6347,7 +6350,7 @@ async function cvResetTplConfig(){
     footer:{ enabled:false, heightPx:60,  bgColor:'transparent', accentColor:'', accentThicknessPx:2, accentPos:'top',    borderStyle:'none', borderColor:'', paddingPx:8 },
     lockZones:false,
   };
-  localStorage.removeItem(CV_TPL_KEY);
+  if(typeof lss === 'function') lss(CV_TPL_KEY, null); else localStorage.removeItem(CV_TPL_KEY);
   cvRenderCanvas();
   toast(t('toast.template_reset', 'Template config reset'));
 }

@@ -1219,7 +1219,6 @@ function vxModePillClick() {
       }));
     }
     return;
-    return;
   }
   // Cloud mode → trigger a manual sync flush, or open sync activity
   vxOpenSyncActivity();

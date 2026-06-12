@@ -270,6 +270,9 @@ function cvBuildPrintHTML(report){
     // actually carries recorded readings (an HT report with the seeded survey
     // page but no readings shouldn't print an empty "No survey" sheet).
     if(b.key === 'ht-survey' || b.key === 'ht-method') return !(report && report.hardnessSurvey && typeof htVerdict === 'function' && htVerdict(report.hardnessSurvey).total > 0);
+    // Material-verification (PMI) page: meaningful only when the report carries a
+    // graded survey — an opted-in but unfilled PMI page shouldn't print.
+    if(b.key === 'pmi-survey' || b.key === 'pmi-method') return !(report && report.pmiSurvey && typeof pmiIsEmpty === 'function' && !pmiIsEmpty(report.pmiSurvey));
     return false; // any other primary block is treated as content-bearing
   };
   // First page in the plan is always the main report — never skip it
@@ -396,6 +399,7 @@ function cvBuildPrintHTML(report){
   });
   _cvItemsSlice   = null;
   _cvHtSlice      = null;
+  _cvPmiSlice     = null;
   _cvPrintPageNum = 0;
 
   // Cert annex — appended after the report's last page when any linked

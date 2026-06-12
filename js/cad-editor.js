@@ -661,6 +661,7 @@ function _cadStartTextEdit(p, existing){
   var done = false;
   function commit(){
     if(done) return; done = true; var v = inp.value.trim(); inp.remove();
+    if(!_cadEd) return;   // editor was closed before the field committed
     if(existing){ _cadPushUndo(); existing.text = v; if(!v) _cadRemove(existing.id); }
     else if(v){ _cadPushUndo(); var e = { id:_cadId(), type:'text', x:p[0], y:p[1], text:v, stroke:_cadEd.stroke, fontSize:26 }; _cadActive().elements.push(e); _cadEd.selIds = [e.id]; _cadEd.tool = 'select'; _cadSyncToolbar(); }
     _cadRender(); _cadRenderPanel();
@@ -668,7 +669,7 @@ function _cadStartTextEdit(p, existing){
   inp.addEventListener('keydown', function(ev){ ev.stopPropagation(); if(ev.key === 'Enter'){ commit(); } else if(ev.key === 'Escape'){ done = true; inp.remove(); } });
   // Focus + wire blur on the next tick so the native click that opened this
   // doesn't immediately move focus back to the canvas and blur the field empty.
-  setTimeout(function(){ inp.focus(); inp.select(); inp.addEventListener('blur', commit); }, 0);
+  setTimeout(function(){ if(!_cadEd || !inp.isConnected){ inp.remove(); return; } inp.focus(); inp.select(); inp.addEventListener('blur', commit); }, 0);
 }
 var CAD_TYPE_LABELS = { line:'Line', rect:'Rectangle', ellipse:'Ellipse', arrow:'Arrow', path:'Freehand', text:'Text', dim:'Dimension', stencil:'Symbol' };
 function _cadPanelHtml(){ return '<div id="cad-panel" style="width:250px;flex-shrink:0;background:#161a22;border-left:1px solid #262d39;padding:14px;overflow:auto;font-size:12px"></div>'; }
@@ -724,7 +725,7 @@ function _cadUploadBg(){
     var f = inp.files && inp.files[0]; if(!f) return;
     if(f.size > 6 * 1024 * 1024){ if(typeof toast === 'function') toast('Image too large (max 6 MB).'); else alert('Image too large (max 6 MB).'); return; }
     var rd = new FileReader();
-    rd.onload = function(){ var d = _cadActive(); _cadPushUndo(); d.background = { type:'image', image:rd.result, opacity:(d.background && d.background.opacity) || 0.6 }; _cadRender(); _cadRenderPanel(); };
+    rd.onload = function(){ if(!_cadEd) return; var d = _cadActive(); _cadPushUndo(); d.background = { type:'image', image:rd.result, opacity:(d.background && d.background.opacity) || 0.6 }; _cadRender(); _cadRenderPanel(); };
     rd.readAsDataURL(f);
   };
   inp.click();

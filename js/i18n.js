@@ -7708,6 +7708,8 @@ function i18nApply(root) {
     const key = elNode.getAttribute('data-i18n-aria-label');
     if(key) elNode.setAttribute('aria-label', t(key));
   });
+  // 5) Refresh collapsed-sidebar hover tooltips from the (now-localized) labels.
+  if(typeof vxSetSnavTooltips === 'function') vxSetSnavTooltips();
 }
 // Run after DOM is ready
 if(document.readyState === 'loading') {

@@ -3258,18 +3258,31 @@ function voiceToggle(fieldId, btn){
 }
 
 // ── Sidebar collapse toggle ────────────────────────────────────
+// When the sidebar is collapsed to an icon-only rail, hovering a button shows
+// its name. The CSS draws the bubble from data-tooltip (see the
+// [data-sidebar-collapsed] .snav-item:hover::after rule in styles.css); this
+// mirrors each item's (localized) label into that attribute. Re-run on locale
+// change (from i18nApply) so the tooltip language tracks the UI.
+function vxSetSnavTooltips(){
+  document.querySelectorAll('.snav-item').forEach(function(it){
+    const label = (it.textContent || '').replace(/\s+/g, ' ').trim();
+    if(label) it.setAttribute('data-tooltip', label);
+  });
+}
 function toggleSidebar(){
   const html = document.documentElement;
   const collapsed = html.getAttribute('data-sidebar-collapsed') === 'true';
   if(collapsed) html.removeAttribute('data-sidebar-collapsed');
   else html.setAttribute('data-sidebar-collapsed', 'true');
   try { localStorage.setItem('vx-sidebar-collapsed-v1', collapsed ? '0' : '1'); } catch(e){}
+  vxSetSnavTooltips();
 }
 function loadSidebarState(){
   try {
     const v = localStorage.getItem('vx-sidebar-collapsed-v1');
     if(v === '1') document.documentElement.setAttribute('data-sidebar-collapsed', 'true');
   } catch(e){}
+  vxSetSnavTooltips();
 }
 
 // ── Online/offline indicator ──────────────────────────────────

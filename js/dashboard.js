@@ -1759,30 +1759,66 @@ function ovFormSection(title, fields, methodId, data, m) {
 // report under a job (or leave it Unassigned). Open jobs sort first; a
 // closed or since-deleted job that the report already points at is kept
 // selectable so revising never silently drops the link.
-function ovJobPickerHtml(selectedJobId) {
+// Shared job-picker option builders — used by the new-report Job picker AND
+// the reports-table assign-job modal so both narrow to a customer identically.
+// vxJobPickerOptions keeps the current selection visible even when it falls
+// outside the customer narrow (e.g. a closed/deleted job already linked).
+function vxJobPickerOptions(o) {
+  o = o || {};
+  const selectedJobId = o.selectedJobId || '';
+  const customerId = o.customerId || '';
+  const unassignedLabel = o.unassignedLabel || '— Unassigned —';
+  const noCustomerLabel = o.noCustomerLabel || 'no customer';
   const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
-  const custName = (id) => (typeof jobCustomerName === 'function') ? jobCustomerName(id) : '—';
-  const sorted = jobs.slice().sort((a, b) => {
-    const oa = (a.status === 'Closed') ? 1 : 0, ob = (b.status === 'Closed') ? 1 : 0;
-    if(oa !== ob) return oa - ob;
-    return (a.title || '').localeCompare(b.title || '');
-  });
-  let hasSelected = false;
-  let opts = '<option value="">— Unassigned —</option>';
-  opts += sorted.map(j => {
-    const sel = (j.id === selectedJobId);
-    if(sel) hasSelected = true;
-    const label = (j.title || '(untitled)') + ' — ' + custName(j.customerId) + (j.status === 'Closed' ? ' (closed)' : '');
+  const custName = (id) => (typeof jobCustomerName === 'function') ? (jobCustomerName(id) || '') : '';
+  const list = (customerId ? jobs.filter(j => j.customerId === customerId) : jobs.slice())
+    .sort((a, b) => {
+      const oa = (a.status === 'Closed') ? 1 : 0, ob = (b.status === 'Closed') ? 1 : 0;
+      if(oa !== ob) return oa - ob;
+      return (a.title || '').localeCompare(b.title || '');
+    });
+  let hasSel = false;
+  let html = `<option value="">${escapeHtml(unassignedLabel)}</option>`;
+  html += list.map(j => {
+    const sel = (j.id === selectedJobId); if(sel) hasSel = true;
+    const label = (j.title || '(untitled)') + ' — ' + (custName(j.customerId) || noCustomerLabel) + (j.status === 'Closed' ? ' (closed)' : '');
     return `<option value="${escapeHtml(j.id)}"${sel ? ' selected' : ''}>${escapeHtml(label)}</option>`;
   }).join('');
-  if(selectedJobId && !hasSelected) {
-    opts += `<option value="${escapeHtml(selectedJobId)}" selected>(deleted job)</option>`;
+  if(selectedJobId && !hasSel) {
+    const j = jobs.find(x => x.id === selectedJobId);
+    const label = j ? ((j.title || '(untitled)') + ' — ' + (custName(j.customerId) || noCustomerLabel)) : '(deleted job)';
+    html += `<option value="${escapeHtml(selectedJobId)}" selected>${escapeHtml(label)}</option>`;
   }
+  return html;
+}
+function vxCustomerPickerOptions(selectedCustomerId) {
+  const customers = (typeof custLoad === 'function') ? custLoad() : (typeof ls === 'function' ? ls(KEYS.customers, []) : []);
+  const sorted = customers.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return '<option value="">All customers</option>'
+    + sorted.map(c => `<option value="${escapeHtml(c.id)}"${c.id === selectedCustomerId ? ' selected' : ''}>${escapeHtml(c.name || '(unnamed)')}</option>`).join('');
+}
+
+// Re-narrow the new-report Job dropdown when its Customer select changes.
+function ovJobPickerNarrow() {
+  const cs = document.getElementById('ov-job-cust');
+  const js2 = document.getElementById('ov-job-picker');
+  if(!cs || !js2) return;
+  js2.innerHTML = vxJobPickerOptions({ selectedJobId: js2.value, customerId: cs.value });
+}
+
+function ovJobPickerHtml(selectedJobId) {
+  const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
+  const opts = vxJobPickerOptions({ selectedJobId: selectedJobId });
   const hint = jobs.length ? '' : ' — create jobs under the Jobs tab';
+  const selStyle = 'width:100%;font-family:var(--font);font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box';
   return `<div class="sc" style="margin:0 14px 14px"><div class="sc-head"><span class="sc-title">Job</span></div><div class="sc-body" style="padding:14px 16px">
+    <div class="fld" style="margin-bottom:10px">
+      <label>Customer</label>
+      <select id="ov-job-cust" data-on-change="ovJobPickerNarrow" style="${selStyle}">${vxCustomerPickerOptions('')}</select>
+    </div>
     <div class="fld">
       <label>Job this report belongs to${hint}</label>
-      <select id="ov-job-picker" style="width:100%;font-family:var(--font);font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box">${opts}</select>
+      <select id="ov-job-picker" style="${selStyle}">${opts}</select>
     </div>
   </div>`;
 }

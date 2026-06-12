@@ -1940,21 +1940,10 @@ async function ovAssignJob(idx){
   const r = all[idx];
   if(!r){ toast(t('toast.report_not_found','Report not found.'), 'error'); return; }
   const jobs = (typeof jobLoad === 'function') ? jobLoad() : ls(KEYS.jobs, []);
-  const custName = (id) => (typeof jobCustomerName === 'function') ? (jobCustomerName(id) || '') : '';
-  const sorted = jobs.slice().sort((a,b)=>{
-    const oa=(a.status==='Closed')?1:0, ob=(b.status==='Closed')?1:0;
-    if(oa!==ob) return oa-ob;
-    return (a.title||'').localeCompare(b.title||'');
-  });
   const cur = r.jobId || '';
-  let hasCur = false;
-  let opts = '<option value="">'+escapeHtml(t('assignjob.unassigned','— Unassigned —'))+'</option>';
-  opts += sorted.map(j=>{
-    const sel = (j.id === cur); if(sel) hasCur = true;
-    const label = (j.title||'(untitled)')+' — '+(custName(j.customerId)||t('approve.link.nocust','no customer'))+(j.status==='Closed'?' (closed)':'');
-    return '<option value="'+escapeHtml(j.id)+'"'+(sel?' selected':'')+'>'+escapeHtml(label)+'</option>';
-  }).join('');
-  if(cur && !hasCur) opts += '<option value="'+escapeHtml(cur)+'" selected>'+escapeHtml(t('assignjob.deleted','(deleted job)'))+'</option>';
+  const unassignedLabel = t('assignjob.unassigned','— Unassigned —');
+  const noCustomerLabel = t('approve.link.nocust','no customer');
+  const opts = vxJobPickerOptions({ selectedJobId: cur, unassignedLabel: unassignedLabel, noCustomerLabel: noCustomerLabel });
 
   const choice = await new Promise((resolve)=>{
     const ov = document.createElement('div');
@@ -1964,6 +1953,8 @@ async function ovAssignJob(idx){
       '<div role="dialog" aria-modal="true" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:460px;width:100%;padding:20px;box-shadow:0 18px 50px rgba(0,0,0,.5)">'
       + '<div style="font-weight:700;font-size:15px;margin-bottom:6px">'+escapeHtml(t('assignjob.title','Assign report to a job'))+'</div>'
       + '<div style="font-size:12.5px;color:var(--t2);line-height:1.5;margin-bottom:14px">'+escapeHtml(t('assignjob.body','The job decides which customer sees this report in their portal. This is routing only — it does not change the sealed report.'))+'</div>'
+      + '<div class="fld" style="margin-bottom:10px"><label style="font-size:12px;display:block;margin-bottom:4px">'+escapeHtml(t('approve.link.customer','Customer'))+'</label>'
+      + '<select id="vxAssignCustSel" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box">'+vxCustomerPickerOptions('')+'</select></div>'
       + '<div class="fld" style="margin-bottom:10px"><label style="font-size:12px;display:block;margin-bottom:4px">'+escapeHtml(t('approve.link.job','Job'))+'</label>'
       + '<select id="vxAssignJobSel" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box">'+opts+'</select></div>'
       + '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--t2);cursor:pointer"><input type="checkbox" id="vxAssignInternal"'+(r.internalNoCustomer?' checked':'')+'> '+escapeHtml(t('approve.link.internal','Internal report — no customer (never shown in a portal)'))+'</label>'
@@ -1973,9 +1964,14 @@ async function ovAssignJob(idx){
       + '</div></div>';
     document.body.appendChild(ov);
     const sel  = ov.querySelector('#vxAssignJobSel');
+    const csel = ov.querySelector('#vxAssignCustSel');
     const intl = ov.querySelector('#vxAssignInternal');
-    if(intl.checked) sel.disabled = true;
-    intl.addEventListener('change', ()=>{ sel.disabled = intl.checked; });
+    // Customer narrows the job dropdown to that client's jobs (current pick kept).
+    csel.addEventListener('change', ()=>{
+      sel.innerHTML = vxJobPickerOptions({ selectedJobId: sel.value, customerId: csel.value, unassignedLabel: unassignedLabel, noCustomerLabel: noCustomerLabel });
+    });
+    if(intl.checked){ sel.disabled = true; csel.disabled = true; }
+    intl.addEventListener('change', ()=>{ sel.disabled = intl.checked; csel.disabled = intl.checked; });
     const done = (v)=>{ try { ov.remove(); } catch(e){} resolve(v); };
     ov.querySelector('#vxAssignCancel').addEventListener('click', ()=>done(null));
     ov.addEventListener('click', (e)=>{ if(e.target===ov) done(null); });

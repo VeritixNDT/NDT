@@ -1117,6 +1117,9 @@
           <button class="snav-item snav-item--stacked" id="sni-pdfeditor" data-action="showSS" data-pass-el="1" data-args="'pdfeditor'">
             <span class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span><span class="snav-item-stack"><span data-i18n="side.pdf_editor">PDF layout editor</span><span class="snav-item-hint" data-i18n="side.pdf_editor_hint">Printed page layout</span></span>
           </button>
+          <button class="snav-item snav-item--stacked" id="sni-drawing" data-action="showSS" data-pass-el="1" data-args="'drawing'">
+            <span class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></span><span class="snav-item-stack"><span data-i18n="side.drawing_editor">Drawing editor</span><span class="snav-item-hint" data-i18n="side.drawing_editor_hint">Sketch &amp; try the CAD tool</span></span>
+          </button>
           <button class="snav-item" id="sni-procedures" data-action="showSS" data-pass-el="1" data-args="'procedures'">
             <span class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7"/><path d="M21 7l-9-4-9 4"/><path d="M3 11h18"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg></span> NDT procedures
           </button>
@@ -2140,6 +2143,36 @@
             </div>
             <div class="sc-body" id="tpl-method-body" style="padding:18px">
               <!-- Dynamically rendered -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ── DRAWING EDITOR ── -->
+        <div class="ss" id="ss-drawing">
+          <div class="sh">
+            <div class="sh-left">
+              <div class="sh-title" data-i18n="sh.drawing">Drawing editor</div>
+              <div class="sh-desc" data-i18n="sh.drawing_desc">Open the lite CAD editor to sketch weld maps, component diagrams and defect-location drawings. This is a scratch pad to try it out — on a report, drawings live in a “CAD drawing” block and seal into the PDF.</div>
+            </div>
+            <div class="sh-actions">
+              <button class="btn btn-primary btn-sm" data-action="cadOpenStandalone" data-i18n="sh.drawing_open">Open drawing editor</button>
+            </div>
+          </div>
+          <div class="sc">
+            <div class="sc-head"><span class="sc-title">What's inside</span></div>
+            <div class="sc-body" style="padding:14px 16px">
+              <div style="display:flex;flex-wrap:wrap;gap:10px 28px;font-size:13px;color:var(--t2);line-height:1.5">
+                <span>✏️ Shapes, freehand, text &amp; dimension callouts</span>
+                <span>🔩 NDT stencils — welds, fittings, flow, defects</span>
+                <span>🖼 Trace over a photo / scanned sketch</span>
+                <span>◳ Multi-select, align &amp; distribute</span>
+                <span>⌨ Shift-constrain · scroll-zoom · space-pan</span>
+                <span>↺ Undo/redo, copy/paste, line styles &amp; colours</span>
+              </div>
+              <div style="margin-top:12px;font-size:12px;color:var(--t3)">Your scratch drawing is saved locally on this device. Best on a desktop / laptop.</div>
+              <div style="margin-top:14px">
+                <button class="btn btn-primary" data-action="cadOpenStandalone" data-i18n="sh.drawing_open">Open drawing editor</button>
+              </div>
             </div>
           </div>
         </div>

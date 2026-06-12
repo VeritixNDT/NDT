@@ -515,7 +515,7 @@ var VX_ADMIN_ONLY_SECTIONS = new Set([
   'company','inspectors','equipment','customers','billing','emailtemplates',
   'users','methods','numbering','templates',
   'pdfeditor','procedures','appearance','subscription','database',
-  'notifications','system'
+  'notifications','system','drawing'
 ]);
 
 // Action-level guard. Call from any handler that performs an admin

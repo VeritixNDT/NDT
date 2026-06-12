@@ -7624,9 +7624,11 @@ function vxLocale() {
 function vxSetLocale(code) {
   if(!STRINGS[code]) return false;
   try {
-    const s = JSON.parse(localStorage.getItem('vx-settings-v1') || '{}');
+    // vx-settings-v1 is an IDB-backed entity key — read/write via ls()/lss() so
+    // the locale change reaches IndexedDB + the sync queue (not LS-only).
+    const s = (typeof ls === 'function') ? ls('vx-settings-v1', {}) : JSON.parse(localStorage.getItem('vx-settings-v1') || '{}');
     s.locale = code;
-    localStorage.setItem('vx-settings-v1', JSON.stringify(s));
+    if(typeof lss === 'function') lss('vx-settings-v1', s); else localStorage.setItem('vx-settings-v1', JSON.stringify(s));
     // Tell other parts of the app
     document.documentElement.lang = code;
     window.dispatchEvent(new CustomEvent('vx:locale-change', { detail: { locale: code } }));

@@ -393,6 +393,74 @@ function billJobSectionsHtml(job) {
 // ══════════════════════════════════════════════════════════════════════════
 function billingInit() { billingRender(); }
 
+// ── Accounting CSV export (Xero / QuickBooks) ────────────────────────────────
+// One row per invoice line item. Both tools offer column-mapping on import, so
+// the instance-specific fields (Xero AccountCode / TaxType) are left blank for
+// the user to map in-app. Line amounts are ex-VAT; totals are derived on import.
+function _billCsvCell(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+function _billCsvDate(d){
+  if(!d) return '';
+  const x = new Date(d); if(isNaN(x.getTime())) return String(d);
+  const p = n => String(n).padStart(2, '0');
+  return p(x.getDate()) + '/' + p(x.getMonth() + 1) + '/' + x.getFullYear();   // DD/MM/YYYY
+}
+function _billDownloadCsv(csv, tag){
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });   // BOM → Excel reads UTF-8
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'veritix-invoices-' + tag + '-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function _billCustName(id){ const c = (typeof custLoad === 'function' ? custLoad() : []).find(x => x.id === id); return c ? (c.name || '') : ''; }
+function _billCustEmail(id){ const c = (typeof custLoad === 'function' ? custLoad() : []).find(x => x.id === id); const ct = (c && c.contacts && c.contacts[0]) || {}; return ct.email || ''; }
+function _billJobName(id){ if(!id || typeof jobLoad !== 'function') return ''; const j = jobLoad().find(x => x.id === id); return j ? (j.title || '') : ''; }
+function _billInvoiceItems(inv){
+  return (inv.lineItems && inv.lineItems.length) ? inv.lineItems : [{ description: (inv.notes || 'NDT services'), qty: 1, unitPrice: billCalc(inv).subtotal }];
+}
+
+function billExportXeroCsv(){
+  const invoices = billLoad('invoice');
+  if(!invoices.length){ if(typeof toast === 'function') toast('No invoices to export.', 'warn'); return; }
+  const head = ['*ContactName','EmailAddress','*InvoiceNumber','Reference','*InvoiceDate','*DueDate','*Description','*Quantity','*UnitAmount','Discount','AccountCode','*TaxType','Currency','Status'];
+  const rows = [head.map(_billCsvCell).join(',')];
+  invoices.forEach(inv => {
+    _billInvoiceItems(inv).forEach(it => {
+      rows.push([
+        _billCustName(inv.customerId), _billCustEmail(inv.customerId), inv.number || '', _billJobName(inv.jobId),
+        _billCsvDate(inv.issueDate), _billCsvDate(inv.dueDate),
+        it.description || '', (it.qty != null ? it.qty : ''), (it.unitPrice != null ? it.unitPrice : ''), '',
+        '',                                                   // AccountCode — map in Xero
+        (inv.vatRate ? (inv.vatRate + '% VAT') : ''),          // TaxType — map in Xero (rate shown for reference)
+        inv.currency || billDefaultCurrency(), inv.status || 'Draft',
+      ].map(_billCsvCell).join(','));
+    });
+  });
+  _billDownloadCsv(rows.join('\r\n'), 'xero');
+  if(typeof toast === 'function') toast(invoices.length + ' invoice(s) exported — Xero CSV.', 'success');
+}
+
+function billExportQuickBooksCsv(){
+  const invoices = billLoad('invoice');
+  if(!invoices.length){ if(typeof toast === 'function') toast('No invoices to export.', 'warn'); return; }
+  const head = ['InvoiceNo','Customer','InvoiceDate','DueDate','Item(Product/Service)','ItemDescription','ItemQuantity','ItemRate','ItemAmount','Currency','Status'];
+  const rows = [head.map(_billCsvCell).join(',')];
+  invoices.forEach(inv => {
+    _billInvoiceItems(inv).forEach(it => {
+      const qty = parseFloat(it.qty) || 0, rate = parseFloat(it.unitPrice) || 0;
+      rows.push([
+        inv.number || '', _billCustName(inv.customerId),
+        _billCsvDate(inv.issueDate), _billCsvDate(inv.dueDate),
+        'NDT services', it.description || '', (it.qty != null ? it.qty : ''), (it.unitPrice != null ? it.unitPrice : ''),
+        (qty * rate).toFixed(2), inv.currency || billDefaultCurrency(), inv.status || 'Draft',
+      ].map(_billCsvCell).join(','));
+    });
+  });
+  _billDownloadCsv(rows.join('\r\n'), 'quickbooks');
+  if(typeof toast === 'function') toast(invoices.length + ' invoice(s) exported — QuickBooks CSV.', 'success');
+}
+
 function billingRender() {
   const wrap = el('billing-list-wrap'); if(!wrap) return;
   const fType   = el('billing-filter-type')?.value || '';

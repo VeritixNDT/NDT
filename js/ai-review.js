@@ -61,12 +61,58 @@ const AI_REVIEW_SEV = {
   low:    { color: 'var(--t3)',    label: 'Low' },
 };
 
-// Trigger: review the report at `idx` in the reports store.
+// Trigger A: review a saved report by its index in the reports store
+// (the "✦ AI" button on each Reports table row).
 async function aiReviewReport(idx) {
   const all = ls(KEYS.reports, []);
   const r = all[idx];
   if (!r) { toast(t('toast.report_not_found', 'Report not found.'), 'error'); return; }
+  await _aiReviewRun(r);
+}
 
+// Trigger B: review the report currently OPEN in the editor — the live form
+// on screen, including unsaved edits (the "✦ AI review" button in the save bar).
+async function aiReviewCurrent() {
+  const report = _aiReviewCollectLive();
+  if (!report) { toast(t('ai.review.noform', 'Open or fill in a report first.'), 'warn'); return; }
+  await _aiReviewRun(report);
+}
+
+// Gather the live editor form into a report-shaped object WITHOUT saving —
+// a lightweight mirror of ovSaveReport's collection (no numbering/persistence).
+// Reads the same rf-* fields, items, verdict, and method survey the save uses.
+function _aiReviewCollectLive() {
+  if (typeof _ovMethod === 'undefined' || !_ovMethod) return null;
+  const base = (typeof _ovReviseSource !== 'undefined' && _ovReviseSource)
+    ? Object.assign({}, _ovReviseSource) : {};
+  const report = Object.assign(base, { method: _ovMethod });
+
+  try {
+    const allFields = (typeof rptAllFormFields === 'function') ? rptAllFormFields() : [];
+    const specific = (typeof TPL_FIELDS !== 'undefined')
+      ? [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])].map(f => ({ ...f, id: 'eq_' + f.id }))
+      : [];
+    [...allFields, ...specific].forEach(f => {
+      const inp = el(`rf-${_ovMethod}-${f.id}`);
+      if (inp) report[f.id] = (f.type === 'select') ? inp.value : (inp.value || '').trim();
+    });
+  } catch (_) {}
+
+  try { if (typeof ovItemsSync === 'function') ovItemsSync(); } catch (_) {}
+  if (typeof _ovItems !== 'undefined' && Array.isArray(_ovItems)) {
+    report.items = _ovItems.map(r => Object.assign({}, r));
+    try { if (typeof _ovOverallVerdict === 'function') report.verdict = _ovOverallVerdict(report.items); } catch (_) {}
+  }
+
+  try { if (_ovMethod === 'HT' && typeof htCollect === 'function') { const s = htCollect(); if (s) report.hardnessSurvey = s; } } catch (_) {}
+  try { if (_ovMethod === 'PMI' && typeof pmiCollect === 'function') { const s = pmiCollect(); if (s) report.pmiSurvey = s; } } catch (_) {}
+  try { if (_ovMethod === 'FN' && typeof fnCollect === 'function') { const s = fnCollect(); if (s) report.ferriteSurvey = s; } } catch (_) {}
+
+  return report;
+}
+
+// Shared runner: validate cloud session, show loading, invoke, render result.
+async function _aiReviewRun(r) {
   const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
   if (!sb || !sb.functions) {
     toast(t('ai.review.offline', 'AI review needs you to be signed in to the cloud.'), 'warn');

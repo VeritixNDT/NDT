@@ -1934,6 +1934,7 @@ function _rptRowActions(r, idx){
     btns.push(`<button class="btn btn-sm" data-action="ovAssignJob" data-args="${idx}" title="Assign this report to a job / customer" style="font-size:10px;padding:3px 7px">Job…</button>`);
   }
   btns.push(`<button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${idx}" title="View history" style="font-size:10px;padding:3px 6px">⌕</button>`);
+  btns.push(`<button class="btn btn-sm" data-action="aiReviewReport" data-args="${idx}" title="AI pre-issue review — flags missing data, out-of-band readings, verdict mismatches" style="font-size:10px;padding:3px 6px">✦ AI</button>`);
   return `<td style="white-space:nowrap;text-align:right">${btns.join(' ')}</td>`;
 }
 

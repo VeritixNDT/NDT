@@ -1,15 +1,16 @@
 // ═════════════════════════════════════════════════════════════════════════
-// stripe-checkout — create a Stripe Checkout Session to pay one invoice
+// mollie-checkout — create a Mollie payment to pay one invoice
 // ═════════════════════════════════════════════════════════════════════════
 // PUBLIC to the customer portal (the HMAC portal token IS the credential — no
 // Supabase session). Given { token, invoiceId }, it verifies the token, loads
 // the invoice from the org store under the service role, confirms it belongs to
-// that customer and is unpaid, then creates a Stripe Checkout Session (hosted
-// payment page — Veritix never touches card data) and returns its URL. The
-// browser redirects there; stripe-webhook flips the invoice to Paid on success.
+// that customer and is unpaid, then creates a Mollie payment (hosted checkout —
+// iDEAL / Bancontact / SEPA / cards / Wero; Veritix never touches card data)
+// and returns the checkout URL. The browser redirects there; mollie-webhook
+// flips the invoice to Paid once Mollie confirms.
 //
-// Secrets: STRIPE_SECRET_KEY, PORTAL_SECRET, APP_URL. Plus auto-injected
-// SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.
+// Secrets: MOLLIE_API_KEY (test_… or live_…), PORTAL_SECRET, APP_URL. Plus
+// auto-injected SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.
 // Deploy with the default JWT gate (the portal's anon key satisfies the
 // gateway; the token is the real credential), same as portal-data.
 // ═════════════════════════════════════════════════════════════════════════
@@ -51,8 +52,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!claims) return jsonResponse({ error: "This portal link is invalid or has expired." }, 401);
   const { orgId, customerId } = claims;
 
+  const supabaseUrl = envOrThrow("SUPABASE_URL");
   const service = createClient(
-    envOrThrow("SUPABASE_URL"), envOrThrow("SUPABASE_SERVICE_ROLE_KEY"),
+    supabaseUrl, envOrThrow("SUPABASE_SERVICE_ROLE_KEY"),
     { auth: { persistSession: false } },
   );
 
@@ -66,31 +68,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const total = invoiceTotal(inv);
   if (!(total > 0)) return jsonResponse({ error: "Nothing to pay on this invoice." }, 400);
-  const currency = String(inv.currency || "EUR").toLowerCase();
-  const amountMinor = Math.round(total * 100);
+  const currency = String(inv.currency || "EUR").toUpperCase();
 
   const base = envOrThrow("APP_URL").replace(/\/+$/, "");
-  const form = new URLSearchParams();
-  form.set("mode", "payment");
-  form.set("success_url", `${base}#/portal/${token}?paid=${encodeURIComponent(invoiceId)}`);
-  form.set("cancel_url", `${base}#/portal/${token}`);
-  form.set("client_reference_id", invoiceId);
-  form.set("metadata[orgId]", String(orgId));
-  form.set("metadata[invoiceId]", invoiceId);
-  form.set("line_items[0][quantity]", "1");
-  form.set("line_items[0][price_data][currency]", currency);
-  form.set("line_items[0][price_data][unit_amount]", String(amountMinor));
-  form.set("line_items[0][price_data][product_data][name]", `Invoice ${inv.number || invoiceId}`);
+  const body = {
+    amount: { currency, value: total.toFixed(2) },   // Mollie wants a 2-decimal STRING
+    description: `Invoice ${inv.number || invoiceId}`,
+    redirectUrl: `${base}#/portal/${token}?paid=${encodeURIComponent(invoiceId)}`,
+    webhookUrl: `${supabaseUrl}/functions/v1/mollie-webhook`,
+    metadata: { orgId: String(orgId), invoiceId },
+  };
 
   let resp: Response;
   try {
-    resp = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    resp = await fetch("https://api.mollie.com/v2/payments", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${envOrThrow("STRIPE_SECRET_KEY")}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${envOrThrow("MOLLIE_API_KEY")}`,
+        "Content-Type": "application/json",
       },
-      body: form.toString(),
+      body: JSON.stringify(body),
     });
   } catch (e) {
     return jsonResponse({ error: `payment provider unreachable: ${String(e)}` }, 502);
@@ -99,7 +96,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const detail = await resp.text().catch(() => "");
     return jsonResponse({ error: "payment provider rejected the request", detail }, 502);
   }
-  const session = await resp.json().catch(() => ({}));
-  if (!session?.url) return jsonResponse({ error: "no checkout URL returned" }, 502);
-  return jsonResponse({ ok: true, url: session.url });
+  const payment = await resp.json().catch(() => ({}));
+  const url = payment?._links?.checkout?.href;
+  if (!url) return jsonResponse({ error: "no checkout URL returned" }, 502);
+  return jsonResponse({ ok: true, url });
 });

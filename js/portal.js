@@ -122,11 +122,10 @@ function vxPortalRender(root, data){
   // the local preview link has no token the payment function can verify.
   const _tok = _vxPortalToken();
   const canPay = !!_tok && _tok.indexOf('local-') !== 0;
-  // Mollie redirects back with ?paid=<invoiceId> after checkout (the webhook is
-  // the source of truth, so keep the wording outcome-agnostic).
+  // Stripe redirects back with ?paid=<invoiceId> after a successful checkout.
   const paidParam = (location.hash.split('?')[1] || '').match(/(?:^|&)paid=([^&]+)/);
   const paidNotice = paidParam
-    ? `<div style="background:#dcfce7;border:1px solid #86efac;color:#15803d;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:13px;font-weight:600">Thanks — we're confirming your payment. This invoice will update to Paid once your bank confirms.</div>`
+    ? `<div style="background:#dcfce7;border:1px solid #86efac;color:#15803d;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:13px;font-weight:600">✓ Payment received — thank you. The invoice will show as paid shortly.</div>`
     : '';
   const reportsByJob = {};
   (data.reports || []).forEach(r => { (reportsByJob[r.jobId] = reportsByJob[r.jobId] || []).push(r); });
@@ -218,10 +217,9 @@ function vxPortalOpenDoc(type, id){
   _vxPortalOpenHtml(html);
 }
 
-// Pay an invoice online — asks the mollie-checkout Edge Function for a hosted
-// Mollie checkout URL (iDEAL / Bancontact / SEPA / cards / Wero; the portal
-// token is the credential), then redirects the customer there. mollie-webhook
-// flips the invoice to Paid once Mollie confirms.
+// Pay an invoice online — asks the stripe-checkout Edge Function for a hosted
+// Stripe Checkout URL (the portal token is the credential), then redirects the
+// customer there. stripe-webhook flips the invoice to Paid on success.
 async function vxPortalPayInvoice(id){
   const token = _vxPortalToken();
   if(!token || token.indexOf('local-') === 0){ if(typeof toast === 'function') toast('Online payment needs a live portal link.', 'warn'); return; }
@@ -229,14 +227,14 @@ async function vxPortalPayInvoice(id){
   if(!sb || !sb.functions){ if(typeof toast === 'function') toast('Payments are not available right now.', 'error'); return; }
   if(typeof toast === 'function') toast('Opening secure checkout…', 'info');
   try {
-    const r = await sb.functions.invoke('mollie-checkout', { body: { token, invoiceId: id } });
+    const r = await sb.functions.invoke('stripe-checkout', { body: { token, invoiceId: id } });
     if(r.error || !r.data || !r.data.url){
       let msg = 'Could not start checkout.';
       try { if(r.error && r.error.context && typeof r.error.context.json === 'function'){ const j = await r.error.context.json(); if(j && j.error) msg = j.error; } } catch(_){}
       if(typeof toast === 'function') toast(msg, 'error');
       return;
     }
-    location.href = r.data.url;   // Mollie-hosted checkout page
+    location.href = r.data.url;   // Stripe-hosted checkout page
   } catch(e){ if(typeof toast === 'function') toast(String(e.message || e), 'error'); }
 }
 

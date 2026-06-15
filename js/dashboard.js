@@ -3285,7 +3285,7 @@ function ovRenderRecentList() {
       <td style="font-family:var(--mono);font-size:12px">${r.revision||'00'}</td>
       <td>${escapeHtml(r.client||'—')}</td>
       <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
-      <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':r.verdict==='Various'?'amber':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
+      <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':r.verdict==='Various'?'amber':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span>${typeof _aiVerdictBadge==='function'?_aiVerdictBadge(r):''}</td>
       <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovViewReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="aiReviewReport" data-args="${idx}" title="AI pre-issue review — flags missing data, out-of-band readings, verdict mismatches" style="margin-right:4px">✦ AI</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Revise</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
     </tr>`;
   });

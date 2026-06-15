@@ -1900,7 +1900,7 @@ function _rptRowInner(r, _origIdx) {
     <td style="font-size:12px;color:var(--t2)">${escapeHtml(r.drawing||'—')}</td>
     <td>${escapeHtml(r.inspector||'—')}</td>
     <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtDate(r.createdAt)}</td>
-    <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span></td>
+    <td><span class="badge badge-${vClass}" data-no-glyph style="font-size:10px">${escapeHtml(verdict)}</span>${typeof _aiVerdictBadge==='function'?_aiVerdictBadge(r):''}</td>
     ${_rptRowActions(r, _origIdx)}`;
 }
 
@@ -2871,7 +2871,7 @@ function inboxOpenAudit(idx){
       </div>
       <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'inbox-audit-modal\'">Close</button>
     </div>
-    <div style="overflow-y:auto;flex:1">${logHtml}</div>
+    <div style="overflow-y:auto;flex:1">${typeof _aiAuditHtml==='function'?_aiAuditHtml(r):''}${logHtml}</div>
   </div>`;
   document.body.appendChild(modal);
   openA11yModal(modal);

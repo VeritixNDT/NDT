@@ -308,3 +308,40 @@ function _aiReviewGateDecision(report, review) {
     ov.addEventListener('click', (e) => { if (e.target === ov) done({ blocked: true }); });
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DISPLAY — surface the recorded verdict (report.aiReview / report.aiOverride).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Compact verdict chip for report list rows. '' when the report has no AI verdict
+// (older reports, or saves made offline where the gate was skipped).
+function _aiVerdictBadge(r) {
+  if (!r || !r.aiReview || !r.aiReview.risk) return '';
+  const risk = AI_REVIEW_RISK[r.aiReview.risk] || AI_REVIEW_RISK.warnings;
+  const overridden = !!r.aiOverride;
+  let tip = 'AI review: ' + risk.label;
+  if (r.aiReview.summary) tip += ' — ' + r.aiReview.summary;
+  if (overridden) tip += '\nOverridden by ' + (r.aiOverride.by || '—') + ': ' + (r.aiOverride.reason || '');
+  return '<span title="' + escapeHtml(tip) + '" style="display:inline-flex;align-items:center;gap:2px;font-size:9px;font-weight:700;'
+    + 'color:#fff;background:' + risk.color + ';border-radius:4px;padding:1px 5px;white-space:nowrap;vertical-align:middle;margin-left:5px">'
+    + '✦' + (overridden ? ' OVR' : '') + '</span>';
+}
+
+// Full AI card for the audit / history modal. '' when no AI verdict recorded.
+function _aiAuditHtml(r) {
+  if (!r || !r.aiReview || !r.aiReview.risk) return '';
+  const risk = AI_REVIEW_RISK[r.aiReview.risk] || AI_REVIEW_RISK.warnings;
+  let h = '<div style="padding:12px 16px;border-bottom:1px solid var(--border);border-left:3px solid ' + risk.color + '">'
+    + '<div style="font-size:12px;font-weight:700;color:' + risk.color + '">✦ AI review — ' + escapeHtml(risk.label) + '</div>';
+  if (r.aiReview.summary) h += '<div style="font-size:12px;color:var(--t2);margin-top:4px;line-height:1.45">' + escapeHtml(r.aiReview.summary) + '</div>';
+  if (r.aiReview.at) h += '<div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:4px">' + escapeHtml(t('ai.audit.reviewed', 'AI-reviewed') + ' ' + fmtDate(r.aiReview.at)) + '</div>';
+  if (r.aiOverride) {
+    h += '<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-left:3px solid var(--red);border-radius:6px;background:var(--bg2)">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--red)">⚠ ' + escapeHtml(t('ai.audit.overridden', 'Do-not-issue overridden')) + '</div>'
+      + '<div style="font-size:12px;color:var(--t1);margin-top:3px;font-style:italic">"' + escapeHtml(r.aiOverride.reason || '') + '"</div>'
+      + '<div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:3px">' + escapeHtml((r.aiOverride.by || '—') + ' · ' + fmtDate(r.aiOverride.at)) + '</div>'
+      + '</div>';
+  }
+  h += '</div>';
+  return h;
+}

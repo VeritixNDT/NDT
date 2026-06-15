@@ -105,6 +105,10 @@ function jobsRender() {
 
   const row = (j) => {
     const reports = _jobReportCount(j.id);
+    // Sealed (Approved/Sent) report count — gates the inline pack shortcut so it
+    // only appears when there is something to deliver. Same source of truth as
+    // the detail-view button and the builder, so the number never overstates.
+    const sealed = (typeof jobSealedReports === 'function') ? jobSealedReports(j.id).length : 0;
     const dates = (j.startDate || j.endDate)
       ? `${j.startDate ? fmtDate(j.startDate) : '—'} → ${j.endDate ? fmtDate(j.endDate) : '—'}`
       : '—';
@@ -115,6 +119,7 @@ function jobsRender() {
       <td style="font-family:var(--mono);font-size:11px">${dates}</td>
       <td style="font-family:var(--mono);font-size:12px;text-align:center">${reports || '—'}</td>
       <td style="text-align:right">
+        ${sealed ? `<button class="btn btn-sm" data-action="jobDownloadReportPack" data-args="'${escapeHtml(j.id)}'" style="font-size:11px" title="Download the consolidated report pack">⬇ Pack (${sealed})</button>` : ''}
         <button class="btn btn-sm" data-action="jobOpenForm" data-args="'${escapeHtml(j.id)}'" style="font-size:11px">Edit</button>
         <button class="btn btn-sm btn-danger" data-action="jobDelete" data-args="'${escapeHtml(j.id)}'" style="font-size:11px">Del</button>
       </td>
@@ -124,7 +129,7 @@ function jobsRender() {
     <thead><tr>
       <th scope="col">Job</th><th scope="col">Customer</th><th scope="col" style="width:90px">Status</th>
       <th scope="col" style="width:180px">Dates</th><th scope="col" style="width:80px">Reports</th>
-      <th scope="col" style="width:120px"></th>
+      <th scope="col" style="width:210px"></th>
     </tr></thead><tbody>${list.map(row).join('')}</tbody>
   </table></div></div>`;
 }

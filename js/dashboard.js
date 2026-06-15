@@ -3248,7 +3248,7 @@ function ovRenderRecentList() {
   }
   let html = _testBar;
   html += `<table class="tbl" style="width:100%"><thead><tr>
-    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:168px"></th>
+    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:215px"></th>
   </tr></thead><tbody>`;
   reports.slice().reverse().forEach((r, i) => {
     const md = NDT_METHODS.find(x => x.id === r.method);
@@ -3260,7 +3260,7 @@ function ovRenderRecentList() {
       <td>${escapeHtml(r.client||'—')}</td>
       <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
       <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':r.verdict==='Various'?'amber':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span></td>
-      <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovViewReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Revise</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovViewReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="aiReviewReport" data-args="${idx}" title="AI pre-issue review — flags missing data, out-of-band readings, verdict mismatches" style="margin-right:4px">✦ AI</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Revise</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>
     </tr>`;
   });
   html += '</tbody></table>';

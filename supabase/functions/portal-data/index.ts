@@ -91,6 +91,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         reportNo: r.reportNo, method: r.method, revision: r.revision, createdAt: r.createdAt,
         verdict: r.verdict, jobId: r.jobId, stage: r.stage,
         sealedHtml: r.sealedHtml || h.sealedHtml || h.frozenHtml || r.frozenHtml || "",
+        acknowledgedBy: r.acknowledgedBy || "", acknowledgedAt: r.acknowledgedAt || "",
       };
     });
 

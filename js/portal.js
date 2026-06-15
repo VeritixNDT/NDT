@@ -61,7 +61,7 @@ function _vxPortalLocalData(customerId){
   const jobIds = new Set(jobs.map(j => j.id));
   const reports = (ls(KEYS.reports, []) || [])
     .filter(r => jobIds.has(r.jobId) && (getReportStage(r) === 'Approved' || getReportStage(r) === 'Sent'))
-    .map(r => ({ reportNo:r.reportNo, method:r.method, revision:r.revision, createdAt:r.createdAt, verdict:r.verdict, jobId:r.jobId, stage:getReportStage(r), sealedHtml:r.sealedHtml || r.frozenHtml || '' }));
+    .map(r => ({ reportNo:r.reportNo, method:r.method, revision:r.revision, createdAt:r.createdAt, verdict:r.verdict, jobId:r.jobId, stage:getReportStage(r), sealedHtml:r.sealedHtml || r.frozenHtml || '', acknowledgedBy:r.acknowledgedBy||'', acknowledgedAt:r.acknowledgedAt||'' }));
   const quotes = (ls(KEYS.quotes, []) || []).filter(q => q.customerId === customerId && (q.status === 'Sent' || q.status === 'Accepted'));
   const invoices = (ls(KEYS.invoices, []) || []).filter(i => i.customerId === customerId);
   return {
@@ -151,7 +151,7 @@ function vxPortalRender(root, data){
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-family:monospace;font-size:12px;color:${accent}">${_portalEsc(r.reportNo||'—')}</td>
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:12px">${_portalEsc(r.method||'')} · Rev ${_portalEsc(r.revision||'00')}</td>
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589">${_portalDate(r.createdAt)}</td>
-          <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right">${r.sealedHtml ? `<button data-action="vxPortalOpenReport" data-args="'${_portalEsc(r.reportNo)}'" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">View / PDF</button>` : '<span style="font-size:11px;color:#9aa5bd">—</span>'}</td>
+          <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${r.acknowledgedBy ? `<span title="Acknowledged ${_portalDate(r.acknowledgedAt)} by ${_portalEsc(r.acknowledgedBy)}" style="font-size:11px;color:#16a34a;font-weight:600;margin-right:8px">✓ Acknowledged</span>` : `<button data-action="vxPortalAckReport" data-args="'${_portalEsc(r.reportNo)}','${_portalEsc(r.revision||'')}'" title="Confirm receipt of this report" style="cursor:pointer;border:1px solid #16a34a;color:#16a34a;background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-right:6px">Acknowledge</button>`}${r.sealedHtml ? `<button data-action="vxPortalOpenReport" data-args="'${_portalEsc(r.reportNo)}'" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">View / PDF</button>` : '<span style="font-size:11px;color:#9aa5bd">—</span>'}</td>
         </tr>`).join('') : `<tr><td colspan="4" style="padding:10px 8px;color:#9aa5bd;font-size:12px">No issued reports for this job yet.</td></tr>`;
       return `<div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);margin-bottom:12px;overflow:hidden">
         <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #eef0f4">
@@ -177,7 +177,7 @@ function vxPortalRender(root, data){
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589">${_portalDate(d.issueDate)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4">${_portalBadge(status, _portalDocStatusColor(status))}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;font-family:monospace;font-size:12px">${_portalMoney(total, d.currency)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${(type==='invoice' && canPay && d.status!=='Paid') ? `<button data-action="vxPortalPayInvoice" data-args="'${_portalEsc(d.id)}'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">Pay online</button>` : ''}<button data-action="vxPortalOpenDoc" data-args="'${type}','${_portalEsc(d.id)}'" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">PDF</button></td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${(type==='quote' && d.status==='Sent') ? `<button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Accepted'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">Accept</button><button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Declined'" style="cursor:pointer;border:1px solid #dc2626;color:#dc2626;background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-right:6px">Decline</button>` : ''}${(type==='quote' && d.status==='Accepted') ? `<span style="font-size:11px;color:#16a34a;font-weight:600;margin-right:8px">✓ Accepted${d.decisionBy ? ' · ' + _portalEsc(d.decisionBy) : ''}</span>` : ''}${(type==='invoice' && canPay && d.status!=='Paid') ? `<button data-action="vxPortalPayInvoice" data-args="'${_portalEsc(d.id)}'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">Pay online</button>` : ''}<button data-action="vxPortalOpenDoc" data-args="'${type}','${_portalEsc(d.id)}'" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">PDF</button></td>
       </tr>`;
     }).join('');
     return `<h2 style="font-size:15px;margin:24px 0 10px;color:#0b1220">${_portalEsc(title)}</h2>
@@ -236,6 +236,130 @@ async function vxPortalPayInvoice(id){
     }
     location.href = r.data.url;   // Stripe-hosted checkout page
   } catch(e){ if(typeof toast === 'function') toast(String(e.message || e), 'error'); }
+}
+
+// ── Two-way channel (Portal v2, Pillar A) ────────────────────────────────────
+// Every customer action goes through one helper. A real (server-signed) token
+// posts to the portal-submit Edge Function, which records a write-once event
+// the inspector's app ingests. A local-<id> preview token has no cloud, so we
+// apply the event straight to localStorage on-device — the same browser holds
+// the data, so the loop still demonstrates end-to-end.
+async function vxPortalSubmit(kind, payload){
+  const token = _vxPortalToken();
+  if(token && token.indexOf('local-') === 0){
+    try { _vxApplyPortalEventLocal({ kind: kind, customerId: token.slice('local-'.length), at: new Date().toISOString(), by: (payload && payload.by) || '', ...payload }); return { ok:true, local:true }; }
+    catch(e){ return { error: String(e.message || e) }; }
+  }
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.functions) return { error: 'This action needs a live portal link.' };
+  try {
+    const r = await sb.functions.invoke('portal-submit', { body: { token: token, kind: kind, payload: payload } });
+    if(r.error){
+      let msg = 'Could not submit — please try again.';
+      try { if(r.error.context && typeof r.error.context.json === 'function'){ const j = await r.error.context.json(); if(j && j.error) msg = j.error; } } catch(_){}
+      return { error: msg };
+    }
+    return r.data || { ok:true };
+  } catch(e){ return { error: String(e.message || e) }; }
+}
+
+// Apply a customer event to the local store (preview path + the model the app's
+// cloud-pull ingest reuses): a quote decision flips the quote; a report ack
+// stamps the report. Mutations go through lss() so entity-key storage is safe.
+function _vxApplyPortalEventLocal(ev){
+  if(!ev || !ev.kind) return;
+  if(ev.kind === 'quote-decision'){
+    const quotes = ls(KEYS.quotes, []) || [];
+    const q = quotes.find(x => x && x.id === ev.quoteId);
+    if(q && q.status === 'Sent'){
+      q.status = ev.decision;
+      q[ev.decision === 'Accepted' ? 'acceptedAt' : 'declinedAt'] = ev.at;
+      q.decisionBy = ev.by || '';
+      lss(KEYS.quotes, quotes);
+    }
+  } else if(ev.kind === 'ack-report'){
+    const reports = ls(KEYS.reports, []) || [];
+    const r = reports.find(x => x && String(x.reportNo) === String(ev.reportNo) && (!ev.revision || String(x.revision) === String(ev.revision)));
+    if(r){
+      r.acknowledgedBy = ev.by || '';
+      r.acknowledgedAt = ev.at;
+      if(ev.note) r.acknowledgedNote = ev.note;
+      if(typeof addReportAudit === 'function') try { addReportAudit(r, 'ack', 'Acknowledged by customer' + (ev.by ? ' (' + ev.by + ')' : '')); } catch(_){}
+      lss(KEYS.reports, reports);
+    }
+  }
+}
+
+// ── A tiny self-contained e-sign prompt (portal has no app modal helpers) ─────
+// Resolves { by, note } or null. The typed name + server timestamp + IP that
+// portal-submit records together form the click-wrap signature.
+function _vxPortalPrompt(opts){
+  opts = opts || {};
+  return new Promise((resolve) => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(12,18,32,.55);display:flex;align-items:center;justify-content:center;padding:18px';
+    const accent = opts.accent || '#185FA5';
+    ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:22px 22px 18px;box-shadow:0 12px 40px rgba(12,18,32,.3);font-family:inherit">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;color:#0b1220">${_portalEsc(opts.title || 'Confirm')}</div>
+      <div style="font-size:12.5px;color:#6b7589;line-height:1.5;margin-bottom:14px">${_portalEsc(opts.body || '')}</div>
+      <label style="font-size:11px;font-weight:600;color:#6b7589;text-transform:uppercase;letter-spacing:.04em">Your name (signature)</label>
+      <input id="vxpp-name" type="text" placeholder="Full name" style="width:100%;box-sizing:border-box;margin:5px 0 12px;padding:9px 11px;border:1px solid #d6dbe6;border-radius:8px;font-size:14px;font-family:inherit">
+      ${opts.note === false ? '' : `<label style="font-size:11px;font-weight:600;color:#6b7589;text-transform:uppercase;letter-spacing:.04em">Note (optional)</label>
+      <textarea id="vxpp-note" rows="2" placeholder="${_portalEsc(opts.notePlaceholder || 'Anything to add…')}" style="width:100%;box-sizing:border-box;margin:5px 0 14px;padding:9px 11px;border:1px solid #d6dbe6;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>`}
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="vxpp-cancel" style="cursor:pointer;border:1px solid #d6dbe6;background:#fff;color:#6b7589;border-radius:8px;font-size:13px;padding:8px 16px">Cancel</button>
+        <button id="vxpp-ok" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:8px;font-size:13px;font-weight:600;padding:8px 18px">${_portalEsc(opts.okLabel || 'Confirm')}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const done = (v) => { try { ov.remove(); } catch(_){} resolve(v); };
+    const nameEl = ov.querySelector('#vxpp-name');
+    ov.querySelector('#vxpp-cancel').addEventListener('click', () => done(null));
+    ov.addEventListener('click', (e) => { if(e.target === ov) done(null); });
+    ov.querySelector('#vxpp-ok').addEventListener('click', () => {
+      const by = (nameEl.value || '').trim();
+      if(!by){ nameEl.style.borderColor = '#dc2626'; nameEl.focus(); return; }
+      const noteEl = ov.querySelector('#vxpp-note');
+      done({ by: by, note: noteEl ? (noteEl.value || '').trim() : '' });
+    });
+    setTimeout(() => { try { nameEl.focus(); } catch(_){} }, 30);
+  });
+}
+
+// Acknowledge receipt of an issued report (C — e-sign).
+async function vxPortalAckReport(reportNo, revision){
+  const accent = (_vxPortalData && _vxPortalData.company && _vxPortalData.company.color) || '#185FA5';
+  const sig = await _vxPortalPrompt({ accent: accent, title: 'Acknowledge report ' + reportNo, body: 'Confirm you have received and reviewed this report. Your name and the time are recorded as a receipt.', okLabel: 'Acknowledge', notePlaceholder: 'Comments on the findings (optional)…' });
+  if(!sig) return;
+  if(typeof toast === 'function') toast('Recording acknowledgement…', 'info');
+  const res = await vxPortalSubmit('ack-report', { reportNo: reportNo, revision: revision, by: sig.by, note: sig.note });
+  if(res.error){ if(typeof toast === 'function') toast(res.error, 'error'); return; }
+  // Optimistically reflect it so the customer sees the receipt immediately.
+  const r = (_vxPortalData && _vxPortalData.reports || []).find(x => String(x.reportNo) === String(reportNo));
+  if(r){ r.acknowledgedBy = sig.by; r.acknowledgedAt = (res.at || new Date().toISOString()); if(sig.note) r.acknowledgedNote = sig.note; }
+  if(typeof toast === 'function') toast('Thank you — acknowledgement recorded.', 'success');
+  _vxPortalReRender();
+}
+
+// Accept or decline a quote (C — e-sign).
+async function vxPortalQuoteDecision(quoteId, decision){
+  const accent = (_vxPortalData && _vxPortalData.company && _vxPortalData.company.color) || '#185FA5';
+  const q = (_vxPortalData && _vxPortalData.quotes || []).find(x => x.id === quoteId);
+  const num = q ? (q.number || '') : '';
+  const sig = await _vxPortalPrompt({ accent: accent, title: decision + ' quote ' + num, body: 'Confirm you ' + (decision === 'Accepted' ? 'accept' : 'decline') + ' this quotation. Your name and the time are recorded.', okLabel: decision, notePlaceholder: decision === 'Declined' ? 'Reason (optional)…' : 'Any note (optional)…' });
+  if(!sig) return;
+  if(typeof toast === 'function') toast('Recording your decision…', 'info');
+  const res = await vxPortalSubmit('quote-decision', { quoteId: quoteId, decision: decision, by: sig.by, note: sig.note });
+  if(res.error){ if(typeof toast === 'function') toast(res.error, 'error'); return; }
+  if(q){ q.status = decision; q.decisionBy = sig.by; }
+  if(typeof toast === 'function') toast(decision === 'Accepted' ? 'Quote accepted — thank you.' : 'Quote declined — noted.', 'success');
+  _vxPortalReRender();
+}
+
+// Re-render the portal from the (possibly optimistically updated) data.
+function _vxPortalReRender(){
+  const root = document.getElementById('vx-portal-root');
+  if(root && _vxPortalData && !_vxPortalData.error) vxPortalRender(root, _vxPortalData);
 }
 
 // Entering a portal link after the app already loaded — render the portal.

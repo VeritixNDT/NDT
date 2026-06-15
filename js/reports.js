@@ -2235,8 +2235,15 @@ function _sealReport(r){
   r.approvedBy   = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? (CURRENT_USER.name || CURRENT_USER.email || '') : '';
   r.approvedById = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.id : null;
   r.sealedAt = now;
-  let html = r.frozenHtml;
-  if(!html && typeof ovBuildReportSnapshot === 'function'){ try { html = ovBuildReportSnapshot(r); } catch(e){} }
+  // Build the sealed snapshot AFTER stamping approver + date onto the record. A
+  // placed "Approved stamp" card reads r.approvedBy / r.sealedAt, so it only
+  // renders its content on a snapshot built post-approval. Reusing the
+  // pre-approval frozenHtml (built at save time, dashboard.js) would capture the
+  // card empty — _stampApproval would then see no marker and fall back to the
+  // default corner stamp, so the placed card would never appear in the PDF.
+  let html = '';
+  if(typeof ovBuildReportSnapshot === 'function'){ try { html = ovBuildReportSnapshot(r); } catch(e){} }
+  if(!html) html = r.frozenHtml;   // rebuild unavailable (no saved template) — keep the existing body
   if(html){ r.frozenHtml = html; r.sealedHtml = _stampApproval(html, r); }
 }
 

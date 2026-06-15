@@ -174,15 +174,13 @@ function _aiReviewLoadingHtml(r) {
     + '<style>@keyframes vxaispin{to{transform:rotate(360deg)}}</style>';
 }
 
-function _aiReviewShowResult(r, review, closeLoading) {
-  closeLoading();
+// Risk banner + findings list (or "none"). Shared by the result modal and the
+// pre-save gate modal.
+function _aiReviewFindingsHtml(review) {
   const risk = AI_REVIEW_RISK[review.overallRisk] || AI_REVIEW_RISK.warnings;
   const findings = Array.isArray(review.findings) ? review.findings : [];
 
-  let body = _aiReviewHeader(r);
-
-  // Risk banner
-  body += '<div style="display:flex;align-items:center;gap:10px;border:1px solid ' + risk.color
+  let html = '<div style="display:flex;align-items:center;gap:10px;border:1px solid ' + risk.color
     + '55;background:' + risk.color + '14;border-radius:8px;padding:10px 12px;margin-bottom:12px">'
     + '<span style="width:22px;height:22px;flex:0 0 auto;border-radius:50%;background:' + risk.color
     + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">' + risk.icon + '</span>'
@@ -191,13 +189,13 @@ function _aiReviewShowResult(r, review, closeLoading) {
     + '</div></div>';
 
   if (!findings.length) {
-    body += '<div style="font-size:13px;color:var(--t2);padding:4px 0 8px">'
+    html += '<div style="font-size:13px;color:var(--t2);padding:4px 0 8px">'
       + escapeHtml(t('ai.review.none', 'No issues found. The report looks complete and self-consistent.')) + '</div>';
   } else {
-    body += '<div style="display:flex;flex-direction:column;gap:8px">';
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
     for (const f of findings) {
       const sev = AI_REVIEW_SEV[f.severity] || AI_REVIEW_SEV.low;
-      body += '<div style="border:1px solid var(--border);border-left:3px solid ' + sev.color
+      html += '<div style="border:1px solid var(--border);border-left:3px solid ' + sev.color
         + ';border-radius:6px;padding:9px 11px;background:var(--bg2)">'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
         + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:' + sev.color + '">' + escapeHtml(sev.label) + '</span>'
@@ -206,20 +204,107 @@ function _aiReviewShowResult(r, review, closeLoading) {
         + '<div style="font-size:13px;color:var(--t1);line-height:1.45">' + escapeHtml(f.message || '') + '</div>'
         + '</div>';
     }
-    body += '</div>';
+    html += '</div>';
   }
+  return html;
+}
 
-  // Disclaimer + close
-  body += '<div style="font-size:11px;color:var(--t3);line-height:1.45;margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">'
-    + escapeHtml(t('ai.review.disclaimer', 'AI assistance — advisory only. It does not change the report or replace the qualified reviewer\'s judgement.'))
-    + '</div>'
+const _AI_DISCLAIMER_HTML =
+  '<div style="font-size:11px;color:var(--t3);line-height:1.45;margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">'
+  + 'AI assistance — advisory only. It does not change the report or replace the qualified reviewer\'s judgement.'
+  + '</div>';
+
+function _aiReviewShowResult(r, review, closeLoading) {
+  closeLoading();
+  const body = _aiReviewHeader(r)
+    + _aiReviewFindingsHtml(review)
+    + _AI_DISCLAIMER_HTML
     + '<div style="display:flex;justify-content:flex-end;margin-top:14px">'
     + '<button class="btn btn-sm btn-primary" data-action="aiReviewCloseTop">' + escapeHtml(t('vxc.close', 'Close')) + '</button>'
     + '</div>';
-
   const close = _aiReviewShowOverlay(body);
   _aiReviewTopClose = close;
 }
 
 let _aiReviewTopClose = null;
 function aiReviewCloseTop() { if (_aiReviewTopClose) { _aiReviewTopClose(); _aiReviewTopClose = null; } }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRE-SAVE GATE — ovSaveReport calls this BEFORE writing the report.
+// ═══════════════════════════════════════════════════════════════════════════
+// Returns one of:
+//   { skip:true }                      — offline / no review available; don't gate
+//   { ok:true, review }                — pass/warnings; save may proceed
+//   { blocked:true }                   — "do not issue" + no override; abort the save
+//   { override:true, reason, review }  — Senior/Admin overrode the do-not-issue block
+async function _aiReviewSaveGate() {
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if (!sb || !sb.functions) return { skip: true };   // offline — can't run, never block
+  const report = _aiReviewCollectLive();
+  if (!report) return { skip: true };
+
+  const close = _aiReviewShowOverlay(_aiReviewLoadingHtml(report));
+  let review;
+  try {
+    const resp = await sb.functions.invoke('ai-review', { body: { report: _aiReviewSanitize(report, 0) } });
+    if (resp.error || !resp.data || !resp.data.review) {
+      close();
+      // Infra failure must not block legitimate work — degrade to a warning.
+      toast(t('ai.gate.unavailable', 'AI review unavailable — saving without it.'), 'warn');
+      return { skip: true };
+    }
+    review = resp.data.review;
+  } catch (e) {
+    close();
+    toast(t('ai.gate.unavailable', 'AI review unavailable — saving without it.'), 'warn');
+    return { skip: true };
+  }
+  close();
+
+  if (review.overallRisk !== 'fail') return { ok: true, review };
+  return await _aiReviewGateDecision(report, review);
+}
+
+// Do-not-issue decision modal. Resolves to {blocked:true} or {override,reason,review}.
+function _aiReviewGateDecision(report, review) {
+  const seniorOrAdmin = (typeof vxIsSeniorOrAdmin === 'function') && vxIsSeniorOrAdmin();
+  return new Promise((resolve) => {
+    const ov = document.createElement('div');
+    ov.className = 'vx-ai-review-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:16px';
+
+    let footer;
+    if (seniorOrAdmin) {
+      footer = '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.45;margin-bottom:6px">'
+        + escapeHtml(t('ai.gate.override.note', 'The AI flagged this report as "do not issue". As a senior reviewer you may override and save anyway — a reason is required and recorded on the report.')) + '</div>'
+        + '<textarea id="vxAiOverrideReason" rows="2" placeholder="' + escapeHtml(t('ai.gate.override.placeholder', 'Reason for overriding the AI block…')) + '" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);box-sizing:border-box;resize:vertical"></textarea>'
+        + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'
+        + '<button class="btn btn-sm" id="vxAiGateCancel">' + escapeHtml(t('ai.gate.fix', 'Go back & fix')) + '</button>'
+        + '<button class="btn btn-sm btn-danger" id="vxAiGateOverride">' + escapeHtml(t('ai.gate.override.btn', 'Override & save')) + '</button>'
+        + '</div></div>';
+    } else {
+      footer = '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'
+        + '<div style="font-size:12.5px;color:var(--red);font-weight:600;line-height:1.45;margin-bottom:10px">'
+        + escapeHtml(t('ai.gate.blocked', 'This report can\'t be saved while the AI flags it as "do not issue". Fix the issues above, or ask a senior reviewer.')) + '</div>'
+        + '<div style="display:flex;justify-content:flex-end"><button class="btn btn-sm btn-primary" id="vxAiGateClose">' + escapeHtml(t('ai.gate.fix', 'Go back & fix')) + '</button></div></div>';
+    }
+
+    ov.innerHTML = '<div role="dialog" aria-modal="true" aria-label="AI pre-issue gate" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:560px;width:100%;max-height:86vh;overflow:auto;padding:20px;box-shadow:0 18px 50px rgba(0,0,0,.5)">'
+      + _aiReviewHeader(report) + _aiReviewFindingsHtml(review) + footer + '</div>';
+    document.body.appendChild(ov);
+
+    const done = (val) => { try { ov.remove(); } catch (_) {} resolve(val); };
+    if (seniorOrAdmin) {
+      ov.querySelector('#vxAiGateCancel').addEventListener('click', () => done({ blocked: true }));
+      ov.querySelector('#vxAiGateOverride').addEventListener('click', () => {
+        const reason = (ov.querySelector('#vxAiOverrideReason').value || '').trim();
+        if (!reason) { toast(t('ai.gate.override.needreason', 'Enter a reason to override the AI block.'), 'warn'); return; }
+        done({ override: true, reason, review });
+      });
+    } else {
+      ov.querySelector('#vxAiGateClose').addEventListener('click', () => done({ blocked: true }));
+    }
+    ov.addEventListener('click', (e) => { if (e.target === ov) done({ blocked: true }); });
+  });
+}

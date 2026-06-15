@@ -2773,10 +2773,36 @@ async function ovSaveReport(mode) {
     }
     return;
   }
+  // AI pre-issue gate — review the live form BEFORE writing the report. A
+  // "do not issue" verdict blocks the save; a Senior/Admin may override with a
+  // logged reason. Skipped offline / on AI infra failure (never blocks work
+  // when the review can't run). See js/ai-review.js → _aiReviewSaveGate.
+  let _aiGate = null;
+  if(typeof _aiReviewSaveGate === 'function'){
+    _aiGate = await _aiReviewSaveGate();
+    if(_aiGate && _aiGate.blocked) return;
+  }
+
   const allFields = rptAllFormFields();
   const specific = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])].map(f => ({...f, id:'eq_'+f.id}));
   const all = [...allFields, ...specific];
   const report = { method: _ovMethod, createdAt: new Date().toISOString() };
+  // Stamp the AI gate result on the report (audit trail). A do-not-issue that
+  // got here was overridden by a Senior/Admin — record the reason + who.
+  if(_aiGate && (_aiGate.review || _aiGate.override)){
+    report.aiReview = {
+      risk: _aiGate.review && _aiGate.review.overallRisk,
+      summary: _aiGate.review && _aiGate.review.summary,
+      at: new Date().toISOString(),
+    };
+    if(_aiGate.override){
+      report.aiOverride = {
+        reason: _aiGate.reason,
+        by: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '',
+        at: new Date().toISOString(),
+      };
+    }
+  }
   // V48: stable id assigned at form-open (or restored from the autosave draft).
   // It keys the report's sync row and drives exactly-once number allocation.
   report.id = _ovReportId || (typeof vxNewId === 'function' ? vxNewId() : ('r-' + Date.now()));

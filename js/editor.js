@@ -156,6 +156,12 @@ var CV_FIELD_DEFS = {
   'weld-map':        {label:'Weld / defect map',     ph:'',           get:r=>'',                          w:380,h:220, weldMap:true},
   'scan-image':      {label:'A/B/C-scan image',      ph:'',           get:r=>'',                          w:280,h:200, scanImg:true},
   'cross-ref':       {label:'Cross-reference',       ph:'See defect 3 on page 4', get:r=>'',              w:200,h:32, xref:true},
+  // The "✓ APPROVED" seal as a placeable card. Content materialises only once
+  // the report is sealed (approver + date); placing this card lets the user
+  // choose where the stamp prints instead of the default bottom-right. A
+  // template with no card placed still gets the default stamp (see
+  // _stampApproval). Drop it in a footer-zone to repeat the stamp on every page.
+  'approval-stamp':  {label:'Approved stamp',        ph:'',           get:r=>'',                          w:150,h:48, approvalStamp:true},
 
   // ── REPEATING SECTIONS ──────────────────────────────────────────
   'defect-row-loop': {label:'Defect row (auto-repeat)', ph:'Loops once per defect', get:r=>'',           w:754,h:34, repeat:'defects'},
@@ -449,7 +455,7 @@ var CV_PALETTE_GROUPS = [
   {id:'criteria',  label:'Criteria',      fields:['exam-type','surf-cond','temperature','heat-treat','extent','spec','acc-crit','proc-rev','stage','weld-pos']},
   {id:'equipment', label:'Equipment',     fields:['light-source','method-cell']},
   {id:'result',    label:'Result',        fields:['result','indications','remarks']},
-  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank']},
+  {id:'signoff',   label:'Sign-off',      fields:['inspector','insp-sig','client-sig','qc-sig','cert-auth-sig','insp-date','date-blank','approval-stamp']},
   {id:'smart',     label:'⚡ Smart / linked',fields:['procedure-link','cert-status','eye-cert-status','calib-status','calib-status-2','light-status','uv-light-status','light-conditions','accept-eval']},
   {id:'computed',  label:'∑ Computed',    fields:['defect-count','rejected-count','pass-rate','today-date','page-num','cross-ref']},
   {id:'advanced',  label:'★ Advanced output', fields:['qr-code','weld-map','scan-image','defect-row-loop']},
@@ -1859,7 +1865,7 @@ function _cvGroupLabel(grp){ return t(_CV_GROUP_KEY_MAP[grp.id] || ('pe.group.' 
 function _cvFieldBadge(def){
   if(def.smartLink)  return { badge:'⚡', badgeStyle:'background:rgba(167,139,250,.15);color:#a78bfa' };
   if(def.computed)   return { badge:'∑', badgeStyle:'background:rgba(20,184,166,.15);color:#14b8a6' };
-  if(def.qr || def.weldMap || def.scanImg || def.repeat || def.xref)
+  if(def.qr || def.weldMap || def.scanImg || def.repeat || def.xref || def.approvalStamp)
                      return { badge:'★', badgeStyle:'background:rgba(245,166,35,.15);color:var(--amber)' };
   return                    { badge:'f', badgeStyle:'background:rgba(79,142,247,.15);color:var(--blue)' };
 }
@@ -3965,6 +3971,29 @@ function cvRenderBlockContent(block, report, preview){
     return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px;box-sizing:border-box">
       ${cvRenderQR(payload, size)}
     </div>`;
+  }
+
+  // Approval stamp — the "✓ APPROVED" seal, placed wherever the user dropped
+  // the card. The content materialises only once the report is sealed
+  // (approvedBy + sealedAt). The data-vx-approval-stamp marker lets _stampApproval
+  // detect a placed card and skip the default bottom-right stamp.
+  if(def.approvalStamp){
+    const by   = (report && report.approvedBy) ? _h(report.approvedBy) : '';
+    const when = (report && report.sealedAt)
+      ? _h((typeof fmtDate === 'function') ? fmtDate(report.sealedAt) : report.sealedAt) : '';
+    if(by || when){
+      return `<div data-vx-approval-stamp="1" style="height:100%;display:flex;align-items:center;justify-content:center">
+        <div style="border:1.5px solid #2e7d32;color:#2e7d32;border-radius:6px;padding:4px 10px;background:rgba(46,125,50,.06);transform:rotate(-5deg);text-align:center;line-height:1.3;font-family:Arial,Helvetica,sans-serif">
+          <div style="font-weight:800;letter-spacing:.1em;font-size:11px">&#10003; APPROVED</div>
+          ${by ? `<div style="font-size:9px">${by}</div>` : ''}${when ? `<div style="font-size:9px">${when}</div>` : ''}
+        </div></div>`;
+    }
+    // Design canvas (preview=false) shows a dashed placeholder so the card is
+    // visible and positionable; an unapproved preview/print renders nothing.
+    if(!preview){
+      return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed #2e7d32;border-radius:6px;color:#2e7d32;background:rgba(46,125,50,.04);font-weight:700;font-size:9px;text-align:center;letter-spacing:.08em">&#10003; APPROVED<span style="font-weight:400;font-size:7px;letter-spacing:0;opacity:.7">shown once sealed</span></div>`;
+    }
+    return '';
   }
 
   // V3: Weld / defect map

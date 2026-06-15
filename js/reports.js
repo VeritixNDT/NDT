@@ -2245,6 +2245,10 @@ function _sealReport(r){
 // stamp on every printed page.
 function _stampApproval(html, r){
   if(!html || typeof html !== 'string') return html;
+  // If the template placed an "Approved stamp" card, the sealed snapshot has
+  // already rendered the stamp at the chosen location — don't add the default
+  // bottom-right one on top of it.
+  if(html.includes('data-vx-approval-stamp')) return html;
   const by = escapeHtml(r.approvedBy || '');
   const when = (typeof fmtDate === 'function') ? fmtDate(r.sealedAt) : (r.sealedAt || '');
   const stamp = `<div style="position:fixed;bottom:9mm;right:9mm;border:1.5px solid #2e7d32;color:#2e7d32;border-radius:6px;padding:5px 11px;font-family:Arial,Helvetica,sans-serif;font-size:9px;line-height:1.3;background:rgba(46,125,50,.06);transform:rotate(-5deg);z-index:99999;text-align:center">

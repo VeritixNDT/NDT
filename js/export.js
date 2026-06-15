@@ -721,13 +721,31 @@ function vxBuildReportPackHtml(job, cust, reports){
   });
   const vColor = (v) => v === 'Acceptable' ? '#1a8d4e' : v === 'Not acceptable' ? '#c0392b' : '#6b7589';
 
-  const summaryRows = reports.map((r) => `<tr>
+  // Render each report's body ONCE and count its printed pages, so the cover
+  // contents table can list the pack page each report starts on (B) without
+  // re-extracting the HTML for the body concatenation below. The cover is
+  // page 1, so the first report body starts on page 2; a report whose snapshot
+  // can't be built contributes 0 pages and shows no start page.
+  let _cursor = 2; // page 1 is the cover
+  const rendered = reports.map((r) => {
+    let html = r.sealedHtml || r.frozenHtml;
+    if(!html && typeof ovBuildReportSnapshot === 'function') html = ovBuildReportSnapshot(r);
+    const m = html ? html.match(/<body[^>]*>([\s\S]*?)<\/body>/i) : null;
+    const body = m ? m[1] : '';
+    const pages = body ? (body.match(/vx-print-page/g) || []).length : 0;
+    const startPage = pages > 0 ? _cursor : null;
+    _cursor += pages;
+    return { r, body, startPage };
+  });
+
+  const summaryRows = rendered.map(({ r, startPage }) => `<tr>
     <td style="font-family:monospace;font-weight:700">${esc(r.method || '—')}</td>
     <td style="font-family:monospace">${esc(r.reportNo || '—')}</td>
     <td style="font-family:monospace;text-align:center">${esc(r.revision || '00')}</td>
     <td>${esc(r.subject || '—')}</td>
     <td style="color:${vColor(r.verdict)};font-weight:600">${esc(vLabel(r.verdict))}</td>
     <td style="font-family:monospace;white-space:nowrap">${r.createdAt ? esc(fdate(r.createdAt)) : '—'}</td>
+    <td style="font-family:monospace;text-align:center">${startPage || '—'}</td>
   </tr>`).join('');
 
   const custAddr = [cust && cust.name, cust && cust.billingAddress, cust && cust.vatNo && ('VAT ' + cust.vatNo)].filter(Boolean);
@@ -749,17 +767,12 @@ function vxBuildReportPackHtml(job, cust, reports){
       <span class="vxpack-chip" style="--c:#c0392b">${nRej} ${esc(T('dash.not_acceptable', 'Not acceptable'))}</span>
       ${nOther ? `<span class="vxpack-chip" style="--c:#6b7589">${nOther} ${esc(T('pack.other', 'Other'))}</span>` : ''}
     </div>
-    <table class="vxpack-tbl"><thead><tr><th>${esc(T('col.method', 'Method'))}</th><th>${esc(T('col.report_no', 'Report no.'))}</th><th>${esc(T('col.rev', 'Rev'))}</th><th>${esc(T('col.subject', 'Subject'))}</th><th>${esc(T('col.verdict', 'Verdict'))}</th><th>${esc(T('col.date', 'Date'))}</th></tr></thead><tbody>${summaryRows}</tbody></table>
+    <table class="vxpack-tbl"><thead><tr><th>${esc(T('col.method', 'Method'))}</th><th>${esc(T('col.report_no', 'Report no.'))}</th><th>${esc(T('col.rev', 'Rev'))}</th><th>${esc(T('col.subject', 'Subject'))}</th><th>${esc(T('col.verdict', 'Verdict'))}</th><th>${esc(T('col.date', 'Date'))}</th><th style="text-align:center">${esc(T('pack.page', 'Page'))}</th></tr></thead><tbody>${summaryRows}</tbody></table>
   </div></div></div>`;
 
-  // Concatenate each report's <body> content (the .vx-print-page set).
-  const bodies = reports.map((r) => {
-    let html = r.sealedHtml || r.frozenHtml;
-    if(!html && typeof ovBuildReportSnapshot === 'function') html = ovBuildReportSnapshot(r);
-    if(!html) return '';
-    const m = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    return m ? m[1] : '';
-  }).join('\n');
+  // Concatenate each report's <body> content (the .vx-print-page set),
+  // already extracted above when counting pages for the contents index.
+  const bodies = rendered.map((x) => x.body).join('\n');
 
   const lang = (typeof vxLocale === 'function' ? vxLocale() : 'en').split('-')[0];
   return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(job.title || T('pack.title', 'Inspection Report Pack'))} — ${esc(T('pack.title', 'Inspection Report Pack'))}</title>

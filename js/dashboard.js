@@ -3274,7 +3274,7 @@ function ovRenderRecentList() {
   }
   let html = _testBar;
   html += `<table class="tbl" style="width:100%"><thead><tr>
-    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:215px"></th>
+    <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Job</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:215px"></th>
   </tr></thead><tbody>`;
   reports.slice().reverse().forEach((r, i) => {
     const md = NDT_METHODS.find(x => x.id === r.method);
@@ -3284,6 +3284,7 @@ function ovRenderRecentList() {
       <td style="font-family:var(--mono);font-size:12px">${r.reportNo||'—'}</td>
       <td style="font-family:var(--mono);font-size:12px">${r.revision||'00'}</td>
       <td>${escapeHtml(r.client||'—')}</td>
+      <td style="font-size:12px"><span data-action="ovAssignJob" data-args="${idx}" title="Assign this report to a job / customer" style="cursor:pointer;border-bottom:1px dashed var(--border);color:${r.internalNoCustomer?'var(--t3)':(r.jobId?'var(--t1)':'var(--t3)')}">${r.internalNoCustomer ? 'Internal' : (r.jobId ? escapeHtml(r.jobTitle||'(job)') : '— Assign')}</span></td>
       <td style="font-family:var(--mono);font-size:11px">${fmtDate(r.createdAt)}</td>
       <td><span class="badge badge-${r.verdict==='Acceptable'?'green':r.verdict==='Not acceptable'?'red':r.verdict==='Various'?'amber':'blue'}" style="font-size:10px">${r.verdict||'Draft'}</span>${typeof _aiVerdictBadge==='function'?_aiVerdictBadge(r):''}</td>
       <td style="white-space:nowrap"><button class="btn btn-sm" data-action="ovPrintReport" data-args="${idx}" style="margin-right:4px">PDF</button><button class="btn btn-sm" data-action="ovViewReport" data-args="${idx}" style="margin-right:4px">Open</button><button class="btn btn-sm" data-action="aiReviewReport" data-args="${idx}" title="AI pre-issue review — flags missing data, out-of-band readings, verdict mismatches" style="margin-right:4px">✦ AI</button><button class="btn btn-sm" data-action="ovOpenReport" data-args="${idx}" style="margin-right:4px">Revise</button><button class="btn btn-sm btn-danger" data-action="ovDeleteReport" data-args="${idx}">Del</button></td>

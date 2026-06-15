@@ -701,11 +701,16 @@ function _vxPrintHtml(html){
 // each (per-block styling is inline, so it travels with the body content).
 function vxBuildReportPackHtml(job, cust, reports){
   const esc = (s) => escapeHtml(String(s == null ? '' : s));
+  // Localized label helper — t() falls back through 'en' → the supplied default.
+  const T = (k, d) => (typeof t === 'function') ? t(k, d) : d;
   const c = (typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {};
   const accent = (c.color && /^#[0-9A-Fa-f]{6}$/.test(c.color)) ? c.color : '#185FA5';
   const W = (typeof CV_PAGE_WIDTH_PX !== 'undefined') ? CV_PAGE_WIDTH_PX : 794;
   const H = (typeof CV_PAGE_HEIGHT_PX !== 'undefined') ? CV_PAGE_HEIGHT_PX : 1123;
   const fdate = (d) => (typeof fmtDate === 'function') ? fmtDate(d) : String(d || '');
+  // Verdict values are stored in English; show the reader's locale on the cover.
+  const vLabel = (v) => v === 'Acceptable' ? T('rpt.result.acceptable', 'Acceptable')
+    : v === 'Not acceptable' ? T('dash.not_acceptable', 'Not acceptable') : (v || '—');
 
   // Pass/fail tally.
   let nAcc = 0, nRej = 0, nOther = 0;
@@ -721,7 +726,7 @@ function vxBuildReportPackHtml(job, cust, reports){
     <td style="font-family:monospace">${esc(r.reportNo || '—')}</td>
     <td style="font-family:monospace;text-align:center">${esc(r.revision || '00')}</td>
     <td>${esc(r.subject || '—')}</td>
-    <td style="color:${vColor(r.verdict)};font-weight:600">${esc(r.verdict || '—')}</td>
+    <td style="color:${vColor(r.verdict)};font-weight:600">${esc(vLabel(r.verdict))}</td>
     <td style="font-family:monospace;white-space:nowrap">${r.createdAt ? esc(fdate(r.createdAt)) : '—'}</td>
   </tr>`).join('');
 
@@ -730,21 +735,21 @@ function vxBuildReportPackHtml(job, cust, reports){
     <div class="vxpack-head">
       <div>${c.logo ? `<img class="vxpack-logo" src="${esc(c.logo)}" alt=""/>` : `<div style="font-size:22px;font-weight:800;color:${accent}">${esc(c.name || 'Your Company')}</div>`}</div>
       <div style="text-align:right">
-        <div class="vxpack-title">Inspection Report Pack</div>
+        <div class="vxpack-title">${esc(T('pack.title', 'Inspection Report Pack'))}</div>
         <div class="vxpack-sub">${esc(job.title || '—')}</div>
       </div>
     </div>
     <div class="vxpack-blocks">
-      <div class="vxpack-block"><h4>Customer</h4>${custAddr.length ? custAddr.map(esc).join('<br>') : '<span style="color:#9aa5bd">—</span>'}</div>
-      <div class="vxpack-block"><h4>Job</h4>${esc(job.title || '—')}<br>${job.scope ? esc(job.scope) + '<br>' : ''}${job.startDate ? 'From ' + esc(fdate(job.startDate)) : ''}${job.endDate ? ' to ' + esc(fdate(job.endDate)) : ''}</div>
-      <div class="vxpack-block" style="text-align:right"><h4>Prepared</h4>${esc(fdate(new Date().toISOString()))}<br>${reports.length} report${reports.length === 1 ? '' : 's'}</div>
+      <div class="vxpack-block"><h4>${esc(T('pack.customer', 'Customer'))}</h4>${custAddr.length ? custAddr.map(esc).join('<br>') : '<span style="color:#9aa5bd">—</span>'}</div>
+      <div class="vxpack-block"><h4>${esc(T('approve.link.job', 'Job'))}</h4>${esc(job.title || '—')}<br>${job.scope ? esc(job.scope) + '<br>' : ''}${job.startDate ? esc(T('pack.from', 'From')) + ' ' + esc(fdate(job.startDate)) : ''}${job.endDate ? ' ' + esc(T('pack.to', 'to')) + ' ' + esc(fdate(job.endDate)) : ''}</div>
+      <div class="vxpack-block" style="text-align:right"><h4>${esc(T('pack.prepared', 'Prepared'))}</h4>${esc(fdate(new Date().toISOString()))}<br>${reports.length} ${esc(T(reports.length === 1 ? 'pack.report_one' : 'pack.report_other', reports.length === 1 ? 'report' : 'reports'))}</div>
     </div>
     <div class="vxpack-tally">
-      <span class="vxpack-chip" style="--c:#1a8d4e">${nAcc} Acceptable</span>
-      <span class="vxpack-chip" style="--c:#c0392b">${nRej} Not acceptable</span>
-      ${nOther ? `<span class="vxpack-chip" style="--c:#6b7589">${nOther} Other</span>` : ''}
+      <span class="vxpack-chip" style="--c:#1a8d4e">${nAcc} ${esc(T('rpt.result.acceptable', 'Acceptable'))}</span>
+      <span class="vxpack-chip" style="--c:#c0392b">${nRej} ${esc(T('dash.not_acceptable', 'Not acceptable'))}</span>
+      ${nOther ? `<span class="vxpack-chip" style="--c:#6b7589">${nOther} ${esc(T('pack.other', 'Other'))}</span>` : ''}
     </div>
-    <table class="vxpack-tbl"><thead><tr><th>Method</th><th>Report no.</th><th>Rev</th><th>Subject</th><th>Verdict</th><th>Date</th></tr></thead><tbody>${summaryRows}</tbody></table>
+    <table class="vxpack-tbl"><thead><tr><th>${esc(T('col.method', 'Method'))}</th><th>${esc(T('col.report_no', 'Report no.'))}</th><th>${esc(T('col.rev', 'Rev'))}</th><th>${esc(T('col.subject', 'Subject'))}</th><th>${esc(T('col.verdict', 'Verdict'))}</th><th>${esc(T('col.date', 'Date'))}</th></tr></thead><tbody>${summaryRows}</tbody></table>
   </div></div></div>`;
 
   // Concatenate each report's <body> content (the .vx-print-page set).
@@ -757,7 +762,7 @@ function vxBuildReportPackHtml(job, cust, reports){
   }).join('\n');
 
   const lang = (typeof vxLocale === 'function' ? vxLocale() : 'en').split('-')[0];
-  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(job.title || 'Report pack')} — Report pack</title>
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(job.title || T('pack.title', 'Inspection Report Pack'))} — ${esc(T('pack.title', 'Inspection Report Pack'))}</title>
 <style>
   @page { size: A4; margin: 0; }
   html, body { margin:0; padding:0; background:#fff; }

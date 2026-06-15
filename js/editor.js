@@ -3981,23 +3981,30 @@ function cvRenderBlockContent(block, report, preview){
     const by   = (report && report.approvedBy) ? _h(report.approvedBy) : '';
     const when = (report && report.sealedAt)
       ? _h((typeof fmtDate === 'function') ? fmtDate(report.sealedAt) : report.sealedAt) : '';
-    // Scale the seal to the card: the natural design is ~150×48px, so resizing
-    // the card smaller shrinks the stamp in proportion (and larger grows it),
-    // clamped so it stays legible. Driven by the more constraining dimension so
-    // the stamp always fits. letter-spacing stays in em to track the font.
-    const k = Math.max(0.25, Math.min(4, Math.min((+block.w || 150) / 150, (+block.h || 48) / 48)));
-    const px = (n) => (n * k).toFixed(2) + 'px';
+    // Render the seal as a viewBox SVG so it scales WITH the card automatically:
+    // shrinking the card shrinks the stamp, live in the editor too. Resizing only
+    // changes the box size, so the SVG re-fits itself (no re-render) and the stamp
+    // is never clipped — unlike fixed-px content under the block's overflow:hidden.
+    const stampSvg = (subs, dashed, marker) => {
+      const s = '#2e7d32';
+      const subEls = subs.map((txt, i) =>
+        `<text x="75" y="${30 + i * 9}" text-anchor="middle" fill="${s}" font-size="${dashed ? 7 : 9}"${dashed ? ' opacity="0.7"' : ''}>${txt}</text>`
+      ).join('');
+      return `<div${marker ? ' data-vx-approval-stamp="1"' : ''} style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">`
+        + `<svg viewBox="0 0 150 48" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="overflow:visible;font-family:Arial,Helvetica,sans-serif">`
+        + `<g transform="rotate(-5 75 24)">`
+        + `<rect x="11" y="7" width="128" height="34" rx="6" fill="rgba(46,125,50,.06)" stroke="${s}" stroke-width="1.5"${dashed ? ' stroke-dasharray="3 2"' : ''}/>`
+        + `<text x="75" y="${subs.length ? 20 : 28}" text-anchor="middle" fill="${s}" font-size="11" font-weight="800" letter-spacing="1">&#10003; APPROVED</text>`
+        + subEls
+        + `</g></svg></div>`;
+    };
     if(by || when){
-      return `<div data-vx-approval-stamp="1" style="height:100%;display:flex;align-items:center;justify-content:center">
-        <div style="border:${px(1.5)} solid #2e7d32;color:#2e7d32;border-radius:${px(6)};padding:${px(4)} ${px(10)};background:rgba(46,125,50,.06);transform:rotate(-5deg);text-align:center;line-height:1.3;font-family:Arial,Helvetica,sans-serif">
-          <div style="font-weight:800;letter-spacing:.1em;font-size:${px(11)}">&#10003; APPROVED</div>
-          ${by ? `<div style="font-size:${px(9)}">${by}</div>` : ''}${when ? `<div style="font-size:${px(9)}">${when}</div>` : ''}
-        </div></div>`;
+      return stampSvg([by, when].filter(Boolean), false, true);
     }
     // Design canvas (preview=false) shows a dashed placeholder so the card is
     // visible and positionable; an unapproved preview/print renders nothing.
     if(!preview){
-      return `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:${px(1)} dashed #2e7d32;border-radius:${px(6)};color:#2e7d32;background:rgba(46,125,50,.04);font-weight:700;font-size:${px(9)};text-align:center;letter-spacing:.08em">&#10003; APPROVED<span style="font-weight:400;font-size:${px(7)};letter-spacing:0;opacity:.7">shown once sealed</span></div>`;
+      return stampSvg(['shown once sealed'], true, false);
     }
     return '';
   }

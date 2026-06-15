@@ -8,7 +8,12 @@
 // Build stamp — BUMP THIS ON EVERY DEPLOY. Shown in the footer so a glance
 // confirms which build a browser is actually running (catches a stale
 // service-worker / HTTP cache serving old JS). Format: YYYY-MM-DD.<n>.
-var VX_BUILD = '2026-06-15.11';
+var VX_BUILD = '2026-06-15.12';
+
+// STAGING-ONLY test tools. `true` keeps the dashboard "Delete all reports"
+// bulk-clear tool visible (veritix.io is staging). Flip to `false` for the
+// customer launch build — one switch instead of surgically deleting the tool.
+var VX_SHOW_TEST_TOOLS = true;
 
 /**
  * @typedef {'Draft'|'Submitted'|'Reviewed'|'Approved'|'Archived'} ReportStage

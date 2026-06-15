@@ -3263,7 +3263,7 @@ function ovRenderRecentList() {
   // TEST TOOL — bulk-clear button for wiping test data during local
   // testing. Built first so it shows in BOTH the empty and populated
   // states. Remove this bar and ovClearAllReports() before release.
-  const _testBar = `<div style="margin-bottom:10px;padding:6px 10px;border:1px dashed var(--amber);border-radius:6px;display:flex;align-items:center;gap:10px;background:rgba(245,166,35,.06);flex-wrap:wrap">
+  const _testBar = !(typeof VX_SHOW_TEST_TOOLS !== 'undefined' && VX_SHOW_TEST_TOOLS) ? '' : `<div style="margin-bottom:10px;padding:6px 10px;border:1px dashed var(--amber);border-radius:6px;display:flex;align-items:center;gap:10px;background:rgba(245,166,35,.06);flex-wrap:wrap">
     <span style="font-size:10px;font-family:var(--mono);color:var(--amber);text-transform:uppercase;letter-spacing:.05em">⚠ Test tool</span>
     <button class="btn btn-sm btn-danger" data-action="ovClearAllReports" style="font-size:11px">Delete all reports</button>
     <span style="font-size:10px;color:var(--t3)">Temporary — clears test data; remove before the cloud release.</span>
@@ -3319,6 +3319,9 @@ function ovOpenReport(idx){
 // data during local testing. Remove this function and the button in
 // ovRenderRecentList before the cloud release.
 async function ovClearAllReports(){
+  // Defence-in-depth: the button is hidden when test tools are off, but guard
+  // the handler too so it can't be invoked from the console in a launch build.
+  if(typeof VX_SHOW_TEST_TOOLS !== 'undefined' && !VX_SHOW_TEST_TOOLS){ return; }
   const reports = ls(KEYS.reports, []);
   if(!reports.length){ toast(t('toast.no_reports','No reports to delete.')); return; }
   if(!await vxConfirm({ message: 'Delete ALL ' + reports.length + ' saved report(s)? This testing tool cannot be undone.', okLabel: t('vxc.delete','Delete all'), danger: true })) return;

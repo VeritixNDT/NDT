@@ -237,10 +237,11 @@ function aiReviewCloseTop() { if (_aiReviewTopClose) { _aiReviewTopClose(); _aiR
 //   { ok:true, review }                — pass/warnings; save may proceed
 //   { blocked:true }                   — "do not issue" + no override; abort the save
 //   { override:true, reason, review }  — Senior/Admin overrode the do-not-issue block
-async function _aiReviewSaveGate() {
+// Core gate over any report object (live-form snapshot for save, or a saved
+// report for approval). Same return shape as above.
+async function _aiReviewGate(report) {
   const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
   if (!sb || !sb.functions) return { skip: true };   // offline — can't run, never block
-  const report = _aiReviewCollectLive();
   if (!report) return { skip: true };
 
   const close = _aiReviewShowOverlay(_aiReviewLoadingHtml(report));
@@ -250,19 +251,24 @@ async function _aiReviewSaveGate() {
     if (resp.error || !resp.data || !resp.data.review) {
       close();
       // Infra failure must not block legitimate work — degrade to a warning.
-      toast(t('ai.gate.unavailable', 'AI review unavailable — saving without it.'), 'warn');
+      toast(t('ai.gate.unavailable', 'AI review unavailable — proceeding without it.'), 'warn');
       return { skip: true };
     }
     review = resp.data.review;
   } catch (e) {
     close();
-    toast(t('ai.gate.unavailable', 'AI review unavailable — saving without it.'), 'warn');
+    toast(t('ai.gate.unavailable', 'AI review unavailable — proceeding without it.'), 'warn');
     return { skip: true };
   }
   close();
 
   if (review.overallRisk !== 'fail') return { ok: true, review };
   return await _aiReviewGateDecision(report, review);
+}
+
+// Save gate — reviews the live editor form before ovSaveReport writes it.
+async function _aiReviewSaveGate() {
+  return await _aiReviewGate(_aiReviewCollectLive());
 }
 
 // Do-not-issue decision modal. Resolves to {blocked:true} or {override,reason,review}.

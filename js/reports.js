@@ -2763,6 +2763,29 @@ async function inboxApprove(idx){
     }
   }
   if(!await vxConfirm({ message: t('inb.confirm.approve','Approve and seal this report? The approved version is locked — later changes require a new revision.'), okLabel: t('vxc.approve','Approve') })) return;
+  // AI pre-issue gate on approval — sealing is the point of no return, so the
+  // same do-not-issue gate applies here as on save. A Senior/Admin (the only
+  // roles that reach this) may override with a logged reason; a block aborts
+  // before any sealing/verify-URL work. Skipped offline. See js/ai-review.js.
+  if(typeof _aiReviewGate === 'function'){
+    const _aiGate = await _aiReviewGate(r);
+    if(_aiGate && _aiGate.blocked) return;
+    if(_aiGate && (_aiGate.review || _aiGate.override)){
+      r.aiReview = {
+        risk: _aiGate.review && _aiGate.review.overallRisk,
+        summary: _aiGate.review && _aiGate.review.summary,
+        at: new Date().toISOString(),
+      };
+      if(_aiGate.override){
+        r.aiOverride = {
+          reason: _aiGate.reason,
+          by: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '',
+          at: new Date().toISOString(),
+        };
+        addReportAudit(r, 'ai-override', 'AI do-not-issue overridden on approval: ' + _aiGate.reason);
+      }
+    }
+  }
   // Foolproof portal linkage: an approved report must be filed under a job
   // (or explicitly marked internal) or it can never reach the customer portal.
   if(typeof _ovEnsureReportLinkedForApproval === 'function' && !await _ovEnsureReportLinkedForApproval(r)) return;

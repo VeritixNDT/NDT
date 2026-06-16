@@ -26,7 +26,7 @@ import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { verifyPortalToken } from "../_shared/portal.ts";
 
 const EVENT_PREFIX = "vx-portal-event::";
-const ALLOWED_KINDS = new Set(["ack-report", "quote-decision", "work-request", "comment"]);
+const ALLOWED_KINDS = new Set(["ack-report", "quote-decision", "work-request", "date-change", "comment"]);
 const MAX_TEXT = 4000;
 const MAX_SHORT = 400;
 
@@ -119,6 +119,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     ev.scope = clip(p.scope, MAX_TEXT);
     ev.urgency = clip(p.urgency, 32);
     ev.site = clip(p.site, MAX_SHORT);
+  } else if (kind === "date-change") {
+    const jobId = clip(p.jobId, MAX_SHORT);
+    if (!jobId || !myJobIds.has(jobId)) return jsonResponse({ error: "job not found for this customer" }, 404);
+    ev.jobId = jobId;
+    ev.jobTitle = clip(p.jobTitle, MAX_SHORT);
+    ev.requestedDate = clip(p.requestedDate, 32);
+    ev.reason = clip(p.reason, MAX_TEXT);
   } else if (kind === "comment") {
     const text = clip(p.text, MAX_TEXT);
     if (!text) return jsonResponse({ error: "text required" }, 400);
@@ -142,7 +149,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // never fails the request. The recipient is fixed to the org's configured
   // address (company.requestEmail → company.email), never the customer, so this
   // can't be turned into a spam relay.
-  if (kind === "work-request") {
+  if (kind === "work-request" || kind === "date-change") {
     try {
       // deno-lint-ignore no-explicit-any
       const company = (byKey["vx-company-v1"] as any) || {};
@@ -150,7 +157,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const apiKey = Deno.env.get("RESEND_API_KEY");
       const from = Deno.env.get("EMAIL_FROM");
       if (to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) && apiKey && from) {
-        const lines = [
+        const isDate = kind === "date-change";
+        const heading = isDate ? "Date-change request" : "New inspection request";
+        const subject = isDate
+          ? `Date-change request — ${ev.jobTitle || cust.name || ""}`
+          : `New inspection request — ${ev.title || cust.name || ""}`;
+        const lines = (isDate ? [
+          ev.jobTitle ? `Job: ${ev.jobTitle}` : "",
+          ev.requestedDate ? `Requested date: ${ev.requestedDate}` : "",
+          ev.reason ? `Reason: ${ev.reason}` : "",
+          `Customer: ${cust.name || ""}`,
+          ev.by ? `Submitted by: ${ev.by}` : "",
+        ] : [
           ev.title ? `Request: ${ev.title}` : "",
           ev.method ? `Method: ${ev.method}` : "",
           ev.urgency ? `Urgency: ${ev.urgency}` : "",
@@ -158,17 +176,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
           ev.scope ? `Details: ${ev.scope}` : "",
           `Customer: ${cust.name || ""}`,
           ev.by ? `Submitted by: ${ev.by}` : "",
-        ].filter(Boolean);
+        ]).filter(Boolean);
         await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             from, to: [to],
-            subject: `New inspection request — ${ev.title || cust.name || ""}`,
-            text: lines.join("\n") + "\n\nOpen Veritix to turn this into a job.",
-            html: `<h2 style="font-family:Arial,sans-serif;color:#185FA5">New inspection request</h2>` +
+            subject,
+            text: lines.join("\n") + "\n\nOpen Veritix to action this.",
+            html: `<h2 style="font-family:Arial,sans-serif;color:#185FA5">${esc(heading)}</h2>` +
               `<p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.7">${lines.map(esc).join("<br>")}</p>` +
-              `<p style="font-family:Arial,sans-serif;font-size:13px;color:#6b7589">Open Veritix to turn this request into a job.</p>`,
+              `<p style="font-family:Arial,sans-serif;font-size:13px;color:#6b7589">Open Veritix to action this.</p>`,
           }),
         });
       }

@@ -92,11 +92,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
         verdict: r.verdict, jobId: r.jobId, stage: r.stage,
         sealedHtml: r.sealedHtml || h.sealedHtml || h.frozenHtml || r.frozenHtml || "",
         acknowledgedBy: r.acknowledgedBy || "", acknowledgedAt: r.acknowledgedAt || "",
+        examDate: r.examDate || "",
       };
     });
 
   const quotes = asArray(byKey["vx-quotes-v1"]).filter((q) => q && q.customerId === customerId && (q.status === "Sent" || q.status === "Accepted"));
   const invoices = asArray(byKey["vx-invoices-v1"]).filter((i) => i && i.customerId === customerId);
+
+  // The customer's own submitted requests (work requests + date-change asks),
+  // so the portal can show them what they've sent. Append-only event rows.
+  const EVENT_PREFIX = "vx-portal-event::";
+  const { data: evRows } = await service
+    .from("entities").select("value").eq("org_id", orgId).like("key", EVENT_PREFIX + "%");
+  const requests = asArray(evRows ? evRows.map((r) => r.value) : [])
+    .filter((e) => e && e.customerId === customerId && (e.kind === "work-request" || e.kind === "date-change"))
+    .map((e) => ({
+      id: e.id, kind: e.kind, at: e.at, title: e.title || "", method: e.method || "",
+      urgency: e.urgency || "", site: e.site || "", scope: e.scope || "",
+      requestedDate: e.requestedDate || "", reason: e.reason || "", jobTitle: e.jobTitle || "",
+    }))
+    .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
 
   // deno-lint-ignore no-explicit-any
   const company = (byKey["vx-company-v1"] as any) || {};
@@ -104,6 +119,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   return jsonResponse({
     company: { name: company.name || "", logo: company.logo || "", color: company.color || "#185FA5", footer: company.footer || "" },
     customer: { name: cust.name || "", id: cust.id },
-    jobs, reports, quotes, invoices,
+    jobs, reports, quotes, invoices, requests,
   });
 });

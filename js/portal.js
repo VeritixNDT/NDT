@@ -61,13 +61,22 @@ function _vxPortalLocalData(customerId){
   const jobIds = new Set(jobs.map(j => j.id));
   const reports = (ls(KEYS.reports, []) || [])
     .filter(r => jobIds.has(r.jobId) && (getReportStage(r) === 'Approved' || getReportStage(r) === 'Sent'))
-    .map(r => ({ reportNo:r.reportNo, method:r.method, revision:r.revision, createdAt:r.createdAt, verdict:r.verdict, jobId:r.jobId, stage:getReportStage(r), sealedHtml:r.sealedHtml || r.frozenHtml || '', acknowledgedBy:r.acknowledgedBy||'', acknowledgedAt:r.acknowledgedAt||'' }));
+    .map(r => ({ reportNo:r.reportNo, method:r.method, revision:r.revision, createdAt:r.createdAt, verdict:r.verdict, jobId:r.jobId, stage:getReportStage(r), sealedHtml:r.sealedHtml || r.frozenHtml || '', acknowledgedBy:r.acknowledgedBy||'', acknowledgedAt:r.acknowledgedAt||'', examDate:r.examDate||'' }));
   const quotes = (ls(KEYS.quotes, []) || []).filter(q => q.customerId === customerId && (q.status === 'Sent' || q.status === 'Accepted'));
   const invoices = (ls(KEYS.invoices, []) || []).filter(i => i.customerId === customerId);
+  // The customer's own submitted requests (from the local requests store).
+  let requests = [];
+  try {
+    const key = (typeof VX_PORTAL_REQ_KEY !== 'undefined') ? VX_PORTAL_REQ_KEY : 'vx-portal-requests-v1';
+    requests = (JSON.parse(localStorage.getItem(key) || '[]') || [])
+      .filter(e => e && e.customerId === customerId && (e.kind === 'work-request' || e.kind === 'date-change'))
+      .map(e => ({ id:e.id, kind:e.kind, at:e.at, title:e.title||'', method:e.method||'', urgency:e.urgency||'', site:e.site||'', scope:e.scope||'', requestedDate:e.requestedDate||'', reason:e.reason||'', jobTitle:e.jobTitle||'' }))
+      .sort((a,b) => String(b.at||'').localeCompare(String(a.at||'')));
+  } catch(e){}
   return {
     company: { name:company.name||'', logo:company.logo||'', color:company.color||'#185FA5', footer:company.footer||'' },
     customer: { name:cust.name||'', id:cust.id },
-    jobs, reports, quotes, invoices,
+    jobs, reports, quotes, invoices, requests,
   };
 }
 
@@ -189,6 +198,75 @@ function _portalCockpit(data, accent){
     </div>`;
 }
 
+// ── Inspection schedule (Portal v2 — calendar of job/exam dates) ──────────────
+function _portalSchedule(data, accent){
+  const items = [];
+  (data.jobs || []).forEach(j => { if(j.startDate) items.push({ ymd:String(j.startDate).slice(0,10), endYmd:j.endDate?String(j.endDate).slice(0,10):'', title:j.title||'Job', sub:j.status||'', jobId:j.id, type:'job' }); });
+  (data.reports || []).forEach(r => { if(r.examDate) items.push({ ymd:String(r.examDate).slice(0,10), endYmd:'', title:((r.method||'')+' '+(r.reportNo||'')).trim(), sub:'Exam', type:'exam' }); });
+  if(!items.length) return '';
+  items.sort((a,b) => a.ymd.localeCompare(b.ymd));
+
+  // Days that carry an inspection (job ranges expanded) → calendar dots.
+  const marked = {};
+  items.forEach(it => {
+    marked[it.ymd] = true;
+    if(it.endYmd && it.endYmd > it.ymd){ let d = new Date(it.ymd+'T00:00:00'); const end = new Date(it.endYmd+'T00:00:00'); let g=0; while(d<=end && g++<400){ marked[d.toISOString().slice(0,10)] = true; d.setDate(d.getDate()+1); } }
+  });
+  const todayYmd = new Date().toISOString().slice(0,10);
+  const focusItem = items.find(it => (it.endYmd||it.ymd) >= todayYmd) || items[items.length-1];
+  const focus = new Date(focusItem.ymd+'T00:00:00');
+  const year = focus.getFullYear(), month = focus.getMonth();
+  const startDow = (new Date(year, month, 1).getDay()+6)%7;   // Monday-first
+  const dim = new Date(year, month+1, 0).getDate();
+  let cells = '';
+  for(let i=0;i<startDow;i++) cells += '<div></div>';
+  for(let d=1; d<=dim; d++){
+    const k = year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const has = marked[k], isToday = k===todayYmd;
+    cells += `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;position:relative;font-size:12px;border-radius:6px;${has?`background:${accent}14;color:${accent};font-weight:700`:'color:#6b7589'}${isToday?(';box-shadow:inset 0 0 0 1.5px '+accent):''}">${d}${has?`<span style="position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:${accent}"></span>`:''}</div>`;
+  }
+  const dowRow = ['Mo','Tu','We','Th','Fr','Sa','Su'].map(x=>`<div style="font-size:10px;color:#9aa5bd;text-align:center;padding-bottom:4px">${x}</div>`).join('');
+  const cal = `<div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);padding:14px 16px;flex:0 0 270px">
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px">${focus.toLocaleString('en',{month:'long',year:'numeric'})}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${dowRow}${cells}</div></div>`;
+
+  const upcoming = items.filter(it => (it.endYmd||it.ymd) >= todayYmd).slice(0,8);
+  const agendaRows = (upcoming.length ? upcoming : items.slice(-4)).map(it => {
+    const dt = new Date(it.ymd+'T00:00:00');
+    const dchg = (it.type==='job' && it.jobId) ? `<button data-action="vxPortalRequestDateChange" data-args="'${_portalEsc(it.jobId)}'" title="Request a different date" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:10px;padding:3px 8px;white-space:nowrap">Request change</button>` : '';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid #eef0f4">
+      <div style="text-align:center;flex:0 0 42px"><div style="font-size:18px;font-weight:800;color:${accent};line-height:1">${dt.getDate()}</div><div style="font-size:10px;color:#9aa5bd;text-transform:uppercase">${dt.toLocaleString('en',{month:'short'})}</div></div>
+      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${_portalEsc(it.title)}</div><div style="font-size:11px;color:#6b7589">${_portalEsc(it.sub)}${it.endYmd&&it.endYmd!==it.ymd?(' · until '+_portalDate(it.endYmd)):''}</div></div>
+      ${dchg}
+    </div>`;
+  }).join('');
+  const agenda = `<div style="flex:1;min-width:220px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);padding:14px 16px"><div style="font-size:11px;font-weight:600;color:#6b7589;margin-bottom:4px">${upcoming.length?'Upcoming':'Recent'}</div>${agendaRows}</div>`;
+
+  return `<h2 style="font-size:15px;margin:24px 0 10px;color:#0b1220">Inspection schedule</h2>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">${cal}${agenda}</div>`;
+}
+
+// ── Your submitted requests (Portal v2) ───────────────────────────────────────
+function _portalRequests(data){
+  const reqs = (data.requests || []);
+  if(!reqs.length) return '';
+  const rows = reqs.map(r => {
+    const isDate = r.kind === 'date-change';
+    const title = isDate
+      ? ('Date change' + (r.jobTitle ? ' · ' + r.jobTitle : '') + (r.requestedDate ? ' → ' + _portalDate(r.requestedDate) : ''))
+      : (r.title || 'Inspection request');
+    const meta = (isDate ? [r.reason] : [r.method, r.site]).filter(Boolean).map(_portalEsc).join(' · ');
+    return `<tr>
+      <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:13px;font-weight:600">${_portalEsc(title)}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589">${meta}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589;white-space:nowrap">${_portalDate(r.at)}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right">${_portalBadge('Received', '#6b7589')}</td>
+    </tr>`;
+  }).join('');
+  return `<h2 style="font-size:15px;margin:24px 0 10px;color:#0b1220">Your requests</h2>
+    <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);overflow:hidden"><table style="width:100%;border-collapse:collapse">${rows}</table></div>`;
+}
+
 function vxPortalRender(root, data){
   const accent = (data.company && /^#[0-9A-Fa-f]{6}$/.test(data.company.color || '')) ? data.company.color : '#185FA5';
   const co = data.company || {};
@@ -283,11 +361,13 @@ function vxPortalRender(root, data){
   const footer = `<div style="text-align:center;color:#9aa5bd;font-size:11px;margin-top:30px">${_portalEsc(co.footer || co.name || '')}</div>`;
 
   const cockpitHtml = _portalCockpit(data, accent);
+  const scheduleHtml = _portalSchedule(data, accent);
+  const requestsHtml = _portalRequests(data);
   const requestCta = `<div style="display:flex;justify-content:flex-end;margin:-6px 0 16px"><button data-action="vxPortalRequestWork" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:9px;font-size:13px;font-weight:600;padding:10px 18px;box-shadow:0 1px 3px rgba(20,30,60,.12)">+ Request an inspection</button></div>`;
   const searchBar = (data.jobs || []).length
     ? `<div style="margin:0 0 16px"><input id="vxp-search" type="search" value="${_portalEsc(_vxPortalQuery)}" data-on-input="vxPortalSearch" data-pass-value="1" placeholder="Search reports, jobs, invoices…" style="width:100%;box-sizing:border-box;padding:11px 15px;border:1px solid #d6dbe6;border-radius:10px;font-size:14px;background:#fff;color:#1c2333"></div>`
     : '';
-  root.innerHTML = header + _portalShell(accent, paidNotice + requestCta + cockpitHtml + searchBar + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
+  root.innerHTML = header + _portalShell(accent, paidNotice + requestCta + cockpitHtml + scheduleHtml + searchBar + jobsHtml + requestsHtml + invoicesHtml + payNote + quotesHtml + footer);
 }
 
 // ── Downloads ────────────────────────────────────────────────────────────────
@@ -417,7 +497,7 @@ function _vxApplyPortalEventLocal(ev){
       if(typeof addReportAudit === 'function') try { addReportAudit(r, 'ack', 'Acknowledged by customer' + (ev.by ? ' (' + ev.by + ')' : '')); } catch(_){}
       lss(KEYS.reports, reports);
     }
-  } else if(ev.kind === 'work-request'){
+  } else if(ev.kind === 'work-request' || ev.kind === 'date-change'){
     // Preview path mirrors the cloud ingest: file the request locally so the
     // inspector's Jobs page shows it on this device.
     try {
@@ -546,6 +626,51 @@ async function vxPortalRequestWork(){
   const res = await vxPortalSubmit('work-request', req);
   if(res.error){ if(typeof toast === 'function') toast(res.error, 'error'); return; }
   if(typeof toast === 'function') toast('Request sent — thank you. We\'ll be in touch.', 'success');
+}
+
+// Request a different date for a scheduled job.
+function _vxPortalDateForm(accent, job){
+  return new Promise((resolve) => {
+    const inp = 'width:100%;box-sizing:border-box;margin:0 0 10px;padding:9px 11px;border:1px solid #d6dbe6;border-radius:8px;font-size:13.5px;font-family:inherit';
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(12,18,32,.55);display:flex;align-items:flex-start;justify-content:center;padding:24px 18px;overflow-y:auto';
+    ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(12,18,32,.3);font-family:inherit">
+      <div style="font-size:16px;font-weight:700;margin-bottom:3px;color:#0b1220">Request a date change</div>
+      <div style="font-size:12.5px;color:#6b7589;margin-bottom:14px">${_portalEsc(job ? (job.title || '') : '')}${job && job.startDate ? ' · currently ' + _portalDate(job.startDate) : ''}</div>
+      <label style="font-size:11px;font-weight:600;color:#6b7589;text-transform:uppercase;letter-spacing:.04em">Preferred date</label>
+      <input id="vxd-date" type="date" style="${inp};margin-top:5px">
+      <textarea id="vxd-reason" rows="2" placeholder="Reason (optional)" style="${inp};resize:vertical"></textarea>
+      <input id="vxd-by" placeholder="Your name" style="${inp}">
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        <button id="vxd-cancel" style="cursor:pointer;border:1px solid #d6dbe6;background:#fff;color:#6b7589;border-radius:8px;font-size:13px;padding:8px 16px">Cancel</button>
+        <button id="vxd-ok" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:8px;font-size:13px;font-weight:600;padding:8px 18px">Send request</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const done = (v) => { try { ov.remove(); } catch(_){} resolve(v); };
+    const dateEl = ov.querySelector('#vxd-date'), byEl = ov.querySelector('#vxd-by');
+    ov.querySelector('#vxd-cancel').addEventListener('click', () => done(null));
+    ov.addEventListener('click', (e) => { if(e.target === ov) done(null); });
+    ov.querySelector('#vxd-ok').addEventListener('click', () => {
+      if(!dateEl.value){ dateEl.style.borderColor = '#dc2626'; dateEl.focus(); return; }
+      const by = (byEl.value || '').trim();
+      if(!by){ byEl.style.borderColor = '#dc2626'; byEl.focus(); return; }
+      done({ requestedDate: dateEl.value, reason: (ov.querySelector('#vxd-reason').value || '').trim(), by: by });
+    });
+    setTimeout(() => { try { dateEl.focus(); } catch(_){} }, 30);
+  });
+}
+async function vxPortalRequestDateChange(jobId){
+  const data = _vxPortalData; if(!data) return;
+  const job = (data.jobs || []).find(j => j.id === jobId) || null;
+  const accent = (data.company && data.company.color) || '#185FA5';
+  const r = await _vxPortalDateForm(accent, job);
+  if(!r) return;
+  if(typeof toast === 'function') toast('Sending your request…', 'info');
+  const res = await vxPortalSubmit('date-change', { jobId: jobId, jobTitle: job ? job.title : '', requestedDate: r.requestedDate, reason: r.reason, by: r.by });
+  if(res.error){ if(typeof toast === 'function') toast(res.error, 'error'); return; }
+  if(typeof toast === 'function') toast('Date-change request sent — thank you.', 'success');
+  _vxPortalReRender();
 }
 
 // Re-render the portal from the (possibly optimistically updated) data.

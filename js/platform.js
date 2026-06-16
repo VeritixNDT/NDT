@@ -3414,6 +3414,10 @@ function _vxIngestPortalEvent(ev){
     try { var reqs = vxPortalRequests(); reqs.unshift(ev); localStorage.setItem(VX_PORTAL_REQ_KEY, JSON.stringify(reqs.slice(0, 200))); } catch(e){}
     return 'New work request: ' + (ev.title || '') + (ev.by ? ' (' + ev.by + ')' : '');
   }
+  if(ev.kind === 'date-change'){
+    try { var reqs2 = vxPortalRequests(); reqs2.unshift(ev); localStorage.setItem(VX_PORTAL_REQ_KEY, JSON.stringify(reqs2.slice(0, 200))); } catch(e){}
+    return 'Date-change request for ' + (ev.jobTitle || 'a job') + (ev.requestedDate ? ' → ' + ev.requestedDate : '') + (ev.by ? ' (' + ev.by + ')' : '');
+  }
   if(ev.kind === 'comment'){ return 'New comment from ' + (ev.by || 'customer'); }
   return 'Customer update';
 }

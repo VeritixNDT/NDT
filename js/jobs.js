@@ -143,17 +143,26 @@ function _jobsRequestsBand(){
   if(!reqs.length) return '';
   const rows = reqs.map(r => {
     const cust = (typeof jobCustomerName === 'function') ? jobCustomerName(r.customerId) : '';
-    const urg = (r.urgency && r.urgency !== 'Normal')
+    const isDate = r.kind === 'date-change';
+    const urg = (!isDate && r.urgency && r.urgency !== 'Normal')
       ? `<span style="font-size:10px;font-weight:700;color:${r.urgency==='Urgent'?'#dc2626':'#d97706'};border:1px solid currentColor;border-radius:10px;padding:1px 7px;margin-left:6px">${escapeHtml(r.urgency)}</span>` : '';
-    const meta = [r.method, r.site, cust].filter(Boolean).map(escapeHtml).join(' · ');
+    const fdate = (d) => (typeof fmtDate === 'function') ? fmtDate(d) : d;
+    const title = isDate
+      ? ('Date change · ' + escapeHtml(r.jobTitle || 'job') + (r.requestedDate ? ' → ' + escapeHtml(fdate(r.requestedDate)) : ''))
+      : escapeHtml(r.title || '(untitled request)');
+    const meta = isDate ? [cust].filter(Boolean).map(escapeHtml).join(' · ') : [r.method, r.site, cust].filter(Boolean).map(escapeHtml).join(' · ');
+    const detail = isDate ? (r.reason || '') : (r.scope || '');
+    const actions = isDate
+      ? `<button class="btn btn-sm btn-primary" data-action="jobApplyDateChange" data-args="'${escapeHtml(r.id)}'" style="font-size:11px">Apply date</button>`
+      : `<button class="btn btn-sm btn-primary" data-action="jobFromRequest" data-args="'${escapeHtml(r.id)}'" style="font-size:11px">Create job</button>`;
     return `<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-top:1px solid var(--border)">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:13px">${escapeHtml(r.title||'(untitled request)')}${urg}</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:2px">${meta}${r.by?' · '+escapeHtml(r.by):''}${r.at?' · '+((typeof fmtDate==='function')?fmtDate(r.at):escapeHtml(r.at)):''}</div>
-        ${r.scope?`<div style="font-size:12px;color:var(--t2);margin-top:4px;white-space:pre-line">${escapeHtml(r.scope)}</div>`:''}
+        <div style="font-weight:600;font-size:13px">${title}${urg}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${meta}${r.by?' · '+escapeHtml(r.by):''}${r.at?' · '+escapeHtml(fdate(r.at)):''}</div>
+        ${detail?`<div style="font-size:12px;color:var(--t2);margin-top:4px;white-space:pre-line">${escapeHtml(detail)}</div>`:''}
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn btn-sm btn-primary" data-action="jobFromRequest" data-args="'${escapeHtml(r.id)}'" style="font-size:11px">Create job</button>
+        ${actions}
         <button class="btn btn-sm" data-action="jobDismissRequest" data-args="'${escapeHtml(r.id)}'" style="font-size:11px">Dismiss</button>
       </div>
     </div>`;
@@ -174,6 +183,21 @@ function jobFromRequest(reqId){
   if(el('jobf-scope'))    el('jobf-scope').value = [req.scope, req.method ? 'Requested method: ' + req.method : '', req.site ? 'Site: ' + req.site : '', (req.urgency && req.urgency !== 'Normal') ? 'Urgency: ' + req.urgency : '', req.by ? 'Requested by: ' + req.by : ''].filter(Boolean).join('\n');
   if(typeof vxPortalRequestMarkHandled === 'function') vxPortalRequestMarkHandled(reqId, 'job');
   toast('Job pre-filled from the request — review and save.', 'info');
+}
+// Apply a customer's requested date to the job (sets its start date), then mark
+// the request handled.
+function jobApplyDateChange(reqId){
+  const req = (typeof vxPortalRequests === 'function') ? vxPortalRequests().find(r => r.id === reqId) : null;
+  if(!req || !req.jobId){ toast('Request not found.', 'error'); return; }
+  const jobs = jobLoad();
+  const j = jobs.find(x => x.id === req.jobId);
+  if(!j){ toast('That job no longer exists.', 'error'); if(typeof vxPortalRequestMarkHandled==='function') vxPortalRequestMarkHandled(reqId, 'dismissed'); jobsRender(); return; }
+  if(req.requestedDate) j.startDate = req.requestedDate;
+  j.updatedAt = new Date().toISOString();
+  jobSaveAll(jobs);
+  if(typeof vxPortalRequestMarkHandled === 'function') vxPortalRequestMarkHandled(reqId, 'applied');
+  toast('Job date updated to ' + ((typeof fmtDate==='function')?fmtDate(req.requestedDate):req.requestedDate) + '.', 'success');
+  jobsRender();
 }
 async function jobDismissRequest(reqId){
   if(typeof vxConfirm === 'function'){ if(!await vxConfirm({ message: 'Dismiss this customer request?', okLabel: 'Dismiss' })) return; }

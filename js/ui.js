@@ -1402,10 +1402,23 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════
 // NOTIFICATIONS
 // ══════════════════════════════════════════════
+// Map a customer portal event to a notification icon kind.
+function _portalNotifKind(n) {
+  if(n.kind === 'quote-decision') return /declined/i.test(n.summary || '') ? 'warn' : 'success';
+  if(n.kind === 'ack-report') return 'success';
+  return 'info';
+}
 function _buildNotifs() {
-  // Generate friendly notifications from recent reports
-  const reports = ls(KEYS.reports, []).slice(-5).reverse();
   const out = [];
+  // Customer portal updates first — the actionable, cross-device ones
+  // (acknowledgements, quote decisions, work requests), newest first.
+  if(typeof vxPortalNotifs === 'function') {
+    vxPortalNotifs().slice(0, 8).forEach(n => {
+      out.push({ kind: _portalNotifKind(n), text: escapeHtml(n.summary || 'Customer update'), time: n.at ? fmtDate(n.at) : '', unread: !n.read });
+    });
+  }
+  // Then recent report activity
+  const reports = ls(KEYS.reports, []).slice(-5).reverse();
   reports.forEach((r, i) => {
     const isFail = r.verdict === 'Not acceptable';
     const isOk   = r.verdict === 'Acceptable';
@@ -1463,13 +1476,17 @@ function _closeNotifOutside(e) {
 }
 function closeNotifDropdown() { el('notif-dropdown').classList.remove('open'); }
 function clearNotifs() {
+  if(typeof vxPortalNotifMarkAllRead === 'function') vxPortalNotifMarkAllRead();
   document.querySelectorAll('.notif-item.unread').forEach(n => n.classList.remove('unread'));
   el('notif-btn').classList.remove('has-notif');
 }
 function refreshNotifBadge() {
   const items = _buildNotifs();
-  el('notif-btn').classList.toggle('has-notif', items.some(n => n.unread));
+  const btn = el('notif-btn');
+  if(btn) btn.classList.toggle('has-notif', items.some(n => n.unread));
 }
+// New customer activity arrived from the portal-events ingest — light the badge.
+window.addEventListener('vx:portal-events', function(){ try { refreshNotifBadge(); } catch(e){} });
 
 // ══════════════════════════════════════════════
 // SPARKLINE GENERATOR

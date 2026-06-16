@@ -651,6 +651,64 @@ function cvPrintOrExport(opts){
 /** Print a standalone HTML document via a hidden iframe + the browser
  *  print dialog. Shared by the editor's Print / PDF (cvPrintOrExport)
  *  and saved-report reprints (ovPrintReport). */
+// ── True no-dialog PDF download ───────────────────────────────────────────────
+// Generates a real .pdf file client-side (html2pdf = html2canvas + jsPDF) and
+// downloads it directly — no browser print dialog. The library is loaded on
+// demand from the same CDN as the Supabase bundle (CSP already allows it) and
+// cached. If it can't load (offline / CSP), we fall back to _vxPrintHtml so the
+// user still gets a PDF via the print dialog. Note: html2canvas rasterises, so
+// the PDF is image-based (not selectable text) — fine for a visual deliverable.
+var _vxHtml2PdfPromise = null;
+function vxEnsureHtml2Pdf(){
+  if(typeof window.html2pdf !== 'undefined') return Promise.resolve(true);
+  if(_vxHtml2PdfPromise) return _vxHtml2PdfPromise;
+  _vxHtml2PdfPromise = new Promise(function(resolve, reject){
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+    s.async = true;
+    s.onload = function(){ resolve(typeof window.html2pdf !== 'undefined'); };
+    s.onerror = function(){ _vxHtml2PdfPromise = null; reject(new Error('pdf-lib-load-failed')); };
+    document.head.appendChild(s);
+  });
+  return _vxHtml2PdfPromise;
+}
+async function vxDownloadHtmlAsPdf(html, filename){
+  if(!html){ if(typeof toast === 'function') toast('Nothing to download.', 'error'); return; }
+  filename = String(filename || 'document').replace(/[^\w.\- ]+/g, '').trim().slice(0, 120) || 'document';
+  if(!/\.pdf$/i.test(filename)) filename += '.pdf';
+  var ok = false;
+  try { ok = await vxEnsureHtml2Pdf(); } catch(e){ ok = false; }
+  if(!ok || typeof window.html2pdf === 'undefined'){
+    // Library unavailable — fall back to the print → Save-as-PDF dialog.
+    if(typeof _vxPrintHtml === 'function') return _vxPrintHtml(html);
+    return;
+  }
+  if(typeof toast === 'function') toast(t('pe.toast.preparing_pdf','Preparing PDF…'), 'info');
+  // Render the report's own styles + body in an offscreen, full-width container
+  // so html2canvas measures the A4 pages at their true size.
+  var styles = (html.match(/<style[\s\S]*?<\/style>/gi) || []).join('');
+  var bodyM = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;background:#fff;z-index:-1';
+  wrap.innerHTML = styles + (bodyM ? bodyM[1] : html);
+  document.body.appendChild(wrap);
+  try {
+    await window.html2pdf().set({
+      margin: 0,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from(wrap).save();
+  } catch(e){
+    console.warn('vxDownloadHtmlAsPdf failed', e);
+    if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
+  } finally {
+    try { document.body.removeChild(wrap); } catch(_){}
+  }
+}
+
 function _vxPrintHtml(html){
   let iframe = document.getElementById('vx-print-iframe');
   if(iframe) iframe.remove();

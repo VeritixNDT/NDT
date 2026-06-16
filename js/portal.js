@@ -418,9 +418,11 @@ function vxPortalDownloadPack(jobId){
   if(typeof vxBuildReportPackHtml !== 'function'){ if(typeof toast === 'function') toast('Pack export unavailable.', 'error'); return; }
   const cust = { name: (data.customer && data.customer.name) || '' };
   const html = vxBuildReportPackHtml(job, cust, reps, data.company || null);
-  // Go straight to the browser's print → "Save as PDF" dialog (the same
-  // download path the inspector-side pack uses), not just open the HTML.
-  if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
+  const fn = (job.title || 'job') + ' report pack';
+  // True no-dialog download → a real .pdf file (falls back to the print dialog
+  // if the PDF library can't load).
+  if(typeof vxDownloadHtmlAsPdf === 'function') vxDownloadHtmlAsPdf(html, fn);
+  else if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
   else _vxPortalOpenHtml(html);
 }
 

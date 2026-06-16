@@ -326,7 +326,11 @@ function vxPortalDownloadPack(jobId){
   reps.sort((a, b) => (a.method || '').localeCompare(b.method || '') || String(a.reportNo || '').localeCompare(String(b.reportNo || '')));
   if(typeof vxBuildReportPackHtml !== 'function'){ if(typeof toast === 'function') toast('Pack export unavailable.', 'error'); return; }
   const cust = { name: (data.customer && data.customer.name) || '' };
-  _vxPortalOpenHtml(vxBuildReportPackHtml(job, cust, reps, data.company || null));
+  const html = vxBuildReportPackHtml(job, cust, reps, data.company || null);
+  // Go straight to the browser's print → "Save as PDF" dialog (the same
+  // download path the inspector-side pack uses), not just open the HTML.
+  if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
+  else _vxPortalOpenHtml(html);
 }
 
 // Portal search — filters jobs/reports/documents by a free-text query, then

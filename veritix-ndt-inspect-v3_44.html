@@ -3524,6 +3524,47 @@
             </div>
           </div>
           <div class="sc">
+            <div class="sc-head"><span class="sc-title">Customer portal notifications</span><span style="font-size:11px;color:var(--t3)">Auto-email customers · off by default</span></div>
+            <div class="sc-body">
+              <div class="info-box">When on, customers are emailed automatically with a secure portal link. Requires the email backend + a contact email on each customer. Each event sends at most once.</div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-label">Enable customer notifications</div>
+                  <div class="toggle-desc">Master switch — nothing is sent unless this is on</div>
+                </div>
+                <label class="tgl"><input type="checkbox" id="cn-enabled"><div class="tgl-track"></div></label>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-label">Report issued</div>
+                  <div class="toggle-desc">Email the customer when their inspection report is ready</div>
+                </div>
+                <label class="tgl"><input type="checkbox" id="cn-report"><div class="tgl-track"></div></label>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-label">Quote sent</div>
+                  <div class="toggle-desc">Email the customer when a quotation is issued for their review</div>
+                </div>
+                <label class="tgl"><input type="checkbox" id="cn-quote"><div class="tgl-track"></div></label>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-label">Invoice due / overdue</div>
+                  <div class="toggle-desc">Remind the customer as an invoice approaches or passes its due date</div>
+                </div>
+                <label class="tgl"><input type="checkbox" id="cn-invoice"><div class="tgl-track"></div></label>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-label">Action receipts</div>
+                  <div class="toggle-desc">Email the customer a confirmation of their own acknowledgement / decision</div>
+                </div>
+                <label class="tgl"><input type="checkbox" id="cn-receipt"><div class="tgl-track"></div></label>
+              </div>
+            </div>
+          </div>
+          <div class="sc">
             <div class="sc-head"><span class="sc-title" data-i18n="nt.email.section">Email delivery (EmailJS)</span></div>
             <div class="sc-body">
               <div class="info-box">Configure <a href="https://www.emailjs.com" target="_blank">EmailJS</a> to send real email notifications. Free tier = 200 emails/month.</div>

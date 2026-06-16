@@ -39,6 +39,15 @@ function loadSettings() {
   if(el('notif-cert'))  el('notif-cert').checked  = s.notifCert!==false;
   if(el('notif-calib')) el('notif-calib').checked = s.notifCalib!==false;
   if(el('notif-report'))el('notif-report').checked= !!s.notifReport;
+  // Customer portal notifications (Portal v2 D) — loaded from vx-notify-v1.
+  if(typeof vxNotifySettings === 'function'){
+    const cn = vxNotifySettings();
+    if(el('cn-enabled')) el('cn-enabled').checked = !!cn.enabled;
+    if(el('cn-report'))  el('cn-report').checked  = !!cn.reportIssued;
+    if(el('cn-quote'))   el('cn-quote').checked   = !!cn.quoteSent;
+    if(el('cn-invoice')) el('cn-invoice').checked = !!cn.invoiceDue;
+    if(el('cn-receipt')) el('cn-receipt').checked = !!cn.receipts;
+  }
   if(el('ejs-service')) el('ejs-service').value   = s.ejsService||'';
   if(el('ejs-template'))el('ejs-template').value  = s.ejsTemplate||'';
   if(el('ejs-pubkey'))  el('ejs-pubkey').value    = s.ejsPubkey||'';
@@ -2845,6 +2854,16 @@ function saveNotifications() {
   s.notifCert   = el('notif-cert')?.checked;
   s.notifCalib  = el('notif-calib')?.checked;
   s.notifReport = el('notif-report')?.checked;
+  // Customer portal notifications (Portal v2 D) → vx-notify-v1.
+  if(typeof vxNotifySettingsSet === 'function'){
+    vxNotifySettingsSet({
+      enabled:      !!el('cn-enabled')?.checked,
+      reportIssued: !!el('cn-report')?.checked,
+      quoteSent:    !!el('cn-quote')?.checked,
+      invoiceDue:   !!el('cn-invoice')?.checked,
+      receipts:     !!el('cn-receipt')?.checked,
+    });
+  }
   s.ejsService  = el('ejs-service')?.value.trim();
   s.ejsTemplate = el('ejs-template')?.value.trim();
   s.ejsPubkey   = el('ejs-pubkey')?.value.trim();

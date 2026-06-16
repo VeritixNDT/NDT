@@ -280,6 +280,15 @@ function billSetStatus(type, id, status) {
   if(status === 'Accepted') list[i].acceptedAt = now;
   if(status === 'Declined') list[i].declinedAt = now;
   list[i].updatedAt = now;
+  // D: notify the customer when a quote is issued (gated + once per quote).
+  if(type === 'quote' && status === 'Sent' && typeof vxNotifyCustomer === 'function' && !list[i].notifiedSent){
+    list[i].notifiedSent = true;
+    try { vxNotifyCustomer('quoteSent', { customerId: list[i].customerId, email: {
+      subject: 'New quotation ' + (list[i].number || '') + ' for your review',
+      title: 'Quotation ' + (list[i].number || '') + ' is ready',
+      intro: 'A new quotation is awaiting your review. You can accept or decline it directly in your portal.',
+      ctaLabel: 'Review quotation' } }); } catch(e){}
+  }
   billSaveAll(type, list);
   toast('Marked ' + status + '.');
   billRefresh();
@@ -463,6 +472,8 @@ function billExportQuickBooksCsv(){
 
 function billingRender() {
   const wrap = el('billing-list-wrap'); if(!wrap) return;
+  // D: sweep for invoices due/overdue and remind the customer (gated, once each).
+  if(typeof vxNotifyCheckInvoices === 'function') try { vxNotifyCheckInvoices(); } catch(e){}
   const fType   = el('billing-filter-type')?.value || '';
   const fStatus = el('billing-filter-status')?.value || '';
   const search  = (el('billing-search')?.value || '').toLowerCase().trim();

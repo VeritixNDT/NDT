@@ -33,7 +33,7 @@ import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { renderTemplate } from "./templates.ts";
 
 // Template types this function will render at all.
-const ALLOWED_TYPES = new Set(["invite", "quote", "invoice", "portal-link"]);
+const ALLOWED_TYPES = new Set(["invite", "quote", "invoice", "portal-link", "notify"]);
 // Subset that require the caller be an admin of `orgId`.
 const ADMIN_ONLY_TYPES = new Set(["invite"]);
 
@@ -149,7 +149,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         inviterName,
         signupUrl: envOrThrow("APP_URL"),
       });
-    } else if (type === "quote" || type === "invoice" || type === "portal-link") {
+    } else if (type === "quote" || type === "invoice" || type === "portal-link" || type === "notify") {
       // Document / link emails render entirely from the structured payload the
       // client sends — no DB lookup, JWT-gated only.
       rendered = renderTemplate(type, payload as unknown as Record<string, unknown>);

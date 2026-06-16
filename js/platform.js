@@ -3391,10 +3391,16 @@ function _vxIngestPortalEvent(ev){
   if(!ev || !ev.kind) return 'Customer update';
   if(ev.kind === 'quote-decision'){
     if(typeof _vxApplyPortalEventLocal === 'function') _vxApplyPortalEventLocal(ev);
+    if(typeof vxNotifyCustomer === 'function') try { vxNotifyCustomer('receipts', { customerId: ev.customerId, withLink: false, email: {
+      subject: 'We received your decision on quote ' + (ev.quoteNumber || ''),
+      title: 'Thank you', intro: 'This confirms we have recorded that you ' + (ev.decision === 'Accepted' ? 'accepted' : 'declined') + ' quotation ' + (ev.quoteNumber || '') + '.' } }); } catch(e){}
     return 'Quote ' + (ev.quoteNumber || ev.quoteId || '') + ' ' + (ev.decision === 'Accepted' ? 'accepted' : 'declined') + ' by ' + (ev.by || 'customer');
   }
   if(ev.kind === 'ack-report'){
     if(typeof _vxApplyPortalEventLocal === 'function') _vxApplyPortalEventLocal(ev);
+    if(typeof vxNotifyCustomer === 'function') try { vxNotifyCustomer('receipts', { customerId: ev.customerId, withLink: false, email: {
+      subject: 'We received your acknowledgement of report ' + (ev.reportNo || ''),
+      title: 'Thank you', intro: 'This confirms we have recorded your acknowledgement of report ' + (ev.reportNo || '') + '.' } }); } catch(e){}
     return 'Report ' + (ev.reportNo || '') + ' acknowledged by ' + (ev.by || 'customer');
   }
   if(ev.kind === 'work-request'){
@@ -3428,6 +3434,84 @@ async function vxPullPortalEvents(){
     try { window.dispatchEvent(new CustomEvent('vx:portal-events', { detail: { applied: applied } })); } catch(e){}
   }
   return { applied: applied };
+}
+
+// ── Proactive customer notifications (Portal v2, Pillar D) ────────────────────
+// Auto-email customers on key events (report issued / quote sent / invoice due /
+// action receipt). OFF by default — the inspector opts in per event in Settings.
+// Every send is gated, de-duplicated (a per-doc flag), best-effort, and silent
+// on failure (a notification must never block or break the workflow).
+var VX_NOTIFY_KEY = 'vx-notify-v1';
+var VX_NOTIFY_DEFAULTS = { enabled:false, reportIssued:false, quoteSent:false, invoiceDue:false, receipts:false, dueDays:5 };
+function vxNotifySettings(){ try { return Object.assign({}, VX_NOTIFY_DEFAULTS, JSON.parse(localStorage.getItem(VX_NOTIFY_KEY) || '{}')); } catch { return Object.assign({}, VX_NOTIFY_DEFAULTS); } }
+function vxNotifySettingsSet(patch){ var n = Object.assign(vxNotifySettings(), patch || {}); try { localStorage.setItem(VX_NOTIFY_KEY, JSON.stringify(n)); } catch(e){} return n; }
+function _vxNotifyOn(kind){ var s = vxNotifySettings(); return !!(s.enabled && s[kind]); }
+
+// Resolve a customer's notification email — portalEmails first, then a contact.
+function _vxCustomerEmail(cust){
+  if(!cust) return '';
+  if(Array.isArray(cust.portalEmails) && cust.portalEmails.length) return String(cust.portalEmails[0] || '').trim();
+  if(Array.isArray(cust.contacts)){ var c = cust.contacts.find(function(x){ return x && x.email; }); if(c) return String(c.email).trim(); }
+  return '';
+}
+function _vxCustomerById(id){ return (ls(KEYS.customers, []) || []).find(function(c){ return c && c.id === id; }) || null; }
+function _vxReportCustomerId(r){
+  if(!r || !r.jobId) return '';
+  var jobs = (typeof jobLoad === 'function') ? jobLoad() : (ls(KEYS.jobs, []) || []);
+  var j = jobs.find(function(x){ return x && x.id === r.jobId; });
+  return j ? (j.customerId || '') : '';
+}
+
+// Mint a server-signed portal link for a customer (24h). Empty on failure.
+async function _vxMintPortalUrl(customerId){
+  try {
+    var sb = _vxSupabase(); if(!sb || !sb.functions) return '';
+    var cfg = vxPlatformConfig(); if(!cfg.orgId) return '';
+    var r = await sb.functions.invoke('portal-token', { body: { orgId: cfg.orgId, customerId: customerId } });
+    if(r.error || !r.data) return '';
+    if(r.data.url) return r.data.url;
+    if(r.data.token){ return location.origin + location.pathname + '#/portal/' + encodeURIComponent(r.data.token); }
+    return '';
+  } catch(e){ return ''; }
+}
+
+// The gated dispatcher. kind ∈ reportIssued|quoteSent|invoiceDue|receipts.
+// ctx: { customerId | customer, email:{subject,title,intro,ctaLabel,footnote}, withLink? }
+async function vxNotifyCustomer(kind, ctx){
+  if(!_vxNotifyOn(kind)) return { skipped: true };
+  if(!vxIsAuthenticated()) return { skipped: true };
+  ctx = ctx || {};
+  var cust = ctx.customer || _vxCustomerById(ctx.customerId);
+  var to = _vxCustomerEmail(cust); if(!to) return { skipped: true, reason: 'no-email' };
+  var company = (ls(KEYS.company, {}) || {}).name || '';
+  var url = (ctx.withLink === false) ? '' : (cust ? await _vxMintPortalUrl(cust.id) : '');
+  var data = Object.assign({ companyName: company, customerName: cust && cust.name, url: url }, ctx.email || {});
+  try { return await vxApi.sendEmail('notify', to, data); }
+  catch(e){ return { ok:false, error: String(e.message || e) }; }
+}
+
+// Invoice-due sweep — call on billing render. Reminds once per invoice that is
+// Sent and within `dueDays` of (or past) its due date.
+function vxNotifyCheckInvoices(){
+  if(!_vxNotifyOn('invoiceDue')) return;
+  var s = vxNotifySettings();
+  var invoices = ls(KEYS.invoices, []) || [];
+  var changed = false;
+  invoices.forEach(function(inv){
+    if(!inv || inv.notifiedDue || inv.status === 'Paid' || !inv.dueDate) return;
+    if(inv.status !== 'Sent') return;
+    var due = new Date(inv.dueDate); if(isNaN(due.getTime())) return;
+    var days = Math.ceil((due.getTime() - Date.now()) / 86400000);
+    if(days > (s.dueDays || 5)) return;                      // not due soon yet
+    inv.notifiedDue = true; changed = true;
+    var overdue = days < 0;
+    vxNotifyCustomer('invoiceDue', { customerId: inv.customerId, email: {
+      subject: (overdue ? 'Overdue invoice ' : 'Invoice due soon — ') + (inv.number || ''),
+      title: (overdue ? 'Invoice ' + (inv.number || '') + ' is overdue' : 'Invoice ' + (inv.number || '') + ' is due soon'),
+      intro: (overdue ? 'Our records show invoice ' + (inv.number || '') + ' is now past its due date.' : 'A friendly reminder that invoice ' + (inv.number || '') + ' is due on ' + inv.dueDate + '.') + ' You can view and pay it in your portal.',
+      ctaLabel: 'View & pay invoice' } });
+  });
+  if(changed) try { lss(KEYS.invoices, invoices); } catch(e){}
 }
 
 var vxStore = {

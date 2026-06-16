@@ -2834,6 +2834,15 @@ async function markReportSent(idx){
   r.stageUpdatedAt = new Date().toISOString();
   r.sentAt = new Date().toISOString();
   addReportAudit(r, 'stage:Sent', 'Issued to customer');
+  // D: notify the customer their report is ready (gated + once per report).
+  if(typeof vxNotifyCustomer === 'function' && !r.notifiedReady){
+    r.notifiedReady = true;
+    try { vxNotifyCustomer('reportIssued', { customerId: _vxReportCustomerId(r), email: {
+      subject: 'Your inspection report ' + (r.reportNo || '') + ' is ready',
+      title: 'Report ' + (r.reportNo || '') + ' is ready',
+      intro: 'Your ' + (r.method || 'NDT') + ' inspection report ' + (r.reportNo || '') + ' has been issued and is available to view and download in your portal.',
+      ctaLabel: 'View report' } }); } catch(e){}
+  }
   lss(KEYS.reports, all);
   if(typeof rptRender === 'function') rptRender();
   if(typeof inboxRender === 'function') inboxRender();

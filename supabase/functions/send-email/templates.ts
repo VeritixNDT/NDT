@@ -244,6 +244,45 @@ function renderPortalLink(d: PortalLinkData): RenderedEmail {
   return { subject, html, text };
 }
 
+// ── notify ─────────────────────────────────────────────────────────────────
+// One flexible proactive-notification template (Portal v2, Pillar D). The app
+// supplies the headline + intro per event (report ready / quote sent / invoice
+// due / action receipt); every field is escaped server-side, so this is plain
+// text in a branded shell — never client HTML.
+interface NotifyData {
+  subject?: string; title?: string; intro?: string;
+  ctaLabel?: string; url?: string; footnote?: string;
+  companyName?: string; customerName?: string;
+}
+function renderNotify(d: NotifyData): RenderedEmail {
+  const company = d.companyName || "your inspection provider";
+  const subject = d.subject || d.title || `Update from ${company}`;
+  const cta = (d.url && d.ctaLabel)
+    ? button(d.url, d.ctaLabel)
+    : "";
+  const linkLine = (d.url)
+    ? `<p style="font-size:12px;line-height:1.6;color:#9aa5bd;margin:0;">Or paste this into your browser:<br><a href="${esc(d.url)}" style="color:#2563eb;word-break:break-all;">${esc(d.url)}</a></p>`
+    : "";
+  const html = wrap(
+    `<p style="font-size:15px;line-height:1.6;margin:0 0 4px;">Dear ${esc(d.customerName || "customer")},</p>
+     ${d.title ? `<p style="font-size:16px;font-weight:700;color:#0b1220;margin:0 0 6px;">${esc(d.title)}</p>` : ""}
+     <p style="font-size:14px;line-height:1.65;color:#3a4660;margin:0 0 8px;">${esc(d.intro || "")}</p>
+     ${cta}
+     ${d.footnote ? `<p style="font-size:13px;line-height:1.6;color:#6b7589;margin:0 0 8px;">${esc(d.footnote)}</p>` : ""}
+     ${linkLine}`,
+    d.intro || subject,
+  );
+  const text = [
+    `Dear ${d.customerName || "customer"},`,
+    ``,
+    d.title || "",
+    d.intro || "",
+    d.url ? `\n${d.ctaLabel || "Open"}: ${d.url}` : "",
+    d.footnote ? `\n${d.footnote}` : "",
+  ].filter(Boolean).join("\n");
+  return { subject, html, text };
+}
+
 // ── dispatch ────────────────────────────────────────────────────────────────
 export function renderTemplate(
   type: string,
@@ -258,6 +297,8 @@ export function renderTemplate(
       return renderDoc("invoice", data as unknown as DocData);
     case "portal-link":
       return renderPortalLink(data as unknown as PortalLinkData);
+    case "notify":
+      return renderNotify(data as unknown as NotifyData);
     default:
       throw new Error(`unknown template type: ${type}`);
   }

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # Deploy the Veritix Supabase Edge Functions: send-email, portal-token,
-# portal-data. Repeatable runbook for what we worked out by hand on 2026-06-03.
+# portal-data, report-verify, portal-submit. Repeatable runbook for what we
+# worked out by hand on 2026-06-03 (portal-submit added for Portal v2).
 #
 # RUN FROM a machine/network that can reach api.supabase.com (your normal
 # terminal — the dev sandbox here couldn't). Authenticate with a Personal
@@ -34,7 +35,7 @@ set -euo pipefail
 
 PROJECT_REF="${SUPABASE_PROJECT_REF:-mmgdqsilgwusehsqgyyj}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FUNCS=(send-email portal-token portal-data report-verify)
+FUNCS=(send-email portal-token portal-data report-verify portal-submit)
 
 command -v supabase >/dev/null 2>&1 || { echo "✗ supabase CLI not found — install with: npm i -g supabase"; exit 1; }
 

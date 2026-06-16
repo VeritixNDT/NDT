@@ -203,6 +203,10 @@ function vxPortalRender(root, data){
     : '';
   const reportsByJob = {};
   (data.reports || []).forEach(r => { (reportsByJob[r.jobId] = reportsByJob[r.jobId] || []).push(r); });
+  // F: free-text filter across reports / jobs / documents.
+  const _q = (_vxPortalQuery || '').trim().toLowerCase();
+  const _match = (s) => !_q || String(s == null ? '' : s).toLowerCase().indexOf(_q) !== -1;
+  const _repMatch = (r) => _match(r.reportNo) || _match(r.method) || _match(r.subject);
 
   // Header (white-label)
   const header = `<div style="background:#fff;border-radius:0 0 16px 16px;box-shadow:0 1px 3px rgba(20,30,60,.08);padding:22px 26px;margin-bottom:22px;display:flex;align-items:center;gap:16px">
@@ -220,7 +224,9 @@ function vxPortalRender(root, data){
     jobsHtml += `<div style="background:#fff;border-radius:12px;padding:22px;color:#9aa5bd;font-size:13px;text-align:center">No jobs to show yet.</div>`;
   } else {
     jobsHtml += (data.jobs || []).map(j => {
-      const reps = reportsByJob[j.id] || [];
+      const allReps = reportsByJob[j.id] || [];
+      let reps = allReps;
+      if(_q){ const jt = _match(j.title); reps = allReps.filter(_repMatch); if(!jt && !reps.length) return ''; }
       const repRows = reps.length ? reps.map(r => `<tr>
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-family:monospace;font-size:12px;color:${accent}">${_portalEsc(r.reportNo||'—')}</td>
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:12px">${_portalEsc(r.method||'')} · Rev ${_portalEsc(r.revision||'00')}</td>
@@ -233,6 +239,7 @@ function vxPortalRender(root, data){
           ${_portalBadge(j.status||'Pending', _portalJobStatusColor(j.status))}
           <span style="flex:1"></span>
           <span style="font-size:11px;color:#9aa5bd">${reps.length} report${reps.length===1?'':'s'}</span>
+          ${allReps.some(r => r.sealedHtml) ? `<button data-action="vxPortalDownloadPack" data-args="'${_portalEsc(j.id)}'" title="Download all reports for this job as one PDF" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-left:8px">⬇ Pack</button>` : ''}
         </div>
         <table style="width:100%;border-collapse:collapse">${repRows}</table>
       </div>`;
@@ -246,10 +253,20 @@ function vxPortalRender(root, data){
       const total = (typeof billCalc === 'function') ? billCalc(d).total : 0;
       const overdue = (type==='invoice' && typeof billIsOverdue === 'function' && billIsOverdue(d));
       const status = overdue ? 'Overdue' : (d.status || 'Draft');
+      // F: invoice aging — days until/over due, beside the status.
+      let aging = '';
+      if(type==='invoice' && d.status!=='Paid' && d.dueDate){
+        const due = new Date(d.dueDate);
+        if(!isNaN(due.getTime())){
+          const days = Math.ceil((due.getTime() - Date.now()) / 86400000);
+          aging = days < 0 ? `<div style="font-size:10px;color:#dc2626;margin-top:2px">${-days} day${-days===1?'':'s'} overdue</div>`
+                : days <= 7 ? `<div style="font-size:10px;color:#d97706;margin-top:2px">due in ${days} day${days===1?'':'s'}</div>` : '';
+        }
+      }
       return `<tr>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-family:monospace;font-size:12px;font-weight:600">${_portalEsc(d.number||'—')}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589">${_portalDate(d.issueDate)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4">${_portalBadge(status, _portalDocStatusColor(status))}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4">${_portalBadge(status, _portalDocStatusColor(status))}${aging}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;font-family:monospace;font-size:12px">${_portalMoney(total, d.currency)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${(type==='quote' && d.status==='Sent') ? `<button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Accepted'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">Accept</button><button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Declined'" style="cursor:pointer;border:1px solid #dc2626;color:#dc2626;background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-right:6px">Decline</button>` : ''}${(type==='quote' && d.status==='Accepted') ? `<span style="font-size:11px;color:#16a34a;font-weight:600;margin-right:8px">✓ Accepted${d.decisionBy ? ' · ' + _portalEsc(d.decisionBy) : ''}</span>` : ''}${(type==='invoice' && canPay && d.status!=='Paid') ? `<button data-action="vxPortalPayInvoice" data-args="'${_portalEsc(d.id)}'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">Pay online</button>` : ''}<button data-action="vxPortalOpenDoc" data-args="'${type}','${_portalEsc(d.id)}'" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">PDF</button></td>
       </tr>`;
@@ -257,8 +274,8 @@ function vxPortalRender(root, data){
     return `<h2 style="font-size:15px;margin:24px 0 10px;color:#0b1220">${_portalEsc(title)}</h2>
       <div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);overflow:hidden"><table style="width:100%;border-collapse:collapse">${rows}</table></div>`;
   };
-  const invoicesHtml = docBlock('Invoices', data.invoices, 'invoice');
-  const quotesHtml   = docBlock('Quotes', data.quotes, 'quote');
+  const invoicesHtml = docBlock('Invoices', (data.invoices || []).filter(d => !_q || _match(d.number)), 'invoice');
+  const quotesHtml   = docBlock('Quotes', (data.quotes || []).filter(d => !_q || _match(d.number)), 'quote');
 
   const payNote = (data.invoices && data.invoices.some(i => i.status !== 'Paid'))
     ? `<div style="font-size:11px;color:#6b7589;margin-top:8px">${canPay ? 'Pay securely online with the button beside each unpaid invoice, or use' : 'To pay an invoice, please use'} the bank details on the invoice PDF and quote the invoice number.</div>` : '';
@@ -267,7 +284,10 @@ function vxPortalRender(root, data){
 
   const cockpitHtml = _portalCockpit(data, accent);
   const requestCta = `<div style="display:flex;justify-content:flex-end;margin:-6px 0 16px"><button data-action="vxPortalRequestWork" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:9px;font-size:13px;font-weight:600;padding:10px 18px;box-shadow:0 1px 3px rgba(20,30,60,.12)">+ Request an inspection</button></div>`;
-  root.innerHTML = header + _portalShell(accent, paidNotice + requestCta + cockpitHtml + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
+  const searchBar = (data.jobs || []).length
+    ? `<div style="margin:0 0 16px"><input id="vxp-search" type="search" value="${_portalEsc(_vxPortalQuery)}" data-on-input="vxPortalSearch" data-pass-value="1" placeholder="Search reports, jobs, invoices…" style="width:100%;box-sizing:border-box;padding:11px 15px;border:1px solid #d6dbe6;border-radius:10px;font-size:14px;background:#fff;color:#1c2333"></div>`
+    : '';
+  root.innerHTML = header + _portalShell(accent, paidNotice + requestCta + cockpitHtml + searchBar + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
 }
 
 // ── Downloads ────────────────────────────────────────────────────────────────
@@ -291,6 +311,36 @@ function vxPortalOpenDoc(type, id){
     ? billBuildDocHtml(type, doc, (_vxPortalData && _vxPortalData.company) || null)
     : '';
   _vxPortalOpenHtml(html);
+}
+
+// ── Self-serve depth (Portal v2, Pillar F) ───────────────────────────────────
+// Download a consolidated report pack for one job — reuses the inspector-side
+// builder, branded from the server-supplied company (the customer device has no
+// local company profile).
+function vxPortalDownloadPack(jobId){
+  const data = _vxPortalData; if(!data) return;
+  const job = (data.jobs || []).find(j => j.id === jobId);
+  if(!job){ if(typeof toast === 'function') toast('Job not found.', 'error'); return; }
+  const reps = (data.reports || []).filter(r => r.jobId === jobId && r.sealedHtml);
+  if(!reps.length){ if(typeof toast === 'function') toast('No issued reports to include yet.', 'warn'); return; }
+  reps.sort((a, b) => (a.method || '').localeCompare(b.method || '') || String(a.reportNo || '').localeCompare(String(b.reportNo || '')));
+  if(typeof vxBuildReportPackHtml !== 'function'){ if(typeof toast === 'function') toast('Pack export unavailable.', 'error'); return; }
+  const cust = { name: (data.customer && data.customer.name) || '' };
+  _vxPortalOpenHtml(vxBuildReportPackHtml(job, cust, reps, data.company || null));
+}
+
+// Portal search — filters jobs/reports/documents by a free-text query, then
+// re-renders. Focus + caret are restored so typing isn't interrupted.
+var _vxPortalQuery = '';
+function vxPortalSearch(v){
+  _vxPortalQuery = v || '';
+  const root = document.getElementById('vx-portal-root');
+  if(root && _vxPortalData && !_vxPortalData.error){
+    const caret = (function(){ const e = document.getElementById('vxp-search'); return e ? e.selectionStart : null; })();
+    vxPortalRender(root, _vxPortalData);
+    const e = document.getElementById('vxp-search');
+    if(e){ e.focus(); try { if(caret != null) e.setSelectionRange(caret, caret); } catch(_){} }
+  }
 }
 
 // Pay an invoice online — asks the stripe-checkout Edge Function for a hosted

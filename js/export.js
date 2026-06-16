@@ -699,11 +699,13 @@ function _vxPrintHtml(html){
 // report's sealed pages. Each report's sealedHtml is a standalone A4 document;
 // we reuse the exact shared page scaffolding and concatenate the <body> of
 // each (per-block styling is inline, so it travels with the body content).
-function vxBuildReportPackHtml(job, cust, reports){
+function vxBuildReportPackHtml(job, cust, reports, companyOverride){
   const esc = (s) => escapeHtml(String(s == null ? '' : s));
   // Localized label helper — t() falls back through 'en' → the supplied default.
   const T = (k, d) => (typeof t === 'function') ? t(k, d) : d;
-  const c = (typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {};
+  // companyOverride lets the portal (customer device, no local company profile)
+  // brand the pack from the server-supplied company data.
+  const c = companyOverride || ((typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {});
   const accent = (c.color && /^#[0-9A-Fa-f]{6}$/.test(c.color)) ? c.color : '#185FA5';
   const W = (typeof CV_PAGE_WIDTH_PX !== 'undefined') ? CV_PAGE_WIDTH_PX : 794;
   const H = (typeof CV_PAGE_HEIGHT_PX !== 'undefined') ? CV_PAGE_HEIGHT_PX : 1123;

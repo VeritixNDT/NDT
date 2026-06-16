@@ -74,7 +74,7 @@ function _vxPortalLocalData(customerId){
       .sort((a,b) => String(b.at||'').localeCompare(String(a.at||'')));
   } catch(e){}
   return {
-    company: { name:company.name||'', logo:company.logo||'', color:company.color||'#185FA5', footer:company.footer||'', portalSections:company.portalSections||{} },
+    company: { name:company.name||'', logo:((company.logoUseOnPortal==='dark' && company.logoDark) ? company.logoDark : company.logo)||'', color:company.color||'#185FA5', footer:company.footer||'', portalSections:company.portalSections||{} },
     customer: { name:cust.name||'', id:cust.id },
     jobs, reports, quotes, invoices, requests,
   };

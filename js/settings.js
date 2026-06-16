@@ -1002,6 +1002,7 @@ function logoSetUsage(slot, context, el){
   const company = ls(KEYS.company, {});
   if(context === 'reports') company.logoUseOnReports = slot;
   else if(context === 'system') company.logoUseOnSystem = slot;
+  else if(context === 'portal') company.logoUseOnPortal = slot;
   lss(KEYS.company, company);
   // Update the inverse slot's checkbox so the UI mirrors the new state.
   const inverseSlot = (slot === 'primary') ? 'dark' : 'primary';
@@ -1022,11 +1023,14 @@ function logoSetUsage(slot, context, el){
 function _logoApplyUsageToCheckboxes(company){
   const onReports = (company && company.logoUseOnReports === 'dark') ? 'dark' : 'primary';
   const onSystem  = (company && company.logoUseOnSystem  === 'dark') ? 'dark' : 'primary';
+  const onPortal  = (company && company.logoUseOnPortal  === 'dark') ? 'dark' : 'primary';
   const map = {
     'logo-use-reports'      : onReports === 'primary',
     'logo-dark-use-reports' : onReports === 'dark',
     'logo-use-system'       : onSystem  === 'primary',
     'logo-dark-use-system'  : onSystem  === 'dark',
+    'logo-use-portal'       : onPortal  === 'primary',
+    'logo-dark-use-portal'  : onPortal  === 'dark',
   };
   Object.keys(map).forEach(id => {
     const cb = document.getElementById(id);

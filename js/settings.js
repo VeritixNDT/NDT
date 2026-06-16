@@ -50,6 +50,15 @@ function loadSettings() {
   }
   // Customer portal — requests email lives on the company profile (server-readable).
   if(el('portal-request-email')) el('portal-request-email').value = (ls(KEYS.company, {}) || {}).requestEmail || '';
+  // Portal section visibility (default on when unset → non-breaking).
+  const _psec = ((ls(KEYS.company, {}) || {}).portalSections) || {};
+  const _psOn = (k) => _psec[k] !== false;
+  if(el('ps-cockpit'))  el('ps-cockpit').checked  = _psOn('cockpit');
+  if(el('ps-schedule')) el('ps-schedule').checked = _psOn('schedule');
+  if(el('ps-reports'))  el('ps-reports').checked  = _psOn('reports');
+  if(el('ps-quotes'))   el('ps-quotes').checked   = _psOn('quotes');
+  if(el('ps-invoices')) el('ps-invoices').checked = _psOn('invoices');
+  if(el('ps-request'))  el('ps-request').checked  = _psOn('requestButton');
   if(el('ejs-service')) el('ejs-service').value   = s.ejsService||'';
   if(el('ejs-template'))el('ejs-template').value  = s.ejsTemplate||'';
   if(el('ejs-pubkey'))  el('ejs-pubkey').value    = s.ejsPubkey||'';
@@ -2857,6 +2866,14 @@ function dbRefresh() { dbRefreshCard(); toast(t('toast.refreshed', 'Refreshed.')
 function savePortalSettings() {
   const c = ls(KEYS.company, {}) || {};
   c.requestEmail = (el('portal-request-email') ? el('portal-request-email').value : '').trim();
+  c.portalSections = {
+    cockpit:       !!(el('ps-cockpit')  && el('ps-cockpit').checked),
+    schedule:      !!(el('ps-schedule') && el('ps-schedule').checked),
+    reports:       !!(el('ps-reports')  && el('ps-reports').checked),
+    quotes:        !!(el('ps-quotes')   && el('ps-quotes').checked),
+    invoices:      !!(el('ps-invoices') && el('ps-invoices').checked),
+    requestButton: !!(el('ps-request')  && el('ps-request').checked),
+  };
   lss(KEYS.company, c);
   toast(t('toast.portal_saved', 'Customer portal settings saved.'));
 }

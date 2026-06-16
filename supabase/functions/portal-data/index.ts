@@ -117,7 +117,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const company = (byKey["vx-company-v1"] as any) || {};
 
   return jsonResponse({
-    company: { name: company.name || "", logo: company.logo || "", color: company.color || "#185FA5", footer: company.footer || "" },
+    company: { name: company.name || "", logo: company.logo || "", color: company.color || "#185FA5", footer: company.footer || "", portalSections: company.portalSections || {} },
     customer: { name: cust.name || "", id: cust.id },
     jobs, reports, quotes, invoices, requests,
   });

@@ -74,7 +74,7 @@ function _vxPortalLocalData(customerId){
       .sort((a,b) => String(b.at||'').localeCompare(String(a.at||'')));
   } catch(e){}
   return {
-    company: { name:company.name||'', logo:company.logo||'', color:company.color||'#185FA5', footer:company.footer||'' },
+    company: { name:company.name||'', logo:company.logo||'', color:company.color||'#185FA5', footer:company.footer||'', portalSections:company.portalSections||{} },
     customer: { name:cust.name||'', id:cust.id },
     jobs, reports, quotes, invoices, requests,
   };
@@ -360,14 +360,25 @@ function vxPortalRender(root, data){
 
   const footer = `<div style="text-align:center;color:#9aa5bd;font-size:11px;margin-top:30px">${_portalEsc(co.footer || co.name || '')}</div>`;
 
-  const cockpitHtml = _portalCockpit(data, accent);
-  const scheduleHtml = _portalSchedule(data, accent);
+  // Section visibility — admin-controlled (Settings → Customer portal). Default
+  // on when unset, so existing portals are unchanged.
+  const _sec = (data.company && data.company.portalSections) || {};
+  const _secOn = (k) => _sec[k] !== false;
+  const cockpitHtml = _secOn('cockpit') ? _portalCockpit(data, accent) : '';
+  const scheduleHtml = _secOn('schedule') ? _portalSchedule(data, accent) : '';
   const requestsHtml = _portalRequests(data);
   const requestCta = `<div style="display:flex;justify-content:flex-end;margin:-6px 0 16px"><button data-action="vxPortalRequestWork" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:9px;font-size:13px;font-weight:600;padding:10px 18px;box-shadow:0 1px 3px rgba(20,30,60,.12)">+ Request an inspection</button></div>`;
   const searchBar = (data.jobs || []).length
     ? `<div style="margin:0 0 16px"><input id="vxp-search" type="search" value="${_portalEsc(_vxPortalQuery)}" data-on-input="vxPortalSearch" data-pass-value="1" placeholder="Search reports, jobs, invoices…" style="width:100%;box-sizing:border-box;padding:11px 15px;border:1px solid #d6dbe6;border-radius:10px;font-size:14px;background:#fff;color:#1c2333"></div>`
     : '';
-  root.innerHTML = header + _portalShell(accent, paidNotice + requestCta + cockpitHtml + scheduleHtml + searchBar + jobsHtml + requestsHtml + invoicesHtml + payNote + quotesHtml + footer);
+  root.innerHTML = header + _portalShell(accent, paidNotice
+    + (_secOn('requestButton') ? requestCta : '')
+    + cockpitHtml + scheduleHtml + searchBar
+    + (_secOn('reports') ? jobsHtml : '')
+    + requestsHtml
+    + (_secOn('invoices') ? invoicesHtml + payNote : '')
+    + (_secOn('quotes') ? quotesHtml : '')
+    + footer);
 }
 
 // ── Downloads ────────────────────────────────────────────────────────────────

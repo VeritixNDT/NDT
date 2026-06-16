@@ -2817,6 +2817,30 @@ var vxApi = {
     } catch(e){ console.warn('vx: hydrateReports failed', e); return null; }
   },
 
+  /** V49 (Portal v2): read the customer-submitted events (write-once
+   *  vx-portal-event::<id> rows written by the portal-submit function).
+   *  Returns { id: event } or null on error (caller leaves local untouched). */
+  async hydratePortalEvents(){
+    if(!vxIsAuthenticated()) return null;
+    var sb = _vxSupabase();
+    if(!sb) return null;
+    var cfg = vxPlatformConfig();
+    if(!cfg.orgId) return null;
+    try {
+      var r = await sb.from('entities')
+        .select('key,value')
+        .eq('org_id', cfg.orgId)
+        .like('key', VX_PORTAL_EVENT_PREFIX + '%');
+      if(r.error){ console.warn('vx: hydratePortalEvents', r.error.message); return null; }
+      var map = {};
+      (r.data || []).forEach(function(row){
+        var id = String(row.key).slice(VX_PORTAL_EVENT_PREFIX.length);
+        if(id) map[id] = row.value || null;
+      });
+      return map;
+    } catch(e){ console.warn('vx: hydratePortalEvents failed', e); return null; }
+  },
+
   /**
    * V44: Upsert one entity. Called by the sync drain and by the
    * first-cloud-login migration. value is the already-parsed JS object
@@ -3339,6 +3363,73 @@ async function vxPullReports(){
   return { count: Object.keys(metaMap).length };
 }
 
+// ── Portal events ingest (Portal v2, Pillar A — cross-device) ─────────────────
+// Customers write append-only vx-portal-event::<id> rows via portal-submit.
+// The inspector's app pulls them, applies each NEW one to local state (a quote
+// decision flips the quote; a report ack stamps the report; a work request is
+// filed), records a notification, and marks the id seen so it never re-applies.
+// The per-kind apply is idempotent (e.g. a quote only flips while still 'Sent'),
+// so a second device pulling the same event is harmless.
+var VX_PORTAL_EVENT_PREFIX = 'vx-portal-event::';
+var VX_PORTAL_SEEN_KEY     = 'vx-portal-events-seen-v1';
+var VX_PORTAL_NOTIF_KEY    = 'vx-portal-notif-v1';
+var VX_PORTAL_REQ_KEY      = 'vx-portal-requests-v1';
+
+function _vxPortalSeen(){ try { return new Set(JSON.parse(localStorage.getItem(VX_PORTAL_SEEN_KEY) || '[]')); } catch { return new Set(); } }
+function _vxPortalSeenSave(set){ try { localStorage.setItem(VX_PORTAL_SEEN_KEY, JSON.stringify(Array.from(set))); } catch(e){} }
+
+function vxPortalNotifs(){ try { return JSON.parse(localStorage.getItem(VX_PORTAL_NOTIF_KEY) || '[]'); } catch { return []; } }
+function vxPortalNotifUnread(){ return vxPortalNotifs().filter(function(n){ return !n.read; }).length; }
+function vxPortalNotifMarkAllRead(){ try { localStorage.setItem(VX_PORTAL_NOTIF_KEY, JSON.stringify(vxPortalNotifs().map(function(n){ n.read = true; return n; }))); } catch(e){} }
+function _vxPortalNotifPush(n){ var a = vxPortalNotifs(); a.unshift(n); try { localStorage.setItem(VX_PORTAL_NOTIF_KEY, JSON.stringify(a.slice(0, 200))); } catch(e){} }
+function vxPortalRequests(){ try { return JSON.parse(localStorage.getItem(VX_PORTAL_REQ_KEY) || '[]'); } catch { return []; } }
+
+// Apply one customer event to local state + return a human summary for the
+// notification. Quote/report mutations reuse _vxApplyPortalEventLocal (portal.js)
+// so the preview path and the cross-device path share one applier.
+function _vxIngestPortalEvent(ev){
+  if(!ev || !ev.kind) return 'Customer update';
+  if(ev.kind === 'quote-decision'){
+    if(typeof _vxApplyPortalEventLocal === 'function') _vxApplyPortalEventLocal(ev);
+    return 'Quote ' + (ev.quoteNumber || ev.quoteId || '') + ' ' + (ev.decision === 'Accepted' ? 'accepted' : 'declined') + ' by ' + (ev.by || 'customer');
+  }
+  if(ev.kind === 'ack-report'){
+    if(typeof _vxApplyPortalEventLocal === 'function') _vxApplyPortalEventLocal(ev);
+    return 'Report ' + (ev.reportNo || '') + ' acknowledged by ' + (ev.by || 'customer');
+  }
+  if(ev.kind === 'work-request'){
+    try { var reqs = vxPortalRequests(); reqs.unshift(ev); localStorage.setItem(VX_PORTAL_REQ_KEY, JSON.stringify(reqs.slice(0, 200))); } catch(e){}
+    return 'New work request: ' + (ev.title || '') + (ev.by ? ' (' + ev.by + ')' : '');
+  }
+  if(ev.kind === 'comment'){ return 'New comment from ' + (ev.by || 'customer'); }
+  return 'Customer update';
+}
+
+async function vxPullPortalEvents(){
+  if(!vxIsAuthenticated()) return { skipped: true };
+  if(typeof vxApi.hydratePortalEvents !== 'function') return { skipped: true };
+  var map = await vxApi.hydratePortalEvents();
+  if(map == null) return { error: true };                  // network/error — leave local untouched
+  var seen = _vxPortalSeen();
+  var ids = Object.keys(map).filter(function(id){ return !seen.has(id); });
+  // Oldest-first so the notification list reads chronologically.
+  ids.sort(function(a, b){ return String((map[a] || {}).at || '').localeCompare(String((map[b] || {}).at || '')); });
+  var applied = 0, lastSummary = '';
+  ids.forEach(function(id){
+    var ev = map[id];
+    if(ev){ var summary = _vxIngestPortalEvent(ev); _vxPortalNotifPush({ id: id, at: ev.at || '', kind: ev.kind, summary: summary, read: false }); lastSummary = summary; applied++; }
+    seen.add(id);
+  });
+  _vxPortalSeenSave(seen);
+  if(applied){
+    try { if(typeof toast === 'function') toast(applied === 1 ? lastSummary : (applied + ' new customer updates'), 'info'); } catch(e){}
+    try { if(typeof rptRender === 'function') rptRender(); } catch(e){}
+    try { if(typeof billRender === 'function') billRender(); } catch(e){}
+    try { window.dispatchEvent(new CustomEvent('vx:portal-events', { detail: { applied: applied } })); } catch(e){}
+  }
+  return { applied: applied };
+}
+
 var vxStore = {
   get: ls,
   set: lss,
@@ -3370,6 +3461,9 @@ var vxStore = {
     // V48: merge the per-report rows (+ their write-once HTML rows) into the
     // local array. Replaces the old "pull the blob then reattach HTML" path.
     try { await vxPullReports(); } catch(e){ console.warn('vx: pullReports failed', e); }
+    // V49: ingest any customer-submitted portal events (acks, quote decisions,
+    // work requests) and surface them locally.
+    try { await vxPullPortalEvents(); } catch(e){ console.warn('vx: pullPortalEvents failed', e); }
     vxPlatformSet({ lastSyncAt: new Date().toISOString() });
     return { count, kept };
   },

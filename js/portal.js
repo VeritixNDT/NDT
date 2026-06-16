@@ -70,7 +70,7 @@ function _vxPortalLocalData(customerId){
     const key = (typeof VX_PORTAL_REQ_KEY !== 'undefined') ? VX_PORTAL_REQ_KEY : 'vx-portal-requests-v1';
     requests = (JSON.parse(localStorage.getItem(key) || '[]') || [])
       .filter(e => e && e.customerId === customerId && (e.kind === 'work-request' || e.kind === 'date-change'))
-      .map(e => ({ id:e.id, kind:e.kind, at:e.at, title:e.title||'', method:e.method||'', urgency:e.urgency||'', site:e.site||'', scope:e.scope||'', requestedDate:e.requestedDate||'', reason:e.reason||'', jobTitle:e.jobTitle||'' }))
+      .map(e => ({ id:e.id, kind:e.kind, at:e.at, title:e.title||'', method:e.method||'', urgency:e.urgency||'', site:e.site||'', scope:e.scope||'', requestedDate:e.requestedDate||'', requestedTime:e.requestedTime||'', reason:e.reason||'', jobTitle:e.jobTitle||'' }))
       .sort((a,b) => String(b.at||'').localeCompare(String(a.at||'')));
   } catch(e){}
   return {
@@ -201,8 +201,8 @@ function _portalCockpit(data, accent){
 // ── Inspection schedule (Portal v2 — calendar of job/exam dates) ──────────────
 function _portalSchedule(data, accent){
   const items = [];
-  (data.jobs || []).forEach(j => { if(j.startDate) items.push({ ymd:String(j.startDate).slice(0,10), endYmd:j.endDate?String(j.endDate).slice(0,10):'', title:j.title||'Job', sub:j.status||'', jobId:j.id, type:'job' }); });
-  (data.reports || []).forEach(r => { if(r.examDate) items.push({ ymd:String(r.examDate).slice(0,10), endYmd:'', title:((r.method||'')+' '+(r.reportNo||'')).trim(), sub:'Exam', type:'exam' }); });
+  (data.jobs || []).forEach(j => { if(j.startDate) items.push({ ymd:String(j.startDate).slice(0,10), endYmd:j.endDate?String(j.endDate).slice(0,10):'', time:j.startTime||'', title:j.title||'Job', sub:j.status||'', jobId:j.id, type:'job' }); });
+  (data.reports || []).forEach(r => { if(r.examDate) items.push({ ymd:String(r.examDate).slice(0,10), endYmd:'', time:'', title:((r.method||'')+' '+(r.reportNo||'')).trim(), sub:'Exam', type:'exam' }); });
   if(!items.length) return '';
   items.sort((a,b) => a.ymd.localeCompare(b.ymd));
 
@@ -236,7 +236,7 @@ function _portalSchedule(data, accent){
     const dchg = (it.type==='job' && it.jobId) ? `<button data-action="vxPortalRequestDateChange" data-args="'${_portalEsc(it.jobId)}'" title="Request a different date" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:10px;padding:3px 8px;white-space:nowrap">Request change</button>` : '';
     return `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid #eef0f4">
       <div style="text-align:center;flex:0 0 42px"><div style="font-size:18px;font-weight:800;color:${accent};line-height:1">${dt.getDate()}</div><div style="font-size:10px;color:#9aa5bd;text-transform:uppercase">${dt.toLocaleString('en',{month:'short'})}</div></div>
-      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${_portalEsc(it.title)}</div><div style="font-size:11px;color:#6b7589">${_portalEsc(it.sub)}${it.endYmd&&it.endYmd!==it.ymd?(' · until '+_portalDate(it.endYmd)):''}</div></div>
+      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${_portalEsc(it.title)}${it.time?` <span style="color:${accent};font-weight:700">${_portalEsc(it.time)}</span>`:''}</div><div style="font-size:11px;color:#6b7589">${_portalEsc(it.sub)}${it.endYmd&&it.endYmd!==it.ymd?(' · until '+_portalDate(it.endYmd)):''}</div></div>
       ${dchg}
     </div>`;
   }).join('');
@@ -253,7 +253,7 @@ function _portalRequests(data){
   const rows = reqs.map(r => {
     const isDate = r.kind === 'date-change';
     const title = isDate
-      ? ('Date change' + (r.jobTitle ? ' · ' + r.jobTitle : '') + (r.requestedDate ? ' → ' + _portalDate(r.requestedDate) : ''))
+      ? ('Date change' + (r.jobTitle ? ' · ' + r.jobTitle : '') + (r.requestedDate ? ' → ' + _portalDate(r.requestedDate) + (r.requestedTime ? ' ' + r.requestedTime : '') : ''))
       : (r.title || 'Inspection request');
     const meta = (isDate ? [r.reason] : [r.method, r.site]).filter(Boolean).map(_portalEsc).join(' · ');
     return `<tr>
@@ -637,8 +637,11 @@ function _vxPortalDateForm(accent, job){
     ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(12,18,32,.3);font-family:inherit">
       <div style="font-size:16px;font-weight:700;margin-bottom:3px;color:#0b1220">Request a date change</div>
       <div style="font-size:12.5px;color:#6b7589;margin-bottom:14px">${_portalEsc(job ? (job.title || '') : '')}${job && job.startDate ? ' · currently ' + _portalDate(job.startDate) : ''}</div>
-      <label style="font-size:11px;font-weight:600;color:#6b7589;text-transform:uppercase;letter-spacing:.04em">Preferred date</label>
-      <input id="vxd-date" type="date" style="${inp};margin-top:5px">
+      <label style="font-size:11px;font-weight:600;color:#6b7589;text-transform:uppercase;letter-spacing:.04em">Preferred date &amp; time</label>
+      <div style="display:flex;gap:10px;margin-top:5px">
+        <input id="vxd-date" type="date" style="${inp};flex:1;margin:0 0 10px">
+        <input id="vxd-time" type="time" style="${inp};flex:0 0 130px;margin:0 0 10px">
+      </div>
       <textarea id="vxd-reason" rows="2" placeholder="Reason (optional)" style="${inp};resize:vertical"></textarea>
       <input id="vxd-by" placeholder="Your name" style="${inp}">
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
@@ -655,7 +658,7 @@ function _vxPortalDateForm(accent, job){
       if(!dateEl.value){ dateEl.style.borderColor = '#dc2626'; dateEl.focus(); return; }
       const by = (byEl.value || '').trim();
       if(!by){ byEl.style.borderColor = '#dc2626'; byEl.focus(); return; }
-      done({ requestedDate: dateEl.value, reason: (ov.querySelector('#vxd-reason').value || '').trim(), by: by });
+      done({ requestedDate: dateEl.value, requestedTime: (ov.querySelector('#vxd-time').value || ''), reason: (ov.querySelector('#vxd-reason').value || '').trim(), by: by });
     });
     setTimeout(() => { try { dateEl.focus(); } catch(_){} }, 30);
   });
@@ -667,7 +670,7 @@ async function vxPortalRequestDateChange(jobId){
   const r = await _vxPortalDateForm(accent, job);
   if(!r) return;
   if(typeof toast === 'function') toast('Sending your request…', 'info');
-  const res = await vxPortalSubmit('date-change', { jobId: jobId, jobTitle: job ? job.title : '', requestedDate: r.requestedDate, reason: r.reason, by: r.by });
+  const res = await vxPortalSubmit('date-change', { jobId: jobId, jobTitle: job ? job.title : '', requestedDate: r.requestedDate, requestedTime: r.requestedTime, reason: r.reason, by: r.by });
   if(res.error){ if(typeof toast === 'function') toast(res.error, 'error'); return; }
   if(typeof toast === 'function') toast('Date-change request sent — thank you.', 'success');
   _vxPortalReRender();

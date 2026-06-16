@@ -91,7 +91,7 @@ function plCollect(startYmd, endYmd, opts) {
     if (_mineOnly && (j.leadInspector || '') !== _me) return;
     const cust = (typeof jobCustomerName === 'function') ? jobCustomerName(j.customerId) : '';
     push({ ymd: String(j.startDate).slice(0, 10), endYmd: j.endDate ? String(j.endDate).slice(0, 10) : '',
-      time: '', title: j.title || 'Job', sub: [cust, j.leadInspector].filter(Boolean).join(' · '),
+      time: j.startTime || '', title: j.title || 'Job', sub: [cust, j.leadInspector].filter(Boolean).join(' · '),
       type: 'job', refId: j.id, editable: false });
   });
 

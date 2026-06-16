@@ -111,7 +111,7 @@ function jobsRender() {
     // the detail-view button and the builder, so the number never overstates.
     const sealed = (typeof jobSealedReports === 'function') ? jobSealedReports(j.id).length : 0;
     const dates = (j.startDate || j.endDate)
-      ? `${j.startDate ? fmtDate(j.startDate) : '—'} → ${j.endDate ? fmtDate(j.endDate) : '—'}`
+      ? `${j.startDate ? fmtDate(j.startDate) + (j.startTime ? ' ' + escapeHtml(j.startTime) : '') : '—'} → ${j.endDate ? fmtDate(j.endDate) : '—'}`
       : '—';
     return `<tr style="cursor:pointer" data-action="jobOpenDetail" data-args="'${escapeHtml(j.id)}'">
       <td style="font-weight:600">${escapeHtml(j.title || '—')}</td>
@@ -148,7 +148,7 @@ function _jobsRequestsBand(){
       ? `<span style="font-size:10px;font-weight:700;color:${r.urgency==='Urgent'?'#dc2626':'#d97706'};border:1px solid currentColor;border-radius:10px;padding:1px 7px;margin-left:6px">${escapeHtml(r.urgency)}</span>` : '';
     const fdate = (d) => (typeof fmtDate === 'function') ? fmtDate(d) : d;
     const title = isDate
-      ? ('Date change · ' + escapeHtml(r.jobTitle || 'job') + (r.requestedDate ? ' → ' + escapeHtml(fdate(r.requestedDate)) : ''))
+      ? ('Date change · ' + escapeHtml(r.jobTitle || 'job') + (r.requestedDate ? ' → ' + escapeHtml(fdate(r.requestedDate)) + (r.requestedTime ? ' ' + escapeHtml(r.requestedTime) : '') : ''))
       : escapeHtml(r.title || '(untitled request)');
     const meta = isDate ? [cust].filter(Boolean).map(escapeHtml).join(' · ') : [r.method, r.site, cust].filter(Boolean).map(escapeHtml).join(' · ');
     const detail = isDate ? (r.reason || '') : (r.scope || '');
@@ -193,6 +193,7 @@ function jobApplyDateChange(reqId){
   const j = jobs.find(x => x.id === req.jobId);
   if(!j){ toast('That job no longer exists.', 'error'); if(typeof vxPortalRequestMarkHandled==='function') vxPortalRequestMarkHandled(reqId, 'dismissed'); jobsRender(); return; }
   if(req.requestedDate) j.startDate = req.requestedDate;
+  if(req.requestedTime) j.startTime = req.requestedTime;
   j.updatedAt = new Date().toISOString();
   jobSaveAll(jobs);
   if(typeof vxPortalRequestMarkHandled === 'function') vxPortalRequestMarkHandled(reqId, 'applied');
@@ -234,6 +235,7 @@ function jobOpenForm(id) {
   el('jobf-status').value = rec ? (rec.status || 'Pending') : 'Pending';
   el('jobf-lead').value   = rec ? (rec.leadInspector || '') : '';
   el('jobf-start').value  = rec ? (rec.startDate || '')     : '';
+  if(el('jobf-time')) el('jobf-time').value = rec ? (rec.startTime || '') : '';
   el('jobf-end').value    = rec ? (rec.endDate || '')       : '';
   el('jobf-scope').value  = rec ? (rec.scope || '')         : '';
   el('jobf-notes').value  = rec ? (rec.notes || '')         : '';
@@ -261,6 +263,7 @@ function jobSave() {
     status: JOB_STATUSES.includes(status) ? status : 'Pending',
     leadInspector: (el('jobf-lead').value  || '').trim(),
     startDate:     (el('jobf-start').value || '').trim() || null,
+    startTime:     (el('jobf-time') ? el('jobf-time').value : '').trim() || null,
     endDate:       (el('jobf-end').value   || '').trim() || null,
     scope:         (el('jobf-scope').value || '').trim(),
     notes:         (el('jobf-notes').value || '').trim(),
@@ -392,7 +395,7 @@ function jobOpenDetail(id) {
               <select data-on-change="jobSetStatusFromDetail" data-pass-value="1" data-args="'${escapeHtml(job.id)}'" style="font-size:12px;padding:3px 6px">${statusOpts}</select>
             </div>
             <div><span style="color:var(--t3);display:inline-block;min-width:90px">Lead inspector</span> ${escapeHtml(job.leadInspector || '—')}</div>
-            <div><span style="color:var(--t3);display:inline-block;min-width:90px">Start date</span> ${job.startDate ? fmtDate(job.startDate) : '—'}</div>
+            <div><span style="color:var(--t3);display:inline-block;min-width:90px">Start date</span> ${job.startDate ? fmtDate(job.startDate) + (job.startTime ? ' at ' + escapeHtml(job.startTime) : '') : '—'}</div>
             <div><span style="color:var(--t3);display:inline-block;min-width:90px">End date</span> ${job.endDate ? fmtDate(job.endDate) : '—'}</div>
           </div>
         </div>

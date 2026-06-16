@@ -125,6 +125,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     ev.jobId = jobId;
     ev.jobTitle = clip(p.jobTitle, MAX_SHORT);
     ev.requestedDate = clip(p.requestedDate, 32);
+    ev.requestedTime = clip(p.requestedTime, 16);
     ev.reason = clip(p.reason, MAX_TEXT);
   } else if (kind === "comment") {
     const text = clip(p.text, MAX_TEXT);
@@ -164,7 +165,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           : `New inspection request — ${ev.title || cust.name || ""}`;
         const lines = (isDate ? [
           ev.jobTitle ? `Job: ${ev.jobTitle}` : "",
-          ev.requestedDate ? `Requested date: ${ev.requestedDate}` : "",
+          ev.requestedDate ? `Requested date: ${ev.requestedDate}${ev.requestedTime ? " at " + ev.requestedTime : ""}` : "",
           ev.reason ? `Reason: ${ev.reason}` : "",
           `Customer: ${cust.name || ""}`,
           ev.by ? `Submitted by: ${ev.by}` : "",

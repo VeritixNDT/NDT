@@ -109,7 +109,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .map((e) => ({
       id: e.id, kind: e.kind, at: e.at, title: e.title || "", method: e.method || "",
       urgency: e.urgency || "", site: e.site || "", scope: e.scope || "",
-      requestedDate: e.requestedDate || "", reason: e.reason || "", jobTitle: e.jobTitle || "",
+      requestedDate: e.requestedDate || "", requestedTime: e.requestedTime || "", reason: e.reason || "", jobTitle: e.jobTitle || "",
     }))
     .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
 

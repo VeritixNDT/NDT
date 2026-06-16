@@ -48,6 +48,8 @@ function loadSettings() {
     if(el('cn-invoice')) el('cn-invoice').checked = !!cn.invoiceDue;
     if(el('cn-receipt')) el('cn-receipt').checked = !!cn.receipts;
   }
+  // Customer portal — requests email lives on the company profile (server-readable).
+  if(el('portal-request-email')) el('portal-request-email').value = (ls(KEYS.company, {}) || {}).requestEmail || '';
   if(el('ejs-service')) el('ejs-service').value   = s.ejsService||'';
   if(el('ejs-template'))el('ejs-template').value  = s.ejsTemplate||'';
   if(el('ejs-pubkey'))  el('ejs-pubkey').value    = s.ejsPubkey||'';
@@ -2849,6 +2851,16 @@ function dbRefresh() { dbRefreshCard(); toast(t('toast.refreshed', 'Refreshed.')
 // ══════════════════════════════════════════════
 // NOTIFICATIONS
 // ══════════════════════════════════════════════
+// Customer portal settings — the inspection-requests email is stored on the
+// company profile (vx-company-v1) so the portal-submit function can read it
+// server-side to send the inbound alert.
+function savePortalSettings() {
+  const c = ls(KEYS.company, {}) || {};
+  c.requestEmail = (el('portal-request-email') ? el('portal-request-email').value : '').trim();
+  lss(KEYS.company, c);
+  toast(t('toast.portal_saved', 'Customer portal settings saved.'));
+}
+
 function saveNotifications() {
   const s=ls(KEYS.settings,{});
   s.notifCert   = el('notif-cert')?.checked;

@@ -38,6 +38,9 @@ function envOrThrow(name: string): string {
 // deno-lint-ignore no-explicit-any
 function asArray(v: any): any[] { return Array.isArray(v) ? v : []; }
 function clip(v: unknown, n: number): string { return String(v == null ? "" : v).slice(0, n); }
+function esc(v: unknown): string {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -63,7 +66,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // target belongs to them. Cheap: a handful of keys for one org.
   const { data: rows, error: readErr } = await service
     .from("entities").select("key,value").eq("org_id", orgId)
-    .in("key", ["vx-customers-v1", "vx-jobs-v1", "vx-quotes-v1"]);
+    .in("key", ["vx-customers-v1", "vx-jobs-v1", "vx-quotes-v1", "vx-company-v1"]);
   if (readErr) return jsonResponse({ error: "could not load portal data" }, 500);
   const byKey: Record<string, unknown> = {};
   (rows || []).forEach((r) => { byKey[r.key] = r.value; });
@@ -133,6 +136,44 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const { error: writeErr } = await service
     .from("entities").upsert({ org_id: orgId, key: EVENT_PREFIX + ev.id, value: ev }, { onConflict: "org_id,key" });
   if (writeErr) return jsonResponse({ error: "could not record your action" }, 500);
+
+  // Inbound alert: email the company when a customer raises a work request, so
+  // they don't have to wait for the app to pull it. Best-effort — a failed email
+  // never fails the request. The recipient is fixed to the org's configured
+  // address (company.requestEmail → company.email), never the customer, so this
+  // can't be turned into a spam relay.
+  if (kind === "work-request") {
+    try {
+      // deno-lint-ignore no-explicit-any
+      const company = (byKey["vx-company-v1"] as any) || {};
+      const to = String(company.requestEmail || company.email || "").trim();
+      const apiKey = Deno.env.get("RESEND_API_KEY");
+      const from = Deno.env.get("EMAIL_FROM");
+      if (to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) && apiKey && from) {
+        const lines = [
+          ev.title ? `Request: ${ev.title}` : "",
+          ev.method ? `Method: ${ev.method}` : "",
+          ev.urgency ? `Urgency: ${ev.urgency}` : "",
+          ev.site ? `Site: ${ev.site}` : "",
+          ev.scope ? `Details: ${ev.scope}` : "",
+          `Customer: ${cust.name || ""}`,
+          ev.by ? `Submitted by: ${ev.by}` : "",
+        ].filter(Boolean);
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from, to: [to],
+            subject: `New inspection request — ${ev.title || cust.name || ""}`,
+            text: lines.join("\n") + "\n\nOpen Veritix to turn this into a job.",
+            html: `<h2 style="font-family:Arial,sans-serif;color:#185FA5">New inspection request</h2>` +
+              `<p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.7">${lines.map(esc).join("<br>")}</p>` +
+              `<p style="font-family:Arial,sans-serif;font-size:13px;color:#6b7589">Open Veritix to turn this request into a job.</p>`,
+          }),
+        });
+      }
+    } catch (_) { /* best-effort: the request is already recorded */ }
+  }
 
   return jsonResponse({ ok: true, id: ev.id, at: ev.at });
 });

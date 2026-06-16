@@ -115,6 +115,80 @@ function _portalBadge(label, color){
 function _portalJobStatusColor(s){ return s==='Active'?'#16a34a':s==='Closed'?'#6b7589':'#d97706'; }
 function _portalDocStatusColor(s){ return (s==='Paid'||s==='Accepted')?'#16a34a':s==='Sent'?'#2563eb':(s==='Overdue'||s==='Declined')?'#dc2626':'#6b7589'; }
 
+// ── Asset cockpit (Portal v2, Pillar E) ──────────────────────────────────────
+// A per-customer inspection-health overview computed from THIS customer's
+// issued reports: headline KPIs, pass-rate by method, and a short trend. Turns
+// the portal from a document list into an asset-integrity view. Read-only;
+// renders nothing until there are reports.
+function _portalCockpit(data, accent){
+  const reports = (data && data.reports) || [];
+  if(!reports.length) return '';
+  let acc = 0, rej = 0, oth = 0;
+  const byMethod = {}, byMonth = {};
+  reports.forEach(r => {
+    const v = r.verdict, m = r.method || '—';
+    byMethod[m] = byMethod[m] || { total:0, acc:0, rej:0 };
+    byMethod[m].total++;
+    if(v === 'Acceptable'){ acc++; byMethod[m].acc++; }
+    else if(v === 'Not acceptable'){ rej++; byMethod[m].rej++; }
+    else oth++;
+    if(r.createdAt){ const d = new Date(r.createdAt); if(!isNaN(d.getTime())){ const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); byMonth[k] = byMonth[k] || { acc:0, rej:0 }; if(v === 'Acceptable') byMonth[k].acc++; else if(v === 'Not acceptable') byMonth[k].rej++; } }
+  });
+  const decided = acc + rej;
+  const passRate = decided ? Math.round(acc / decided * 100) : null;
+  const prColor = passRate == null ? '#6b7589' : passRate >= 90 ? '#16a34a' : passRate >= 70 ? '#d97706' : '#dc2626';
+  const activeJobs = ((data.jobs) || []).filter(j => j.status === 'Active').length;
+  const ackCount = reports.filter(r => r.acknowledgedBy).length;
+
+  const kpi = (label, value, sub, color) => `<div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);padding:13px 16px;flex:1;min-width:120px">
+    <div style="font-size:10px;color:#9aa5bd;text-transform:uppercase;letter-spacing:.05em">${_portalEsc(label)}</div>
+    <div style="font-size:25px;font-weight:800;color:${color || '#0b1220'};line-height:1.1;margin-top:3px">${_portalEsc(value)}</div>
+    ${sub ? `<div style="font-size:11px;color:#6b7589;margin-top:2px">${_portalEsc(sub)}</div>` : ''}
+  </div>`;
+
+  const kpis = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+    ${kpi('Reports', String(reports.length), reports.length === 1 ? 'issued' : 'issued', accent)}
+    ${kpi('Acceptable rate', passRate == null ? '—' : passRate + '%', decided + ' with a verdict', prColor)}
+    ${kpi('Open issues', String(rej), rej === 1 ? 'not acceptable' : 'not acceptable', rej ? '#dc2626' : '#16a34a')}
+    ${kpi('Active jobs', String(activeJobs), ackCount + ' report' + (ackCount === 1 ? '' : 's') + ' acknowledged', '#0b1220')}
+  </div>`;
+
+  const methodRows = Object.keys(byMethod).sort().map(m => {
+    const x = byMethod[m], dec = x.acc + x.rej, pr = dec ? Math.round(x.acc / dec * 100) : null;
+    const c = pr == null ? '#9aa5bd' : pr >= 90 ? '#16a34a' : pr >= 70 ? '#d97706' : '#dc2626';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="font-family:monospace;font-weight:700;font-size:12px;width:40px;color:${accent}">${_portalEsc(m)}</span>
+      <div style="flex:1;height:8px;background:#eef0f4;border-radius:4px;overflow:hidden"><div style="height:100%;width:${pr == null ? 0 : pr}%;background:${c}"></div></div>
+      <span style="font-size:11px;color:#6b7589;width:96px;text-align:right">${pr == null ? '—' : pr + '% pass'} · ${x.total}</span>
+    </div>`;
+  }).join('');
+
+  const months = Object.keys(byMonth).sort().slice(-6);
+  let trendHtml = '';
+  if(months.length > 1){
+    const maxM = Math.max(1, ...months.map(k => byMonth[k].acc + byMonth[k].rej));
+    const bars = months.map(k => {
+      const x = byMonth[k], tot = x.acc + x.rej, h = Math.round((tot / maxM) * 56), accH = tot ? Math.round((x.acc / tot) * h) : 0;
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1">
+        <div style="height:56px;display:flex;flex-direction:column;justify-content:flex-end;width:22px">
+          <div style="height:${h - accH}px;background:#dc2626;border-radius:3px 3px 0 0"></div>
+          <div style="height:${accH}px;background:#16a34a"></div>
+        </div>
+        <span style="font-size:9px;color:#9aa5bd;font-family:monospace">${_portalEsc(k.slice(2))}</span>
+      </div>`;
+    }).join('');
+    trendHtml = `<div style="flex:1;min-width:200px"><div style="font-size:11px;font-weight:600;color:#6b7589;margin-bottom:8px">Results by month</div>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:78px">${bars}</div></div>`;
+  }
+
+  return `<h2 style="font-size:15px;margin:0 0 10px;color:#0b1220">Asset overview</h2>
+    ${kpis}
+    <div style="display:flex;gap:18px;flex-wrap:wrap;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);padding:16px 18px;margin-bottom:22px">
+      <div style="flex:1;min-width:240px"><div style="font-size:11px;font-weight:600;color:#6b7589;margin-bottom:6px">Pass rate by method</div>${methodRows}</div>
+      ${trendHtml}
+    </div>`;
+}
+
 function vxPortalRender(root, data){
   const accent = (data.company && /^#[0-9A-Fa-f]{6}$/.test(data.company.color || '')) ? data.company.color : '#185FA5';
   const co = data.company || {};
@@ -191,7 +265,8 @@ function vxPortalRender(root, data){
 
   const footer = `<div style="text-align:center;color:#9aa5bd;font-size:11px;margin-top:30px">${_portalEsc(co.footer || co.name || '')}</div>`;
 
-  root.innerHTML = header + _portalShell(accent, paidNotice + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
+  const cockpitHtml = _portalCockpit(data, accent);
+  root.innerHTML = header + _portalShell(accent, paidNotice + cockpitHtml + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
 }
 
 // ── Downloads ────────────────────────────────────────────────────────────────

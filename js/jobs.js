@@ -57,6 +57,7 @@ function jobsInit() {
 // ── List ────────────────────────────────────────────────────────────────
 function jobsRender() {
   const wrap = el('jobs-list-wrap'); if(!wrap) return;
+  const requestsBand = (typeof _jobsRequestsBand === 'function') ? _jobsRequestsBand() : '';
   const all = jobLoad();
   const search = (el('jobs-search')?.value || '').toLowerCase().trim();
   const fStatus = el('jobs-filter-status')?.value || '';
@@ -95,11 +96,11 @@ function jobsRender() {
     const body = noCust
       ? `<div style="color:var(--t3);font-size:13px;margin-bottom:14px">${escapeHtml(t('jobs.empty.needcust','A job belongs to a customer. Add your first customer to get started.'))}</div><button class="btn btn-primary btn-sm" data-action="ovOpenCustomers">+ ${escapeHtml(t('gs.cta1','Add customer'))}</button>`
       : `<div style="color:var(--t3);font-size:13px;margin-bottom:14px">${escapeHtml(t('jobs.empty.nojobs','No jobs yet — create your first one.'))}</div><button class="btn btn-primary btn-sm" data-action="jobOpenForm" data-args="null">+ ${escapeHtml(t('gs.cta2','New job'))}</button>`;
-    wrap.innerHTML = `<div class="sc"><div class="sc-body" style="text-align:center;padding:34px 20px">${body}</div></div>`;
+    wrap.innerHTML = requestsBand + `<div class="sc"><div class="sc-body" style="text-align:center;padding:34px 20px">${body}</div></div>`;
     return;
   }
   if(!list.length) {
-    wrap.innerHTML = `<div class="sc"><div class="sc-body" style="text-align:center;color:var(--t3);font-size:13px;padding:30px">No jobs match your filters.</div></div>`;
+    wrap.innerHTML = requestsBand + `<div class="sc"><div class="sc-body" style="text-align:center;color:var(--t3);font-size:13px;padding:30px">No jobs match your filters.</div></div>`;
     return;
   }
 
@@ -125,13 +126,59 @@ function jobsRender() {
       </td>
     </tr>`;
   };
-  wrap.innerHTML = `<div class="sc"><div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
+  wrap.innerHTML = requestsBand + `<div class="sc"><div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
     <thead><tr>
       <th scope="col">Job</th><th scope="col">Customer</th><th scope="col" style="width:90px">Status</th>
       <th scope="col" style="width:180px">Dates</th><th scope="col" style="width:80px">Reports</th>
       <th scope="col" style="width:210px"></th>
     </tr></thead><tbody>${list.map(row).join('')}</tbody>
   </table></div></div>`;
+}
+
+// ── Customer work requests (Portal v2, Pillar B) ──────────────────────────────
+// Pending portal requests (filed by the ingest / preview applier) shown atop the
+// Jobs page, each turnable into a job or dismissed.
+function _jobsRequestsBand(){
+  const reqs = (typeof vxPortalPendingRequests === 'function') ? vxPortalPendingRequests() : [];
+  if(!reqs.length) return '';
+  const rows = reqs.map(r => {
+    const cust = (typeof jobCustomerName === 'function') ? jobCustomerName(r.customerId) : '';
+    const urg = (r.urgency && r.urgency !== 'Normal')
+      ? `<span style="font-size:10px;font-weight:700;color:${r.urgency==='Urgent'?'#dc2626':'#d97706'};border:1px solid currentColor;border-radius:10px;padding:1px 7px;margin-left:6px">${escapeHtml(r.urgency)}</span>` : '';
+    const meta = [r.method, r.site, cust].filter(Boolean).map(escapeHtml).join(' · ');
+    return `<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-top:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${escapeHtml(r.title||'(untitled request)')}${urg}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${meta}${r.by?' · '+escapeHtml(r.by):''}${r.at?' · '+((typeof fmtDate==='function')?fmtDate(r.at):escapeHtml(r.at)):''}</div>
+        ${r.scope?`<div style="font-size:12px;color:var(--t2);margin-top:4px;white-space:pre-line">${escapeHtml(r.scope)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-sm btn-primary" data-action="jobFromRequest" data-args="'${escapeHtml(r.id)}'" style="font-size:11px">Create job</button>
+        <button class="btn btn-sm" data-action="jobDismissRequest" data-args="'${escapeHtml(r.id)}'" style="font-size:11px">Dismiss</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="sc" style="margin-bottom:14px">
+    <div class="sc-head" style="display:flex;align-items:center;gap:8px"><span class="sc-title">📥 Customer requests</span><span style="font-size:11px;color:var(--t3);font-family:var(--mono)">(${reqs.length})</span></div>
+    <div class="sc-body" style="padding:2px 16px 12px">${rows}</div>
+  </div>`;
+}
+
+// Pre-fill the New-job form from a customer request, then mark it handled.
+function jobFromRequest(reqId){
+  const req = (typeof vxPortalRequests === 'function') ? vxPortalRequests().find(r => r.id === reqId) : null;
+  if(!req){ toast('Request not found.', 'error'); return; }
+  jobOpenForm(null);
+  if(el('jobf-title'))    el('jobf-title').value = req.title || '';
+  if(el('jobf-customer')) el('jobf-customer').value = req.customerId || '';
+  if(el('jobf-scope'))    el('jobf-scope').value = [req.scope, req.method ? 'Requested method: ' + req.method : '', req.site ? 'Site: ' + req.site : '', (req.urgency && req.urgency !== 'Normal') ? 'Urgency: ' + req.urgency : '', req.by ? 'Requested by: ' + req.by : ''].filter(Boolean).join('\n');
+  if(typeof vxPortalRequestMarkHandled === 'function') vxPortalRequestMarkHandled(reqId, 'job');
+  toast('Job pre-filled from the request — review and save.', 'info');
+}
+async function jobDismissRequest(reqId){
+  if(typeof vxConfirm === 'function'){ if(!await vxConfirm({ message: 'Dismiss this customer request?', okLabel: 'Dismiss' })) return; }
+  if(typeof vxPortalRequestMarkHandled === 'function') vxPortalRequestMarkHandled(reqId, 'dismissed');
+  jobsRender();
 }
 
 // ── Create / edit form ────────────────────────────────────────────────────

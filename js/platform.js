@@ -3383,6 +3383,13 @@ function vxPortalNotifUnread(){ return vxPortalNotifs().filter(function(n){ retu
 function vxPortalNotifMarkAllRead(){ try { localStorage.setItem(VX_PORTAL_NOTIF_KEY, JSON.stringify(vxPortalNotifs().map(function(n){ n.read = true; return n; }))); } catch(e){} }
 function _vxPortalNotifPush(n){ var a = vxPortalNotifs(); a.unshift(n); try { localStorage.setItem(VX_PORTAL_NOTIF_KEY, JSON.stringify(a.slice(0, 200))); } catch(e){} }
 function vxPortalRequests(){ try { return JSON.parse(localStorage.getItem(VX_PORTAL_REQ_KEY) || '[]'); } catch { return []; } }
+function vxPortalPendingRequests(){ return vxPortalRequests().filter(function(r){ return r && !r.handled; }); }
+function vxPortalRequestMarkHandled(id, how){
+  var a = vxPortalRequests(); var changed = false;
+  a.forEach(function(r){ if(r && r.id === id){ r.handled = how || 'done'; r.handledAt = new Date().toISOString(); changed = true; } });
+  if(changed) try { localStorage.setItem(VX_PORTAL_REQ_KEY, JSON.stringify(a)); } catch(e){}
+  return changed;
+}
 
 // Apply one customer event to local state + return a human summary for the
 // notification. Quote/report mutations reuse _vxApplyPortalEventLocal (portal.js)

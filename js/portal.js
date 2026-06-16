@@ -266,7 +266,8 @@ function vxPortalRender(root, data){
   const footer = `<div style="text-align:center;color:#9aa5bd;font-size:11px;margin-top:30px">${_portalEsc(co.footer || co.name || '')}</div>`;
 
   const cockpitHtml = _portalCockpit(data, accent);
-  root.innerHTML = header + _portalShell(accent, paidNotice + cockpitHtml + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
+  const requestCta = `<div style="display:flex;justify-content:flex-end;margin:-6px 0 16px"><button data-action="vxPortalRequestWork" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:9px;font-size:13px;font-weight:600;padding:10px 18px;box-shadow:0 1px 3px rgba(20,30,60,.12)">+ Request an inspection</button></div>`;
+  root.innerHTML = header + _portalShell(accent, paidNotice + requestCta + cockpitHtml + jobsHtml + invoicesHtml + payNote + quotesHtml + footer);
 }
 
 // ── Downloads ────────────────────────────────────────────────────────────────
@@ -362,6 +363,15 @@ function _vxApplyPortalEventLocal(ev){
       if(typeof addReportAudit === 'function') try { addReportAudit(r, 'ack', 'Acknowledged by customer' + (ev.by ? ' (' + ev.by + ')' : '')); } catch(_){}
       lss(KEYS.reports, reports);
     }
+  } else if(ev.kind === 'work-request'){
+    // Preview path mirrors the cloud ingest: file the request locally so the
+    // inspector's Jobs page shows it on this device.
+    try {
+      const key = (typeof VX_PORTAL_REQ_KEY !== 'undefined') ? VX_PORTAL_REQ_KEY : 'vx-portal-requests-v1';
+      const reqs = JSON.parse(localStorage.getItem(key) || '[]');
+      reqs.unshift(Object.assign({ id: 'req-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6) }, ev));
+      localStorage.setItem(key, JSON.stringify(reqs.slice(0, 200)));
+    } catch(_){}
   }
 }
 
@@ -429,6 +439,59 @@ async function vxPortalQuoteDecision(quoteId, decision){
   if(q){ q.status = decision; q.decisionBy = sig.by; }
   if(typeof toast === 'function') toast(decision === 'Accepted' ? 'Quote accepted — thank you.' : 'Quote declined — noted.', 'success');
   _vxPortalReRender();
+}
+
+// ── Work request (Portal v2, Pillar B) ───────────────────────────────────────
+// A self-contained form letting the customer raise an inspection request, which
+// the channel records as a work-request event the inspector's app files.
+function _vxPortalRequestForm(accent){
+  return new Promise((resolve) => {
+    const methods = (typeof NDT_METHODS !== 'undefined' && Array.isArray(NDT_METHODS)) ? NDT_METHODS : [];
+    const methodOpts = '<option value="">— Method (optional) —</option>'
+      + methods.map(m => `<option value="${_portalEsc(m.id)}">${_portalEsc(m.id + (m.name ? ' · ' + m.name : ''))}</option>`).join('')
+      + '<option value="Other">Other</option>';
+    const inp = 'width:100%;box-sizing:border-box;margin:0 0 10px;padding:9px 11px;border:1px solid #d6dbe6;border-radius:8px;font-size:13.5px;font-family:inherit';
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(12,18,32,.55);display:flex;align-items:flex-start;justify-content:center;padding:24px 18px;overflow-y:auto';
+    ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:480px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(12,18,32,.3);font-family:inherit">
+      <div style="font-size:16px;font-weight:700;margin-bottom:3px;color:#0b1220">Request an inspection</div>
+      <div style="font-size:12.5px;color:#6b7589;margin-bottom:14px">Tell us what you need and we'll be in touch.</div>
+      <input id="vxr-title" placeholder="What needs inspecting? (e.g. Unit 4 weld survey)" style="${inp}">
+      <div style="display:flex;gap:10px">
+        <select id="vxr-method" style="${inp};flex:1">${methodOpts}</select>
+        <select id="vxr-urgency" style="${inp};flex:1"><option value="Normal">Normal</option><option value="High">High priority</option><option value="Urgent">Urgent</option></select>
+      </div>
+      <input id="vxr-site" placeholder="Site / location (optional)" style="${inp}">
+      <textarea id="vxr-scope" rows="3" placeholder="Scope or details (optional)" style="${inp};resize:vertical"></textarea>
+      <input id="vxr-by" placeholder="Your name" style="${inp}">
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        <button id="vxr-cancel" style="cursor:pointer;border:1px solid #d6dbe6;background:#fff;color:#6b7589;border-radius:8px;font-size:13px;padding:8px 16px">Cancel</button>
+        <button id="vxr-ok" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:8px;font-size:13px;font-weight:600;padding:8px 18px">Send request</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const done = (v) => { try { ov.remove(); } catch(_){} resolve(v); };
+    const titleEl = ov.querySelector('#vxr-title'), byEl = ov.querySelector('#vxr-by');
+    ov.querySelector('#vxr-cancel').addEventListener('click', () => done(null));
+    ov.addEventListener('click', (e) => { if(e.target === ov) done(null); });
+    ov.querySelector('#vxr-ok').addEventListener('click', () => {
+      const title = (titleEl.value || '').trim();
+      if(!title){ titleEl.style.borderColor = '#dc2626'; titleEl.focus(); return; }
+      const by = (byEl.value || '').trim();
+      if(!by){ byEl.style.borderColor = '#dc2626'; byEl.focus(); return; }
+      done({ title: title, method: ov.querySelector('#vxr-method').value, urgency: ov.querySelector('#vxr-urgency').value, site: (ov.querySelector('#vxr-site').value || '').trim(), scope: (ov.querySelector('#vxr-scope').value || '').trim(), by: by });
+    });
+    setTimeout(() => { try { titleEl.focus(); } catch(_){} }, 30);
+  });
+}
+async function vxPortalRequestWork(){
+  const accent = (_vxPortalData && _vxPortalData.company && _vxPortalData.company.color) || '#185FA5';
+  const req = await _vxPortalRequestForm(accent);
+  if(!req) return;
+  if(typeof toast === 'function') toast('Sending your request…', 'info');
+  const res = await vxPortalSubmit('work-request', req);
+  if(res.error){ if(typeof toast === 'function') toast(res.error, 'error'); return; }
+  if(typeof toast === 'function') toast('Request sent — thank you. We\'ll be in touch.', 'success');
 }
 
 // Re-render the portal from the (possibly optimistically updated) data.

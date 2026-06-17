@@ -445,7 +445,10 @@ function jobDownloadReportPack(jobId) {
   if(typeof vxBuildReportPackHtml !== 'function' || typeof _vxPrintHtml !== 'function'){
     toast(t('toast.pack_unavailable','Report pack export is unavailable.'), 'error'); return;
   }
-  _vxPrintHtml(vxBuildReportPackHtml(job, cust, sealed));
+  const _packHtml = vxBuildReportPackHtml(job, cust, sealed);
+  // Download as a PDF (server vector → raster → print-dialog fallback).
+  if(typeof vxDownloadHtmlAsPdf === 'function') vxDownloadHtmlAsPdf(_packHtml, ((job.title || 'job') + ' report pack'));
+  else _vxPrintHtml(_packHtml);
 }
 
 // Inline status change from the detail view's dropdown. The dispatcher

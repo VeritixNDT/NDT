@@ -641,7 +641,9 @@ function billPrintDoc(type, id) {
   if(!doc) { toast('Document not found.', 'error'); return; }
   let html = _billCanvasHtml(type, doc);
   if(!html) html = billBuildDocHtml(type, doc);   // fallback to the fixed layout
-  if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
+  // Download as a PDF (server vector → raster → print-dialog fallback).
+  if(typeof vxDownloadHtmlAsPdf === 'function') vxDownloadHtmlAsPdf(html, (doc.number || type));
+  else if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
   else { const w = window.open('', '_blank'); if(w) { w.document.write(html); w.document.close(); } }
 }
 

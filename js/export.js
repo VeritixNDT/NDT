@@ -971,7 +971,9 @@ function ovPrintReport(idx){
     toast(t('toast.report_no_snapshot','No printable layout for this report — its method has no saved template.'),'error');
     return;
   }
-  _vxPrintHtml(html);
+  // Download as a PDF (server vector → raster → print-dialog fallback).
+  if(typeof vxDownloadHtmlAsPdf === 'function') vxDownloadHtmlAsPdf(html, (r.reportNo || 'report'));
+  else _vxPrintHtml(html);
 }
 
 /** Open a saved report in a new browser tab as a viewable PDF-like page.

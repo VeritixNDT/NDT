@@ -47,9 +47,67 @@ function extractKey(req: Request): string {
   return "";
 }
 
+// ── Write builders — validate + shape the fields for one resource. Return
+// { fields } on success or { error } (→ 400). `existing` is the current record
+// on PATCH, null on POST (so required fields are only enforced on create). ──
+// deno-lint-ignore no-explicit-any
+function buildCustomer(payload: any, existing: any): any {
+  const name = existing ? (payload.name ?? existing.name) : payload.name;
+  if (!name || typeof name !== "string" || !name.trim()) return { error: "name is required" };
+  // deno-lint-ignore no-explicit-any
+  const f: any = { name: name.trim().slice(0, 300) };
+  ["vatNo", "billingAddress", "notes"].forEach((k) => { if (payload[k] !== undefined) f[k] = String(payload[k] ?? "").slice(0, 4000); });
+  if (Array.isArray(payload.contacts)) f.contacts = payload.contacts.slice(0, 50);
+  if (Array.isArray(payload.sites)) f.sites = payload.sites.slice(0, 50);
+  if (Array.isArray(payload.portalEmails)) f.portalEmails = payload.portalEmails.slice(0, 20).map((e: unknown) => String(e).toLowerCase());
+  return { fields: f };
+}
+// deno-lint-ignore no-explicit-any
+async function buildJob(payload: any, existing: any, orgId: string, service: any): Promise<any> {
+  const title = existing ? (payload.title ?? existing.title) : payload.title;
+  if (!title || !String(title).trim()) return { error: "title is required" };
+  const customerId = existing ? (payload.customerId ?? existing.customerId) : payload.customerId;
+  if (!customerId) return { error: "customerId is required" };
+  const { data } = await service.from("entities").select("value").eq("org_id", orgId).eq("key", "vx-customers-v1").maybeSingle();
+  if (!asArray(data?.value).some((c) => c && c.id === customerId)) return { error: "customerId not found" };
+  // deno-lint-ignore no-explicit-any
+  const f: any = { title: String(title).trim().slice(0, 500), customerId };
+  ["status", "startDate", "startTime", "endDate", "leadInspector", "scope", "notes"].forEach((k) => { if (payload[k] !== undefined) f[k] = (typeof payload[k] === "string") ? payload[k].slice(0, 4000) : payload[k]; });
+  if (f.status && !["Pending", "Active", "Closed"].includes(f.status)) return { error: "status must be Pending, Active or Closed" };
+  if (!existing && !f.status) f.status = "Pending";
+  return { fields: f };
+}
+
+// Read-modify-write one entity blob: append on POST, merge on PATCH.
+// deno-lint-ignore no-explicit-any
+async function writeEntity(service: any, orgId: string, key: string, idPrefix: string, method: string, id: string, payload: any, build: any): Promise<Response> {
+  const { data } = await service.from("entities").select("value").eq("org_id", orgId).eq("key", key).maybeSingle();
+  const arr = asArray(data?.value);
+  const now = new Date().toISOString();
+  // deno-lint-ignore no-explicit-any
+  let rec: any;
+  if (method === "PATCH") {
+    if (!id) return jsonResponse({ error: "id required in path for update" }, 400);
+    const idx = arr.findIndex((x) => x && x.id === id);
+    if (idx < 0) return jsonResponse({ error: "not found" }, 404);
+    const built = await build(payload, arr[idx], orgId, service);
+    if (built.error) return jsonResponse({ error: built.error }, 400);
+    rec = { ...arr[idx], ...built.fields, id, updatedAt: now };
+    arr[idx] = rec;
+  } else {
+    const built = await build(payload, null, orgId, service);
+    if (built.error) return jsonResponse({ error: built.error }, 400);
+    rec = { id: idPrefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7), ...built.fields, createdAt: now, updatedAt: now };
+    arr.push(rec);
+  }
+  const { error: wErr } = await service.from("entities").upsert({ org_id: orgId, key, value: arr }, { onConflict: "org_id,key" });
+  if (wErr) return jsonResponse({ error: "write failed" }, 500);
+  return jsonResponse(rec, method === "POST" ? 201 : 200);
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: { ...corsHeaders, "Access-Control-Allow-Methods": "GET, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-api-key, content-type" } });
-  if (req.method !== "GET") return jsonResponse({ error: "method not allowed" }, 405);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: { ...corsHeaders, "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-api-key, content-type" } });
+  if (!["GET", "POST", "PATCH"].includes(req.method)) return jsonResponse({ error: "method not allowed" }, 405);
 
   // ── Authenticate by API key ──────────────────────────────────────────────
   const presented = extractKey(req);
@@ -70,7 +128,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
   let path = url.pathname;
   const i = path.indexOf("/api");
   path = i >= 0 ? path.slice(i + 4) : path;
-  const resource = path.replace(/^\/+/, "").split("/")[0] || "";
+  const segs = path.replace(/^\/+/, "").split("/").filter(Boolean);
+  const resource = segs[0] || "";
+  const id = segs[1] || "";
+
+  // ── Writes (POST create / PATCH update) — require the 'write' scope ───────
+  if (req.method === "POST" || req.method === "PATCH") {
+    const scopes = Array.isArray(keyRow.scopes) ? keyRow.scopes : [];
+    if (!scopes.includes("write")) return jsonResponse({ error: "this API key is read-only (no write scope)" }, 403);
+    let payload: Record<string, unknown>;
+    try { payload = await req.json(); } catch { return jsonResponse({ error: "invalid JSON body" }, 400); }
+    if (resource === "customers") return await writeEntity(service, orgId, "vx-customers-v1", "cust", req.method, id, payload, buildCustomer);
+    if (resource === "jobs") return await writeEntity(service, orgId, "vx-jobs-v1", "job", req.method, id, payload, buildJob);
+    return jsonResponse({ error: "writes not supported for resource: " + resource + " (try customers, jobs)" }, 404);
+  }
+
   const q = url.searchParams;
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(q.get("limit") || "", 10) || DEFAULT_LIMIT));
   const offset = Math.max(0, parseInt(q.get("offset") || "", 10) || 0);
@@ -79,6 +151,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({
       object: "api", version: "1", org: orgId,
       endpoints: ["/reports", "/jobs", "/customers", "/invoices", "/quotes"],
+      writes: ["POST /customers", "PATCH /customers/:id", "POST /jobs", "PATCH /jobs/:id"],
+      writes_note: "Writes require a key with the 'write' scope.",
       auth: "Authorization: Bearer vxk_…", pagination: "?limit (≤200) &offset",
     });
   }

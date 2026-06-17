@@ -2911,7 +2911,7 @@ async function renderApiKeys(){
       const revoked = !!k.revoked_at;
       return '<tr style="' + (revoked ? 'opacity:.5' : '') + '">'
         + '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(k.prefix) + '…' + (revoked ? ' <span style="color:var(--red)">revoked</span>' : '') + '</td>'
-        + '<td>' + escapeHtml(k.label || '—') + '</td>'
+        + '<td>' + escapeHtml(k.label || '—') + ' <span style="font-size:10px;color:var(--t3)">· ' + (((k.scopes || []).indexOf('write') >= 0) ? 'read+write' : 'read') + '</span></td>'
         + '<td style="font-size:11px;color:var(--t3)">' + (k.created_at ? fmtDate(k.created_at) : '—') + '</td>'
         + '<td style="font-size:11px;color:var(--t3)">' + (k.last_used_at ? fmtDate(k.last_used_at) : 'never') + '</td>'
         + '<td style="text-align:right">' + (revoked ? '' : '<button class="btn btn-sm btn-danger" data-action="apiKeyRevoke" data-args="\'' + escapeHtml(k.id) + '\'" style="font-size:11px">Revoke</button>') + '</td>'
@@ -2924,13 +2924,15 @@ async function apiKeyCreate(){
   if(!sb || !cfg.orgId){ toast('Sign in to Veritix Cloud first.', 'error'); return; }
   const label = window.prompt('Name this API key (e.g. "Zapier", "ERP integration"):', '');
   if(label === null) return;
+  const write = window.confirm('Allow this key to WRITE (create / update customers & jobs)?\n\nOK = read + write\nCancel = read-only');
+  const scopes = write ? ['read', 'write'] : ['read'];
   const bytes = crypto.getRandomValues(new Uint8Array(24));
   const b64 = btoa(String.fromCharCode.apply(null, Array.prototype.slice.call(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const key = 'vxk_' + b64;
   const hash = await _vxSha256Hex(key);
   let userId = null;
   try { const u = await sb.auth.getUser(); userId = (u && u.data && u.data.user) ? u.data.user.id : null; } catch(e){}
-  const r = await sb.from('api_keys').insert({ org_id: cfg.orgId, key_hash: hash, prefix: key.slice(0, 12), label: (label || '').trim() || null, created_by: userId });
+  const r = await sb.from('api_keys').insert({ org_id: cfg.orgId, key_hash: hash, prefix: key.slice(0, 12), label: (label || '').trim() || null, scopes: scopes, created_by: userId });
   if(r.error){ toast('Could not create key: ' + r.error.message, 'error'); return; }
   _vxShowApiKeyOnce(key);
   renderApiKeys();

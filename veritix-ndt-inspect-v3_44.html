@@ -3711,7 +3711,7 @@
           <div class="sc">
             <div class="sc-head"><span class="sc-title">Base URL</span></div>
             <div class="sc-body">
-              <div class="info-box">Authenticate every request with <code>Authorization: Bearer vxk_…</code>. Read endpoints: <code>/reports</code>, <code>/jobs</code>, <code>/customers</code>, <code>/invoices</code>, <code>/quotes</code> (filters + <code>?limit</code>/<code>?offset</code>).</div>
+              <div class="info-box">Authenticate every request with <code>Authorization: Bearer vxk_…</code>. Read: <code>GET /reports /jobs /customers /invoices /quotes</code> (filters + <code>?limit</code>/<code>?offset</code>). Write (needs a read+write key): <code>POST/PATCH /customers</code>, <code>POST/PATCH /jobs</code>.</div>
               <div class="fld form-row"><label>Endpoint</label>
                 <input id="api-base-url" readonly value="" style="font-family:var(--mono);font-size:12px"/>
                 <div class="fld-hint">Example: <span style="font-family:var(--mono)">curl -H "Authorization: Bearer vxk_…" &lt;base&gt;/reports</span></div>

@@ -24,6 +24,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { verifyPortalToken } from "../_shared/portal.ts";
+import { deliverWebhooks } from "../_shared/webhooks.ts";
 
 const EVENT_PREFIX = "vx-portal-event::";
 const ALLOWED_KINDS = new Set(["ack-report", "quote-decision", "work-request", "date-change", "comment"]);
@@ -193,6 +194,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     } catch (_) { /* best-effort: the request is already recorded */ }
   }
+
+  // Fan the customer action out to the org's webhooks (signed, best-effort).
+  const whEvent = kind === "quote-decision" ? (ev.decision === "Accepted" ? "quote.accepted" : "quote.declined")
+    : kind === "ack-report" ? "report.acknowledged"
+    : kind === "work-request" ? "job.requested" : "";
+  if (whEvent) await deliverWebhooks(service, orgId, whEvent, ev);
 
   return jsonResponse({ ok: true, id: ev.id, at: ev.at });
 });

@@ -3723,6 +3723,13 @@
             <div class="sc-head"><span class="sc-title">API keys</span><button class="btn btn-sm" data-action="renderApiKeys" style="margin-left:auto;font-size:11px">↻ Refresh</button></div>
             <div class="sc-body"><div id="api-keys-list" style="font-size:13px">Loading…</div></div>
           </div>
+          <div class="sc">
+            <div class="sc-head"><span class="sc-title">Webhooks</span><button class="btn btn-sm btn-primary" data-action="vxWebhookAdd" style="margin-left:auto;font-size:11px">+ Add webhook</button></div>
+            <div class="sc-body">
+              <div class="info-box">We POST signed JSON to your URL when events happen — verify <code>X-Veritix-Signature: sha256=…</code> = HMAC-SHA256(secret, body). Events: <code>report.approved/sent/acknowledged</code>, <code>quote.sent/accepted/declined</code>, <code>invoice.sent/paid</code>, <code>job.requested</code>.</div>
+              <div id="webhooks-list" style="font-size:13px">Loading…</div>
+            </div>
+          </div>
         </div>
 
         <!-- ── SYSTEM INFO ── -->

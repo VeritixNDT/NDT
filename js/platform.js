@@ -3447,6 +3447,21 @@ async function vxPullPortalEvents(){
   return { applied: applied };
 }
 
+// ── Webhooks — emit a client-side event to the org's webhooks ─────────────────
+// Fire-and-forget through the webhook-emit function (it verifies the session +
+// org membership, then fans out signed). Server-side events (portal decisions,
+// invoice.paid) are delivered from their own functions, not here.
+function vxEmitWebhook(event, data){
+  try {
+    if(typeof vxIsAuthenticated === 'function' && !vxIsAuthenticated()) return;
+    var sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+    if(!sb || !sb.functions) return;
+    var cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+    if(!cfg.orgId) return;
+    sb.functions.invoke('webhook-emit', { body: { event: event, orgId: cfg.orgId, data: data || {} } });
+  } catch(e){}
+}
+
 // ── Proactive customer notifications (Portal v2, Pillar D) ────────────────────
 // Auto-email customers on key events (report issued / quote sent / invoice due /
 // action receipt). OFF by default — the inspector opts in per event in Settings.

@@ -2918,6 +2918,60 @@ async function renderApiKeys(){
         + '</tr>';
     }).join('') + '</tbody></table>';
 }
+// ── Webhooks (server-side outbound) ───────────────────────────────────────
+async function vxWebhookList(){
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+  if(!sb || !cfg.orgId) return [];
+  const r = await sb.from('webhooks').select('id,url,secret,events,enabled,last_delivery_at,last_status,created_at').eq('org_id', cfg.orgId).order('created_at', { ascending: false });
+  return r.data || [];
+}
+async function vxWebhookRender(){
+  const host = el('webhooks-list'); if(!host) return;
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb){ host.innerHTML = '<div style="color:var(--t3);font-size:13px">Sign in to Veritix Cloud to manage webhooks.</div>'; return; }
+  host.innerHTML = 'Loading…';
+  const hooks = await vxWebhookList();
+  if(!hooks.length){ host.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:8px 0">No webhooks yet — add one to receive events.</div>'; return; }
+  host.innerHTML = '<table class="tbl" style="width:100%"><thead><tr><th>URL</th><th>Events</th><th>Secret</th><th>Last delivery</th><th></th></tr></thead><tbody>'
+    + hooks.map(h => {
+      const last = h.last_delivery_at ? (fmtDate(h.last_delivery_at) + ' · ' + (h.last_status != null ? h.last_status : '—')) : 'never';
+      return '<tr>'
+        + '<td style="font-family:var(--mono);font-size:11px;word-break:break-all;max-width:220px">' + escapeHtml(h.url) + '</td>'
+        + '<td style="font-size:11px">' + escapeHtml((h.events || []).join(', ')) + '</td>'
+        + '<td style="font-family:var(--mono);font-size:11px;word-break:break-all;max-width:160px">' + escapeHtml(h.secret || '') + '</td>'
+        + '<td style="font-size:11px;color:var(--t3)">' + last + '</td>'
+        + '<td style="text-align:right"><button class="btn btn-sm btn-danger" data-action="vxWebhookDelete" data-args="\'' + escapeHtml(h.id) + '\'" style="font-size:11px">Delete</button></td>'
+        + '</tr>';
+    }).join('') + '</tbody></table>';
+}
+async function vxWebhookAdd(){
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+  if(!sb || !cfg.orgId){ toast('Sign in to Veritix Cloud first.', 'error'); return; }
+  let url = window.prompt('Webhook URL — we POST signed JSON here\n(tip: grab a free test URL from webhook.site):', 'https://');
+  if(url === null) return;
+  url = (url || '').trim();
+  if(!/^https?:\/\/.+/.test(url)){ toast('Enter a valid http(s) URL.', 'error'); return; }
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  const secret = 'whsec_' + btoa(String.fromCharCode.apply(null, Array.prototype.slice.call(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  let userId = null;
+  try { const u = await sb.auth.getUser(); userId = (u && u.data && u.data.user) ? u.data.user.id : null; } catch(e){}
+  const r = await sb.from('webhooks').insert({ org_id: cfg.orgId, url: url, secret: secret, events: ['*'], created_by: userId });
+  if(r.error){ toast('Could not add webhook: ' + r.error.message, 'error'); return; }
+  toast('Webhook added — it receives all events. Signing secret is shown in the list.');
+  vxWebhookRender();
+}
+async function vxWebhookDelete(id){
+  if(typeof vxConfirm === 'function'){ if(!await vxConfirm({ message: 'Delete this webhook?', okLabel: 'Delete', danger: true })) return; }
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb){ toast('Offline.', 'error'); return; }
+  const r = await sb.from('webhooks').delete().eq('id', id);
+  if(r.error){ toast('Could not delete: ' + r.error.message, 'error'); return; }
+  toast('Webhook deleted.');
+  vxWebhookRender();
+}
+
 function apiOpenDocs(){
   const baseMeta = document.querySelector('meta[name="vx-supabase-url"]');
   const base = baseMeta ? baseMeta.content : '';

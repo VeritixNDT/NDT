@@ -1807,7 +1807,7 @@ function showSS(id, btn) {
   if(id==='customers')   { try{custRender();}catch(e){console.error(e);} }
   if(id==='database') { try{dbRefreshCard();}catch(e){console.error(e);} }
   if(id==='subscription') { try{vxRenderSubscription();}catch(e){console.error(e);} }
-  if(id==='api')      { try{ renderApiKeys(); }catch(e){console.error(e);} }
+  if(id==='api')      { try{ renderApiKeys(); }catch(e){console.error(e);} try{ vxWebhookRender(); }catch(e){console.error(e);} }
   if(id==='system')   { renderSystemInfo(); }
   if(id==='methods')  { renderMethodsTable(); }
   if(id==='numbering'){ renderNumberingPreview(); }

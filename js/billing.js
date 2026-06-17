@@ -290,6 +290,7 @@ function billSetStatus(type, id, status) {
       ctaLabel: 'Review quotation' } }); } catch(e){}
   }
   billSaveAll(type, list);
+  if(status === 'Sent' && typeof vxEmitWebhook === 'function') try { vxEmitWebhook(type === 'quote' ? 'quote.sent' : 'invoice.sent', { id: list[i].id, number: list[i].number, customerId: list[i].customerId, jobId: list[i].jobId }); } catch(e){}
   toast('Marked ' + status + '.');
   billRefresh();
 }

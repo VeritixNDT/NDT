@@ -35,7 +35,7 @@ set -euo pipefail
 
 PROJECT_REF="${SUPABASE_PROJECT_REF:-mmgdqsilgwusehsqgyyj}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FUNCS=(send-email portal-token portal-data report-verify portal-submit pdf-render)
+FUNCS=(send-email portal-token portal-data report-verify portal-submit pdf-render webhook-emit)
 
 command -v supabase >/dev/null 2>&1 || { echo "✗ supabase CLI not found — install with: npm i -g supabase"; exit 1; }
 

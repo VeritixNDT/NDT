@@ -2245,6 +2245,7 @@ function _sealReport(r){
   if(typeof ovBuildReportSnapshot === 'function'){ try { html = ovBuildReportSnapshot(r); } catch(e){} }
   if(!html) html = r.frozenHtml;   // rebuild unavailable (no saved template) — keep the existing body
   if(html){ r.frozenHtml = html; r.sealedHtml = _stampApproval(html, r); }
+  if(typeof vxEmitWebhook === 'function') try { vxEmitWebhook('report.approved', { reportNo: r.reportNo, revision: r.revision, method: r.method, verdict: r.verdict, jobId: r.jobId, approvedBy: r.approvedBy, sealedAt: r.sealedAt }); } catch(e){}
 }
 
 // Inject a small "APPROVED" stamp into a sealed report's HTML so the printed
@@ -2844,6 +2845,7 @@ async function markReportSent(idx){
       ctaLabel: 'View report' } }); } catch(e){}
   }
   lss(KEYS.reports, all);
+  if(typeof vxEmitWebhook === 'function') try { vxEmitWebhook('report.sent', { reportNo: r.reportNo, revision: r.revision, method: r.method, verdict: r.verdict, jobId: r.jobId }); } catch(e){}
   if(typeof rptRender === 'function') rptRender();
   if(typeof inboxRender === 'function') inboxRender();
   if(typeof updateInboxBadge === 'function') updateInboxBadge();

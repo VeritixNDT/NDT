@@ -105,9 +105,101 @@ async function writeEntity(service: any, orgId: string, key: string, idPrefix: s
   return jsonResponse(rec, method === "POST" ? 201 : 200);
 }
 
+// ── OpenAPI 3 spec (served at GET /openapi.json) ─────────────────────────────
+// deno-lint-ignore no-explicit-any
+function openApiSpec(baseUrl: string): any {
+  // deno-lint-ignore no-explicit-any
+  const listEnvelope = (ref: string): any => ({
+    type: "object",
+    properties: {
+      object: { type: "string", example: "list" }, url: { type: "string" },
+      limit: { type: "integer" }, offset: { type: "integer" },
+      count: { type: "integer" }, has_more: { type: "boolean" },
+      data: { type: "array", items: { $ref: ref } },
+    },
+  });
+  const qp = (name: string) => ({ name, in: "query", schema: { type: "string" } });
+  const paging = [
+    { name: "limit", in: "query", schema: { type: "integer", maximum: 200, default: 50 } },
+    { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+  ];
+  const pathId = () => ({ name: "id", in: "path", required: true, schema: { type: "string" } });
+  const errRef = { description: "Error", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } };
+  const listResp = (ref: string) => ({ "200": { description: "OK", content: { "application/json": { schema: listEnvelope(ref) } } }, "401": errRef, "403": errRef });
+  const objResp = (ref: string, code: number) => ({ [String(code)]: { description: "OK", content: { "application/json": { schema: { $ref: ref } } } }, "400": errRef, "401": errRef, "403": errRef, "404": errRef });
+  const bodyRef = (ref: string) => ({ required: true, content: { "application/json": { schema: { $ref: ref } } } });
+  return {
+    openapi: "3.0.3",
+    info: {
+      title: "Veritix NDT API", version: "1.0.0",
+      description: "Key-authenticated access to your reports, jobs, customers and billing. Authenticate every request with `Authorization: Bearer vxk_…`. Create and manage keys in the app under **Settings → API & integrations** (read-only or read+write).",
+    },
+    servers: [{ url: baseUrl }],
+    security: [{ ApiKeyAuth: [] }],
+    components: {
+      securitySchemes: { ApiKeyAuth: { type: "http", scheme: "bearer", bearerFormat: "vxk_…" } },
+      schemas: {
+        Error: { type: "object", properties: { error: { type: "string" } } },
+        Report: { type: "object", properties: { reportNo: { type: "string" }, method: { type: "string" }, revision: { type: "string" }, stage: { type: "string" }, verdict: { type: "string" }, jobId: { type: "string" }, customerId: { type: "string", nullable: true }, subject: { type: "string" }, inspector: { type: "string" }, examDate: { type: "string" }, createdAt: { type: "string", format: "date-time" }, acknowledgedBy: { type: "string" }, acknowledgedAt: { type: "string" }, sealedHtml: { type: "string", description: "Only present with ?include=html" } } },
+        Job: { type: "object", required: ["title", "customerId"], properties: { id: { type: "string", readOnly: true }, title: { type: "string" }, customerId: { type: "string" }, status: { type: "string", enum: ["Pending", "Active", "Closed"] }, startDate: { type: "string", nullable: true }, startTime: { type: "string", nullable: true }, endDate: { type: "string", nullable: true }, leadInspector: { type: "string" }, scope: { type: "string" }, notes: { type: "string" }, createdAt: { type: "string", readOnly: true }, updatedAt: { type: "string", readOnly: true } } },
+        Customer: { type: "object", required: ["name"], properties: { id: { type: "string", readOnly: true }, name: { type: "string" }, vatNo: { type: "string" }, billingAddress: { type: "string" }, notes: { type: "string" }, portalEmails: { type: "array", items: { type: "string" } }, contacts: { type: "array", items: { $ref: "#/components/schemas/Contact" } }, sites: { type: "array", items: { $ref: "#/components/schemas/Site" } } } },
+        Contact: { type: "object", properties: { name: { type: "string" }, role: { type: "string" }, email: { type: "string" }, phone: { type: "string" } } },
+        Site: { type: "object", properties: { label: { type: "string" }, address: { type: "string" } } },
+        BillingDoc: { type: "object", properties: { id: { type: "string" }, number: { type: "string" }, type: { type: "string" }, status: { type: "string" }, customerId: { type: "string" }, jobId: { type: "string", nullable: true }, issueDate: { type: "string", nullable: true }, dueDate: { type: "string", nullable: true }, currency: { type: "string" }, subtotal: { type: "number" }, vatRate: { type: "number" }, total: { type: "number" } } },
+      },
+    },
+    paths: {
+      "/reports": { get: { summary: "List reports", parameters: [...paging, qp("jobId"), qp("customerId"), qp("stage"), qp("method"), { name: "include", in: "query", schema: { type: "string", enum: ["html"] } }], responses: listResp("#/components/schemas/Report") } },
+      "/jobs": {
+        get: { summary: "List jobs", parameters: [...paging, qp("customerId"), qp("status")], responses: listResp("#/components/schemas/Job") },
+        post: { summary: "Create a job (write scope)", requestBody: bodyRef("#/components/schemas/Job"), responses: objResp("#/components/schemas/Job", 201) },
+      },
+      "/jobs/{id}": { patch: { summary: "Update a job (write scope)", parameters: [pathId()], requestBody: bodyRef("#/components/schemas/Job"), responses: objResp("#/components/schemas/Job", 200) } },
+      "/customers": {
+        get: { summary: "List customers", parameters: [...paging], responses: listResp("#/components/schemas/Customer") },
+        post: { summary: "Create a customer (write scope)", requestBody: bodyRef("#/components/schemas/Customer"), responses: objResp("#/components/schemas/Customer", 201) },
+      },
+      "/customers/{id}": { patch: { summary: "Update a customer (write scope)", parameters: [pathId()], requestBody: bodyRef("#/components/schemas/Customer"), responses: objResp("#/components/schemas/Customer", 200) } },
+      "/invoices": { get: { summary: "List invoices", parameters: [...paging, qp("customerId"), qp("status")], responses: listResp("#/components/schemas/BillingDoc") } },
+      "/quotes": { get: { summary: "List quotes", parameters: [...paging, qp("customerId"), qp("status")], responses: listResp("#/components/schemas/BillingDoc") } },
+    },
+  };
+}
+
+// Interactive docs page (Swagger UI from CDN), served at GET /docs.
+function docsHtml(baseUrl: string): string {
+  const spec = baseUrl.replace(/\/$/, "") + "/openapi.json";
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veritix NDT API — Reference</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+<style>body{margin:0}.topbar{display:none}</style></head>
+<body><div id="swagger"></div>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>window.ui = SwaggerUIBundle({ url: ${JSON.stringify(spec)}, dom_id: '#swagger', deepLinking: true, presets: [SwaggerUIBundle.presets.apis], layout: 'BaseLayout' });</script>
+</body></html>`;
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: { ...corsHeaders, "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-api-key, content-type" } });
   if (!["GET", "POST", "PATCH"].includes(req.method)) return jsonResponse({ error: "method not allowed" }, 405);
+
+  // ── Parse the path (shared by the public docs + the authed routes) ───────
+  const url = new URL(req.url);
+  let path = url.pathname;
+  const pi = path.indexOf("/api");
+  path = pi >= 0 ? path.slice(pi + 4) : path;
+  const segs = path.replace(/^\/+/, "").split("/").filter(Boolean);
+  const resource = segs[0] || "";
+  const id = segs[1] || "";
+  const baseUrl = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "") + "/functions/v1/api";
+
+  // ── Public (no key): the OpenAPI spec + interactive docs ─────────────────
+  if (req.method === "GET" && resource === "openapi.json") {
+    return new Response(JSON.stringify(openApiSpec(baseUrl)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  if (req.method === "GET" && resource === "docs") {
+    return new Response(docsHtml(baseUrl), { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } });
+  }
 
   // ── Authenticate by API key ──────────────────────────────────────────────
   const presented = extractKey(req);
@@ -123,15 +215,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // Best-effort usage stamp (don't block the response on it).
   service.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id).then(() => {}, () => {});
 
-  // ── Route ────────────────────────────────────────────────────────────────
-  const url = new URL(req.url);
-  let path = url.pathname;
-  const i = path.indexOf("/api");
-  path = i >= 0 ? path.slice(i + 4) : path;
-  const segs = path.replace(/^\/+/, "").split("/").filter(Boolean);
-  const resource = segs[0] || "";
-  const id = segs[1] || "";
-
+  // ── Route (url/path/resource/id parsed above) ────────────────────────────
   // ── Writes (POST create / PATCH update) — require the 'write' scope ───────
   if (req.method === "POST" || req.method === "PATCH") {
     const scopes = Array.isArray(keyRow.scopes) ? keyRow.scopes : [];

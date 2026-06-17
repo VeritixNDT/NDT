@@ -2918,6 +2918,12 @@ async function renderApiKeys(){
         + '</tr>';
     }).join('') + '</tbody></table>';
 }
+function apiOpenDocs(){
+  const baseMeta = document.querySelector('meta[name="vx-supabase-url"]');
+  const base = baseMeta ? baseMeta.content : '';
+  if(!base){ toast('Cloud not configured.', 'error'); return; }
+  window.open(base.replace(/\/$/, '') + '/functions/v1/api/docs', '_blank');
+}
 async function apiKeyCreate(){
   const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
   const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};

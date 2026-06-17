@@ -419,9 +419,10 @@ function vxPortalDownloadPack(jobId){
   const cust = { name: (data.customer && data.customer.name) || '' };
   const html = vxBuildReportPackHtml(job, cust, reps, data.company || null);
   const fn = (job.title || 'job') + ' report pack';
-  // True no-dialog download → a real .pdf file (falls back to the print dialog
-  // if the PDF library can't load).
-  if(typeof vxDownloadHtmlAsPdf === 'function') vxDownloadHtmlAsPdf(html, fn);
+  const tok = _vxPortalToken();
+  // True no-dialog download → server-side vector PDF (passing the portal token
+  // to authenticate), falling back to raster / print dialog.
+  if(typeof vxDownloadHtmlAsPdf === 'function') vxDownloadHtmlAsPdf(html, fn, { portalToken: (tok && tok.indexOf('local-') !== 0) ? tok : '' });
   else if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
   else _vxPortalOpenHtml(html);
 }

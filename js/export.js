@@ -658,6 +658,52 @@ function cvPrintOrExport(opts){
 // cached. If it can't load (offline / CSP), we fall back to _vxPrintHtml so the
 // user still gets a PDF via the print dialog. Note: html2canvas rasterises, so
 // the PDF is image-based (not selectable text) — fine for a visual deliverable.
+// Trigger a browser download of a Blob under a filename.
+function _vxTriggerDownload(blob, filename){
+  try {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ try { document.body.removeChild(a); } catch(_){} URL.revokeObjectURL(url); }, 1500);
+    return true;
+  } catch(e){ console.warn('download failed', e); return false; }
+}
+
+// Best-quality path: ask the pdf-render Edge Function for a server-side VECTOR
+// PDF and download the bytes. Returns a Blob on success, or null (not
+// configured / unauthorised / offline) so the caller falls back to raster.
+// opts.portalToken authenticates a customer-portal caller (no Supabase session).
+async function vxRenderPdfServer(html, filename, opts){
+  opts = opts || {};
+  var urlMeta  = document.querySelector('meta[name="vx-supabase-url"]');
+  var anonMeta = document.querySelector('meta[name="vx-supabase-anon-key"]');
+  var baseUrl = urlMeta ? urlMeta.content : '';
+  var anon = anonMeta ? anonMeta.content : '';
+  if(!baseUrl || !anon) return null;
+  // App callers send their session JWT; portal callers send the anon key + a
+  // portal token in the body.
+  var access = anon;
+  try {
+    var sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+    if(sb && sb.auth && !opts.portalToken){
+      var s = await sb.auth.getSession();
+      if(s && s.data && s.data.session && s.data.session.access_token) access = s.data.session.access_token;
+    }
+  } catch(_){}
+  try {
+    var res = await fetch(baseUrl.replace(/\/$/, '') + '/functions/v1/pdf-render', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': anon, 'Authorization': 'Bearer ' + access },
+      body: JSON.stringify({ html: html, filename: filename, token: opts.portalToken || undefined }),
+    });
+    if(!res.ok) return null;
+    var ct = res.headers.get('content-type') || '';
+    if(ct.indexOf('application/pdf') === -1) return null;
+    return await res.blob();
+  } catch(e){ return null; }
+}
+
 var _vxHtml2PdfPromise = null;
 function vxEnsureHtml2Pdf(){
   if(typeof window.html2pdf !== 'undefined') return Promise.resolve(true);
@@ -672,10 +718,18 @@ function vxEnsureHtml2Pdf(){
   });
   return _vxHtml2PdfPromise;
 }
-async function vxDownloadHtmlAsPdf(html, filename){
+async function vxDownloadHtmlAsPdf(html, filename, opts){
   if(!html){ if(typeof toast === 'function') toast('Nothing to download.', 'error'); return; }
   filename = String(filename || 'document').replace(/[^\w.\- ]+/g, '').trim().slice(0, 120) || 'document';
   if(!/\.pdf$/i.test(filename)) filename += '.pdf';
+  if(typeof toast === 'function') toast(t('pe.toast.preparing_pdf','Preparing PDF…'), 'info');
+  // 1) Best quality: server-side vector render (no dialog). Falls through to
+  //    the client-side raster path below when the engine isn't configured.
+  try {
+    var serverBlob = await vxRenderPdfServer(html, filename, opts);
+    if(serverBlob && _vxTriggerDownload(serverBlob, filename)) return;
+  } catch(_){}
+  // 2) Client-side raster via html2pdf.
   var ok = false;
   try { ok = await vxEnsureHtml2Pdf(); } catch(e){ ok = false; }
   if(!ok || typeof window.html2pdf === 'undefined'){
@@ -683,7 +737,6 @@ async function vxDownloadHtmlAsPdf(html, filename){
     if(typeof _vxPrintHtml === 'function') return _vxPrintHtml(html);
     return;
   }
-  if(typeof toast === 'function') toast(t('pe.toast.preparing_pdf','Preparing PDF…'), 'info');
   // Render the report's own styles + body in an offscreen, full-width container
   // so html2canvas measures the A4 pages at their true size.
   var styles = (html.match(/<style[\s\S]*?<\/style>/gi) || []).join('');

@@ -4079,6 +4079,128 @@ function switchLoginTab(tab, btn) {
   el('register-form').style.display = tab==='register' ? '' : 'none';
 }
 
+// ── SSO (OAuth) + MFA (TOTP), via Supabase Auth ──────────────────────────────
+async function doOAuth(provider){
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  const err = el('li-err');
+  if(!sb || !sb.auth || typeof sb.auth.signInWithOAuth !== 'function'){ if(err){ err.textContent = 'Cloud sign-in is unavailable.'; err.classList.add('show'); } return; }
+  try {
+    const r = await sb.auth.signInWithOAuth({ provider: provider, options: { redirectTo: location.origin + location.pathname } });
+    if(r.error){ if(err){ err.textContent = r.error.message; err.classList.add('show'); } }
+    // On success the browser redirects to the provider; the callback lands back
+    // here and the boot path picks up the session.
+  } catch(e){ if(err){ err.textContent = String(e.message || e); err.classList.add('show'); } }
+}
+
+// Small modal helper for the MFA flows. Resolves with done(v) or null.
+function _vxMfaOverlay(innerHtml, onMount){
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:7000;background:rgba(12,18,32,.6);display:flex;align-items:center;justify-content:center;padding:18px';
+    ov.innerHTML = '<div style="background:var(--panel,#fff);color:var(--t1);border-radius:14px;max-width:420px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.4);font-family:inherit">' + innerHtml + '</div>';
+    document.body.appendChild(ov);
+    var done = function(v){ try { ov.remove(); } catch(e){} resolve(v); };
+    ov.addEventListener('click', function(e){ if(e.target === ov) done(null); });
+    if(typeof onMount === 'function') onMount(ov, done);
+  });
+}
+function _vxMfaCodeField(ov, done){
+  var inp = ov.querySelector('#vxmfa-code');
+  ov.querySelector('#vxmfa-cancel').addEventListener('click', function(){ done(null); });
+  ov.querySelector('#vxmfa-ok').addEventListener('click', function(){ var v = (inp.value || '').replace(/\D/g, ''); if(v.length !== 6){ inp.style.borderColor = '#dc2626'; inp.focus(); return; } done(v); });
+  inp.addEventListener('keydown', function(e){ if(e.key === 'Enter') ov.querySelector('#vxmfa-ok').click(); });
+  setTimeout(function(){ try { inp.focus(); } catch(e){} }, 30);
+}
+var _VXMFA_INPUT = '<input id="vxmfa-code" inputmode="numeric" maxlength="6" placeholder="123456" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:4px;font-size:18px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;background:var(--bg2);color:var(--t1)">';
+var _VXMFA_BTNS = '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" id="vxmfa-cancel">Cancel</button><button class="btn btn-primary btn-sm" id="vxmfa-ok">Verify</button></div>';
+function _vxMfaEnrollPrompt(qrSvg, secret){
+  return _vxMfaOverlay(
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">Set up two-factor authentication</div>'
+    + '<div style="font-size:12.5px;color:var(--t3);margin-bottom:12px">Scan with an authenticator app (Google Authenticator, 1Password, Authy), then enter the 6-digit code.</div>'
+    + '<div style="display:flex;justify-content:center;margin-bottom:10px;background:#fff;border-radius:10px;padding:10px">' + (qrSvg ? '<img src="' + qrSvg + '" alt="QR" style="width:180px;height:180px"/>' : '') + '</div>'
+    + '<div style="font-size:11px;color:var(--t3);text-align:center;margin-bottom:12px">Or enter this key manually:<br><span style="font-family:var(--mono);font-size:12px;color:var(--t1);word-break:break-all">' + escapeHtml(secret || '') + '</span></div>'
+    + _VXMFA_INPUT + _VXMFA_BTNS, _vxMfaCodeField);
+}
+function _vxMfaCodePrompt(){
+  return _vxMfaOverlay(
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">Two-factor authentication</div>'
+    + '<div style="font-size:12.5px;color:var(--t3);margin-bottom:14px">Enter the 6-digit code from your authenticator app.</div>'
+    + _VXMFA_INPUT + _VXMFA_BTNS, _vxMfaCodeField);
+}
+// If the user has a verified factor but the session is only AAL1, challenge for
+// the code. Returns true to proceed, false to block (cancelled/failed).
+async function vxMfaEnsureAAL2(){
+  var sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.auth || !sb.auth.mfa) return true;
+  try {
+    var aal = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    var d = aal && aal.data;
+    if(!d || d.nextLevel !== 'aal2' || d.nextLevel === d.currentLevel) return true;
+    var fl = await sb.auth.mfa.listFactors();
+    var totps = (fl.data && fl.data.totp) || [];
+    var factor = totps.filter(function(x){ return x.status === 'verified'; })[0] || totps[0];
+    if(!factor) return true;
+    var code = await _vxMfaCodePrompt();
+    if(!code) return false;
+    var ch = await sb.auth.mfa.challenge({ factorId: factor.id });
+    if(ch.error) return false;
+    var v = await sb.auth.mfa.verify({ factorId: factor.id, challengeId: ch.data.id, code: code });
+    if(v.error){ toast('Incorrect code.', 'error'); return false; }
+    return true;
+  } catch(e){ console.warn('mfa check failed', e); return true; }
+}
+async function vxMfaEnroll(){
+  var sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.auth || !sb.auth.mfa){ toast('Cloud sign-in required for 2FA.', 'error'); return; }
+  var en = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Authenticator-' + Date.now().toString(36) });
+  if(en.error){ toast(en.error.message, 'error'); return; }
+  var factorId = en.data.id;
+  var qr = en.data.totp && en.data.totp.qr_code, secret = en.data.totp && en.data.totp.secret;
+  var code = await _vxMfaEnrollPrompt(qr, secret);
+  if(!code){ try { await sb.auth.mfa.unenroll({ factorId: factorId }); } catch(e){} return; }
+  var ch = await sb.auth.mfa.challenge({ factorId: factorId });
+  if(ch.error){ toast(ch.error.message, 'error'); try { await sb.auth.mfa.unenroll({ factorId: factorId }); } catch(e){} return; }
+  var v = await sb.auth.mfa.verify({ factorId: factorId, challengeId: ch.data.id, code: code });
+  if(v.error){ toast('Incorrect code — please try again.', 'error'); try { await sb.auth.mfa.unenroll({ factorId: factorId }); } catch(e){} return; }
+  toast('Two-factor authentication enabled.', 'success');
+  openMfaModal();
+}
+async function vxMfaUnenroll(factorId){
+  var sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.auth || !sb.auth.mfa) return;
+  if(typeof vxConfirm === 'function'){ if(!await vxConfirm({ message: 'Turn off two-factor authentication?', okLabel: 'Turn off', danger: true })) return; }
+  var r = await sb.auth.mfa.unenroll({ factorId: factorId });
+  if(r.error){ toast(r.error.message, 'error'); return; }
+  toast('Two-factor authentication disabled.');
+  openMfaModal();
+}
+async function openMfaModal(){
+  var existing = document.getElementById('vx-mfa-modal'); if(existing) existing.remove();
+  var sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.auth || !sb.auth.mfa){ toast('Cloud sign-in required for 2FA.', 'error'); return; }
+  var fl = await sb.auth.mfa.listFactors();
+  var totps = ((fl.data && fl.data.totp) || []).filter(function(x){ return x.status === 'verified'; });
+  var body;
+  if(totps.length){
+    body = '<div style="font-size:12.5px;color:#16a34a;font-weight:600;margin-bottom:10px">✓ Two-factor authentication is on.</div>'
+      + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px">You\'ll be asked for a code from your authenticator app when you sign in.</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" id="vxmfa-close">Close</button><button class="btn btn-sm btn-danger" id="vxmfa-off">Turn off</button></div>';
+  } else {
+    body = '<div style="font-size:12.5px;color:var(--t3);margin-bottom:14px">Add a second step at sign-in with an authenticator app — protects your account even if your password is stolen.</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" id="vxmfa-close">Close</button><button class="btn btn-primary btn-sm" id="vxmfa-on">Enable 2FA</button></div>';
+  }
+  var ov = document.createElement('div');
+  ov.id = 'vx-mfa-modal';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:6500;background:rgba(12,18,32,.6);display:flex;align-items:center;justify-content:center;padding:18px';
+  ov.innerHTML = '<div style="background:var(--panel,#fff);color:var(--t1);border-radius:14px;max-width:420px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.4)"><div style="font-size:16px;font-weight:700;margin-bottom:8px">Two-factor authentication</div>' + body + '</div>';
+  document.body.appendChild(ov);
+  var close = function(){ try { ov.remove(); } catch(e){} };
+  ov.addEventListener('click', function(e){ if(e.target === ov) close(); });
+  var cl = ov.querySelector('#vxmfa-close'); if(cl) cl.addEventListener('click', close);
+  var on = ov.querySelector('#vxmfa-on'); if(on) on.addEventListener('click', function(){ close(); vxMfaEnroll(); });
+  var off = ov.querySelector('#vxmfa-off'); if(off) off.addEventListener('click', function(){ close(); if(totps[0]) vxMfaUnenroll(totps[0].id); });
+}
+
 async function doLogin() {
   const email = el('li-email').value.trim().toLowerCase();
   const pwd   = el('li-pwd').value;
@@ -4113,6 +4235,17 @@ async function doLogin() {
         saveUsers();
       }
       saveSession(CURRENT_USER.id);
+      // MFA: if a verified TOTP factor exists, require the code before entering.
+      if(typeof vxMfaEnsureAAL2 === 'function'){
+        const mfaOk = await vxMfaEnsureAAL2();
+        if(!mfaOk){
+          try { await _vxSupabase().auth.signOut(); } catch(e){}
+          err.textContent = t('validation.mfa_failed','Two-factor verification was cancelled or failed.');
+          err.classList.add('show');
+          if(btn && origLabel){ btn.disabled = false; btn.textContent = origLabel; }
+          return;
+        }
+      }
       try { await vxStore.pullAll(); } catch(e) { console.warn('pullAll', e); }
       bootApp();
       toast(t('toast.signed_in','Signed in to Veritix Cloud.'), 'success');

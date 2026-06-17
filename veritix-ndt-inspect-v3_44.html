@@ -172,7 +172,18 @@
         <div class="login-fld"><label for="li-pwd" data-i18n="auth.password">Password</label><div class="pwd-wrap"><input type="password" id="li-pwd" autocomplete="current-password" placeholder="••••••••" data-on-keydown="doLogin" data-key="Enter"/><button type="button" class="pwd-eye" data-action="togglePwdVis" data-pass-el="1" aria-label="Show password"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/></svg></button></div></div>
         <div class="login-err" id="li-err" role="alert"></div>
         <button class="login-btn" data-action="doLogin" type="button"><span data-i18n="app.signin">Sign in</span> to Veritix Cloud</button>
-        <div class="login-meta-row">
+        <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--t3,#9aa5bd);font-size:11px"><span style="flex:1;height:1px;background:currentColor;opacity:.3"></span>or continue with<span style="flex:1;height:1px;background:currentColor;opacity:.3"></span></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" type="button" data-action="doOAuth" data-args="'google'" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            <span>Google</span>
+          </button>
+          <button class="btn" type="button" data-action="doOAuth" data-args="'azure'" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px">
+            <svg width="15" height="15" viewBox="0 0 23 23" aria-hidden="true"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>
+            <span>Microsoft</span>
+          </button>
+        </div>
+        <div class="login-meta-row" style="margin-top:14px">
           <a class="login-link" data-action="vxOpenForgotPassword" data-i18n="auth.forgot">Forgot password?</a>
           <span class="login-link-sep">·</span>
           <a class="login-link" data-action="liGuestMode" data-i18n="welcome.preview_cta">Preview without an account →</a>
@@ -341,6 +352,10 @@
         <button class="pd-item" data-action="openPwdModal">
           <svg class="pd-iconsvg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Change password
+        </button>
+        <button class="pd-item" data-action="openMfaModal">
+          <svg class="pd-iconsvg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          Two-factor authentication
         </button>
         <div class="pd-sep"></div>
         <button class="pd-item" data-action="_wHelpFromProfile">

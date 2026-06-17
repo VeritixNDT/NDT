@@ -26,6 +26,11 @@ alter table public.api_keys enable row level security;
 
 -- Org members can see their org's keys (metadata only — the hash is not a
 -- secret, the plaintext is never stored). Only admins create / revoke / delete.
+-- drop-if-exists first so this migration is safe to re-run.
+drop policy if exists api_keys_select on public.api_keys;
+drop policy if exists api_keys_insert on public.api_keys;
+drop policy if exists api_keys_update on public.api_keys;
+drop policy if exists api_keys_delete on public.api_keys;
 create policy api_keys_select on public.api_keys for select
   using (public.is_org_member(org_id));
 create policy api_keys_insert on public.api_keys for insert

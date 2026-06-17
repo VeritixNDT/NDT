@@ -2882,6 +2882,86 @@ function savePortalSettings() {
   toast(t('toast.portal_saved', 'Customer portal settings saved.'));
 }
 
+// ── Public API keys ───────────────────────────────────────────────────────
+// Keys are generated in the browser; only the SHA-256 hash is stored (the
+// plaintext is shown once). The `api` Edge Function validates by hash.
+async function _vxSha256Hex(s){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function vxApiKeyList(){
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+  if(!sb || !cfg.orgId) return [];
+  const r = await sb.from('api_keys').select('id,prefix,label,scopes,created_at,last_used_at,revoked_at').eq('org_id', cfg.orgId).order('created_at', { ascending: false });
+  return r.data || [];
+}
+async function renderApiKeys(){
+  const host = el('api-keys-list'); if(!host) return;
+  const baseMeta = document.querySelector('meta[name="vx-supabase-url"]');
+  const base = baseMeta ? baseMeta.content : '';
+  if(el('api-base-url')) el('api-base-url').value = base ? (base.replace(/\/$/, '') + '/functions/v1/api') : '(cloud not configured)';
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb){ host.innerHTML = '<div style="color:var(--t3);font-size:13px">Sign in to Veritix Cloud to manage API keys.</div>'; return; }
+  host.innerHTML = 'Loading…';
+  const keys = await vxApiKeyList();
+  if(!keys.length){ host.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:8px 0">No API keys yet — create one to start using the API.</div>'; return; }
+  host.innerHTML = '<table class="tbl" style="width:100%"><thead><tr><th>Key</th><th>Label</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody>'
+    + keys.map(k => {
+      const revoked = !!k.revoked_at;
+      return '<tr style="' + (revoked ? 'opacity:.5' : '') + '">'
+        + '<td style="font-family:var(--mono);font-size:12px">' + escapeHtml(k.prefix) + '…' + (revoked ? ' <span style="color:var(--red)">revoked</span>' : '') + '</td>'
+        + '<td>' + escapeHtml(k.label || '—') + '</td>'
+        + '<td style="font-size:11px;color:var(--t3)">' + (k.created_at ? fmtDate(k.created_at) : '—') + '</td>'
+        + '<td style="font-size:11px;color:var(--t3)">' + (k.last_used_at ? fmtDate(k.last_used_at) : 'never') + '</td>'
+        + '<td style="text-align:right">' + (revoked ? '' : '<button class="btn btn-sm btn-danger" data-action="apiKeyRevoke" data-args="\'' + escapeHtml(k.id) + '\'" style="font-size:11px">Revoke</button>') + '</td>'
+        + '</tr>';
+    }).join('') + '</tbody></table>';
+}
+async function apiKeyCreate(){
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  const cfg = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig() : {};
+  if(!sb || !cfg.orgId){ toast('Sign in to Veritix Cloud first.', 'error'); return; }
+  const label = window.prompt('Name this API key (e.g. "Zapier", "ERP integration"):', '');
+  if(label === null) return;
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  const b64 = btoa(String.fromCharCode.apply(null, Array.prototype.slice.call(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const key = 'vxk_' + b64;
+  const hash = await _vxSha256Hex(key);
+  let userId = null;
+  try { const u = await sb.auth.getUser(); userId = (u && u.data && u.data.user) ? u.data.user.id : null; } catch(e){}
+  const r = await sb.from('api_keys').insert({ org_id: cfg.orgId, key_hash: hash, prefix: key.slice(0, 12), label: (label || '').trim() || null, created_by: userId });
+  if(r.error){ toast('Could not create key: ' + r.error.message, 'error'); return; }
+  _vxShowApiKeyOnce(key);
+  renderApiKeys();
+}
+function _vxShowApiKeyOnce(key){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:7000;background:rgba(12,18,32,.6);display:flex;align-items:center;justify-content:center;padding:18px';
+  ov.innerHTML = '<div style="background:var(--panel,#fff);color:var(--t1);border-radius:14px;max-width:540px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+    + '<div style="font-size:16px;font-weight:700;margin-bottom:4px">Your new API key</div>'
+    + '<div style="font-size:12.5px;color:var(--t3);margin-bottom:12px">Copy it now — for security it is shown only once and cannot be retrieved later.</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:14px"><input id="vxak-val" readonly value="' + escapeHtml(key) + '" style="flex:1;font-family:var(--mono);font-size:12px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--t1)"/><button class="btn btn-sm" id="vxak-copy">Copy</button></div>'
+    + '<div style="display:flex;justify-content:flex-end"><button class="btn btn-primary btn-sm" id="vxak-done">Done</button></div></div>';
+  document.body.appendChild(ov);
+  const done = () => { try { ov.remove(); } catch(e){} };
+  ov.querySelector('#vxak-done').addEventListener('click', done);
+  ov.querySelector('#vxak-copy').addEventListener('click', () => {
+    try { navigator.clipboard.writeText(key); toast('Copied to clipboard.'); }
+    catch(e){ const inp = ov.querySelector('#vxak-val'); inp.select(); try { document.execCommand('copy'); toast('Copied.'); } catch(_){} }
+  });
+  setTimeout(() => { try { ov.querySelector('#vxak-val').select(); } catch(e){} }, 30);
+}
+async function apiKeyRevoke(id){
+  if(typeof vxConfirm === 'function'){ if(!await vxConfirm({ message: 'Revoke this API key? Anything using it stops working immediately.', okLabel: 'Revoke', danger: true })) return; }
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb){ toast('Offline.', 'error'); return; }
+  const r = await sb.from('api_keys').update({ revoked_at: new Date().toISOString() }).eq('id', id);
+  if(r.error){ toast('Could not revoke: ' + r.error.message, 'error'); return; }
+  toast('API key revoked.');
+  renderApiKeys();
+}
+
 function saveNotifications() {
   const s=ls(KEYS.settings,{});
   s.notifCert   = el('notif-cert')?.checked;

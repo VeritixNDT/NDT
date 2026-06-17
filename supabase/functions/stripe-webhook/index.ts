@@ -15,6 +15,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jsonResponse } from "../_shared/cors.ts";
+import { deliverWebhooks } from "../_shared/webhooks.ts";
 
 function envOrThrow(name: string): string {
   const v = Deno.env.get(name);
@@ -80,6 +81,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         if (i >= 0 && invoices[i].status !== "Paid") {
           invoices[i] = { ...invoices[i], status: "Paid", paidAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
           await service.from("entities").update({ value: invoices }).eq("org_id", orgId).eq("key", "vx-invoices-v1");
+          // Fan the payment out to the org's webhooks (signed, best-effort).
+          await deliverWebhooks(service, orgId, "invoice.paid", { id: invoiceId, number: invoices[i].number, customerId: invoices[i].customerId, jobId: invoices[i].jobId, paidAt: invoices[i].paidAt });
         }
       } catch (e) {
         // Acknowledge to Stripe anyway (it retries on non-2xx); log for ops.

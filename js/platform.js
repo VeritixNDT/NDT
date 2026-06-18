@@ -238,6 +238,12 @@ async function _vxApplySupabaseSession(session){
     } catch(e){}
     return;
   }
+  // Capture the identity this device was last associated with BEFORE the patch
+  // below overwrites userId. Used to detect a user *switch* (signing in with a
+  // different account / provider on a browser that still holds the previous
+  // user's orgId+role): a stale cross-user orgId is the "phantom admin" masking
+  // bug, and must never survive into the new session.
+  var prevUserId = (function(){ try { return vxPlatformConfig().userId || null; } catch(e){ return null; } })();
   var patch = {
     accessToken:  session.access_token  || null,
     refreshToken: session.refresh_token || null,
@@ -264,62 +270,124 @@ async function _vxApplySupabaseSession(session){
   // — the latter gets a clear reconnect banner instead of being silently
   // left at local Inspector privilege (which is what masked Carl's admin).
   try { localStorage.setItem('vx-sb-cloud-seen', '1'); } catch(e){}
-  // Resolve orgId via the membership table. If the user has no membership
-  // (signed up under email-confirm-on so vxApi.register returned early
-  // without provisioning, or invitation pending), reconcile by creating
-  // an org for them right now. This closes the half-provisioned-account
-  // gap that the Phase 1 audit flagged.
+  // Resolve orgId / role from the CURRENT cloud user's membership — the single
+  // source of truth. A previous user's orgId/role must NEVER be inherited:
+  // signing in with a different account/provider on a browser that still holds
+  // the old config was showing "phantom admin" of a workspace the new user has
+  // no membership in (Carl's Google login appeared admin of org ecabfac4). And
+  // a genuinely new OAuth user must be provisioned an org of their own rather
+  // than left org-less. _vxResolveOrgMembership handles both, robustly against
+  // the supabase-js token-commit race.
   try {
     var sb = _vxSupabase();
-    if(sb && session.user?.id){
-      var r = await sb.from('org_members')
-        .select('org_id, role')
-        .eq('user_id', session.user.id)
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if(r && r.error){
-        // The membership query FAILED (network drop, TLS interception,
-        // RLS error, …). This is NOT the same as "user has no org" —
-        // reconciling here would spawn a spurious duplicate org and
-        // make the user admin of the wrong (empty) workspace. Leave
-        // orgId / role untouched and let a later session-apply (on a
-        // healthy connection) resolve them correctly.
-        console.warn('vx: org membership lookup failed — skipping reconcile', r.error.message || r.error);
-      } else if(r && r.data){
-        // V44.3: stash the server-trusted role into vxPlatformConfig so
-        // bootApp can sync it down to CURRENT_USER (the legacy local user
-        // record) after loadSession runs. Without this, a user who signed
-        // up under email-confirm-on ends up with CURRENT_USER.role =
-        // 'Inspector' (local-fallback default) despite being admin server-
-        // side, and the Settings nav gate hides their own admin tools.
-        vxPlatformSet({ orgId: r.data.org_id || null, role: r.data.role || null });
+    if(sb && session.user && session.user.id){
+      var res = await _vxResolveOrgMembership(sb, session, prevUserId);
+      if(res.status === 'member' || res.status === 'reconciled'){
+        // V44.3: server-trusted orgId + role. bootApp syncs role down to the
+        // legacy CURRENT_USER record so admin tools unhide correctly.
+        vxPlatformSet({ orgId: res.orgId, role: res.role });
+      } else if(res.status === 'none'){
+        // The user genuinely belongs to no org and reconcile could not create
+        // one. Clear any inherited orgId/role so the UI reflects cloud truth
+        // (org-less) instead of masking it with a previous user's config.
+        vxPlatformSet({ orgId: null, role: null });
       } else {
-        // V44.1: No org → reconcile. Trigger orgs_add_creator_as_admin
-        // bootstraps the org_members row inside the same transaction, so
-        // the very next read of membership succeeds.
-        var meta = session.user?.user_metadata || {};
-        var userEmail = session.user?.email || '';
-        var displayName = meta.name || (userEmail ? userEmail.split('@')[0] : 'New user');
-        var orgInsert = await sb.from('orgs')
-          .insert({
-            name: meta.company || (displayName + "'s team"),
-            created_by: session.user.id,
-            plan_tier: 'trial',
-            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          })
-          .select('id')
-          .single();
-        if(!orgInsert.error && orgInsert.data){
-          // Creator becomes admin via the orgs_add_creator_as_admin trigger.
-          vxPlatformSet({ orgId: orgInsert.data.id, role: 'admin' });
-          console.log('vx: reconciled missing org for user', session.user.id);
-        } else {
-          console.warn('vx: org reconciliation failed', orgInsert.error);
+        // status === 'error' — a transient lookup failure (network / TLS /
+        // RLS). Leave orgId/role as-is so we don't drop a valid admin or spawn
+        // a duplicate org on a flaky connection — BUT only if they belong to
+        // THIS user. If the device last held a *different* user's org, that
+        // value is never right, so clear it.
+        if(prevUserId && prevUserId !== session.user.id){
+          vxPlatformSet({ orgId: null, role: null });
         }
       }
     }
-  } catch(e){ console.warn('vx: org membership lookup failed', e); }
+  } catch(e){ console.warn('vx: org membership resolution failed', e); }
+}
+
+// Resolve (or provision) the org for a freshly-authenticated cloud user.
+// Returns { status, orgId, role } where status is one of:
+//   'member'     — found an existing org_members row
+//   'reconciled' — the user had no org so we created one (they become admin)
+//   'none'       — the user has no org AND provisioning failed (caller clears)
+//   'error'      — the membership lookup itself failed transiently (caller
+//                  leaves orgId/role untouched for a later, healthy apply)
+//
+// Robust against the supabase-js token-commit race that previously left brand-
+// new OAuth users org-less: the OAuth callback reaches _vxApplySupabaseSession
+// via onAuthStateChange, which fires while the SDK is still committing the
+// freshly-issued token. We confirm the JWT is live with getUser() FIRST — once
+// it resolves, auth.uid() is committed for PostgREST too, so (a) an existing
+// member's read returns their row instead of a spurious empty (which would have
+// created a DUPLICATE org), and (b) an empty read is genuinely "no org" so the
+// provisioning INSERT (RLS: created_by = auth.uid()) won't 401. A single
+// delayed re-read + retry covers any residual timing slack.
+async function _vxResolveOrgMembership(sb, session, prevUserId){
+  var userId = session.user.id;
+  // Confirm the token is live server-side before trusting any read/insert.
+  try { await sb.auth.getUser(); } catch(e){}
+
+  var lookup = function(){
+    return sb.from('org_members')
+      .select('org_id, role')
+      .eq('user_id', userId)
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+  };
+
+  var r = await lookup();
+  if(r && r.error){
+    console.warn('vx: org membership lookup failed — leaving org unresolved', r.error.message || r.error);
+    return { status: 'error' };
+  }
+  if(r && r.data){
+    return { status: 'member', orgId: r.data.org_id || null, role: r.data.role || null };
+  }
+
+  // No membership → provision an org. The orgs_add_creator_as_admin trigger
+  // inserts the admin org_members row inside the same transaction.
+  var made = await _vxCreateOrgForUser(sb, session);
+  if(made.ok) return { status: 'reconciled', orgId: made.orgId, role: 'admin' };
+
+  // Insert rejected — most often the token-commit race (auth.uid() momentarily
+  // null). Give the SDK a tick, re-read in case a concurrent apply already
+  // provisioned the org, then try the insert one final time.
+  await new Promise(function(resolve){ setTimeout(resolve, 250); });
+  var r2 = await lookup();
+  if(r2 && !r2.error && r2.data){
+    return { status: 'member', orgId: r2.data.org_id || null, role: r2.data.role || null };
+  }
+  var retry = await _vxCreateOrgForUser(sb, session);
+  if(retry.ok) return { status: 'reconciled', orgId: retry.orgId, role: 'admin' };
+
+  console.warn('vx: org reconciliation failed after retry', retry.error);
+  return { status: 'none' };
+}
+
+// Insert a fresh 14-day trial org for the session's user. The
+// orgs_add_creator_as_admin trigger makes them its admin. Returns
+// { ok, orgId } on success or { ok:false, error } on failure.
+async function _vxCreateOrgForUser(sb, session){
+  var meta = (session.user && session.user.user_metadata) || {};
+  var userEmail = (session.user && session.user.email) || '';
+  var displayName = meta.name || meta.full_name || (userEmail ? userEmail.split('@')[0] : 'New user');
+  try {
+    var ins = await sb.from('orgs')
+      .insert({
+        name: meta.company || (displayName + "'s team"),
+        created_by: session.user.id,
+        plan_tier: 'trial',
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select('id')
+      .single();
+    if(!ins.error && ins.data){
+      console.log('vx: provisioned org for user', session.user.id);
+      return { ok: true, orgId: ins.data.id };
+    }
+    return { ok: false, error: ins.error && (ins.error.message || ins.error) };
+  } catch(e){ return { ok: false, error: String((e && e.message) || e) }; }
 }
 
 // Build a local CURRENT_USER record from a Supabase session so the rest of

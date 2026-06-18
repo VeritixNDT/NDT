@@ -147,6 +147,11 @@ function bootApp() {
         const sess = await sb.auth.getSession();
         if(sess && sess.data && sess.data.session){
           await _vxApplySupabaseSession(sess.data.session);
+          // OAuth (Google/Microsoft) sign-ins return here with a valid cloud
+          // session but no local CURRENT_USER (they never ran doLogin). Without
+          // this the boot's `if(CURRENT_USER…)` check below fails and the user
+          // is bounced back to the login screen even though they're signed in.
+          try { if(typeof _vxMaterializeCloudUser === 'function') _vxMaterializeCloudUser(sess.data.session); } catch(e){ console.warn('vx: materialize cloud user failed', e); }
           // Refresh local cache from cloud for whatever org the user
           // belongs to. We do this lazily — if it fails (network, RLS),
           // the user still sees their last-known local state.
@@ -195,7 +200,19 @@ function bootApp() {
             // guidance: never await Supabase calls directly in this callback.)
             setTimeout(function(){
               // Use the helper so orgId gets re-resolved if it wasn't set.
-              _vxApplySupabaseSession(session).catch(function(e){ console.warn('apply session', e); });
+              _vxApplySupabaseSession(session).then(function(){
+                // Safety net for OAuth: if the boot getSession() resolved before
+                // the PKCE code exchange finished, the app is still on the login
+                // screen. Materialise the user and boot now that SIGNED_IN fired.
+                var loginEl = document.getElementById('login-screen');
+                var stillOnLogin = loginEl && !loginEl.classList.contains('hidden');
+                if(stillOnLogin && typeof _vxMaterializeCloudUser === 'function'){
+                  if(_vxMaterializeCloudUser(session)){
+                    try { if(typeof vxStore !== 'undefined' && vxStore.pullAll) vxStore.pullAll().catch(function(){}); } catch(e){}
+                    try { if(typeof bootApp === 'function') bootApp(); } catch(e){ console.warn('vx: boot after SIGNED_IN failed', e); }
+                  }
+                }
+              }).catch(function(e){ console.warn('apply session', e); });
               try { if(typeof vxRealtimeConnect === 'function') vxRealtimeConnect(); } catch(e){}
             }, 0);
           }

@@ -322,6 +322,46 @@ async function _vxApplySupabaseSession(session){
   } catch(e){ console.warn('vx: org membership lookup failed', e); }
 }
 
+// Build a local CURRENT_USER record from a Supabase session so the rest of
+// the UI (which keys off CURRENT_USER + AUTH_USERS) works. The password path
+// does this inline in doLogin; OAuth (Google/Microsoft) sign-ins instead land
+// back on the boot getSession / SIGNED_IN path with NO doLogin call, so the
+// session is valid server-side but no CURRENT_USER ever gets materialised —
+// boot then hits `else clearSession()` and bounces straight back to the login
+// screen (the "Microsoft sign-in loops back to login" symptom). Persists
+// straight to KEYS.users / KEYS.session via ls/lss because this can run before
+// loadUsers() populates the in-memory AUTH_USERS array. Idempotent: upserts by
+// id/email and just refreshes lastLogin for a returning user.
+function _vxMaterializeCloudUser(session){
+  if(!session || !session.user) return null;
+  var u = session.user;
+  var meta = u.user_metadata || {};
+  var cfgRole = (typeof vxPlatformConfig === 'function') ? vxPlatformConfig().role : null;
+  var role = (typeof _vxRoleToDisplay === 'function') ? _vxRoleToDisplay(cfgRole) : 'Inspector';
+  var email = (u.email || '').toLowerCase();
+  var users = ls(KEYS.users, []);
+  if(!Array.isArray(users)) users = [];
+  var existing = users.find(function(x){ return x.id === u.id || (email && (x.email || '').toLowerCase() === email); });
+  var rec = existing || {};
+  rec.id = u.id;
+  rec.email = email || rec.email || '';
+  rec.name = rec.name || meta.name || meta.full_name || (email ? email.split('@')[0] : 'User');
+  rec.role = role || rec.role || 'Inspector';
+  if((meta.avatar_url || meta.picture) && !rec.photo) rec.photo = meta.avatar_url || meta.picture;
+  rec.certs = rec.certs || []; rec.certAuth = rec.certAuth || ''; rec.dept = rec.dept || ''; rec.notes = rec.notes || '';
+  rec.createdAt = rec.createdAt || new Date().toISOString();
+  rec.lastLogin = new Date().toISOString();
+  if(!existing) users.push(rec);
+  try { lss(KEYS.users, users); } catch(e){}
+  if(Array.isArray(AUTH_USERS)){
+    var i = AUTH_USERS.findIndex(function(x){ return x.id === rec.id; });
+    if(i >= 0) AUTH_USERS[i] = rec; else AUTH_USERS.push(rec);
+  }
+  CURRENT_USER = rec;
+  try { saveSession(rec.id); } catch(e){}
+  return rec;
+}
+
 // Map Supabase lowercase enum role → display role used by the existing
 // CURRENT_USER materialisation in doLogin / doRegister / etc.
 function _vxRoleToDisplay(role){

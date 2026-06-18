@@ -1,8 +1,8 @@
-# Veritix NDT Inspect — Competitive Audit
+﻿# Veritix NDT Inspect - Competitive Audit
 
-_June 2026 · benchmark vs. leading NDT inspection/reporting software_
+_June 2026 - benchmark vs. leading NDT inspection/reporting software - status refreshed 2026-06-18_
 
-## 1. The landscape — who we actually compete with
+## 1. The landscape - who we actually compete with
 
 Two distinct categories:
 
@@ -13,61 +13,68 @@ Two distinct categories:
   CIVA, BeamTool, WeldSight, Mentor UT. These acquire/analyse raw scan data;
   Veritix is a management/reporting layer and should not try to compete here.
 
-Recurring competitor pitch: **field → report → invoice with no re-entry**
+Recurring competitor pitch: **field -> report -> invoice with no re-entry**
 (Floodlight's wedge), configurable approval workflows, white-label customer
 portals, personnel/equipment/calibration, and increasingly **AI** + **integrations**.
 
-## 2. Where Veritix wins 🟢
+## 2. Where Veritix wins (strengths)
 
 | Differentiator | vs competitors |
 |---|---|
-| Inspection-engine depth — 9 methods (UT/MT/VT/PT/RT/ET/PMI/HT/FN) with live survey grids, acceptance criteria, sampling tables, grade libraries | Most management-first rivals treat the report as a flat form |
+| Inspection-engine depth - 9 methods (UT/MT/VT/PT/RT/ET/PMI/HT/FN) with live survey grids, acceptance criteria, sampling tables, grade libraries | Most management-first rivals treat the report as a flat form |
 | Canvas PDF editor (smart cards, conditional blocks, Annex) | More flexible than the fixed templates most rivals offer (AgileNDT excepted) |
 | Eye-test cert + Annex A, sealed/frozen PDFs, QR verify | Audit-grade evidence few rivals match |
 | Offline-first (localStorage / IndexedDB) | Strong for field; many rivals are cloud-only |
-| Full around-the-inspection layer: Customers → Jobs → Quotes/Invoices → Portal → Planner → Management reports → Job report pack | Unusual breadth for our size |
+| Full around-the-inspection layer: Customers -> Jobs -> Quotes/Invoices -> Portal -> Planner -> Management reports -> Job report pack | Unusual breadth for our size |
 | 5-language i18n | Most rivals are English-only |
 
-## 3. Where competitors are ahead — the gaps 🔴
+## 3. Where competitors were ahead - the gaps (mostly closed)
 
-| Gap | Who has it | Veritix today |
+Status as of 2026-06-18. The original June-12 gap list is now largely shipped.
+Legend: [LIVE] shipped & live - [BUILT] built/verified - [PARTIAL] partly done - [OPEN] not started.
+
+| Gap | Who has it | Veritix status (2026-06-18) |
 |---|---|---|
-| Online payments (pay invoice in-portal) | AgileNDT, SPA | Stripe Checkout now BUILT (portal Pay online + webhook), pending Stripe keys + deploy |
-| Integrations: public API, SSO/MFA, ERP/accounting | AgileNDT, SkySoft | None — enterprise procurement gate |
-| Customer-initiated work requests via portal | AgileNDT, Floodlight | Portal is read-only |
-| AI layer — report review, trend digests, NL asset query | AgileNDT | None — but our structured survey data is ideal for it |
-| Scheduling / dispatch depth | Zertify, Floodlight | Planner exists; no dispatch queue |
-| Portal depth — notifications, payment, role tiers | AgileNDT | Magic-link read-only (+ Stripe pay now) |
-| Technique sheets as a formal artifact | AgileNDT, NDTspec | Implicit via method forms + procedure register |
+| Online payments (pay invoice in-portal) | AgileNDT, SPA | [BUILT] Stripe Checkout built + test-verified (portal Pay online + webhook -> invoice Paid). Needs **go-live** (live keys + business/bank verification + live webhook). |
+| Public API | AgileNDT, SkySoft | [LIVE] key-authed read+write (reports/jobs/customers/invoices/quotes), OpenAPI spec + Swagger docs, signed webhooks. Verified end-to-end. |
+| SSO / MFA | AgileNDT, SkySoft | [LIVE] Google + Microsoft OAuth + TOTP MFA via Supabase Auth. |
+| ERP / accounting integration | AgileNDT, SkySoft | [OPEN] QuickBooks/Xero CSV export is the next integration. |
+| Customer-initiated work requests via portal | AgileNDT, Floodlight | [LIVE] (Portal v2 B) request form -> inspector "Customer requests" band -> pre-filled job; + date-change requests. |
+| AI layer | AgileNDT | [LIVE] AI report-review (do-not-issue gate, structured findings). [OPEN] trend digests / NL asset query. |
+| Scheduling / dispatch depth | Zertify, Floodlight | [PARTIAL] Planner + portal inspection schedule + customer date-change. [OPEN] no dispatch queue. |
+| Portal depth - notifications, payment, role tiers | AgileNDT | [LIVE] Portal v2 (A+B+C+D+E+F): two-way channel, ack/e-sign, proactive notifications, asset cockpit, work requests, self-serve depth, section toggles, white-label. [OPEN] multi-contact role tiers. |
+| Technique sheets as a formal artifact | AgileNDT, NDTspec | [OPEN] still implicit via method forms + procedure register. |
 
-## 4. Internal audit flags (build/state)
+## 4. Internal audit flags (build/state) - 2026-06-18
 
-1. Backend went live 2026-06-12 (email/portal/verify); cross-device portal/verify still needs a real-world test.
-2. jsonb sync scaling risk (~650 KB/report blobs) — harden before pilot volume.
-3. No public API / SSO — blocks enterprise + the "no re-entry" story.
-4. Test scaffolding still shipping ("Delete all reports" bulk tool) — remove before launch.
-5. Service-worker cache fragility (documented stale-JS issues).
-6. Print fidelity of new PDFs verified structurally, not on a real printer.
+1. [DONE] Backend live since 2026-06-12 (email/portal/verify); portal notifications confirmed live 2026-06-16. [OPEN] a full real-world cross-device portal/verify pass is still worth doing.
+2. [DONE] jsonb sync scaling - per-report rows shipped; only embedded photo dataURLs -> Supabase Storage remains, deferred to pilot volume.
+3. [DONE] Public API + SSO/MFA shipped - enterprise/no-re-entry gate closed.
+4. [OPEN] Test scaffolding still shipping ("Delete all reports" tool / VX_SHOW_TEST_TOOLS) - flip off before customer launch.
+5. [DONE] Service-worker cache fragility - fixed (per-build SW cache + footer build stamp + no-cache headers).
+6. [OPEN] Print fidelity of new PDFs verified structurally, not on a real printer. Server-side vector PDF (pdf-render) is deployed but inert until a Gotenberg container + GOTENBERG_URL are provided (falls back to raster/print).
 
-## 5. Prioritised recommendations
+## 5. Prioritised recommendations - updated 2026-06-18
 
-1. **Stripe online payments** — highest leverage; closes quote → invoice → paid. **(Built 2026-06-12 — needs Stripe keys + deploy.)**
-2. Accounting export first (QuickBooks/Xero CSV), public API second.
-3. SSO/MFA (Azure AD/Okta/Google) — enterprise gate.
-4. Portal v2 — customer work-request submission + "report ready" notifications.
-5. AI report-review — pre-delivery validation. Our structured data makes this easier for us than for form-based rivals.
-6. Harden sync scaling before pilot customers.
+Done since June 12: Stripe payments (built), Public API, SSO/MFA, AI report-review,
+Portal v2, sync-scaling hardening. Remaining:
 
-**Bottom line:** Veritix is ahead on inspection-engine depth, evidence handling,
-offline, and breadth; behind on integrations/SSO and AI. None of the gaps are
-architectural. Online payments (the #1 gap) is now built.
+1. **Launch-readiness** (gating, not features): Stripe go-live; remove the "Delete all reports" test tool; real-printer PDF check; deploy a Gotenberg container for vector PDFs; cross-device portal/verify pass; photo dataURLs -> Storage before pilot volume.
+2. **Accounting/ERP export** (QuickBooks/Xero CSV) - the one untouched integration; pairs with the now-live public API.
+3. **Post-launch product depth:** dispatch queue (scheduling), formal technique-sheet artifact, AI expansion (trend digests / NL asset query), portal multi-contact role tiers + i18n.
+
+**Bottom line:** As of 2026-06-18 the integration/enterprise gate is essentially
+closed - public API, SSO/MFA, AI review, online payments, and a full Portal v2 are
+all built. What remains is **launch-readiness chores** (Stripe go-live, remove test
+tooling, vector-PDF infra, real-world tests) plus one net-new integration
+(accounting export); the rest is post-launch depth. No gaps are architectural.
 
 ### Sources
-- DRIVE NDT — https://www.drive-ndt.com/en/
-- AgileNDT — https://agilendt.com/
-- Floodlight — https://floodlightsoft.com/ndt-inspection-software/
-- SkySoft — https://www.skysoftconnections.com/skysoft-ndt-inspection-software/
-- SPA InnoVision / InspectO — https://spainnovision.com/inspecto/
-- NDTspec (TWI) — https://www.twisoftware.com/software/welding-software/ndtspec/
+- DRIVE NDT - https://www.drive-ndt.com/en/
+- AgileNDT - https://agilendt.com/
+- Floodlight - https://floodlightsoft.com/ndt-inspection-software/
+- SkySoft - https://www.skysoftconnections.com/skysoft-ndt-inspection-software/
+- SPA InnoVision / InspectO - https://spainnovision.com/inspecto/
+- NDTspec (TWI) - https://www.twisoftware.com/software/welding-software/ndtspec/
 
-_Created 2026-06-12 · Owner: Carl Cope (Smart Veritas BV)_
+_Created 2026-06-12 - Status refreshed 2026-06-18 - Owner: Carl Cope (Smart Veritas BV)_

@@ -365,28 +365,28 @@ async function _vxResolveOrgMembership(sb, session, prevUserId){
   return { status: 'none' };
 }
 
-// Insert a fresh 14-day trial org for the session's user. The
-// orgs_add_creator_as_admin trigger makes them its admin. Returns
-// { ok, orgId } on success or { ok:false, error } on failure.
+// Provision a fresh 14-day trial org for the session's user via the
+// vx_provision_org RPC (migration 0006). We deliberately do NOT use a direct
+// INSERT into orgs: that path is subject to the orgs_insert RLS WITH CHECK,
+// which was denying brand-new SSO users even when auth.uid() == created_by and
+// the policy is permissive (an environment RLS-on-insert anomaly — confirmed
+// with a whoami probe showing auth.uid()/auth.role() correct yet the insert
+// 42501'd). The SECURITY DEFINER RPC bypasses that while staying safe: it forces
+// created_by = auth.uid(), requires a session, and is idempotent (returns the
+// caller's existing org, so no duplicates on retry). Returns { ok, orgId } or
+// { ok:false, error }.
 async function _vxCreateOrgForUser(sb, session){
   var meta = (session.user && session.user.user_metadata) || {};
   var userEmail = (session.user && session.user.email) || '';
   var displayName = meta.name || meta.full_name || (userEmail ? userEmail.split('@')[0] : 'New user');
+  var orgName = meta.company || (displayName + "'s team");
   try {
-    var ins = await sb.from('orgs')
-      .insert({
-        name: meta.company || (displayName + "'s team"),
-        created_by: session.user.id,
-        plan_tier: 'trial',
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .select('id')
-      .single();
-    if(!ins.error && ins.data){
+    var rpc = await sb.rpc('vx_provision_org', { p_name: orgName });
+    if(!rpc.error && rpc.data){
       console.log('vx: provisioned org for user', session.user.id);
-      return { ok: true, orgId: ins.data.id };
+      return { ok: true, orgId: rpc.data };
     }
-    return { ok: false, error: ins.error && (ins.error.message || ins.error) };
+    return { ok: false, error: rpc.error && (rpc.error.message || rpc.error) };
   } catch(e){ return { ok: false, error: String((e && e.message) || e) }; }
 }
 
@@ -2799,22 +2799,21 @@ var vxApi = {
         if(!orgFetch.error && orgFetch.data) newOrg = orgFetch.data;
       } else {
         // Fallback: reconciliation failed inside _vxApplySupabaseSession.
-        // Try once more here so the signup doesn't return a half-provisioned
-        // session. Logs the original error for diagnostics.
-        var orgInsert = await sb.from('orgs')
-          .insert({
-            name: payload.company || (payload.name ? (payload.name + "'s team") : 'New team'),
-            created_by: session.user.id,
-            plan_tier: 'trial',
-            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          })
-          .select('id, name, plan_tier, trial_ends_at')
-          .single();
-        if(!orgInsert.error && orgInsert.data){
-          newOrg = orgInsert.data;
-          vxPlatformSet({ orgId: newOrg.id, role: 'admin' });
+        // Provision via the SECURITY DEFINER RPC (same as _vxCreateOrgForUser —
+        // a direct orgs INSERT hits the orgs_insert RLS anomaly). Then fetch the
+        // org details for the response. Logs the error for diagnostics.
+        var prov = await sb.rpc('vx_provision_org', {
+          p_name: payload.company || (payload.name ? (payload.name + "'s team") : 'New team'),
+        });
+        if(!prov.error && prov.data){
+          vxPlatformSet({ orgId: prov.data, role: 'admin' });
+          var orgFetch2 = await sb.from('orgs')
+            .select('id, name, plan_tier, trial_ends_at')
+            .eq('id', prov.data)
+            .maybeSingle();
+          if(!orgFetch2.error && orgFetch2.data) newOrg = orgFetch2.data;
         } else {
-          console.warn('vx: org provisioning fallback failed', orgInsert.error);
+          console.warn('vx: org provisioning fallback failed', prov.error);
         }
       }
       return {

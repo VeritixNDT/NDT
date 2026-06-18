@@ -4114,10 +4114,24 @@ function _vxMfaCodeField(ov, done){
 var _VXMFA_INPUT = '<input id="vxmfa-code" inputmode="numeric" maxlength="6" placeholder="123456" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:4px;font-size:18px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;background:var(--bg2);color:var(--t1)">';
 var _VXMFA_BTNS = '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" id="vxmfa-cancel">Cancel</button><button class="btn btn-primary btn-sm" id="vxmfa-ok">Verify</button></div>';
 function _vxMfaEnrollPrompt(qrSvg, secret){
+  // Supabase returns the QR as data:image/svg+xml;utf-8,<svg…> with the SVG
+  // UN-encoded, which often won't load in an <img>. Inline the raw SVG instead
+  // (always renders); fall back to <img> for any other format.
+  var qrHtml = '';
+  if(qrSvg){
+    var ci = qrSvg.indexOf(',');
+    if(/^data:image\/svg\+xml/i.test(qrSvg) && ci >= 0){
+      var svg = qrSvg.slice(ci + 1);
+      try { if(/%3c/i.test(svg)) svg = decodeURIComponent(svg); } catch(e){}
+      qrHtml = '<div style="width:180px;height:180px;line-height:0">' + svg.replace(/<svg /i, '<svg style="width:100%;height:100%" ') + '</div>';
+    } else {
+      qrHtml = '<img src="' + String(qrSvg).replace(/"/g, '&quot;') + '" alt="QR" style="width:180px;height:180px"/>';
+    }
+  }
   return _vxMfaOverlay(
     '<div style="font-size:16px;font-weight:700;margin-bottom:4px">Set up two-factor authentication</div>'
     + '<div style="font-size:12.5px;color:var(--t3);margin-bottom:12px">Scan with an authenticator app (Google Authenticator, 1Password, Authy), then enter the 6-digit code.</div>'
-    + '<div style="display:flex;justify-content:center;margin-bottom:10px;background:#fff;border-radius:10px;padding:10px">' + (qrSvg ? '<img src="' + qrSvg + '" alt="QR" style="width:180px;height:180px"/>' : '') + '</div>'
+    + '<div style="display:flex;justify-content:center;margin-bottom:10px;background:#fff;border-radius:10px;padding:10px">' + qrHtml + '</div>'
     + '<div style="font-size:11px;color:var(--t3);text-align:center;margin-bottom:12px">Or enter this key manually:<br><span style="font-family:var(--mono);font-size:12px;color:var(--t1);word-break:break-all">' + escapeHtml(secret || '') + '</span></div>'
     + _VXMFA_INPUT + _VXMFA_BTNS, _vxMfaCodeField);
 }

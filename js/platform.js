@@ -4113,12 +4113,16 @@ function _vxMfaCodeField(ov, done){
 }
 var _VXMFA_INPUT = '<input id="vxmfa-code" inputmode="numeric" maxlength="6" placeholder="123456" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:4px;font-size:18px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;background:var(--bg2);color:var(--t1)">';
 var _VXMFA_BTNS = '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" id="vxmfa-cancel">Cancel</button><button class="btn btn-primary btn-sm" id="vxmfa-ok">Verify</button></div>';
-function _vxMfaEnrollPrompt(qrSvg, secret){
-  // Supabase returns the QR as data:image/svg+xml;utf-8,<svg…> with the SVG
-  // UN-encoded, which often won't load in an <img>. Inline the raw SVG instead
-  // (always renders); fall back to <img> for any other format.
+function _vxMfaEnrollPrompt(qrSvg, secret, uri){
+  // Prefer rendering our OWN QR from the otpauth:// URI with the bundled qrcode
+  // library (cvRenderQR) — clean, correctly-margined and reliably scannable.
+  // Supabase's own QR is a data:image/svg+xml;utf-8,<svg…> URI with the SVG
+  // UN-encoded, which frequently won't load in an <img> (and forcing it to fit
+  // can distort the modules). Fall back to that inline SVG, then to <img>.
   var qrHtml = '';
-  if(qrSvg){
+  if(uri && typeof cvRenderQR === 'function' && typeof window.qrcode === 'function'){
+    qrHtml = '<div style="width:200px;height:200px;line-height:0">' + cvRenderQR(uri, 200) + '</div>';
+  } else if(qrSvg){
     var ci = qrSvg.indexOf(',');
     if(/^data:image\/svg\+xml/i.test(qrSvg) && ci >= 0){
       var svg = qrSvg.slice(ci + 1);
@@ -4170,7 +4174,8 @@ async function vxMfaEnroll(){
   if(en.error){ toast(en.error.message, 'error'); return; }
   var factorId = en.data.id;
   var qr = en.data.totp && en.data.totp.qr_code, secret = en.data.totp && en.data.totp.secret;
-  var code = await _vxMfaEnrollPrompt(qr, secret);
+  var uri = en.data.totp && en.data.totp.uri;
+  var code = await _vxMfaEnrollPrompt(qr, secret, uri);
   if(!code){ try { await sb.auth.mfa.unenroll({ factorId: factorId }); } catch(e){} return; }
   var ch = await sb.auth.mfa.challenge({ factorId: factorId });
   if(ch.error){ toast(ch.error.message, 'error'); try { await sb.auth.mfa.unenroll({ factorId: factorId }); } catch(e){} return; }

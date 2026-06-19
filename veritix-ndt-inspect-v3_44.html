@@ -2040,6 +2040,18 @@
                   <input id="custf-portal-emails" placeholder="jan@acme.example, accounts@acme.example"/>
                   <div style="font-size:11px;color:var(--t3);margin-top:2px">Comma-separated. These addresses may open this customer's read-only portal (jobs, approved reports, invoices) via a magic link.</div>
                 </div>
+                <div class="fld form-row">
+                  <label>Portal language</label>
+                  <select id="custf-portal-lang">
+                    <option value="">Auto (customer chooses)</option>
+                    <option value="en">English</option>
+                    <option value="nl-NL">Nederlands</option>
+                    <option value="de-DE">Deutsch</option>
+                    <option value="fr-FR">Français</option>
+                    <option value="es-ES">Español</option>
+                  </select>
+                  <div style="font-size:11px;color:var(--t3);margin-top:2px">Default language shown on this customer's portal. They can still switch it themselves.</div>
+                </div>
                 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
                   <button class="btn btn-sm" data-action="custCloseForm">Cancel</button>
                   <button class="btn btn-primary btn-sm" data-action="custSave">Save customer</button>

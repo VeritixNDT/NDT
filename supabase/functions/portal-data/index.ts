@@ -118,7 +118,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   return jsonResponse({
     company: { name: company.name || "", logo: ((company.logoUseOnPortal === "dark" && company.logoDark) ? company.logoDark : company.logo) || "", color: company.color || "#185FA5", footer: company.footer || "", portalSections: company.portalSections || {} },
-    customer: { name: cust.name || "", id: cust.id },
+    customer: { name: cust.name || "", id: cust.id, lang: cust.portalLang || "" },
     jobs, reports, quotes, invoices, requests,
   });
 });

@@ -3411,6 +3411,7 @@ function custOpenForm(id) {
   el('custf-billing').value = rec ? (rec.billingAddress||'') : '';
   el('custf-notes').value   = rec ? (rec.notes||'')          : '';
   if(el('custf-portal-emails')) el('custf-portal-emails').value = rec ? ((rec.portalEmails||[]).join(', ')) : '';
+  if(el('custf-portal-lang')) el('custf-portal-lang').value = rec ? (rec.portalLang||'') : '';
   // Rebuild the dynamic rows fresh — at least one empty row of each so
   // the form never looks blank.
   el('custf-contacts').innerHTML = '';
@@ -3442,6 +3443,8 @@ function custSave() {
     notes:          (el('custf-notes').value   || '').trim(),
     // Phase 4: emails allowed to access this customer's portal (magic link).
     portalEmails:   (el('custf-portal-emails') ? el('custf-portal-emails').value : '').split(/[,;\s]+/).map(s=>s.trim().toLowerCase()).filter(Boolean),
+    // Portal v2: default language shown on this customer's portal ('' = auto).
+    portalLang:     (el('custf-portal-lang') ? el('custf-portal-lang').value : '') || '',
     updatedAt:      now,
   };
   const list = custLoad();

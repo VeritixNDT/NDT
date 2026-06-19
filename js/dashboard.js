@@ -3273,6 +3273,7 @@ function ovRenderRecentList() {
     return;
   }
   let html = _testBar;
+  html += (typeof _aiInsightsBarHtml === 'function') ? _aiInsightsBarHtml() : '';
   html += `<table class="tbl" style="width:100%"><thead><tr>
     <th scope="col" style="width:40px">Method</th><th scope="col">Report no.</th><th scope="col">Rev</th><th scope="col">Client</th><th scope="col">Job</th><th scope="col">Date</th><th scope="col">Verdict</th><th scope="col" style="width:215px"></th>
   </tr></thead><tbody>`;

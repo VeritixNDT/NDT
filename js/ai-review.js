@@ -351,3 +351,120 @@ function _aiAuditHtml(r) {
   h += '</div>';
   return h;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI INSIGHTS — trend digests + natural-language query over the org's reports
+// ═══════════════════════════════════════════════════════════════════════════
+// Pairs with supabase/functions/ai-insights. The browser builds a compact,
+// media-stripped summary of the org's reports and sends it to the JWT-gated
+// function; Claude returns a structured trend digest, or answers a question
+// grounded only in that data. Advisory only.
+
+// Build the compact dataset (latest revisions, metadata only — no HTML/media).
+function _aiInsightsBuildData(){
+  const reports = ls(KEYS.reports, []) || [];
+  const latest = (typeof rptLatestRevisions === 'function') ? rptLatestRevisions(reports) : reports;
+  const custs = (typeof custLoad === 'function') ? custLoad() : [];
+  const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
+  const custName = id => { const c = custs.find(x => x && x.id === id); return c ? (c.name || '') : ''; };
+  const jobOf = id => jobs.find(j => j && j.id === id) || null;
+  const rows = latest.slice(-400).map(r => {
+    const j = jobOf(r.jobId);
+    return {
+      reportNo: r.reportNo, method: r.method, revision: r.revision,
+      stage: (typeof getReportStage === 'function') ? getReportStage(r) : r.stage,
+      verdict: r.verdict, examDate: r.examDate || '', createdAt: r.createdAt || '',
+      customer: j ? custName(j.customerId) : '', job: j ? (j.title || '') : '',
+      inspector: r.inspector || '', subject: r.subject || '',
+    };
+  });
+  return { generatedAt: new Date().toISOString(), reportCount: rows.length, reports: rows };
+}
+
+// Invoke the ai-insights Edge Function. Returns { mode, result } or { error }.
+async function vxAiInsights(mode, question){
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.functions) return { error: 'AI insights need you to be signed in to the cloud.' };
+  const data = _aiInsightsBuildData();
+  if(!data.reportCount) return { error: 'No reports yet to analyse.' };
+  try {
+    const r = await sb.functions.invoke('ai-insights', { body: { mode: mode, question: question || '', data: data } });
+    if(r.error || !r.data || r.data.error){
+      let msg = 'AI insights could not be completed.';
+      try { if(r.error && r.error.context && typeof r.error.context.json === 'function'){ const j = await r.error.context.json(); if(j && j.error) msg = j.error; } } catch(_){}
+      if(r.data && r.data.error) msg = r.data.error;
+      return { error: msg };
+    }
+    return r.data;
+  } catch(e){ return { error: String(e.message || e) }; }
+}
+
+function _aiInsightsDigestHtml(d){
+  const esc = s => escapeHtml(String(s == null ? '' : s));
+  const arrow = dir => dir === 'up' ? '▲' : dir === 'down' ? '▼' : '▶';
+  const sevColor = s => s === 'high' ? '#dc2626' : s === 'medium' ? '#d97706' : '#6b7589';
+  const trends = (d.trends || []).map(t => '<li style="margin-bottom:7px"><strong>' + esc(t.label) + '</strong> <span style="color:var(--t3)">' + arrow(t.direction) + '</span><div style="font-size:12.5px;color:var(--t2)">' + esc(t.detail) + '</div></li>').join('');
+  const issues = (d.recurringIssues || []).map(i => '<li style="margin-bottom:5px"><span style="color:' + sevColor(i.severity) + ';font-weight:600;text-transform:capitalize">' + esc(i.severity) + '</span> · ' + esc(i.issue) + ' <span style="color:var(--t3)">(' + esc(i.where) + ')</span></li>').join('');
+  const recs = (d.recommendations || []).map(r => '<li style="margin-bottom:4px">' + esc(r) + '</li>').join('');
+  const sec = (label, body) => body ? '<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin:0 0 4px">' + label + '</div>' + body : '';
+  return '<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">' + esc(d.period || '') + '</div>'
+    + '<div style="font-size:14px;font-weight:600;margin:4px 0 14px">' + esc(d.headline || '') + '</div>'
+    + sec('Trends', trends ? '<ul style="margin:0 0 14px;padding-left:18px">' + trends + '</ul>' : '')
+    + sec('Recurring issues', issues ? '<ul style="margin:0 0 14px;padding-left:18px;font-size:13px">' + issues + '</ul>' : '')
+    + sec('Recommendations', recs ? '<ul style="margin:0;padding-left:18px;font-size:13px">' + recs + '</ul>' : '');
+}
+function _aiInsightsQueryHtml(q, d){
+  const esc = s => escapeHtml(String(s == null ? '' : s));
+  const refs = (d.references || []).map(r => '<span style="display:inline-block;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:1px 7px;font-size:11px;font-family:var(--mono);margin:0 4px 4px 0">' + esc(r) + '</span>').join('');
+  return '<div style="font-size:13px;color:var(--t2);margin-bottom:6px"><strong>Q:</strong> ' + esc(q) + '</div>'
+    + '<div style="font-size:13.5px;line-height:1.6;white-space:pre-line;margin-bottom:10px">' + esc(d.answer || '') + '</div>'
+    + (refs ? '<div style="font-size:11px;color:var(--t3);margin-bottom:4px">Based on:</div><div>' + refs + '</div>' : '')
+    + '<div style="font-size:11px;color:var(--t3);margin-top:8px">Confidence: ' + esc(d.confidence || '—') + '</div>';
+}
+
+function vxAiInsightsModal(){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.55);padding:24px 16px;overflow-y:auto';
+  ov.innerHTML = '<div role="dialog" aria-modal="true" aria-label="AI insights" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:600px;width:100%;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,.5);font-family:inherit">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-weight:700;font-size:15px">✦ AI insights</span><div style="flex:1"></div><button class="btn btn-sm" id="vxai-close">Close</button></div>'
+    + '<div style="font-size:12px;color:var(--t3);margin-bottom:14px">Generated from your saved reports. AI is advisory — verify before acting.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+    + '<button class="btn btn-sm btn-primary" id="vxai-digest">✦ Trend digest</button>'
+    + '<input id="vxai-q" placeholder="Ask about your reports… e.g. which customer fails most?" style="flex:1;min-width:200px;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg2);color:var(--t1)">'
+    + '<button class="btn btn-sm" id="vxai-ask">Ask</button>'
+    + '</div><div id="vxai-out" style="min-height:40px"></div></div>';
+  document.body.appendChild(ov);
+  const close = () => { try { ov.remove(); } catch(e){} };
+  ov.addEventListener('click', e => { if(e.target === ov) close(); });
+  ov.querySelector('#vxai-close').addEventListener('click', close);
+  const out = ov.querySelector('#vxai-out');
+  const spin = (msg) => { out.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--t2);font-size:13px;padding:10px 0"><span style="width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent,#4a9);border-radius:50%;display:inline-block;animation:vxaispin .8s linear infinite"></span>' + escapeHtml(msg) + '</div><style>@keyframes vxaispin{to{transform:rotate(360deg)}}</style>'; };
+  const runDigest = async () => {
+    spin('Analysing your inspection history…');
+    const r = await vxAiInsights('digest', '');
+    out.innerHTML = r.error ? '<div style="color:#dc2626;font-size:13px">' + escapeHtml(r.error) + '</div>' : _aiInsightsDigestHtml(r.result || {});
+  };
+  const runQuery = async () => {
+    const qEl = ov.querySelector('#vxai-q'); const q = (qEl.value || '').trim();
+    if(!q){ qEl.focus(); return; }
+    spin('Reading your reports…');
+    const r = await vxAiInsights('query', q);
+    out.innerHTML = r.error ? '<div style="color:#dc2626;font-size:13px">' + escapeHtml(r.error) + '</div>' : _aiInsightsQueryHtml(q, r.result || {});
+  };
+  ov.querySelector('#vxai-digest').addEventListener('click', runDigest);
+  ov.querySelector('#vxai-ask').addEventListener('click', runQuery);
+  ov.querySelector('#vxai-q').addEventListener('keydown', e => { if(e.key === 'Enter') runQuery(); });
+  setTimeout(() => { try { ov.querySelector('#vxai-q').focus(); } catch(e){} }, 30);
+}
+
+// Launcher bar for the Overview — Senior/Admin, cloud-authed, with reports.
+function _aiInsightsBarHtml(){
+  const authed = (typeof vxIsAuthenticated === 'function') && vxIsAuthenticated();
+  const canSee = (typeof vxIsSeniorOrAdmin === 'function') ? vxIsSeniorOrAdmin() : true;
+  if(!authed || !canSee) return '';
+  if(!((ls(KEYS.reports, []) || []).length)) return '';
+  return '<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    + '<button class="btn btn-sm" data-action="aiInsightsOpen" style="font-size:11px">✦ AI insights</button>'
+    + '<span style="font-size:11px;color:var(--t3)">Trend digest &amp; ask-your-data over your reports</span></div>';
+}
+function aiInsightsOpen(){ vxAiInsightsModal(); }

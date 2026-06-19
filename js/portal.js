@@ -404,6 +404,22 @@ function _portalStatus(s){
   var m = PORTAL_STATUS_I18N[_vxPortalLang()];
   return (m && m[s]) || s;
 }
+// ── Multi-contact roles (Portal v2 — deferred depth) ─────────────────────────
+// A per-contact link carries a role (viewer | approver | billing). A
+// customer-wide link has no contact/role → full access (backward compatible).
+//   viewer   — view + download only
+//   approver — + acknowledge reports, quote decisions, work/date requests
+//   billing  — + pay invoices online
+function _vxPortalCaps(){
+  var c = _vxPortalData && _vxPortalData.contact;
+  var role = c && c.role;
+  if(!role) return { contact: null, role: null, ack: true, quote: true, request: true, pay: true };
+  var rw = (role === 'approver' || role === 'billing');
+  return { contact: c, role: role, ack: rw, quote: rw, request: rw, pay: role === 'billing' };
+}
+function _vxPortalRoleLabel(role){
+  return role === 'viewer' ? _ptl('role_viewer') : role === 'billing' ? _ptl('role_billing') : _ptl('role_approver');
+}
 
 function vxPortalActive(){
   const h = (location.hash || '').replace(/^#\/?/, '');
@@ -613,6 +629,7 @@ function _portalSchedule(data, accent){
     cells += `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;position:relative;font-size:12px;border-radius:6px;${has?`background:${accent}14;color:${accent};font-weight:700`:'color:#6b7589'}${isToday?(';box-shadow:inset 0 0 0 1.5px '+accent):''}">${d}${has?`<span style="position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:${accent}"></span>`:''}</div>`;
   }
   const _loc = _vxPortalLang();
+  const _schedCaps = _vxPortalCaps();
   // Localized Monday-first weekday initials (Jan 1 2024 was a Monday).
   const _dowNames = [];
   for(let i = 0; i < 7; i++){ let s = new Date(Date.UTC(2024, 0, 1 + i)).toLocaleString(_loc, { weekday: 'short', timeZone: 'UTC' }); s = s.charAt(0).toUpperCase() + s.slice(1); _dowNames.push(s.slice(0, 2)); }
@@ -624,7 +641,7 @@ function _portalSchedule(data, accent){
   const upcoming = items.filter(it => (it.endYmd||it.ymd) >= todayYmd).slice(0,8);
   const agendaRows = (upcoming.length ? upcoming : items.slice(-4)).map(it => {
     const dt = new Date(it.ymd+'T00:00:00');
-    const dchg = (it.type==='job' && it.jobId) ? `<button data-action="vxPortalRequestDateChange" data-args="'${_portalEsc(it.jobId)}'" title="${_portalEsc(_ptl('request_change'))}" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:10px;padding:3px 8px;white-space:nowrap">${_portalEsc(_ptl('request_change'))}</button>` : '';
+    const dchg = (it.type==='job' && it.jobId && _schedCaps.request) ? `<button data-action="vxPortalRequestDateChange" data-args="'${_portalEsc(it.jobId)}'" title="${_portalEsc(_ptl('request_change'))}" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:10px;padding:3px 8px;white-space:nowrap">${_portalEsc(_ptl('request_change'))}</button>` : '';
     return `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid #eef0f4">
       <div style="text-align:center;flex:0 0 42px"><div style="font-size:18px;font-weight:800;color:${accent};line-height:1">${dt.getDate()}</div><div style="font-size:10px;color:#9aa5bd;text-transform:uppercase">${dt.toLocaleString(_loc,{month:'short'})}</div></div>
       <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${_portalEsc(it.title)}${it.time?` <span style="color:${accent};font-weight:700">${_portalEsc(it.time)}</span>`:''}</div><div style="font-size:11px;color:#6b7589">${_portalEsc(it.sub)}${it.endYmd&&it.endYmd!==it.ymd?(' · '+_ptl('until')+' '+_portalDate(it.endYmd)):''}</div></div>
@@ -664,7 +681,8 @@ function vxPortalRender(root, data){
   // Online payment is only available from a live (server-signed) portal link —
   // the local preview link has no token the payment function can verify.
   const _tok = _vxPortalToken();
-  const canPay = !!_tok && _tok.indexOf('local-') !== 0;
+  const caps = _vxPortalCaps();
+  const canPay = !!_tok && _tok.indexOf('local-') !== 0 && caps.pay;
   // Stripe redirects back with ?paid=<invoiceId> after a successful checkout.
   const paidParam = (location.hash.split('?')[1] || '').match(/(?:^|&)paid=([^&]+)/);
   const paidNotice = paidParam
@@ -690,6 +708,7 @@ function vxPortalRender(root, data){
     <div style="text-align:right">
       <div style="font-size:11px;color:#9aa5bd;text-transform:uppercase;letter-spacing:.06em">${_portalEsc(_ptl('customer_portal'))}</div>
       <div style="font-size:14px;font-weight:600">${_portalEsc((data.customer && data.customer.name) || '')}</div>
+      ${caps.contact ? `<div style="font-size:11px;color:#6b7589;margin-top:1px">${_portalEsc(_ptl('signed_in_as'))} ${_portalEsc(caps.contact.name || caps.contact.email || '')} · ${_portalEsc(_vxPortalRoleLabel(caps.role))}</div>` : ''}
     </div>
   </div>`;
 
@@ -706,7 +725,7 @@ function vxPortalRender(root, data){
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-family:monospace;font-size:12px;color:${accent}">${_portalEsc(r.reportNo||'—')}</td>
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:12px">${_portalEsc(r.method||'')} · ${_portalEsc(_ptl('rev'))} ${_portalEsc(r.revision||'00')}</td>
           <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589">${_portalDate(r.createdAt)}</td>
-          <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${r.acknowledgedBy ? `<span title="${_portalDate(r.acknowledgedAt)} · ${_portalEsc(r.acknowledgedBy)}" style="font-size:11px;color:#16a34a;font-weight:600;margin-right:8px">${_portalEsc(_ptl('acknowledged'))}</span>` : `<button data-action="vxPortalAckReport" data-args="'${_portalEsc(r.reportNo)}','${_portalEsc(r.revision||'')}'" title="${_portalEsc(_ptl('acknowledge'))}" style="cursor:pointer;border:1px solid #16a34a;color:#16a34a;background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-right:6px">${_portalEsc(_ptl('acknowledge'))}</button>`}${r.sealedHtml ? `<button data-action="vxPortalOpenReport" data-args="'${_portalEsc(r.reportNo)}'" title="${_portalEsc(_ptl('pdf'))}" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">${_portalEsc(_ptl('pdf'))}</button>` : '<span style="font-size:11px;color:#9aa5bd">—</span>'}</td>
+          <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${r.acknowledgedBy ? `<span title="${_portalDate(r.acknowledgedAt)} · ${_portalEsc(r.acknowledgedBy)}" style="font-size:11px;color:#16a34a;font-weight:600;margin-right:8px">${_portalEsc(_ptl('acknowledged'))}</span>` : (caps.ack ? `<button data-action="vxPortalAckReport" data-args="'${_portalEsc(r.reportNo)}','${_portalEsc(r.revision||'')}'" title="${_portalEsc(_ptl('acknowledge'))}" style="cursor:pointer;border:1px solid #16a34a;color:#16a34a;background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-right:6px">${_portalEsc(_ptl('acknowledge'))}</button>` : '')}${r.sealedHtml ? `<button data-action="vxPortalOpenReport" data-args="'${_portalEsc(r.reportNo)}'" title="${_portalEsc(_ptl('pdf'))}" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">${_portalEsc(_ptl('pdf'))}</button>` : '<span style="font-size:11px;color:#9aa5bd">—</span>'}</td>
         </tr>`).join('') : `<tr><td colspan="4" style="padding:10px 8px;color:#9aa5bd;font-size:12px">${_portalEsc(_ptl('no_reports_job'))}</td></tr>`;
       return `<div style="background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(20,30,60,.06);margin-bottom:12px;overflow:hidden">
         <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #eef0f4">
@@ -743,7 +762,7 @@ function vxPortalRender(root, data){
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;font-size:11px;color:#6b7589">${_portalDate(d.issueDate)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4">${_portalBadge(_portalStatus(status), _portalDocStatusColor(status))}${aging}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;font-family:monospace;font-size:12px">${_portalMoney(total, d.currency)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${(type==='quote' && d.status==='Sent') ? `<button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Accepted'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">${_portalEsc(_ptl('accept'))}</button><button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Declined'" style="cursor:pointer;border:1px solid #dc2626;color:#dc2626;background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-right:6px">${_portalEsc(_ptl('decline'))}</button>` : ''}${(type==='quote' && d.status==='Accepted') ? `<span style="font-size:11px;color:#16a34a;font-weight:600;margin-right:8px">${_portalEsc(_ptl('accepted'))}${d.decisionBy ? ' · ' + _portalEsc(d.decisionBy) : ''}</span>` : ''}${(type==='invoice' && canPay && d.status!=='Paid') ? `<button data-action="vxPortalPayInvoice" data-args="'${_portalEsc(d.id)}'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">${_portalEsc(_ptl('pay_online'))}</button>` : ''}<button data-action="vxPortalOpenDoc" data-args="'${type}','${_portalEsc(d.id)}'" title="${_portalEsc(_ptl('pdf'))}" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">${_portalEsc(_ptl('pdf'))}</button></td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap">${(type==='quote' && d.status==='Sent' && caps.quote) ? `<button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Accepted'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">${_portalEsc(_ptl('accept'))}</button><button data-action="vxPortalQuoteDecision" data-args="'${_portalEsc(d.id)}','Declined'" style="cursor:pointer;border:1px solid #dc2626;color:#dc2626;background:transparent;border-radius:6px;font-size:11px;padding:4px 10px;margin-right:6px">${_portalEsc(_ptl('decline'))}</button>` : ''}${(type==='quote' && d.status==='Accepted') ? `<span style="font-size:11px;color:#16a34a;font-weight:600;margin-right:8px">${_portalEsc(_ptl('accepted'))}${d.decisionBy ? ' · ' + _portalEsc(d.decisionBy) : ''}</span>` : ''}${(type==='invoice' && canPay && d.status!=='Paid') ? `<button data-action="vxPortalPayInvoice" data-args="'${_portalEsc(d.id)}'" style="cursor:pointer;border:none;color:#fff;background:#16a34a;border-radius:6px;font-size:11px;padding:4px 11px;margin-right:6px;font-weight:600">${_portalEsc(_ptl('pay_online'))}</button>` : ''}<button data-action="vxPortalOpenDoc" data-args="'${type}','${_portalEsc(d.id)}'" title="${_portalEsc(_ptl('pdf'))}" style="cursor:pointer;border:1px solid ${accent};color:${accent};background:transparent;border-radius:6px;font-size:11px;padding:4px 10px">${_portalEsc(_ptl('pdf'))}</button></td>
       </tr>`;
     }).join('');
     return `<h2 style="font-size:15px;margin:24px 0 10px;color:#0b1220">${_portalEsc(title)}</h2>
@@ -769,7 +788,7 @@ function vxPortalRender(root, data){
     ? `<div style="margin:0 0 16px"><input id="vxp-search" type="search" value="${_portalEsc(_vxPortalQuery)}" data-on-input="vxPortalSearch" data-pass-value="1" placeholder="${_portalEsc(_ptl('search_ph'))}" style="width:100%;box-sizing:border-box;padding:11px 15px;border:1px solid #d6dbe6;border-radius:10px;font-size:14px;background:#fff;color:#1c2333"></div>`
     : '';
   root.innerHTML = header + _portalShell(accent, paidNotice
-    + (_secOn('requestButton') ? requestCta : '')
+    + (_secOn('requestButton') && caps.request ? requestCta : '')
     + cockpitHtml + scheduleHtml + searchBar
     + (_secOn('reports') ? jobsHtml : '')
     + requestsHtml
@@ -941,7 +960,7 @@ function _vxPortalPrompt(opts){
       <div style="font-size:16px;font-weight:700;margin-bottom:4px;color:#0b1220">${_portalEsc(opts.title || 'Confirm')}</div>
       <div style="font-size:12.5px;color:#6b7589;line-height:1.5;margin-bottom:14px">${_portalEsc(opts.body || '')}</div>
       <label style="font-size:11px;font-weight:600;color:#6b7589;text-transform:uppercase;letter-spacing:.04em">${_portalEsc(_ptl('sign_name'))}</label>
-      <input id="vxpp-name" type="text" placeholder="${_portalEsc(_ptl('full_name'))}" style="width:100%;box-sizing:border-box;margin:5px 0 12px;padding:9px 11px;border:1px solid #d6dbe6;border-radius:8px;font-size:14px;font-family:inherit">
+      <input id="vxpp-name" type="text" placeholder="${_portalEsc(_ptl('full_name'))}" value="${_portalEsc((_vxPortalData && _vxPortalData.contact && _vxPortalData.contact.name) || '')}" style="width:100%;box-sizing:border-box;margin:5px 0 12px;padding:9px 11px;border:1px solid #d6dbe6;border-radius:8px;font-size:14px;font-family:inherit">
       ${opts.note === false ? '' : `<label style="font-size:11px;font-weight:600;color:#6b7589;text-transform:uppercase;letter-spacing:.04em">${_portalEsc(_ptl('note_optional'))}</label>
       <textarea id="vxpp-note" rows="2" placeholder="${_portalEsc(opts.notePlaceholder || _ptl('note_ph'))}" style="width:100%;box-sizing:border-box;margin:5px 0 14px;padding:9px 11px;border:1px solid #d6dbe6;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>`}
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -1016,7 +1035,7 @@ function _vxPortalRequestForm(accent){
       </div>
       <input id="vxr-site" placeholder="${_portalEsc(_ptl('req_site_ph'))}" style="${inp}">
       <textarea id="vxr-scope" rows="3" placeholder="${_portalEsc(_ptl('req_scope_ph'))}" style="${inp};resize:vertical"></textarea>
-      <input id="vxr-by" placeholder="${_portalEsc(_ptl('your_name'))}" style="${inp}">
+      <input id="vxr-by" placeholder="${_portalEsc(_ptl('your_name'))}" value="${_portalEsc((_vxPortalData && _vxPortalData.contact && _vxPortalData.contact.name) || '')}" style="${inp}">
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
         <button id="vxr-cancel" style="cursor:pointer;border:1px solid #d6dbe6;background:#fff;color:#6b7589;border-radius:8px;font-size:13px;padding:8px 16px">${_portalEsc(_ptl('cancel'))}</button>
         <button id="vxr-ok" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:8px;font-size:13px;font-weight:600;padding:8px 18px">${_portalEsc(_ptl('send_request'))}</button>
@@ -1062,7 +1081,7 @@ function _vxPortalDateForm(accent, job){
         <input id="vxd-time" type="time" style="${inp};flex:0 0 130px;margin:0 0 10px">
       </div>
       <textarea id="vxd-reason" rows="2" placeholder="${_portalEsc(_ptl('date_reason_ph'))}" style="${inp};resize:vertical"></textarea>
-      <input id="vxd-by" placeholder="${_portalEsc(_ptl('your_name'))}" style="${inp}">
+      <input id="vxd-by" placeholder="${_portalEsc(_ptl('your_name'))}" value="${_portalEsc((_vxPortalData && _vxPortalData.contact && _vxPortalData.contact.name) || '')}" style="${inp}">
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
         <button id="vxd-cancel" style="cursor:pointer;border:1px solid #d6dbe6;background:#fff;color:#6b7589;border-radius:8px;font-size:13px;padding:8px 16px">${_portalEsc(_ptl('cancel'))}</button>
         <button id="vxd-ok" style="cursor:pointer;border:none;background:${accent};color:#fff;border-radius:8px;font-size:13px;font-weight:600;padding:8px 18px">${_portalEsc(_ptl('send_request'))}</button>

@@ -58,6 +58,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!ALLOWED_KINDS.has(kind)) return jsonResponse({ error: "unknown action" }, 400);
   const p = (body.payload && typeof body.payload === "object") ? body.payload : {};
 
+  // Portal v2: enforce the contact's portal role. Customer-wide links (no role)
+  // keep full access. 'viewer' is read/download only — it may write nothing.
+  // 'approver' and 'billing' may perform every write-back action here (online
+  // payment, the only billing-exclusive capability, runs through stripe-checkout).
+  if (claims.role === "viewer") {
+    return jsonResponse({ error: "This portal access is view-only — please ask your account admin for an Approver link." }, 403);
+  }
+
   const service = createClient(
     envOrThrow("SUPABASE_URL"), envOrThrow("SUPABASE_SERVICE_ROLE_KEY"),
     { auth: { persistSession: false } },
@@ -80,7 +88,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   // ── Build + validate the event by kind ──────────────────────────────────
   // deno-lint-ignore no-explicit-any
-  const ev: Record<string, any> = { kind, customerId, status: "new", by: clip(p.by, MAX_SHORT) };
+  const ev: Record<string, any> = { kind, customerId, status: "new", by: clip(p.by, MAX_SHORT) || clip(claims.contactName, MAX_SHORT) };
+  // Attribute the action to the signed-in contact (when it's a per-contact link).
+  if (claims.contactEmail) ev.contactEmail = claims.contactEmail;
+  if (claims.role) ev.role = claims.role;
 
   if (kind === "ack-report") {
     const reportNo = clip(p.reportNo, MAX_SHORT);

@@ -36,7 +36,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (userErr || !userData?.user) return jsonResponse({ error: "invalid session" }, 401);
   const caller = userData.user;
 
-  let payload: { orgId?: string; customerId?: string; reportId?: string; kind?: string };
+  let payload: { orgId?: string; customerId?: string; reportId?: string; kind?: string; contactEmail?: string };
   try { payload = await req.json(); } catch { return jsonResponse({ error: "invalid JSON body" }, 400); }
   const orgId = String(payload.orgId || "");
   const kind = payload.kind === "verify" ? "verify" : "portal";
@@ -66,7 +66,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ ok: true, token, url: `${base}#/verify/${token}` });
   }
 
+  // Portal v2: optionally scope the link to ONE contact + their portal role.
+  // The role is read from the stored contact (authoritative — not client-set).
+  // Without a contactEmail the link stays customer-wide / full-access.
+  const contactEmail = String(payload.contactEmail || "").trim().toLowerCase();
+  let contactClaims: { contactEmail?: string; contactName?: string; role?: string } = {};
+  if (contactEmail) {
+    const { data: custRow } = await service
+      .from("entities").select("value").eq("org_id", orgId).eq("key", "vx-customers-v1").maybeSingle();
+    // deno-lint-ignore no-explicit-any
+    const customers: any[] = Array.isArray(custRow?.value) ? custRow!.value : [];
+    const cust = customers.find((c) => c && c.id === customerId);
+    const contact = cust && Array.isArray(cust.contacts)
+      ? cust.contacts.find((k: { email?: string }) => k && String(k.email || "").trim().toLowerCase() === contactEmail)
+      : null;
+    if (!contact) return jsonResponse({ error: "contact not found for this customer" }, 404);
+    const role = (contact.portalRole === "viewer" || contact.portalRole === "billing") ? contact.portalRole : "approver";
+    contactClaims = { contactEmail, contactName: contact.name || "", role };
+  }
+
   const exp = Date.now() + TOKEN_TTL_MS;
-  const token = await signPortalToken({ orgId, customerId, exp }, secret);
-  return jsonResponse({ ok: true, token, url: `${base}#/portal/${token}`, expiresAt: new Date(exp).toISOString() });
+  const token = await signPortalToken({ orgId, customerId, exp, ...contactClaims }, secret);
+  return jsonResponse({ ok: true, token, url: `${base}#/portal/${token}`, expiresAt: new Date(exp).toISOString(), contact: contactClaims.contactEmail || null, role: contactClaims.role || null });
 });

@@ -49,6 +49,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const claims = await verifyPortalToken(token, envOrThrow("PORTAL_SECRET"));
   if (!claims) return jsonResponse({ error: "This portal link is invalid or has expired." }, 401);
+  // Portal v2: online payment is a Billing-only capability. Customer-wide links
+  // (no role) keep full access; viewer/approver per-contact links may not pay.
+  if (claims.role && claims.role !== "billing") {
+    return jsonResponse({ error: "This portal access cannot pay invoices — please ask your account admin for a Billing link." }, 403);
+  }
   const { orgId, customerId } = claims;
 
   const service = createClient(

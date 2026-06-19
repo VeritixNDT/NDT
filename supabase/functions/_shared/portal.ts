@@ -33,7 +33,17 @@ async function hmac(data: string, secret: string): Promise<Uint8Array> {
   return new Uint8Array(sig);
 }
 
-export interface PortalClaims { orgId: string; customerId: string; exp: number; }
+// Portal v2: a token may optionally be scoped to ONE contact with a portal
+// role. Customer-wide links (no contact*/role) keep full access for backward
+// compatibility. role ∈ 'viewer' | 'approver' | 'billing'.
+export interface PortalClaims {
+  orgId: string;
+  customerId: string;
+  exp: number;
+  contactEmail?: string;
+  contactName?: string;
+  role?: string;
+}
 
 export async function signPortalToken(claims: PortalClaims, secret: string): Promise<string> {
   const body = b64url(enc.encode(JSON.stringify(claims)));

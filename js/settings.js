@@ -3322,11 +3322,14 @@ function custAddContactRow(data) {
   const row = document.createElement('div');
   row.className = 'cust-crow';
   row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+  const pr = (d.portalRole === 'viewer' || d.portalRole === 'billing') ? d.portalRole : 'approver';
+  const prOpt = (v, lbl) => `<option value="${v}"${pr === v ? ' selected' : ''}>${lbl}</option>`;
   row.innerHTML =
       `<input class="cust-c-name"  placeholder="Name"  value="${escapeHtml(d.name||'')}"  style="flex:1 1 130px"/>`
     + `<input class="cust-c-role"  placeholder="Role"  value="${escapeHtml(d.role||'')}"  style="flex:1 1 100px"/>`
     + `<input class="cust-c-email" type="email" placeholder="Email" value="${escapeHtml(d.email||'')}" style="flex:1 1 150px"/>`
     + `<input class="cust-c-phone" placeholder="Phone" value="${escapeHtml(d.phone||'')}" style="flex:1 1 120px"/>`
+    + `<select class="cust-c-prole" title="Portal access this contact has when you send them their own portal link" style="flex:0 0 auto">${prOpt('viewer','Portal: Viewer')}${prOpt('approver','Portal: Approver')}${prOpt('billing','Portal: Billing')}</select>`
     + `<button type="button" class="btn btn-sm btn-danger" data-action="custRemoveRow" data-pass-el="1" title="Remove contact" style="font-size:11px;flex:0 0 auto">✕</button>`;
   host.appendChild(row);
 }
@@ -3357,6 +3360,7 @@ function custCollectContacts() {
     role:  (row.querySelector('.cust-c-role')  || {}).value?.trim() || '',
     email: (row.querySelector('.cust-c-email') || {}).value?.trim() || '',
     phone: (row.querySelector('.cust-c-phone') || {}).value?.trim() || '',
+    portalRole: (row.querySelector('.cust-c-prole') || {}).value || 'approver',
   })).filter(c => c.name || c.role || c.email || c.phone);
 }
 function custCollectSites() {
@@ -3466,6 +3470,33 @@ async function custDelete(id) {
   custRender();
 }
 
+// Portal v2: choose whether a portal link is for the whole customer (shared,
+// full access) or one contact (their portal role applies). Resolves '' for
+// whole-customer, an email for a contact, or null if cancelled.
+function _custPortalLinkChooser(rec){
+  return new Promise((resolve) => {
+    const contacts = ((rec && rec.contacts) || []).filter(c => c && c.email);
+    if(!contacts.length){ resolve(''); return; }  // no contacts → whole-customer link
+    const roleLbl = r => r === 'viewer' ? 'Viewer' : r === 'billing' ? 'Billing' : 'Approver';
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:7000;background:rgba(12,18,32,.55);display:flex;align-items:center;justify-content:center;padding:18px';
+    const rows = contacts.map(c => `<button type="button" class="cpl-opt" data-email="${escapeHtml(c.email)}" style="display:block;width:100%;text-align:left;border:1px solid var(--border);background:var(--bg2);color:var(--t1);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-size:13px">${escapeHtml(c.name || c.email)} <span style="color:var(--t3);font-size:11px">· ${escapeHtml(c.email)} · ${escapeHtml(roleLbl(c.portalRole))}</span></button>`).join('');
+    ov.innerHTML = `<div style="background:var(--panel,#fff);color:var(--t1);border-radius:14px;max-width:470px;width:100%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.4);font-family:inherit">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Portal link for ${escapeHtml(rec.name || 'customer')}</div>
+      <div style="font-size:12.5px;color:var(--t3);margin-bottom:14px">Send a personal link to one contact (their portal role applies), or a shared full-access link for the whole customer.</div>
+      ${rows}
+      <button type="button" class="cpl-all" style="display:block;width:100%;text-align:left;border:1px dashed var(--border);background:transparent;color:var(--t1);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;font-size:13px">Whole customer <span style="color:var(--t3);font-size:11px">· shared link, full access</span></button>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button type="button" class="cpl-cancel" style="border:1px solid var(--border);background:transparent;color:var(--t2);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px">Cancel</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const done = v => { try { ov.remove(); } catch(e){} resolve(v); };
+    ov.addEventListener('click', e => { if(e.target === ov) done(null); });
+    ov.querySelector('.cpl-cancel').addEventListener('click', () => done(null));
+    ov.querySelector('.cpl-all').addEventListener('click', () => done(''));
+    ov.querySelectorAll('.cpl-opt').forEach(b => b.addEventListener('click', () => done(b.getAttribute('data-email'))));
+  });
+}
+
 // Generate a customer-portal magic link. With the backend deployed this
 // mints a signed token (portal-token Edge Function) and can email it to the
 // customer's portal addresses; in trial/local mode it builds a preview link
@@ -3473,13 +3504,19 @@ async function custDelete(id) {
 async function custPortalLink(id){
   const rec = custLoad().find(r => r.id === id);
   if(!rec){ toast('Customer not found.','error'); return; }
+  // Portal v2: whole-customer vs per-contact link.
+  const choice = await _custPortalLinkChooser(rec);
+  if(choice === null) return;          // cancelled
+  const contactEmail = choice || '';   // '' = whole customer
   let link = '';
   let viaServer = false;
   const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
   if(sb && sb.functions && typeof vxIsAuthenticated === 'function' && vxIsAuthenticated()){
     try {
       const orgId = (typeof vxPlatformConfig === 'function') ? (vxPlatformConfig().orgId || '') : '';
-      const r = await sb.functions.invoke('portal-token', { body: { orgId, customerId: id } });
+      const body = { orgId, customerId: id };
+      if(contactEmail) body.contactEmail = contactEmail;
+      const r = await sb.functions.invoke('portal-token', { body });
       if(!r.error && r.data && r.data.url){ link = r.data.url; viaServer = true; }
     } catch(e){ /* fall back to local link */ }
   }
@@ -3500,7 +3537,7 @@ async function custPortalLink(id){
   });
   if(wantEmail && canEmail){
     const co = ls(KEYS.company, {}) || {};
-    const to = (rec.portalEmails && rec.portalEmails[0]) || ((rec.contacts || [])[0] || {}).email || '';
+    const to = contactEmail || (rec.portalEmails && rec.portalEmails[0]) || ((rec.contacts || [])[0] || {}).email || '';
     vxEmailCompose({
       type: 'portal',
       to,

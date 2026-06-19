@@ -8,7 +8,7 @@
 // Build stamp — BUMP THIS ON EVERY DEPLOY. Shown in the footer so a glance
 // confirms which build a browser is actually running (catches a stale
 // service-worker / HTTP cache serving old JS). Format: YYYY-MM-DD.<n>.
-var VX_BUILD = '2026-06-19.5';
+var VX_BUILD = '2026-06-19.6';
 
 // STAGING-ONLY test tools. `true` keeps the dashboard "Delete all reports"
 // bulk-clear tool visible (veritix.io is staging). Flip to `false` for the
@@ -150,6 +150,7 @@ var KEYS = {
   reports:  'vx-reports-v1',
   defects:  'vx-defects-v1',
   procedures:'vx-procedures-v1',
+  techniques:'vx-techniques-v1',   // formal NDT technique sheets (per job/inspection)
   inspectors:'vx-inspectors-v1',
   // Equipment register — each entry is { id, name, svId, methods:[],
   // calLastAt:ISO, calDueAt:ISO, notes }. Drives the equipment dropdown

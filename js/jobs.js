@@ -411,6 +411,8 @@ function jobOpenDetail(id) {
       <button class="btn btn-sm" data-action="jobDownloadReportPack" data-args="'${escapeHtml(job.id)}'" style="margin-left:auto;font-size:11px"${sealedCount ? '' : ' disabled title="No approved reports to include yet"'}>⬇ Report pack${sealedCount ? ` (${sealedCount})` : ''}</button>
     </div>${reportsBlock}</div>
 
+    ${typeof _jobTechniqueSheetsHtml === 'function' ? _jobTechniqueSheetsHtml(job) : ''}
+
     ${typeof billJobSectionsHtml === 'function' ? billJobSectionsHtml(job) : ''}
   `;
 
@@ -429,6 +431,202 @@ function jobSealedReports(jobId) {
     const st = (typeof getReportStage === 'function') ? getReportStage(r) : r.stage;
     return (st === 'Approved' || st === 'Sent') && (r.sealedHtml || r.frozenHtml);
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TECHNIQUE SHEETS (formal NDT technique-sheet artifact, per job/inspection)
+// ═══════════════════════════════════════════════════════════════════════════
+// A structured, numbered, printable technique sheet: method + procedure ref +
+// the execution detail (equipment, technique/parameters, coverage, acceptance,
+// personnel). Stored in KEYS.techniques; created/edited from a job's detail page
+// and exported via the shared PDF pipeline. Complements the procedures register
+// (controlled documents) with the application-level "how this inspection is done".
+var TS_STATUSES = ['Draft', 'Approved', 'Superseded'];
+function tsLoad(){ return ls(KEYS.techniques, []) || []; }
+function tsSaveAll(list){ lss(KEYS.techniques, list); }
+function tsForJob(jobId){ return tsLoad().filter(t => t && t.jobId === jobId); }
+function _tsNextNumber(){
+  const s = ls(KEYS.settings, {}) || {};
+  const n = parseInt(s.techniqueNext || '1', 10) || 1;
+  return 'TS-' + new Date().getFullYear() + '-' + String(n).padStart(3, '0');
+}
+function _tsBumpNumber(){
+  const s = ls(KEYS.settings, {}) || {};
+  s.techniqueNext = (parseInt(s.techniqueNext || '1', 10) || 1) + 1;
+  lss(KEYS.settings, s);
+}
+
+function _jobTechniqueSheetsHtml(job){
+  if(!job) return '';
+  const esc = s => escapeHtml(String(s == null ? '' : s));
+  const list = tsForJob(job.id).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const statusBadge = s => {
+    const cls = s === 'Approved' ? 'green' : s === 'Superseded' ? 'amber' : 'blue';
+    return `<span class="badge badge-${cls}" style="font-size:10px">${esc(s || 'Draft')}</span>`;
+  };
+  const rows = list.map(ts => `<tr>
+      <td style="font-family:var(--mono);font-size:12px;font-weight:600">${esc(ts.number || '—')}</td>
+      <td>${esc(ts.title || '—')}</td>
+      <td><span style="font-family:var(--mono)">${esc(ts.method || '—')}</span></td>
+      <td style="font-family:var(--mono);font-size:12px;text-align:center">${esc(ts.revision || '—')}</td>
+      <td>${statusBadge(ts.status)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-sm" data-action="tsPrint" data-args="'${esc(ts.id)}'" style="font-size:11px;margin-right:4px">PDF</button>
+        <button class="btn btn-sm" data-action="tsOpenForm" data-args="'${esc(job.id)}','${esc(ts.id)}'" style="font-size:11px;margin-right:4px">Edit</button>
+        <button class="btn btn-sm btn-danger" data-action="tsDelete" data-args="'${esc(ts.id)}'" style="font-size:11px">✕</button>
+      </td>
+    </tr>`).join('');
+  const body = list.length
+    ? `<div class="sc-body" style="padding:0"><table class="tbl" style="width:100%">
+         <thead><tr><th scope="col" style="width:120px">No.</th><th scope="col">Title</th><th scope="col" style="width:70px">Method</th><th scope="col" style="width:50px">Rev</th><th scope="col" style="width:100px">Status</th><th scope="col" style="width:170px"></th></tr></thead>
+         <tbody>${rows}</tbody></table></div>`
+    : `<div class="sc-body" style="color:var(--t3);font-size:13px;padding:18px;text-align:center">No technique sheets yet — create one to define how this job's inspection is performed.</div>`;
+  return `<div class="sc" style="margin-bottom:14px"><div class="sc-head" style="display:flex;align-items:center;gap:8px">
+      <span class="sc-title">Technique sheets</span>
+      <span style="font-size:11px;color:var(--t3);font-family:var(--mono)">(${list.length})</span>
+      <button class="btn btn-sm btn-primary" data-action="tsOpenForm" data-args="'${esc(job.id)}',null" style="margin-left:auto;font-size:11px">+ New technique sheet</button>
+    </div>${body}</div>`;
+}
+
+// Self-contained builder modal (independent of the static HTML form).
+function tsOpenForm(jobId, id){
+  const esc = s => escapeHtml(String(s == null ? '' : s));
+  const ts = id ? (tsLoad().find(x => x.id === id) || null) : null;
+  const job = jobLoad().find(j => j.id === jobId) || null;
+  const methods = (typeof getActiveMethods === 'function') ? getActiveMethods() : (typeof NDT_METHODS !== 'undefined' ? NDT_METHODS : []);
+  const procs = (typeof procGetAll === 'function') ? procGetAll() : [];
+  const methodOpts = ['<option value="">— method —</option>'].concat(methods.map(m => `<option value="${esc(m.id)}"${ts && ts.method === m.id ? ' selected' : ''}>${esc(m.id)}${m.name ? ' · ' + esc(m.name) : ''}</option>`)).join('');
+  const procOpts = ['<option value="">— none —</option>'].concat(procs.map(p => `<option value="${esc(p.procNo)}"${ts && ts.procedureRef === p.procNo ? ' selected' : ''}>${esc(p.procNo)}${p.title ? ' · ' + esc(p.title) : ''}</option>`)).join('');
+  const statusOpts = TS_STATUSES.map(s => `<option value="${s}"${(ts ? ts.status : 'Draft') === s ? ' selected' : ''}>${s}</option>`).join('');
+  const v = k => esc(ts ? (ts[k] || '') : '');
+  const inp = 'width:100%;box-sizing:border-box;margin:3px 0 10px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg2);color:var(--t1);font-family:inherit';
+  const lbl = 'font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em';
+  const fld = (label, k, ph) => `<label style="${lbl}">${esc(label)}</label><input id="tsf-${k}" value="${v(k)}" placeholder="${esc(ph || '')}" style="${inp}">`;
+  const area = (label, k, ph) => `<label style="${lbl}">${esc(label)}</label><textarea id="tsf-${k}" rows="2" placeholder="${esc(ph || '')}" style="${inp};resize:vertical">${v(k)}</textarea>`;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:7000;background:rgba(12,18,32,.55);display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto';
+  ov.innerHTML = `<div style="background:var(--panel,#fff);color:var(--t1);border-radius:14px;max-width:620px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.4);font-family:inherit">
+    <div style="font-size:16px;font-weight:700;margin-bottom:2px">${ts ? 'Edit technique sheet' : 'New technique sheet'}</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:14px">${esc(job ? (job.title || '') : '')}</div>
+    ${fld('Title', 'title', 'e.g. MT of pipe-to-flange welds, Unit 4')}
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label style="${lbl}">Method</label><select id="tsf-method" style="${inp}">${methodOpts}</select></div>
+      <div style="flex:1"><label style="${lbl}">Procedure ref</label><select id="tsf-procedureRef" style="${inp}">${procOpts}</select></div>
+      <div style="flex:0 0 90px"><label style="${lbl}">Revision</label><input id="tsf-revision" value="${v('revision') || '0'}" style="${inp}"></div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1">${fld('Component / item', 'component', 'e.g. Weld W4-12')}</div>
+      <div style="flex:1">${fld('Material', 'material', 'e.g. P265GH')}</div>
+      <div style="flex:0 0 110px">${fld('Thickness', 'thickness', 'mm')}</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1">${fld('Surface condition / stage', 'surfaceCondition', 'e.g. As-welded, post-PWHT')}</div>
+      <div style="flex:1">${fld('Personnel (cert level)', 'personnel', 'e.g. Level 2 MT (ISO 9712)')}</div>
+    </div>
+    ${area('Equipment', 'equipment', 'Yoke / lamp / penetrant kit, serials…')}
+    ${area('Technique / parameters', 'technique', 'Magnetisation, current, viewing conditions, dwell/development times…')}
+    ${area('Extent / coverage', 'coverage', 'e.g. 100% of accessible weld length + 25 mm each side')}
+    <div style="display:flex;gap:10px">
+      <div style="flex:1">${fld('Acceptance standard', 'acceptanceStandard', 'e.g. ISO 5817 level B')}</div>
+      <div style="flex:1">${fld('Acceptance criteria', 'acceptanceCriteria', 'e.g. No relevant linear indications')}</div>
+    </div>
+    ${area('Notes', 'notes', '')}
+    <div style="display:flex;gap:10px;align-items:center;margin-top:4px">
+      <label style="${lbl}">Status</label><select id="tsf-status" style="${inp};max-width:160px;margin:0">${statusOpts}</select>
+      <div style="flex:1"></div>
+      <button class="btn btn-sm" id="tsf-cancel">Cancel</button>
+      <button class="btn btn-sm btn-primary" id="tsf-save">${ts ? 'Save' : 'Create'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close = () => { try { ov.remove(); } catch(e){} };
+  ov.addEventListener('click', e => { if(e.target === ov) close(); });
+  ov.querySelector('#tsf-cancel').addEventListener('click', close);
+  ov.querySelector('#tsf-save').addEventListener('click', () => {
+    const get = k => { const e = ov.querySelector('#tsf-' + k); return e ? (e.value || '').trim() : ''; };
+    if(!get('title')){ const e = ov.querySelector('#tsf-title'); if(e){ e.style.borderColor = '#dc2626'; e.focus(); } return; }
+    const now = new Date().toISOString();
+    const list = tsLoad();
+    if(ts){
+      const i = list.findIndex(x => x.id === ts.id);
+      if(i >= 0) Object.assign(list[i], _tsCollect(get), { updatedAt: now });
+    } else {
+      list.push(Object.assign({ id: 'ts-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6), jobId: jobId, number: _tsNextNumber(), createdAt: now, updatedAt: now }, _tsCollect(get)));
+      _tsBumpNumber();
+    }
+    tsSaveAll(list);
+    if(typeof toast === 'function') toast(ts ? 'Technique sheet saved.' : 'Technique sheet created.', 'success');
+    close();
+    if(typeof jobOpenDetail === 'function') jobOpenDetail(jobId);
+  });
+}
+function _tsCollect(get){
+  return {
+    title: get('title'), method: get('method'), procedureRef: get('procedureRef'), revision: get('revision'),
+    component: get('component'), material: get('material'), thickness: get('thickness'),
+    surfaceCondition: get('surfaceCondition'), personnel: get('personnel'),
+    equipment: get('equipment'), technique: get('technique'), coverage: get('coverage'),
+    acceptanceStandard: get('acceptanceStandard'), acceptanceCriteria: get('acceptanceCriteria'),
+    notes: get('notes'), status: get('status') || 'Draft',
+  };
+}
+function tsDelete(id){
+  const ts = tsLoad().find(x => x.id === id);
+  const jobId = ts ? ts.jobId : null;
+  const doDelete = () => {
+    tsSaveAll(tsLoad().filter(x => x.id !== id));
+    if(typeof toast === 'function') toast('Technique sheet deleted.', 'success');
+    if(jobId && typeof jobOpenDetail === 'function') jobOpenDetail(jobId);
+  };
+  if(typeof vxConfirm === 'function'){
+    vxConfirm({ message: 'Delete technique sheet ' + (ts ? (ts.number || '') : '') + '?', okLabel: 'Delete', danger: true }).then(ok => { if(ok) doDelete(); });
+  } else doDelete();
+}
+function tsPrint(id){
+  const ts = tsLoad().find(x => x.id === id);
+  if(!ts){ if(typeof toast === 'function') toast('Technique sheet not found.', 'error'); return; }
+  const html = _tsBuildHtml(ts);
+  if(typeof vxDownloadHtmlAsPdf === 'function') vxDownloadHtmlAsPdf(html, (ts.number || 'technique-sheet'), {});
+  else if(typeof _vxPrintHtml === 'function') _vxPrintHtml(html);
+}
+function _tsBuildHtml(ts){
+  const esc = s => escapeHtml(String(s == null ? '' : s));
+  const co = (typeof ls === 'function') ? (ls(KEYS.company, {}) || {}) : {};
+  const job = jobLoad().find(j => j.id === ts.jobId) || {};
+  const cust = (typeof custLoad === 'function' ? custLoad() : []).find(c => c.id === job.customerId) || {};
+  const accent = /^#[0-9A-Fa-f]{6}$/.test(co.color || '') ? co.color : '#185FA5';
+  const row = (label, val) => val ? `<tr><td style="padding:6px 10px;border:1px solid #d6dbe6;background:#f5f7fb;font-weight:600;width:200px;vertical-align:top">${esc(label)}</td><td style="padding:6px 10px;border:1px solid #d6dbe6;white-space:pre-line">${esc(val)}</td></tr>` : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(ts.number)}</title></head>
+  <body style="font-family:Arial,Helvetica,sans-serif;color:#1c2333;max-width:800px;margin:0 auto;padding:24px;font-size:13px">
+    <div style="display:flex;align-items:center;gap:14px;border-bottom:3px solid ${accent};padding-bottom:12px;margin-bottom:16px">
+      ${co.logo ? `<img src="${esc(co.logo)}" style="max-height:50px;max-width:180px;object-fit:contain">` : `<div style="font-size:20px;font-weight:800;color:${accent}">${esc(co.name || '')}</div>`}
+      <div style="flex:1"></div>
+      <div style="text-align:right"><div style="font-size:18px;font-weight:800;color:${accent}">Technique Sheet</div><div style="font-family:monospace;font-size:13px">${esc(ts.number)}${ts.revision ? (' · Rev ' + esc(ts.revision)) : ''}</div></div>
+    </div>
+    <h2 style="font-size:16px;margin:0 0 4px">${esc(ts.title || '')}</h2>
+    <div style="font-size:12px;color:#6b7589;margin-bottom:14px">${esc(co.name || '')} · ${esc(cust.name || '')}${job.title ? (' · ' + esc(job.title)) : ''} · ${esc(ts.status || 'Draft')}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      ${row('Method', ts.method)}
+      ${row('Procedure reference', ts.procedureRef)}
+      ${row('Component / item', ts.component)}
+      ${row('Material', ts.material)}
+      ${row('Thickness', ts.thickness)}
+      ${row('Surface condition / stage', ts.surfaceCondition)}
+      ${row('Equipment', ts.equipment)}
+      ${row('Technique / parameters', ts.technique)}
+      ${row('Extent / coverage', ts.coverage)}
+      ${row('Acceptance standard', ts.acceptanceStandard)}
+      ${row('Acceptance criteria', ts.acceptanceCriteria)}
+      ${row('Personnel', ts.personnel)}
+      ${row('Notes', ts.notes)}
+    </table>
+    <div style="margin-top:30px;display:flex;gap:40px;font-size:12px;color:#6b7589">
+      <div style="flex:1;border-top:1px solid #1c2333;padding-top:4px">Prepared by</div>
+      <div style="flex:1;border-top:1px solid #1c2333;padding-top:4px">Approved by</div>
+      <div style="flex:1;border-top:1px solid #1c2333;padding-top:4px">Date</div>
+    </div>
+    <div style="text-align:center;color:#9aa5bd;font-size:10px;margin-top:24px">${esc(co.footer || co.name || '')}</div>
+  </body></html>`;
 }
 
 // Build + print a consolidated client report pack for one job: a branded

@@ -38,6 +38,7 @@ var VX_ENTITY_KEYS = new Set([
   'vx-users-v1', 'vx-company-v1', 'vx-settings-v1', 'vx-numbering-v1',
   'vx-reports-v1', 'vx-defects-v1', 'vx-procedures-v1', 'vx-inspectors-v1',
   'vx-equipment-v1', 'vx-customers-v1', 'vx-jobs-v1',
+  'vx-events-v1', 'vx-techniques-v1',
   'vx-quotes-v1', 'vx-invoices-v1',
   'vx-templates-v1', 'vx-method-order-v1',
   // V22 — PDF editor layout & per-method templates. These are heavy
@@ -56,6 +57,25 @@ var VX_ENTITY_KEYS = new Set([
 ]);
 // Auth-sensitive keys handled specially (never naively synced — derive from token instead)
 var VX_AUTH_KEYS = new Set(['vx-session-v1']);
+// Intentionally per-device (never synced): the in-progress report draft.
+var VX_LOCAL_ONLY_KEYS = new Set(['vx-session-v1', 'vx-rptdraft-v1']);
+// Boot safety net: warn if any KEYS user-content value is NOT registered as an
+// entity key (it would route to raw localStorage and never sync — the class of
+// bug that lost PT reports on 2026-05-28, and that left planner events +
+// technique sheets un-synced until 2026-06-19). Forces new KEYS entries to be
+// classified. Console-only; never throws.
+function _vxAssertEntityKeys(){
+  try {
+    if(typeof KEYS === 'undefined') return;
+    Object.keys(KEYS).forEach(function(k){
+      var v = KEYS[k];
+      if(typeof v !== 'string' || v.indexOf('vx-') !== 0) return;
+      if(VX_ENTITY_KEYS.has(v) || VX_AUTH_KEYS.has(v) || VX_LOCAL_ONLY_KEYS.has(v)) return;
+      console.warn('vx: KEYS.' + k + ' ("' + v + '") is not in VX_ENTITY_KEYS — it will route to raw localStorage and never sync. Register it in VX_ENTITY_KEYS, or add it to VX_LOCAL_ONLY_KEYS if it is intentionally per-device.');
+    });
+  } catch(e){}
+}
+try { setTimeout(_vxAssertEntityKeys, 0); } catch(e){}
 
 // V13: Cloud-first defaults. Veritix is now a cloud SaaS product;
 // every account lives on Veritix's servers and every device is a sync target.

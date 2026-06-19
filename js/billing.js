@@ -513,16 +513,61 @@ function _billCsvGeneric(docs, type){
   return rows.join('\r\n');
 }
 
+// e-Boekhouden.nl "Mutaties importeren" CSV (Dutch online accounting). One row
+// per line item; rows sharing a Factuurnummer + Relatie are auto-merged by
+// e-Boekhouden into a single invoice with multiple lines. Per the official
+// import manual: Mutatiesoort "Factuur verstuurd"; sales BTW-codes
+// HOOG_VERK_21 / LAAG_VERK_9 / LAAG_VERK / GEEN; amount ex-VAT with a COMMA
+// decimal; date D-M-YYYY. Rekening defaults to 8000 (Omzet) — remap if needed.
+function _billEbDate(d){
+  if(!d) return '';
+  const x = new Date(d); if(isNaN(x.getTime())) return String(d);
+  const p = n => String(n).padStart(2, '0');
+  return p(x.getDate()) + '-' + p(x.getMonth() + 1) + '-' + x.getFullYear();
+}
+function _billEbVat(rate){
+  const r = parseFloat(rate) || 0;
+  if(r === 21) return 'HOOG_VERK_21';
+  if(r === 9)  return 'LAAG_VERK_9';
+  if(r === 6)  return 'LAAG_VERK';
+  return 'GEEN';
+}
+function _billEbAmount(n){ return (Number(n) || 0).toFixed(2).replace('.', ','); }
+function _billPaymentDays(issue, due){
+  if(!issue || !due) return '';
+  const a = new Date(issue), b = new Date(due);
+  if(isNaN(a.getTime()) || isNaN(b.getTime())) return '';
+  const days = Math.round((b.getTime() - a.getTime()) / 86400000);
+  return days >= 0 ? String(days) : '';
+}
+function _billCsvEBoekhouden(docs){
+  const head = ['Datum','Soort','Rekening/dagboek','Omschrijving','Bedrag excl BTW','BTW-code','Relatie','Factuurnummer','Betalingstermijn'];
+  const rows = [head.map(_billCsvCell).join(',')];
+  docs.forEach(d => {
+    const vat = _billEbVat(d.vatRate);
+    const term = _billPaymentDays(d.issueDate, d.dueDate);
+    _billInvoiceItems(d).forEach(it => {
+      const net = (parseFloat(it.qty) || 0) * (parseFloat(it.unitPrice) || 0);
+      rows.push([
+        _billEbDate(d.issueDate), 'Factuur verstuurd', '8000', (it.description || 'NDT services'),
+        _billEbAmount(net), vat, _billCustName(d.customerId), d.number || '', term,
+      ].map(_billCsvCell).join(','));
+    });
+  });
+  return rows.join('\r\n');
+}
+
 // Run an export for the chosen format / document type / scope.
 function billExportRun(format, type, scope, fromDate, toDate){
   type = (type === 'quote') ? 'quote' : 'invoice';
   const docs = _billExportDocs(type, scope, { from: fromDate, to: toDate });
   if(!docs.length){ if(typeof toast === 'function') toast('Nothing matches — no ' + (type === 'quote' ? 'quotes' : 'invoices') + ' to export.', 'warn'); return; }
   let csv, tag;
-  if(format === 'xero')            { csv = _billCsvXero(docs);        tag = 'xero'; }
-  else if(format === 'quickbooks') { csv = _billCsvQuickBooks(docs);  tag = 'quickbooks'; }
-  else if(format === 'sage')       { csv = _billCsvSage(docs);        tag = 'sage'; }
-  else                             { csv = _billCsvGeneric(docs, type); tag = 'generic'; }
+  if(format === 'xero')             { csv = _billCsvXero(docs);          tag = 'xero'; }
+  else if(format === 'quickbooks')  { csv = _billCsvQuickBooks(docs);    tag = 'quickbooks'; }
+  else if(format === 'sage')        { csv = _billCsvSage(docs);          tag = 'sage'; }
+  else if(format === 'eboekhouden') { csv = _billCsvEBoekhouden(docs);   tag = 'e-boekhouden'; }
+  else                              { csv = _billCsvGeneric(docs, type); tag = 'generic'; }
   _billDownloadCsv(csv, (type === 'quote' ? 'quotes-' : '') + tag);
   if(typeof toast === 'function') toast(docs.length + ' ' + (type === 'quote' ? 'quote' : 'invoice') + (docs.length === 1 ? '' : 's') + ' exported — ' + tag.charAt(0).toUpperCase() + tag.slice(1) + ' CSV.', 'success');
 }
@@ -546,6 +591,7 @@ function billExportDialog(){
       <button type="button" class="btn btn-sm bxp-fmt" data-fmt="xero">⬇ Xero CSV</button>
       <button type="button" class="btn btn-sm bxp-fmt" data-fmt="quickbooks">⬇ QuickBooks CSV</button>
       <button type="button" class="btn btn-sm bxp-fmt" data-fmt="sage">⬇ Sage CSV</button>
+      <button type="button" class="btn btn-sm bxp-fmt" data-fmt="eboekhouden">⬇ e-Boekhouden</button>
       <button type="button" class="btn btn-sm bxp-fmt" data-fmt="generic">⬇ Generic CSV</button>
     </div>
     <div style="display:flex;justify-content:flex-end"><button type="button" class="btn btn-sm" id="bxp-cancel">Close</button></div>

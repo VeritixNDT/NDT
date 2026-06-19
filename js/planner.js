@@ -284,6 +284,11 @@ function plRender() {
     `<span class="pl-chip ${_plEnabled(s.key) ? '' : 'off'}" data-action="plToggleFilter" data-args="'${s.key}'" title="Show/hide ${esc(s.label)}">
        <span class="pl-dot" style="background:${s.color}"></span>${esc(s.label)}</span>`).join('');
 
+  // Dispatch queue is a Senior/Admin allocation view; its badge counts the open
+  // jobs that still need an inspector or a date.
+  const _canDispatch = _plCanEdit();
+  const _dispCount = _canDispatch ? _plDispatchCount() : 0;
+
   root.innerHTML = `
     <div class="pl-head">
       <div class="pl-nav">
@@ -298,12 +303,13 @@ function plRender() {
         <button class="${_plView === 'day' ? 'on' : ''}" data-action="plSetView" data-args="'day'">Day</button>
         <button class="${_plView === 'resource' ? 'on' : ''}" data-action="plSetView" data-args="'resource'">Team</button>
         <button class="${_plView === 'agenda' ? 'on' : ''}" data-action="plSetView" data-args="'agenda'">Agenda</button>
+        ${_canDispatch ? `<button class="${_plView === 'dispatch' ? 'on' : ''}" data-action="plSetView" data-args="'dispatch'">Dispatch${_dispCount ? ` <span style="background:var(--amber);color:#001;border-radius:8px;padding:0 5px;font-size:10px;font-weight:700">${_dispCount}</span>` : ''}</button>` : ''}
       </div>
       <div class="pl-legend">${legend}</div>
       <div style="flex:1"></div>
       ${_plCanEdit() ? `<button class="btn btn-primary btn-sm" data-action="plNewEvent" style="white-space:nowrap">+ New event</button>` : ''}
     </div>
-    <div class="pl-body">${_plView === 'week' ? _plWeekHtml() : _plView === 'day' ? _plDayHtml() : _plView === 'resource' ? _plResourceHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
+    <div class="pl-body">${_plView === 'dispatch' ? _plDispatchHtml() : _plView === 'week' ? _plWeekHtml() : _plView === 'day' ? _plDayHtml() : _plView === 'resource' ? _plResourceHtml() : _plView === 'agenda' ? _plAgendaHtml() : _plMonthHtml()}</div>`;
 
   if (typeof a11yWireLabels === 'function') a11yWireLabels(root);
 }
@@ -602,7 +608,87 @@ function _plStep(dir) { return (_plView === 'day') ? _plAddDays(_plCursor, dir) 
 function plPrev()  { _plCursor = _plStep(-1); plRender(); }
 function plNext()  { _plCursor = _plStep(1);  plRender(); }
 function plToday() { _plCursor = new Date(); plRender(); }
-function plSetView(v) { _plView = (v === 'agenda' || v === 'week' || v === 'day' || v === 'resource') ? v : 'month'; plRender(); }
+function plSetView(v) { _plView = (v === 'agenda' || v === 'week' || v === 'day' || v === 'resource' || v === 'dispatch') ? v : 'month'; plRender(); }
+
+// ── Dispatch queue ───────────────────────────────────────────────────────────
+// Operational triage for Senior/Admin: which OPEN jobs still need an inspector
+// or a date, plus each inspector's current workload. Assign inline (updates the
+// job and re-renders). Complements the calendar views with an allocation board.
+function _plDispatchJobs(){
+  const jobs = (typeof jobLoad === 'function') ? jobLoad() : [];
+  const open = jobs.filter(j => j && j.status !== 'Closed');
+  return {
+    open,
+    unassigned: open.filter(j => !(j.leadInspector || '').trim()),
+    unscheduled: open.filter(j => (j.leadInspector || '').trim() && !j.startDate),
+  };
+}
+function _plDispatchCount(){ const d = _plDispatchJobs(); return d.unassigned.length + d.unscheduled.length; }
+function _plDispatchHtml(){
+  const esc = s => (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s);
+  const d = _plDispatchJobs();
+  const roster = (ls(KEYS.inspectors, []) || []).map(i => i && i.name).filter(Boolean);
+  const custName = id => (typeof jobCustomerName === 'function') ? jobCustomerName(id) : '';
+  // Per-inspector open-job workload, to inform allocation.
+  const load = {}; roster.forEach(n => { load[n] = 0; });
+  d.open.forEach(j => { const n = (j.leadInspector || '').trim(); if(n) load[n] = (load[n] || 0) + 1; });
+
+  const inspectorSelect = (j) => `<select data-job="${esc(j.id)}" data-on-change="plDispatchAssign" data-pass-el="1" title="Assign an inspector" style="font-size:12px;max-width:170px">`
+    + ['<option value="">— assign —</option>'].concat(roster.map(n => `<option value="${esc(n)}"${(j.leadInspector||'') === n ? ' selected' : ''}>${esc(n)}${load[n] ? ' (' + load[n] + ')' : ''}</option>`)).join('')
+    + '</select>';
+  const dateInput = (j) => `<input type="date" data-job="${esc(j.id)}" data-on-change="plDispatchDate" data-pass-el="1" title="Schedule a start date" value="${esc(j.startDate ? String(j.startDate).slice(0,10) : '')}" style="font-size:12px">`;
+
+  const card = 'background:var(--panel,#fff);border:1px solid var(--border);border-radius:10px;overflow:hidden';
+  const rowCss = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid var(--border)';
+  const rows = (list, emptyMsg) => list.length ? list.map(j => {
+    const hint = (j.scope || '').replace(/\s+/g, ' ').trim();
+    return `<div style="${rowCss}">
+      <div style="flex:1;min-width:150px">
+        <div style="font-weight:600;font-size:13px">${esc(j.title || '—')}</div>
+        <div style="font-size:11px;color:var(--t3)">${esc(custName(j.customerId) || '—')}${hint ? ' · ' + esc(hint.slice(0, 70)) : ''}</div>
+      </div>
+      ${inspectorSelect(j)}
+      ${dateInput(j)}
+      <button class="btn btn-sm" data-action="plDispatchOpenJob" data-args="'${esc(j.id)}'" style="font-size:11px">Open</button>
+    </div>`;
+  }).join('') : `<div style="color:var(--t3);font-size:12px;padding:12px">${esc(emptyMsg)}</div>`;
+
+  const workload = roster.length
+    ? roster.map(n => `<span class="pl-chip" title="${esc(n)}: ${load[n] || 0} open job${(load[n] || 0) === 1 ? '' : 's'}">${esc(n)} <strong>${load[n] || 0}</strong></span>`).join('')
+    : '<span style="color:var(--t3);font-size:12px">No inspectors on the roster yet — add them under Settings.</span>';
+
+  return `<div style="max-width:780px;padding:4px 2px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+      <span style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-right:4px">Workload</span>${workload}
+    </div>
+    <h3 style="font-size:13px;margin:0 0 7px">Unassigned <span style="color:var(--t3);font-weight:400">· ${d.unassigned.length}</span></h3>
+    <div style="${card}">${rows(d.unassigned, 'No unassigned open jobs — everything has an inspector.')}</div>
+    <h3 style="font-size:13px;margin:20px 0 7px">Assigned, not scheduled <span style="color:var(--t3);font-weight:400">· ${d.unscheduled.length}</span></h3>
+    <div style="${card}">${rows(d.unscheduled, 'Nothing is awaiting a date.')}</div>
+  </div>`;
+}
+function plDispatchAssign(sel){
+  if(!sel || typeof jobLoad !== 'function' || typeof jobSaveAll !== 'function') return;
+  const jobs = jobLoad(); const j = jobs.find(x => x.id === sel.dataset.job); if(!j) return;
+  j.leadInspector = sel.value || '';
+  j.updatedAt = new Date().toISOString();
+  jobSaveAll(jobs);
+  if(typeof toast === 'function') toast(sel.value ? ('Assigned to ' + sel.value + '.') : 'Unassigned.', 'success');
+  plRender(); if(typeof plRenderUpcoming === 'function') plRenderUpcoming();
+}
+function plDispatchDate(inp){
+  if(!inp || typeof jobLoad !== 'function' || typeof jobSaveAll !== 'function') return;
+  const jobs = jobLoad(); const j = jobs.find(x => x.id === inp.dataset.job); if(!j) return;
+  j.startDate = inp.value || null;
+  j.updatedAt = new Date().toISOString();
+  jobSaveAll(jobs);
+  if(typeof toast === 'function') toast(inp.value ? ('Scheduled for ' + inp.value + '.') : 'Date cleared.', 'success');
+  plRender(); if(typeof plRenderUpcoming === 'function') plRenderUpcoming();
+}
+function plDispatchOpenJob(id){
+  if(typeof showPage === 'function') showPage('jobs');
+  if(typeof jobOpenDetail === 'function') setTimeout(() => { try { jobOpenDetail(id); } catch(e){} }, 0);
+}
 // Drill into a single day (from a month cell / week column date).
 function plOpenDay(ymd) { _plCursor = _plParse(ymd); _plView = 'day'; plRender(); }
 function plToggleFilter(key) {

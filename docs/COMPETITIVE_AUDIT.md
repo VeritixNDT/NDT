@@ -1,6 +1,6 @@
 ﻿# Veritix NDT Inspect - Competitive Audit
 
-_June 2026 - benchmark vs. leading NDT inspection/reporting software - status refreshed 2026-06-18_
+_June 2026 - benchmark vs. leading NDT inspection/reporting software - status refreshed 2026-06-19_
 
 ## 1. The landscape - who we actually compete with
 
@@ -26,48 +26,54 @@ portals, personnel/equipment/calibration, and increasingly **AI** + **integratio
 | Eye-test cert + Annex A, sealed/frozen PDFs, QR verify | Audit-grade evidence few rivals match |
 | Offline-first (localStorage / IndexedDB) | Strong for field; many rivals are cloud-only |
 | Full around-the-inspection layer: Customers -> Jobs -> Quotes/Invoices -> Portal -> Planner -> Management reports -> Job report pack | Unusual breadth for our size |
-| 5-language i18n | Most rivals are English-only |
+| 5-language i18n (app + customer portal) | Most rivals are English-only |
 
-## 3. Where competitors were ahead - the gaps (mostly closed)
+## 3. Where competitors were ahead - the gaps (status 2026-06-19)
 
-Status as of 2026-06-18. The original June-12 gap list is now largely shipped.
-Legend: [LIVE] shipped & live - [BUILT] built/verified - [PARTIAL] partly done - [OPEN] not started.
+Reconciled against the actual codebase (the doc had drifted - see the note at the
+foot of this section). Legend: [LIVE] shipped & live - [BUILT] built/verified, needs
+go-live - [PARTIAL] partly done - [OPEN] not started.
 
-| Gap | Who has it | Veritix status (2026-06-18) |
+| Gap | Who has it | Veritix status (2026-06-19) |
 |---|---|---|
 | Online payments (pay invoice in-portal) | AgileNDT, SPA | [BUILT] Stripe Checkout built + test-verified (portal Pay online + webhook -> invoice Paid). Needs **go-live** (live keys + business/bank verification + live webhook). |
-| Public API | AgileNDT, SkySoft | [LIVE] key-authed read+write (reports/jobs/customers/invoices/quotes), OpenAPI spec + Swagger docs, signed webhooks. Verified end-to-end. |
+| Public API | AgileNDT, SkySoft | [LIVE] key-authed read+write (reports/jobs/customers/invoices/quotes), OpenAPI + Swagger docs, signed webhooks. Verified end-to-end. |
 | SSO / MFA | AgileNDT, SkySoft | [LIVE] Google + Microsoft OAuth + TOTP MFA via Supabase Auth. |
-| ERP / accounting integration | AgileNDT, SkySoft | [OPEN] QuickBooks/Xero CSV export is the next integration. |
-| Customer-initiated work requests via portal | AgileNDT, Floodlight | [LIVE] (Portal v2 B) request form -> inspector "Customer requests" band -> pre-filled job; + date-change requests. |
+| Accounting / ERP export | AgileNDT, SkySoft | [LIVE] invoice/quote CSV export to **Xero, QuickBooks, Sage, e-Boekhouden.nl, and a generic CSV** (Billing -> Export: all / current filter / date range). [OPEN] deeper *live API* push to QBO/Xero/e-Boekhouden (vs CSV import). |
+| Customer-initiated work requests via portal | AgileNDT, Floodlight | [LIVE] (Portal v2) request + date-change forms -> inspector "Customer requests" band -> pre-filled job. |
 | AI layer | AgileNDT | [LIVE] AI report-review (do-not-issue gate, structured findings). [OPEN] trend digests / NL asset query. |
 | Scheduling / dispatch depth | Zertify, Floodlight | [PARTIAL] Planner + portal inspection schedule + customer date-change. [OPEN] no dispatch queue. |
-| Portal depth - notifications, payment, role tiers | AgileNDT | [LIVE] Portal v2 (A+B+C+D+E+F): two-way channel, ack/e-sign, proactive notifications, asset cockpit, work requests, self-serve depth, section toggles, white-label. [OPEN] multi-contact role tiers. |
+| Portal depth - notifications, payment, role tiers | AgileNDT | [LIVE] **Portal v2 complete** - two-way channel, ack/e-sign, proactive notifications, asset cockpit, work requests, self-serve depth, section toggles, white-label, **multi-contact roles (Viewer/Approver/Billing)**, and **per-customer language + EN/NL/DE/FR/ES portal i18n**. |
 | Technique sheets as a formal artifact | AgileNDT, NDTspec | [OPEN] still implicit via method forms + procedure register. |
 
-## 4. Internal audit flags (build/state) - 2026-06-18
+**Doc-drift note:** this table is reconciled against code. The prior versions
+wrongly listed Portal v2 as "partial" and accounting export as "not started" when
+both had shipped. Grep the code before trusting any "[OPEN]" here.
+
+## 4. Internal audit flags (build/state) - 2026-06-19
 
 1. [DONE] Backend live since 2026-06-12 (email/portal/verify); portal notifications confirmed live 2026-06-16. [OPEN] a full real-world cross-device portal/verify pass is still worth doing.
 2. [DONE] jsonb sync scaling - per-report rows shipped; only embedded photo dataURLs -> Supabase Storage remains, deferred to pilot volume.
 3. [DONE] Public API + SSO/MFA shipped - enterprise/no-re-entry gate closed.
-4. [OPEN] Test scaffolding still shipping ("Delete all reports" tool / VX_SHOW_TEST_TOOLS) - flip off before customer launch.
+4. [OPEN] Test scaffolding still shipping (VX_SHOW_TEST_TOOLS=true -> dashboard "Delete all reports" bar) - flip off before customer launch.
 5. [DONE] Service-worker cache fragility - fixed (per-build SW cache + footer build stamp + no-cache headers).
 6. [OPEN] Print fidelity of new PDFs verified structurally, not on a real printer. Server-side vector PDF (pdf-render) is deployed but inert until a Gotenberg container + GOTENBERG_URL are provided (falls back to raster/print).
 
-## 5. Prioritised recommendations - updated 2026-06-18
+## 5. Prioritised recommendations - updated 2026-06-19
 
-Done since June 12: Stripe payments (built), Public API, SSO/MFA, AI report-review,
-Portal v2, sync-scaling hardening. Remaining:
+Done since the June-12 draft: Stripe payments (built), Public API, SSO/MFA, AI
+report-review, full Portal v2 (incl. roles + i18n), accounting CSV export (5
+formats), sync-scaling hardening. Remaining:
 
-1. **Launch-readiness** (gating, not features): Stripe go-live; remove the "Delete all reports" test tool; real-printer PDF check; deploy a Gotenberg container for vector PDFs; cross-device portal/verify pass; photo dataURLs -> Storage before pilot volume.
-2. **Accounting/ERP export** (QuickBooks/Xero CSV) - the one untouched integration; pairs with the now-live public API.
-3. **Post-launch product depth:** dispatch queue (scheduling), formal technique-sheet artifact, AI expansion (trend digests / NL asset query), portal multi-contact role tiers + i18n.
+1. **Launch-readiness** (gating, mostly external): Stripe go-live; flip VX_SHOW_TEST_TOOLS off / remove the "Delete all reports" tool; stand up a Gotenberg container for vector PDFs; real-printer PDF check; cross-device portal/verify pass; photo dataURLs -> Storage before pilot volume.
+2. **Post-launch product depth:** dispatch queue (scheduling), formal technique-sheet artifact, AI expansion (trend digests / NL asset query), live ERP API sync (deeper than CSV).
 
-**Bottom line:** As of 2026-06-18 the integration/enterprise gate is essentially
-closed - public API, SSO/MFA, AI review, online payments, and a full Portal v2 are
-all built. What remains is **launch-readiness chores** (Stripe go-live, remove test
-tooling, vector-PDF infra, real-world tests) plus one net-new integration
-(accounting export); the rest is post-launch depth. No gaps are architectural.
+**Bottom line:** As of 2026-06-19 the integration/enterprise gate is closed -
+public API, SSO/MFA, AI review, online payments (built), a full Portal v2, and
+multi-tool accounting export are all shipped. What remains is **launch-readiness
+chores** (mostly your external steps - Stripe go-live, vector-PDF infra, real-world
+tests) plus **post-launch depth** (dispatch, technique sheets, AI expansion, live
+ERP API). No gaps are architectural.
 
 ### Sources
 - DRIVE NDT - https://www.drive-ndt.com/en/
@@ -77,4 +83,4 @@ tooling, vector-PDF infra, real-world tests) plus one net-new integration
 - SPA InnoVision / InspectO - https://spainnovision.com/inspecto/
 - NDTspec (TWI) - https://www.twisoftware.com/software/welding-software/ndtspec/
 
-_Created 2026-06-12 - Status refreshed 2026-06-18 - Owner: Carl Cope (Smart Veritas BV)_
+_Created 2026-06-12 - Reconciled against code 2026-06-19 - Owner: Carl Cope (Smart Veritas BV)_

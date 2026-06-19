@@ -430,46 +430,143 @@ function _billInvoiceItems(inv){
   return (inv.lineItems && inv.lineItems.length) ? inv.lineItems : [{ description: (inv.notes || 'NDT services'), qty: 1, unitPrice: billCalc(inv).subtotal }];
 }
 
-function billExportXeroCsv(){
-  const invoices = billLoad('invoice');
-  if(!invoices.length){ if(typeof toast === 'function') toast('No invoices to export.', 'warn'); return; }
-  const head = ['*ContactName','EmailAddress','*InvoiceNumber','Reference','*InvoiceDate','*DueDate','*Description','*Quantity','*UnitAmount','Discount','AccountCode','*TaxType','Currency','Status'];
-  const rows = [head.map(_billCsvCell).join(',')];
-  invoices.forEach(inv => {
-    _billInvoiceItems(inv).forEach(it => {
-      rows.push([
-        _billCustName(inv.customerId), _billCustEmail(inv.customerId), inv.number || '', _billJobName(inv.jobId),
-        _billCsvDate(inv.issueDate), _billCsvDate(inv.dueDate),
-        it.description || '', (it.qty != null ? it.qty : ''), (it.unitPrice != null ? it.unitPrice : ''), '',
-        '',                                                   // AccountCode — map in Xero
-        (inv.vatRate ? (inv.vatRate + '% VAT') : ''),          // TaxType — map in Xero (rate shown for reference)
-        inv.currency || billDefaultCurrency(), inv.status || 'Draft',
-      ].map(_billCsvCell).join(','));
-    });
-  });
-  _billDownloadCsv(rows.join('\r\n'), 'xero');
-  if(typeof toast === 'function') toast(invoices.length + ' invoice(s) exported — Xero CSV.', 'success');
+// Select which documents to export, honouring the chosen scope:
+//   'all'      — every doc of this type
+//   'filtered' — those matching the live Billing page status + search filter
+//   'range'    — those whose issue date falls within [from, to]
+function _billExportDocs(type, scope, range){
+  let docs = billLoad(type);
+  if(scope === 'filtered'){
+    const fStatus = (typeof el === 'function' && el('billing-filter-status')) ? el('billing-filter-status').value : '';
+    const search  = (typeof el === 'function' && el('billing-search')) ? (el('billing-search').value || '').toLowerCase().trim() : '';
+    if(fStatus) docs = docs.filter(d => (typeof billStatusMeta === 'function' && billStatusMeta(d).label === fStatus) || d.status === fStatus);
+    if(search)  docs = docs.filter(d => [d.number, _billCustName(d.customerId), _billJobName(d.jobId)].map(x => (x||'').toLowerCase()).join(' ').includes(search));
+  } else if(scope === 'range' && range){
+    const from = range.from || '', to = range.to || '';
+    docs = docs.filter(d => { const dt = String(d.issueDate || '').slice(0, 10); return dt && (!from || dt >= from) && (!to || dt <= to); });
+  }
+  return docs.slice().sort((a, b) => String(a.issueDate || a.createdAt || '').localeCompare(String(b.issueDate || b.createdAt || '')));
 }
 
-function billExportQuickBooksCsv(){
-  const invoices = billLoad('invoice');
-  if(!invoices.length){ if(typeof toast === 'function') toast('No invoices to export.', 'warn'); return; }
+// ── Format builders — each takes the selected docs and returns CSV text ───────
+function _billCsvXero(docs){
+  const head = ['*ContactName','EmailAddress','*InvoiceNumber','Reference','*InvoiceDate','*DueDate','*Description','*Quantity','*UnitAmount','Discount','AccountCode','*TaxType','Currency','Status'];
+  const rows = [head.map(_billCsvCell).join(',')];
+  docs.forEach(d => _billInvoiceItems(d).forEach(it => {
+    rows.push([
+      _billCustName(d.customerId), _billCustEmail(d.customerId), d.number || '', _billJobName(d.jobId),
+      _billCsvDate(d.issueDate), _billCsvDate(d.dueDate),
+      it.description || '', (it.qty != null ? it.qty : ''), (it.unitPrice != null ? it.unitPrice : ''), '',
+      '',                                                    // AccountCode — map in Xero
+      (d.vatRate ? (d.vatRate + '% VAT') : ''),               // TaxType — map in Xero (rate shown for reference)
+      d.currency || billDefaultCurrency(), d.status || 'Draft',
+    ].map(_billCsvCell).join(','));
+  }));
+  return rows.join('\r\n');
+}
+function _billCsvQuickBooks(docs){
   const head = ['InvoiceNo','Customer','InvoiceDate','DueDate','Item(Product/Service)','ItemDescription','ItemQuantity','ItemRate','ItemAmount','Currency','Status'];
   const rows = [head.map(_billCsvCell).join(',')];
-  invoices.forEach(inv => {
-    _billInvoiceItems(inv).forEach(it => {
-      const qty = parseFloat(it.qty) || 0, rate = parseFloat(it.unitPrice) || 0;
+  docs.forEach(d => _billInvoiceItems(d).forEach(it => {
+    const qty = parseFloat(it.qty) || 0, rate = parseFloat(it.unitPrice) || 0;
+    rows.push([
+      d.number || '', _billCustName(d.customerId),
+      _billCsvDate(d.issueDate), _billCsvDate(d.dueDate),
+      'NDT services', it.description || '', (it.qty != null ? it.qty : ''), (it.unitPrice != null ? it.unitPrice : ''),
+      (qty * rate).toFixed(2), d.currency || billDefaultCurrency(), d.status || 'Draft',
+    ].map(_billCsvCell).join(','));
+  }));
+  return rows.join('\r\n');
+}
+// Sage-style sales import (Sage 50 audit-trail shape): one row per line item.
+// Type SI = sales invoice; nominal 4000 (sales) + tax codes T1 (standard) / T0
+// (zero) are sensible defaults the user can remap in Sage.
+function _billCsvSage(docs){
+  const head = ['Type','Account Reference','Nominal A/C Ref','Date','Reference','Details','Net Amount','Tax Code','Tax Amount'];
+  const rows = [head.map(_billCsvCell).join(',')];
+  docs.forEach(d => {
+    const rate = parseFloat(d.vatRate) || 0;
+    _billInvoiceItems(d).forEach(it => {
+      const net = (parseFloat(it.qty) || 0) * (parseFloat(it.unitPrice) || 0);
+      const tax = Math.round(net * rate) / 100;
       rows.push([
-        inv.number || '', _billCustName(inv.customerId),
-        _billCsvDate(inv.issueDate), _billCsvDate(inv.dueDate),
-        'NDT services', it.description || '', (it.qty != null ? it.qty : ''), (it.unitPrice != null ? it.unitPrice : ''),
-        (qty * rate).toFixed(2), inv.currency || billDefaultCurrency(), inv.status || 'Draft',
+        'SI', _billCustName(d.customerId), '4000', _billCsvDate(d.issueDate), d.number || '',
+        it.description || '', net.toFixed(2), (rate ? 'T1' : 'T0'), tax.toFixed(2),
       ].map(_billCsvCell).join(','));
     });
   });
-  _billDownloadCsv(rows.join('\r\n'), 'quickbooks');
-  if(typeof toast === 'function') toast(invoices.length + ' invoice(s) exported — QuickBooks CSV.', 'success');
+  return rows.join('\r\n');
 }
+// Generic flat CSV — one row per document with computed totals. Universal:
+// imports anywhere, and works for quotes as well as invoices.
+function _billCsvGeneric(docs, type){
+  const head = ['Number','Type','Customer','Email','Job','IssueDate','DueDate','Currency','Subtotal','VATRate','VATAmount','Total','Status'];
+  const rows = [head.map(_billCsvCell).join(',')];
+  docs.forEach(d => {
+    const c = billCalc(d);
+    rows.push([
+      d.number || '', (type === 'quote' ? 'Quote' : 'Invoice'), _billCustName(d.customerId), _billCustEmail(d.customerId),
+      _billJobName(d.jobId), _billCsvDate(d.issueDate), _billCsvDate(d.dueDate), d.currency || billDefaultCurrency(),
+      c.subtotal.toFixed(2), (d.vatRate || 0), c.vat.toFixed(2), c.total.toFixed(2), d.status || 'Draft',
+    ].map(_billCsvCell).join(','));
+  });
+  return rows.join('\r\n');
+}
+
+// Run an export for the chosen format / document type / scope.
+function billExportRun(format, type, scope, fromDate, toDate){
+  type = (type === 'quote') ? 'quote' : 'invoice';
+  const docs = _billExportDocs(type, scope, { from: fromDate, to: toDate });
+  if(!docs.length){ if(typeof toast === 'function') toast('Nothing matches — no ' + (type === 'quote' ? 'quotes' : 'invoices') + ' to export.', 'warn'); return; }
+  let csv, tag;
+  if(format === 'xero')            { csv = _billCsvXero(docs);        tag = 'xero'; }
+  else if(format === 'quickbooks') { csv = _billCsvQuickBooks(docs);  tag = 'quickbooks'; }
+  else if(format === 'sage')       { csv = _billCsvSage(docs);        tag = 'sage'; }
+  else                             { csv = _billCsvGeneric(docs, type); tag = 'generic'; }
+  _billDownloadCsv(csv, (type === 'quote' ? 'quotes-' : '') + tag);
+  if(typeof toast === 'function') toast(docs.length + ' ' + (type === 'quote' ? 'quote' : 'invoice') + (docs.length === 1 ? '' : 's') + ' exported — ' + tag.charAt(0).toUpperCase() + tag.slice(1) + ' CSV.', 'success');
+}
+
+// Export chooser modal: document type × scope (all / current filter / date
+// range) × format (Xero / QuickBooks / Sage / Generic). Accounting formats are
+// invoice-only; quotes export as Generic.
+function billExportDialog(){
+  const today = new Date().toISOString().slice(0, 10);
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:7000;background:rgba(12,18,32,.55);display:flex;align-items:center;justify-content:center;padding:18px';
+  ov.innerHTML = `<div style="background:var(--panel,#fff);color:var(--t1);border-radius:14px;max-width:470px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.4);font-family:inherit">
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px">Export to accounting</div>
+    <div class="fld" style="margin-bottom:10px"><label style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Documents</label>
+      <select id="bxp-type" style="width:100%;box-sizing:border-box"><option value="invoice">Invoices</option><option value="quote">Quotes</option></select></div>
+    <div class="fld" style="margin-bottom:10px"><label style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Which ones</label>
+      <select id="bxp-scope" style="width:100%;box-sizing:border-box"><option value="all">All</option><option value="filtered">Matching the current filter</option><option value="range">Date range (issue date)</option></select></div>
+    <div id="bxp-range" style="display:none;gap:8px;margin-bottom:10px"><input type="date" id="bxp-from" style="flex:1;box-sizing:border-box"/><span style="align-self:center;color:var(--t3)">to</span><input type="date" id="bxp-to" value="${today}" style="flex:1;box-sizing:border-box"/></div>
+    <label style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Format</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin:7px 0 16px">
+      <button type="button" class="btn btn-sm bxp-fmt" data-fmt="xero">⬇ Xero CSV</button>
+      <button type="button" class="btn btn-sm bxp-fmt" data-fmt="quickbooks">⬇ QuickBooks CSV</button>
+      <button type="button" class="btn btn-sm bxp-fmt" data-fmt="sage">⬇ Sage CSV</button>
+      <button type="button" class="btn btn-sm bxp-fmt" data-fmt="generic">⬇ Generic CSV</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end"><button type="button" class="btn btn-sm" id="bxp-cancel">Close</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close = () => { try { ov.remove(); } catch(e){} };
+  ov.addEventListener('click', e => { if(e.target === ov) close(); });
+  ov.querySelector('#bxp-cancel').addEventListener('click', close);
+  const typeSel = ov.querySelector('#bxp-type'), scopeSel = ov.querySelector('#bxp-scope'), rangeRow = ov.querySelector('#bxp-range');
+  scopeSel.addEventListener('change', () => { rangeRow.style.display = scopeSel.value === 'range' ? 'flex' : 'none'; });
+  const syncFormats = () => { const q = typeSel.value === 'quote'; ov.querySelectorAll('.bxp-fmt').forEach(b => { if(b.dataset.fmt !== 'generic') b.style.display = q ? 'none' : ''; }); };
+  typeSel.addEventListener('change', syncFormats); syncFormats();
+  ov.querySelectorAll('.bxp-fmt').forEach(b => b.addEventListener('click', () => {
+    billExportRun(b.dataset.fmt, typeSel.value, scopeSel.value, ov.querySelector('#bxp-from').value, ov.querySelector('#bxp-to').value);
+    close();
+  }));
+}
+
+// Back-compat thin wrappers (older data-action references → export all invoices).
+function billExportXeroCsv(){ billExportRun('xero', 'invoice', 'all'); }
+function billExportQuickBooksCsv(){ billExportRun('quickbooks', 'invoice', 'all'); }
 
 function billingRender() {
   const wrap = el('billing-list-wrap'); if(!wrap) return;

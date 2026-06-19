@@ -64,7 +64,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   if (event?.type === "checkout.session.completed") {
     const s = event.data?.object || {};
-    const paid = s.payment_status === "paid" || s.status === "complete";
+    // Only a confirmed payment marks an invoice Paid. Stripe also fires
+    // checkout.session.completed for async/delayed methods with
+    // payment_status: "unpaid" — the old `|| s.status === "complete"` fallback
+    // flipped those to Paid with no money received.
+    const paid = s.payment_status === "paid";
     const orgId = s.metadata?.orgId;
     const invoiceId = s.metadata?.invoiceId;
     if (paid && orgId && invoiceId) {
@@ -79,6 +83,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const invoices: any[] = Array.isArray(row?.value) ? row!.value : [];
         const i = invoices.findIndex((x) => x && x.id === invoiceId);
         if (i >= 0 && invoices[i].status !== "Paid") {
+          // Guard against under-collection (e.g. the invoice was edited after
+          // checkout was created): the charge must cover the invoice total and
+          // match its currency, or we leave it unpaid for manual reconciliation.
+          const inv = invoices[i];
+          // deno-lint-ignore no-explicit-any
+          const sub = (Array.isArray(inv.lineItems) ? inv.lineItems : []).reduce((acc: number, li: any) => acc + (Number(li.qty) || 0) * (Number(li.unitPrice) || 0), 0);
+          const expectedCents = Math.round(sub * (1 + (Number(inv.vatRate) || 0) / 100) * 100);
+          const gotCents = Number(s.amount_total) || 0;
+          const curOk = !inv.currency || !s.currency || String(inv.currency).toLowerCase() === String(s.currency).toLowerCase();
+          if (!curOk || gotCents + 1 < expectedCents) {
+            console.error("stripe-webhook amount/currency mismatch — NOT marking paid", JSON.stringify({ invoiceId, expectedCents, gotCents, invCurrency: inv.currency, sCurrency: s.currency }));
+            return jsonResponse({ received: true, warning: "amount mismatch — left unpaid" });
+          }
           invoices[i] = { ...invoices[i], status: "Paid", paidAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
           await service.from("entities").update({ value: invoices }).eq("org_id", orgId).eq("key", "vx-invoices-v1");
           // Fan the payment out to the org's webhooks (signed, best-effort).

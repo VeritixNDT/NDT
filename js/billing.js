@@ -407,7 +407,15 @@ function billingInit() { billingRender(); }
 // One row per invoice line item. Both tools offer column-mapping on import, so
 // the instance-specific fields (Xero AccountCode / TaxType) are left blank for
 // the user to map in-app. Line amounts are ex-VAT; totals are derived on import.
-function _billCsvCell(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+function _billCsvCell(v){
+  let s = String(v == null ? '' : v);
+  // CSV formula-injection guard: a cell that opens with = + - @ (or a control
+  // char) is treated as a live formula by Excel/Sheets/accounting imports. A
+  // customer named =HYPERLINK(...) would execute on the accountant's machine.
+  // Prefix with a single quote to force it to text.
+  if(/^[=+\-@\t\r\n]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
 function _billCsvDate(d){
   if(!d) return '';
   const x = new Date(d); if(isNaN(x.getTime())) return String(d);
@@ -562,6 +570,16 @@ function billExportRun(format, type, scope, fromDate, toDate){
   type = (type === 'quote') ? 'quote' : 'invoice';
   const docs = _billExportDocs(type, scope, { from: fromDate, to: toDate });
   if(!docs.length){ if(typeof toast === 'function') toast('Nothing matches — no ' + (type === 'quote' ? 'quotes' : 'invoices') + ' to export.', 'warn'); return; }
+  // e-Boekhouden only recognises the NL sales VAT rates (0/6/9/21). Any other
+  // non-zero rate would silently map to "GEEN" (exempt) — a tax-filing error —
+  // so block the export and name the offending documents instead.
+  if(format === 'eboekhouden'){
+    const bad = docs.filter(d => { const r = parseFloat(d.vatRate) || 0; return ![0, 6, 9, 21].includes(r); });
+    if(bad.length){
+      if(typeof toast === 'function') toast('e-Boekhouden only supports 0/6/9/21% VAT. Fix the rate on: ' + bad.slice(0, 5).map(d => d.number || '—').join(', ') + (bad.length > 5 ? '…' : '') + '.', 'error');
+      return;
+    }
+  }
   let csv, tag;
   if(format === 'xero')             { csv = _billCsvXero(docs);          tag = 'xero'; }
   else if(format === 'quickbooks')  { csv = _billCsvQuickBooks(docs);    tag = 'quickbooks'; }

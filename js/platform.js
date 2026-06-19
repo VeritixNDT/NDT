@@ -3017,7 +3017,10 @@ var vxApi = {
     var sb = _vxSupabase();
     if(!sb || !sb.functions) return { ok: false, error: 'email backend unavailable' };
     try {
-      var body = Object.assign({ type: type, to: to }, data || {});
+      // Always carry the caller's orgId — the function now requires it and
+      // verifies org membership (data may override, e.g. invite's target org).
+      var _org = (typeof vxPlatformConfig === 'function' && vxPlatformConfig().orgId) || '';
+      var body = Object.assign({ type: type, to: to, orgId: _org }, data || {});
       var r = await sb.functions.invoke('send-email', { body: body });
       if(r.error){
         // The SDK wraps non-2xx as a FunctionsHttpError whose .context is

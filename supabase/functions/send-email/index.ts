@@ -56,6 +56,31 @@ function isEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
+// Anti-relay allow-list: the set of lowercased addresses that belong to THIS
+// org's own data — customer contact + portal emails, and the org's own
+// addresses. Customer-facing sends may only target one of these, so a signed-in
+// user can't turn the function into a phishing relay to arbitrary recipients.
+// deno-lint-ignore no-explicit-any
+async function orgRecipientSet(svc: any, orgId: string): Promise<Set<string>> {
+  const set = new Set<string>();
+  const { data: rows } = await svc.from("entities").select("key,value")
+    .eq("org_id", orgId).in("key", ["vx-customers-v1", "vx-company-v1"]);
+  // deno-lint-ignore no-explicit-any
+  (rows || []).forEach((r: any) => {
+    if (r.key === "vx-customers-v1" && Array.isArray(r.value)) {
+      // deno-lint-ignore no-explicit-any
+      r.value.forEach((c: any) => {
+        (Array.isArray(c?.portalEmails) ? c.portalEmails : []).forEach((e: unknown) => set.add(String(e).trim().toLowerCase()));
+        (Array.isArray(c?.contacts) ? c.contacts : []).forEach((ct: { email?: string }) => { if (ct?.email) set.add(String(ct.email).trim().toLowerCase()); });
+      });
+    } else if (r.key === "vx-company-v1" && r.value) {
+      const co = r.value as { email?: string; requestEmail?: string };
+      [co.email, co.requestEmail].forEach((e) => { if (e) set.add(String(e).trim().toLowerCase()); });
+    }
+  });
+  return set;
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   // CORS preflight.
   if (req.method === "OPTIONS") {
@@ -112,26 +137,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
     { auth: { persistSession: false } },
   );
 
+  // ── Authorise: every send is org-scoped, and the caller must belong to that
+  // org. Without this any signed-in user (incl. a fresh trial signup) could
+  // send branded mail from our verified domain to any address. ──────────────
+  const orgId = String(payload.orgId || "");
+  if (!orgId) return jsonResponse({ error: "orgId required" }, 400);
+  const { data: membership } = await serviceClient
+    .from("org_members").select("role")
+    .eq("org_id", orgId).eq("user_id", caller.id).maybeSingle();
+  if (!membership) return jsonResponse({ error: "not a member of this org" }, 403);
+  if (ADMIN_ONLY_TYPES.has(type) && membership.role !== "admin") {
+    return jsonResponse({ error: "admin access required" }, 403);
+  }
+  // Anti-relay: customer-facing sends may only target an address that exists in
+  // this org's own data. Invites are exempt (an admin invites a new address).
+  if (type !== "invite") {
+    const allowed = await orgRecipientSet(serviceClient, orgId);
+    if (!allowed.has(to)) {
+      return jsonResponse({ error: "recipient is not a known contact for this organisation" }, 403);
+    }
+  }
+
   // ── Build the email per template ────────────────────────────────────────
   let rendered;
   try {
     if (type === "invite") {
-      const orgId = String(payload.orgId || "");
-      if (!orgId) return jsonResponse({ error: "orgId required" }, 400);
-
-      // Admin gating: confirm the caller is an admin of this org.
-      if (ADMIN_ONLY_TYPES.has(type)) {
-        const { data: membership } = await serviceClient
-          .from("org_members")
-          .select("role")
-          .eq("org_id", orgId)
-          .eq("user_id", caller.id)
-          .maybeSingle();
-        if (!membership || membership.role !== "admin") {
-          return jsonResponse({ error: "admin access required" }, 403);
-        }
-      }
-
       // Org name (for branding) + inviter display name.
       const { data: org } = await serviceClient
         .from("orgs")

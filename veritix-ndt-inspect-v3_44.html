@@ -335,6 +335,12 @@
         </div>
       </div>
     </div>
+    <!-- Company / workspace logo — paired with the account menu so brand
+         identity stays legible at a fixed size regardless of sidebar
+         collapse state. Painted by vxRenderSidebarOrgBlock from
+         Settings → Company; click routes to workspace settings. Hidden
+         until a logo is configured, and on narrow screens (CSS). -->
+    <div class="topbar-org-logo" id="topbar-org-logo" data-action="vxOpenWorkspaceSettings" role="button" tabindex="0" title="Workspace settings" aria-label="Workspace settings" style="display:none"></div>
     <div style="position:relative">
       <button class="avatar-btn" id="avatar-btn" data-action="toggleProfileDropdown" title="Your profile">CC</button>
       <div class="profile-dropdown" id="profile-dropdown">

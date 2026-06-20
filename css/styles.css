@@ -2318,6 +2318,39 @@ a { color: var(--cyan); text-decoration: none; }
   margin-left: auto;
 }
 
+/* Company / workspace logo in the topbar, grouped with the account menu.
+   Fixed height so brand identity stays legible regardless of sidebar
+   collapse. A thin divider separates it from the icon cluster on its
+   left; the avatar sits to its right. Hidden on narrow viewports where
+   the topbar-right cluster is already tight. */
+.topbar-org-logo {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  max-width: 132px;
+  padding-left: 12px;
+  margin-left: 2px;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.topbar-org-logo:empty { display: none !important; }
+.topbar-org-logo img {
+  max-height: 24px;
+  max-width: 120px;
+  object-fit: contain;
+  display: block;
+}
+.topbar-org-logo:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 3px; }
+/* Invert dark/monochrome logos on dark themes — mirrors the sidebar rule
+   so the same uploaded asset reads correctly in both spots. */
+body:not([data-theme="light"]) .topbar-org-logo.is-inverted img {
+  filter: invert(1) hue-rotate(180deg);
+}
+@media (max-width: 720px) {
+  .topbar-org-logo { display: none !important; }
+}
+
 .icon-btn {
   width: 34px; height: 34px;
   border-radius: var(--r);

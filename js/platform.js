@@ -3203,46 +3203,49 @@ function vxRenderSidebarOrgBlock(name){
     if(!isLightTheme && invertOnDark && logoSrc === primarySrc) useInvert = true;
   }
   var nameStr = (name && String(name).trim()) ? String(name).trim() : '';
-  // Option B: logo XOR name. When a logo is configured it carries the
-  // workspace identity on its own and the name is hidden to avoid
-  // duplication. When no logo is set, the name takes over as the
-  // identifier (and the empty-logo slot collapses so it doesn't leave a
-  // 78px gap). Click target stays the same — the whole block routes to
-  // Settings → Company in both modes.
+
+  // Topbar company logo — the single, fixed-size home for brand identity,
+  // grouped with the account menu and unaffected by sidebar collapse.
+  // Shows the logo when one is configured, otherwise hides (the sidebar
+  // header below still carries the workspace NAME as the text identifier).
+  var topLogo = document.getElementById('topbar-org-logo');
+  if(topLogo){
+    if(logoSrc){
+      if(useInvert) topLogo.classList.add('is-inverted');
+      else          topLogo.classList.remove('is-inverted');
+      topLogo.innerHTML = '<img src="' + logoSrc.replace(/"/g, '&quot;') + '" alt="Company logo"/>';
+      topLogo.style.display = '';
+    } else {
+      topLogo.innerHTML = '';
+      topLogo.classList.remove('is-inverted');
+      topLogo.style.display = 'none';
+    }
+  }
+
+  // Sidebar header now shows the workspace NAME only (the logo moved to
+  // the topbar above, so it no longer gets squeezed into the 56px
+  // collapsed rail). Click target unchanged — the block still routes to
+  // Settings → Company. When collapsed (and name-only), the existing
+  // `.snav-org-block.no-logo-mode` collapse rule hides it cleanly.
   var blockIds = ['ov-snav-org-block', 'stg-snav-org-block', 'insp-snav-org-block', 'admin-snav-org-block'];
   for(var i = 0; i < blockIds.length; i++){
     var block = document.getElementById(blockIds[i]);
     if(!block) continue;
     var logoEl = block.querySelector('.snav-org-logo');
     var nameEl = block.querySelector('.snav-org-name');
-    if(logoSrc){
-      // Logo mode — paint the image and clear the name so the existing
-      // `.snav-org-name:empty { display: none; }` rule hides it.
-      if(logoEl){
-        if(useInvert) logoEl.classList.add('is-inverted');
-        else          logoEl.classList.remove('is-inverted');
-        logoEl.innerHTML = '<img src="' + logoSrc.replace(/"/g, '&quot;') + '" alt="Company logo"/>';
-        logoEl.classList.remove('is-placeholder');
-      }
-      if(nameEl) nameEl.textContent = '';
-      block.classList.remove('no-logo-mode');
-    } else {
-      // No-logo mode — surface the name as the primary identifier and
-      // collapse the empty logo slot via `.no-logo-mode` (CSS hides it).
-      // No placeholder building-silhouette here: it would compete
-      // visually with the standalone name.
-      if(logoEl){
-        logoEl.innerHTML = '';
-        logoEl.classList.remove('is-placeholder', 'is-inverted');
-      }
-      if(nameEl) nameEl.textContent = nameStr;
-      block.classList.add('no-logo-mode');
+    // Name-only: clear/collapse the logo slot (logo lives in the topbar
+    // now) and surface the workspace name as the sidebar identifier.
+    if(logoEl){
+      logoEl.innerHTML = '';
+      logoEl.classList.remove('is-placeholder', 'is-inverted');
     }
-    // Hide the whole block when neither logo nor name is set — keeps the
-    // sidebar header from showing an empty box for first-run / signed-out
-    // users. Reappears as soon as either is set.
-    if(!logoSrc && !nameStr) block.classList.add('is-empty');
-    else                     block.classList.remove('is-empty');
+    if(nameEl) nameEl.textContent = nameStr;
+    block.classList.add('no-logo-mode');
+    // Hide the whole block when there's no name to show — keeps the
+    // sidebar header clean for first-run / signed-out users (the topbar
+    // logo, if any, still carries identity). Reappears once a name is set.
+    if(!nameStr) block.classList.add('is-empty');
+    else         block.classList.remove('is-empty');
   }
 }
 

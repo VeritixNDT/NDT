@@ -1263,7 +1263,7 @@
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
                       <input type="checkbox" id="logo-use-system" data-on-change="logoSetUsage" data-pass-el="1" data-args="'primary','system'"/>
-                      <span>System (sidebar)</span>
+                      <span>System (topbar)</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
                       <input type="checkbox" id="logo-use-portal" data-on-change="logoSetUsage" data-pass-el="1" data-args="'primary','portal'"/>
@@ -1280,8 +1280,8 @@
                   </div>
                 </div>
               </div>
-              <!-- Dark-theme logo (optional). Used by the sidebar when the
-                   UI is in dark mode and this slot is set; otherwise the
+              <!-- Dark-theme logo (optional). Used by the topbar logo when
+                   the UI is in dark mode and this slot is set; otherwise the
                    primary logo above is used (optionally with the invert
                    filter via the checkbox). PDFs always use the primary. -->
               <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px dashed var(--border)">
@@ -1305,7 +1305,7 @@
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
                       <input type="checkbox" id="logo-dark-use-system" data-on-change="logoSetUsage" data-pass-el="1" data-args="'dark','system'"/>
-                      <span>System (sidebar)</span>
+                      <span>System (topbar)</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
                       <input type="checkbox" id="logo-dark-use-portal" data-on-change="logoSetUsage" data-pass-el="1" data-args="'dark','portal'"/>
@@ -1313,7 +1313,7 @@
                     </label>
                   </div>
                   <div style="font-size:10.5px;color:var(--t3);line-height:1.5;margin-top:2px">
-                    A white / light variant of your logo. Tick the boxes above to override which slot is used for reports or the sidebar.
+                    A white / light variant of your logo. Tick the boxes above to override which slot is used for reports or the app topbar.
                   </div>
                 </div>
 

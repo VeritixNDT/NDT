@@ -104,6 +104,58 @@ const VISION_SCHEMA = {
   required: ["summary", "overallRisk", "findings"],
 };
 
+// ── OCR mode (Phase 2) ────────────────────────────────────────────────────
+// Read text/values off an equipment label, calibration sticker, gauge, or
+// material stamp and map each to one of the report's fillable fields, so the
+// inspector can one-click "Apply" it. Still advisory — the client writes the
+// value into the form only on the inspector's confirmation.
+const OCR_SYSTEM =
+  `You are reading text and values off inspection-equipment photos for Veritix NDT Inspect — ` +
+  `equipment labels, calibration stickers, gauges/displays, material stamps, certificates. ` +
+  `Extract the distinct field/value pairs you can CLEARLY read: e.g. serial number, model, ` +
+  `manufacturer, calibration date / due date, certificate number, gauge reading, material grade, ` +
+  `heat number.\n\n` +
+  `You are given a list of the report's fillable fields as JSON ("Available fields"), each with a ` +
+  `"key" and "label". For every value you read, set "suggestedKey" to the BEST-matching field key ` +
+  `from that list, or "" if none fits. Use the exact key string.\n\n` +
+  `Rules: Transcribe only what is legibly visible — do NOT guess characters, complete partial ` +
+  `serials, or invent values. Use low confidence when the text is unclear and omit anything you ` +
+  `cannot read. Set imageId to the image the value came from. This is an ADVISORY aid; the ` +
+  `inspector confirms every value before it is applied.`;
+
+const OCR_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: {
+      type: "string",
+      description: "One sentence: what kind of label/sticker/stamp was read.",
+    },
+    fields: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          label: {
+            type: "string",
+            description: "What the value is, e.g. \"Serial number\", \"Calibration due\".",
+          },
+          value: { type: "string", description: "The value read, verbatim." },
+          suggestedKey: {
+            type: "string",
+            description: "Best-matching field key from the provided list, or \"\".",
+          },
+          imageId: { type: "string" },
+          confidence: { type: "string", enum: ["low", "medium", "high"] },
+        },
+        required: ["label", "value", "suggestedKey", "confidence"],
+      },
+    },
+  },
+  required: ["summary", "fields"],
+};
+
 function envOrThrow(name: string): string {
   const v = Deno.env.get(name);
   if (!v) throw new Error(`missing env ${name}`);
@@ -140,12 +192,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // ── Parse + validate ─────────────────────────────────────────────────────
-  let payload: { reportCtx?: unknown; images?: unknown };
+  let payload: {
+    mode?: unknown;
+    reportCtx?: unknown;
+    images?: unknown;
+    fieldOptions?: unknown;
+  };
   try {
     payload = await req.json();
   } catch {
     return jsonResponse({ error: "invalid JSON body" }, 400);
   }
+  const mode = payload?.mode === "ocr" ? "ocr" : "indications";
 
   const images = Array.isArray(payload?.images) ? payload.images as ImageIn[] : [];
   if (!images.length) {
@@ -198,15 +256,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
     ctxJson = ctxJson.slice(0, MAX_CTX_CHARS) + "…[truncated]";
   }
 
+  // For OCR, give the model the report's fillable fields so it can map each
+  // value it reads to a field key the client can one-click apply.
+  let fieldOptsJson = "[]";
+  if (mode === "ocr") {
+    try {
+      const fo = Array.isArray(payload?.fieldOptions) ? payload.fieldOptions : [];
+      fieldOptsJson = JSON.stringify(fo).slice(0, 20_000);
+    } catch {
+      fieldOptsJson = "[]";
+    }
+  }
+
   // Image blocks come BEFORE the instruction text (recommended ordering).
+  const instruction = mode === "ocr"
+    ? "Read the values off the equipment label / sticker / stamp in the photo(s) " +
+      "and return them as JSON, mapping each to a field key where possible.\n\n" +
+      "Available fields:\n```json\n" + fieldOptsJson + "\n```\n\n" +
+      "Report context (text only):\n```json\n" + ctxJson + "\n```"
+    : "Analyze the inspection photo(s) above and return findings as JSON.\n\n" +
+      "Report context (text only):\n```json\n" + ctxJson + "\n```";
   const userContent = [
     ...imageBlocks,
-    {
-      type: "text",
-      text:
-        "Analyze the inspection photo(s) above and return findings as JSON.\n\n" +
-        "Report context (text only):\n```json\n" + ctxJson + "\n```",
-    },
+    { type: "text", text: instruction },
   ];
 
   // ── Ask Claude ────────────────────────────────────────────────────────────
@@ -223,10 +295,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         thinking: { type: "adaptive" },
-        system: SYSTEM_PROMPT,
+        system: mode === "ocr" ? OCR_SYSTEM : SYSTEM_PROMPT,
         output_config: {
           effort: "medium",
-          format: { type: "json_schema", schema: VISION_SCHEMA },
+          format: {
+            type: "json_schema",
+            schema: mode === "ocr" ? OCR_SCHEMA : VISION_SCHEMA,
+          },
         },
         messages: [{ role: "user", content: userContent }],
       }),
@@ -265,12 +340,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!textBlock?.text) {
     return jsonResponse({ error: "AI returned no findings" }, 502);
   }
-  let vision: unknown;
+  let parsed: unknown;
   try {
-    vision = JSON.parse(textBlock.text);
+    parsed = JSON.parse(textBlock.text);
   } catch {
     return jsonResponse({ error: "AI returned malformed findings" }, 502);
   }
 
-  return jsonResponse({ ok: true, vision });
+  // Return under a mode-specific key so the client renders the right UI.
+  return jsonResponse(
+    mode === "ocr" ? { ok: true, ocr: parsed } : { ok: true, vision: parsed },
+  );
 });

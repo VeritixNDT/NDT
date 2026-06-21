@@ -1,6 +1,7 @@
 # Vision Photo-Analysis — Feature Spec
 
-Status: **Phase 1 in progress** (indication-triage). Author: Veritix. Created 2026-06-21.
+Status: **Phase 1 + Phase 2 built** (indication-triage + equipment-label OCR);
+pending Edge redeploy + real-photo eyeball. Author: Veritix. Created 2026-06-21.
 
 ## 1. Goal & scope
 Let Claude's vision model look at inspection photos already attached to a report
@@ -81,8 +82,13 @@ Mirrors `js/ai-review.js`; reuses `_aiReviewSanitize`, `_aiReviewShowOverlay`,
 - Future: prompt caching on the system prompt; vision feed into do-not-issue gate.
 
 ## 9. Phasing
-- **Phase 1** — Edge fn + `js/ai-vision.js` + report-row `✦ Photos`, indication mode.
-- **Phase 2** — OCR mode + "Apply to field".
+- **Phase 1 — DONE** (d07dd11). Edge fn + `js/ai-vision.js` + report-row
+  `✦ Photos`, indication-triage mode.
+- **Phase 2 — DONE**. Edge fn `mode:"ocr"` (OCR_SCHEMA + `fieldOptions` mapping)
+  + editor save-bar `📷 Scan label`: photographs a label/sticker, reads values,
+  per-field **Apply** writes into the live `rf-<method>-<key>` input
+  (inspector-confirmed, never auto). Logic-verified headless; needs Edge
+  redeploy + real-photo eyeball.
 - **Phase 3** — photo-vs-verdict consistency, optional approval-gate wiring.
 
 ## 10. Open decisions

@@ -238,3 +238,160 @@ function _aiVisionShowResult(r, vision, n, closeLoading) {
   const close = _aiReviewShowOverlay(body);
   _aiReviewTopClose = close;   // reuse ai-review's top-close handle + aiReviewCloseTop()
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 2 — Equipment-label / cert OCR ("Scan label")
+// ═══════════════════════════════════════════════════════════════════════════
+// The inspector photographs a calibration sticker / equipment label / stamp;
+// Claude reads the values and maps each to one of the open report's fields. The
+// inspector confirms with "Apply", which writes the value into the live form
+// input. Operates on the OPEN editor (needs _ovMethod), unlike aiVisionReport.
+
+// The report's fillable equipment/parameter fields, as { key, label } — keys
+// match the live inputs (rf-<method>-eq_<id>). Sent so the model can map each
+// read value to a field the client can one-click apply.
+function _aiVisionOcrFieldOptions() {
+  if (typeof TPL_FIELDS === 'undefined' || typeof _ovMethod === 'undefined' || !_ovMethod) return [];
+  const fields = [...(TPL_FIELDS._common || []), ...(TPL_FIELDS[_ovMethod] || [])];
+  return fields.map(f => ({ key: 'eq_' + f.id, label: f.label || f.id }));
+}
+
+let _aiVisionOcrFields = [];     // last OCR result rows, for index-based Apply
+
+// Entry point: the "📷 Scan label" button in the editor save bar. Pops a file
+// picker (camera on mobile), encodes the photo, OCRs it, shows Apply buttons.
+function aiVisionScanLabel() {
+  if (typeof _ovMethod === 'undefined' || !_ovMethod) {
+    toast(t('ai.ocr.noform', 'Open or start a report first, then scan a label.'), 'warn');
+    return;
+  }
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if (!sb || !sb.functions) {
+    toast(t('ai.vision.offline', 'Photo analysis needs you to be signed in to the cloud.'), 'warn');
+    return;
+  }
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.setAttribute('capture', 'environment');   // prefer rear camera on mobile
+  inp.style.display = 'none';
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    try { inp.remove(); } catch (_) {}
+    if (!file) return;
+    await _aiVisionOcrRun(file);
+  };
+  document.body.appendChild(inp);
+  inp.click();
+}
+
+async function _aiVisionOcrRun(file) {
+  const sb = _vxSupabase();
+  const r = (typeof _aiReviewCollectLive === 'function') ? (_aiReviewCollectLive() || { method: _ovMethod }) : { method: _ovMethod };
+  const close = _aiReviewShowOverlay(_aiVisionOcrLoadingHtml());
+  try {
+    const b64 = await _aiVisionToJpegB64(file);
+    if (!b64) { close(); toast(t('ai.ocr.badimg', 'Could not read that image.'), 'error'); return; }
+
+    const resp = await sb.functions.invoke('ai-vision', {
+      body: {
+        mode: 'ocr',
+        reportCtx: _aiReviewSanitize(r, 0),
+        images: [{ id: 'p1', mediaType: 'image/jpeg', data: b64 }],
+        fieldOptions: _aiVisionOcrFieldOptions(),
+      },
+    });
+    if (resp.error || !resp.data || !resp.data.ocr) {
+      let msg = t('ai.ocr.failed', 'Label scan could not be completed.');
+      try {
+        if (resp.error && resp.error.context && typeof resp.error.context.json === 'function') {
+          const j = await resp.error.context.json();
+          if (j && j.error) msg = j.error;
+        }
+      } catch (_) {}
+      close();
+      toast(msg, 'error');
+      return;
+    }
+    _aiVisionOcrShow(resp.data.ocr, close);
+  } catch (e) {
+    close();
+    toast(t('ai.ocr.failed', 'Label scan could not be completed.'), 'error');
+  }
+}
+
+function _aiVisionOcrLoadingHtml() {
+  return '<div style="font-weight:700;font-size:15px;margin-bottom:12px">📷 ' + escapeHtml(t('ai.ocr.title', 'Scan equipment label')) + '</div>'
+    + '<div style="display:flex;align-items:center;gap:10px;color:var(--t2);font-size:13px;padding:8px 0">'
+    + '<span class="vx-ai-spin" style="width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent,#4a9);border-radius:50%;display:inline-block;animation:vxaispin .8s linear infinite"></span>'
+    + escapeHtml(t('ai.ocr.working', 'Reading the label and matching values to report fields…'))
+    + '</div><style>@keyframes vxaispin{to{transform:rotate(360deg)}}</style>';
+}
+
+// Does a field key resolve to a live input on the open editor?
+function _aiVisionOcrInput(key) {
+  if (!key || typeof _ovMethod === 'undefined' || !_ovMethod) return null;
+  return el('rf-' + _ovMethod + '-' + key)
+    || el('rf-' + _ovMethod + '-' + String(key).replace(/^eq_/, ''))
+    || null;
+}
+
+function _aiVisionOcrShow(ocr, closeLoading) {
+  closeLoading();
+  const fields = Array.isArray(ocr.fields) ? ocr.fields : [];
+  _aiVisionOcrFields = fields;
+
+  let body = '<div style="font-weight:700;font-size:15px;margin-bottom:2px">📷 ' + escapeHtml(t('ai.ocr.title', 'Scan equipment label')) + '</div>'
+    + (ocr.summary ? '<div style="font-size:12px;color:var(--t2);margin-bottom:14px">' + escapeHtml(ocr.summary) + '</div>' : '<div style="margin-bottom:10px"></div>');
+
+  if (!fields.length) {
+    body += '<div style="font-size:13px;color:var(--t2);padding:4px 0 8px">'
+      + escapeHtml(t('ai.ocr.none', 'No legible values read from the photo.')) + '</div>';
+  } else {
+    body += '<div style="display:flex;flex-direction:column;gap:8px">';
+    fields.forEach((f, i) => {
+      const canApply = !!(f.suggestedKey && _aiVisionOcrInput(f.suggestedKey));
+      const conf = f.confidence ? '<span style="font-size:10.5px;color:var(--t3)">' + escapeHtml(t('ai.vision.conf', 'confidence') + ': ' + f.confidence) + '</span>' : '';
+      body += '<div style="border:1px solid var(--border);border-radius:6px;padding:9px 11px;background:var(--bg2);display:flex;align-items:center;gap:10px">'
+        + '<div style="min-width:0;flex:1">'
+        + '<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px">' + escapeHtml(f.label || '') + '</div>'
+        + '<div style="font-size:14px;color:var(--t1);font-family:var(--mono);word-break:break-word">' + escapeHtml(f.value || '') + '</div>'
+        + conf
+        + '</div>'
+        + (canApply
+            ? '<button class="btn btn-sm btn-primary" data-action="aiVisionApplyOcr" data-args="' + i + '" style="flex:0 0 auto">' + escapeHtml(t('ai.ocr.apply', 'Apply')) + '</button>'
+            : '<span style="flex:0 0 auto;font-size:11px;color:var(--t3)">' + escapeHtml(t('ai.ocr.nofield', 'no field')) + '</span>')
+        + '</div>';
+    });
+    body += '</div>';
+  }
+
+  body += _AI_DISCLAIMER_HTML
+    + '<div style="display:flex;justify-content:flex-end;margin-top:14px">'
+    + '<button class="btn btn-sm btn-primary" data-action="aiReviewCloseTop">' + escapeHtml(t('vxc.done', 'Done')) + '</button>'
+    + '</div>';
+  const close = _aiReviewShowOverlay(body);
+  _aiReviewTopClose = close;
+}
+
+// Apply one OCR row's value to its mapped live input (selects get the value
+// added as an option if absent). Inspector-confirmed — never auto-applied.
+function aiVisionApplyOcr(i) {
+  const f = _aiVisionOcrFields[i];
+  if (!f || !f.suggestedKey) return;
+  const inp = _aiVisionOcrInput(f.suggestedKey);
+  if (!inp) { toast(t('ai.ocr.gone', 'That field is no longer on the report.'), 'warn'); return; }
+  const val = String(f.value == null ? '' : f.value);
+  try {
+    if (inp.tagName === 'SELECT') {
+      let opt = Array.from(inp.options).find(o => o.value === val);
+      if (!opt) { opt = document.createElement('option'); opt.value = val; opt.textContent = val; inp.appendChild(opt); }
+      inp.value = val;
+    } else {
+      inp.value = val;
+    }
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+  } catch (_) {}
+  toast(tf('ai.ocr.applied', 'Applied to "{label}".', { label: f.label || f.suggestedKey }), 'success');
+}

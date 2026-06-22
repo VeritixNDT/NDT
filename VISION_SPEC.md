@@ -1,7 +1,8 @@
 # Vision Photo-Analysis — Feature Spec
 
-Status: **Phase 1 + Phase 2 built** (indication-triage + equipment-label OCR);
-pending Edge redeploy + real-photo eyeball. Author: Veritix. Created 2026-06-21.
+Status: **Phase 1 + 2 + 3 built** (indication-triage + equipment-label OCR +
+photo-vs-verdict consistency); pending Edge redeploy + real-photo eyeball.
+Author: Veritix. Created 2026-06-21.
 
 ## 1. Goal & scope
 Let Claude's vision model look at inspection photos already attached to a report
@@ -89,7 +90,14 @@ Mirrors `js/ai-review.js`; reuses `_aiReviewSanitize`, `_aiReviewShowOverlay`,
   per-field **Apply** writes into the live `rf-<method>-<key>` input
   (inspector-confirmed, never auto). Logic-verified headless; needs Edge
   redeploy + real-photo eyeball.
-- **Phase 3** — photo-vs-verdict consistency, optional approval-gate wiring.
+- **Phase 3 — DONE (v1, on-demand)**. Edge fn `mode:"consistency"` (focused
+  photo-vs-verdict check → `consistent`/`contradicted`/`inconclusive` +
+  gate-ready `overallRisk`) + report-row `✦ Verdict` button. `overallRisk:"fail"`
+  only on a confident contradiction. **Auto do-not-issue gate wiring is OPT-IN
+  and NOT yet wired** — `_aiVisionConsistencyRun` returns the result so a
+  `_aiVisionSaveGate` mirroring `_aiReviewGate` can block on `fail` with a
+  Senior/Admin override; deferred pending product sign-off (adds a vision call +
+  latency to every save-with-photos).
 
 ## 10. Open decisions
 1. First use case after triage — OCR vs consistency.

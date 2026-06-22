@@ -156,6 +156,79 @@ const OCR_SCHEMA = {
   required: ["summary", "fields"],
 };
 
+// ── Consistency mode (Phase 3) ────────────────────────────────────────────
+// Focused photo-vs-verdict check: does the visible evidence support the
+// report's recorded verdict and defect entries, or contradict them? Returns a
+// clear consistency call + an overallRisk suitable for an optional do-not-issue
+// gate (fail only on a confident contradiction). Advisory.
+const CONSISTENCY_SYSTEM =
+  `You are a senior NDT QA reviewer for Veritix NDT Inspect performing a focused ` +
+  `PHOTO-vs-VERDICT consistency check. You are shown the report's inspection PHOTOS plus its ` +
+  `recorded result as JSON (verdict, defect entries, method). Each photo is introduced by ` +
+  `"Image <id>:".\n\n` +
+  `Judge ONE thing: does what is VISIBLE in the photos support the recorded verdict and defects, ` +
+  `or contradict them? Examples of a contradiction: an obvious crack/porosity visible on a report ` +
+  `marked "Acceptable"; a clean, sound weld on a report marked "Not acceptable" with no visible ` +
+  `defect; a defect type/location in the photo that disagrees with the recorded defect entries.\n\n` +
+  `Rules: Base the call strictly on what is visible. Photos that are unclear, off-subject, or simply ` +
+  `do not show the graded feature are INCONCLUSIVE, not a contradiction — do NOT manufacture a ` +
+  `contradiction from a poor photo. Set consistency to "contradicted" only when the image plainly ` +
+  `disagrees with the verdict. This is ADVISORY and not a certified interpretation.\n\n` +
+  `Set overallRisk: "fail" ONLY when consistency is "contradicted" with high confidence; ` +
+  `"warnings" for a possible/low-confidence contradiction or notable concern; "pass" when the ` +
+  `photos are consistent with the report or merely inconclusive (empty findings array is fine).`;
+
+const CONSISTENCY_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: {
+      type: "string",
+      description: "One sentence: do the photos support the recorded verdict?",
+    },
+    consistency: {
+      type: "string",
+      enum: ["consistent", "contradicted", "inconclusive"],
+    },
+    overallRisk: { type: "string", enum: ["pass", "warnings", "fail"] },
+    findings: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          imageId: { type: "string" },
+          severity: { type: "string", enum: ["high", "medium", "low"] },
+          description: {
+            type: "string",
+            description: "How the image agrees with or contradicts the verdict.",
+          },
+          location: { type: "string", description: "Where in the image (may be empty)." },
+        },
+        required: ["imageId", "severity", "description"],
+      },
+    },
+  },
+  required: ["summary", "consistency", "overallRisk", "findings"],
+};
+
+// Per-mode dispatch — system prompt, output schema, and response key.
+const MODE_SYSTEM: Record<string, string> = {
+  indications: SYSTEM_PROMPT,
+  ocr: OCR_SYSTEM,
+  consistency: CONSISTENCY_SYSTEM,
+};
+const MODE_SCHEMA: Record<string, unknown> = {
+  indications: VISION_SCHEMA,
+  ocr: OCR_SCHEMA,
+  consistency: CONSISTENCY_SCHEMA,
+};
+const MODE_RESP_KEY: Record<string, string> = {
+  indications: "vision",
+  ocr: "ocr",
+  consistency: "consistency",
+};
+
 function envOrThrow(name: string): string {
   const v = Deno.env.get(name);
   if (!v) throw new Error(`missing env ${name}`);
@@ -203,7 +276,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   } catch {
     return jsonResponse({ error: "invalid JSON body" }, 400);
   }
-  const mode = payload?.mode === "ocr" ? "ocr" : "indications";
+  const mode = (payload?.mode === "ocr" || payload?.mode === "consistency")
+    ? payload.mode
+    : "indications";
 
   const images = Array.isArray(payload?.images) ? payload.images as ImageIn[] : [];
   if (!images.length) {
@@ -274,6 +349,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       "and return them as JSON, mapping each to a field key where possible.\n\n" +
       "Available fields:\n```json\n" + fieldOptsJson + "\n```\n\n" +
       "Report context (text only):\n```json\n" + ctxJson + "\n```"
+    : mode === "consistency"
+    ? "Decide whether the photo(s) above support the report's recorded verdict and " +
+      "defects, and return the result as JSON.\n\n" +
+      "Recorded result (text only):\n```json\n" + ctxJson + "\n```"
     : "Analyze the inspection photo(s) above and return findings as JSON.\n\n" +
       "Report context (text only):\n```json\n" + ctxJson + "\n```";
   const userContent = [
@@ -295,13 +374,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         thinking: { type: "adaptive" },
-        system: mode === "ocr" ? OCR_SYSTEM : SYSTEM_PROMPT,
+        system: MODE_SYSTEM[mode],
         output_config: {
           effort: "medium",
-          format: {
-            type: "json_schema",
-            schema: mode === "ocr" ? OCR_SCHEMA : VISION_SCHEMA,
-          },
+          format: { type: "json_schema", schema: MODE_SCHEMA[mode] },
         },
         messages: [{ role: "user", content: userContent }],
       }),
@@ -348,7 +424,5 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // Return under a mode-specific key so the client renders the right UI.
-  return jsonResponse(
-    mode === "ocr" ? { ok: true, ocr: parsed } : { ok: true, vision: parsed },
-  );
+  return jsonResponse({ ok: true, [MODE_RESP_KEY[mode]]: parsed });
 });

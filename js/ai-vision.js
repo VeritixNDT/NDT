@@ -395,3 +395,131 @@ function aiVisionApplyOcr(i) {
   } catch (_) {}
   toast(tf('ai.ocr.applied', 'Applied to "{label}".', { label: f.label || f.suggestedKey }), 'success');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — Photo-vs-verdict consistency check ("✦ Verdict")
+// ═══════════════════════════════════════════════════════════════════════════
+// Focused check: do the report's photos support its recorded verdict/defects,
+// or contradict them? On-demand from the Reports-table row. Advisory only — it
+// does not block issuance (that wiring into the do-not-issue gate is an opt-in
+// follow-up that mirrors the ai-review gate; see _aiVisionConsistencyRun).
+
+const AI_VISION_CONSIST = {
+  consistent:   { label: 'Photos support the recorded verdict',    color: 'var(--green)', icon: '✓' },
+  contradicted: { label: 'Photos appear to contradict the verdict', color: 'var(--red)',   icon: '✕' },
+  inconclusive: { label: 'Photos neither confirm nor contradict',   color: 'var(--t3)',    icon: '?' },
+};
+
+// Entry point: the "✦ Verdict" button on each Reports-table row.
+async function aiVisionVerdictCheck(idx) {
+  const all = ls(KEYS.reports, []);
+  const r = all[idx];
+  if (!r) { toast(t('toast.report_not_found', 'Report not found.'), 'error'); return; }
+  await _aiVisionConsistencyRun(r);
+}
+
+// Shared runner. Returns the parsed consistency result (or null) so a future
+// save/approval gate can reuse this exact call — block on overallRisk === 'fail'
+// with a Senior/Admin override, mirroring _aiReviewGate.
+async function _aiVisionConsistencyRun(r) {
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if (!sb || !sb.functions) {
+    toast(t('ai.vision.offline', 'Photo analysis needs you to be signed in to the cloud.'), 'warn');
+    return null;
+  }
+  const photos = _aiVisionCollectPhotos(r);
+  if (!photos.length) {
+    toast(t('ai.vision.nophotos', 'This report has no photos to analyze.'), 'warn');
+    return null;
+  }
+
+  const close = _aiReviewShowOverlay(_aiVisionVerdictLoadingHtml(r, photos.length));
+  try {
+    const encoded = [];
+    await Promise.all(photos.map(async (p, i) => {
+      const bytes = await _aiVisionResolveBytes(p);
+      if (!bytes) return;
+      const b64 = await _aiVisionToJpegB64(bytes);
+      if (b64) encoded.push({ id: 'p' + (i + 1), mediaType: 'image/jpeg', data: b64 });
+    }));
+    if (!encoded.length) {
+      close();
+      toast(t('ai.vision.unresolved', 'Could not load this report\'s photos for analysis.'), 'error');
+      return null;
+    }
+
+    const resp = await sb.functions.invoke('ai-vision', {
+      body: { mode: 'consistency', reportCtx: _aiReviewSanitize(r, 0), images: encoded },
+    });
+    if (resp.error || !resp.data || !resp.data.consistency) {
+      let msg = t('ai.verdict.failed', 'Verdict check could not be completed.');
+      try {
+        if (resp.error && resp.error.context && typeof resp.error.context.json === 'function') {
+          const j = await resp.error.context.json();
+          if (j && j.error) msg = j.error;
+        }
+      } catch (_) {}
+      close();
+      toast(msg, 'error');
+      return null;
+    }
+    _aiVisionConsistencyShow(r, resp.data.consistency, encoded.length, close);
+    return resp.data.consistency;
+  } catch (e) {
+    close();
+    toast(t('ai.verdict.failed', 'Verdict check could not be completed.'), 'error');
+    return null;
+  }
+}
+
+function _aiVisionVerdictLoadingHtml(r, n) {
+  return _aiVisionHeader(r, n)
+    + '<div style="display:flex;align-items:center;gap:10px;color:var(--t2);font-size:13px;padding:8px 0">'
+    + '<span class="vx-ai-spin" style="width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent,#4a9);border-radius:50%;display:inline-block;animation:vxaispin .8s linear infinite"></span>'
+    + escapeHtml(t('ai.verdict.working', 'Checking the photos against the recorded verdict…'))
+    + '</div><style>@keyframes vxaispin{to{transform:rotate(360deg)}}</style>';
+}
+
+function _aiVisionConsistencyHtml(c) {
+  const con = AI_VISION_CONSIST[c.consistency] || AI_VISION_CONSIST.inconclusive;
+  const findings = Array.isArray(c.findings) ? c.findings : [];
+
+  let html = '<div style="display:flex;align-items:center;gap:10px;border:1px solid ' + con.color
+    + '55;background:' + con.color + '14;border-radius:8px;padding:10px 12px;margin-bottom:12px">'
+    + '<span style="width:22px;height:22px;flex:0 0 auto;border-radius:50%;background:' + con.color
+    + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">' + con.icon + '</span>'
+    + '<div><div style="font-weight:600;font-size:13px;color:' + con.color + '">' + escapeHtml(con.label) + '</div>'
+    + (c.summary ? '<div style="font-size:12.5px;color:var(--t2);line-height:1.45;margin-top:2px">' + escapeHtml(c.summary) + '</div>' : '')
+    + '</div></div>';
+
+  if (findings.length) {
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+    for (const f of findings) {
+      const sev = AI_REVIEW_SEV[f.severity] || AI_REVIEW_SEV.low;
+      const tail = f.location ? '<div style="font-size:11px;color:var(--t3);margin-top:3px">' + escapeHtml(f.location) + '</div>' : '';
+      html += '<div style="border:1px solid var(--border);border-left:3px solid ' + sev.color
+        + ';border-radius:6px;padding:9px 11px;background:var(--bg2)">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
+        + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:' + sev.color + '">' + escapeHtml(sev.label) + '</span>'
+        + (f.imageId ? '<span style="font-size:11px;color:var(--t3);font-family:var(--mono)">' + escapeHtml(f.imageId) + '</span>' : '')
+        + '</div>'
+        + '<div style="font-size:13px;color:var(--t1);line-height:1.45">' + escapeHtml(f.description || '') + '</div>'
+        + tail
+        + '</div>';
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function _aiVisionConsistencyShow(r, c, n, closeLoading) {
+  closeLoading();
+  const body = _aiVisionHeader(r, n)
+    + _aiVisionConsistencyHtml(c)
+    + _AI_DISCLAIMER_HTML
+    + '<div style="display:flex;justify-content:flex-end;margin-top:14px">'
+    + '<button class="btn btn-sm btn-primary" data-action="aiReviewCloseTop">' + escapeHtml(t('vxc.close', 'Close')) + '</button>'
+    + '</div>';
+  const close = _aiReviewShowOverlay(body);
+  _aiReviewTopClose = close;
+}

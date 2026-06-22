@@ -1,6 +1,6 @@
 ﻿# Veritix NDT Inspect - Competitive Audit
 
-_June 2026 - benchmark vs. leading NDT inspection/reporting software - status refreshed 2026-06-19_
+_June 2026 - benchmark vs. leading NDT inspection/reporting software - status refreshed 2026-06-19; parked vision item added 2026-06-22_
 
 ## 1. The landscape - who we actually compete with
 
@@ -73,6 +73,21 @@ and AI trend/query all shipped today; only the live ERP API push is deferred.
 What remains is **launch-readiness chores** (mostly external). No gaps are
 architectural.
 
+## 6. Parked - future differentiators
+
+Built ahead of the market but deliberately **held**, to revisit post-launch.
+Not live; do not list as a current strength.
+
+| Item | Status | Competitive position |
+|---|---|---|
+| **AI vision photo-analysis** - Claude reads a report's attached photos: (1) indication triage (visible cracks/porosity/undercut/corrosion + photo-quality flags), (2) equipment/cert **OCR -> fields** (serials, cal dates, stamps), (3) **photo-vs-verdict consistency** as an optional do-not-issue gate | **[HELD] BUILT (Phases 1-3), parked 2026-06-22.** UI backed out of `master`; full code on branch `feat/ai-vision`; `ai-vision` Edge fn not deployed. Spec: `VISION_SPEC.md`. Reuses the `ai-review` security model + the existing `ANTHROPIC_API_KEY`. | **Whitespace among our real competitors (§1A).** No management/reporting platform is documented with photo/vision AI; AgileNDT's "AI layer" is text/workflow only. **Distinct from the adjacent instrument/film world (§1B - CIVA, OmniScan, ML radiographic interpretation),** which analyses the raw NDT signal/film, not documentation photos - do **not** conflate or pitch as "AI defect detection". Accurate framing: *AI photo sanity-checks built into the report workflow.* |
+
+**Why parked:** ahead-of-market but not launch-critical, and an auto do-not-issue
+gate carries a per-save vision cost (~$0.04-0.13/run) + false-positive friction
+that needs product sign-off. Revive = re-add the `js/ai-vision.js` script include
++ row/save-bar buttons, then deploy the Edge fn. The on-demand check (no gate)
+ships with zero forced cost when revived.
+
 ### Sources
 - DRIVE NDT - https://www.drive-ndt.com/en/
 - AgileNDT - https://agilendt.com/
@@ -81,4 +96,4 @@ architectural.
 - SPA InnoVision / InspectO - https://spainnovision.com/inspecto/
 - NDTspec (TWI) - https://www.twisoftware.com/software/welding-software/ndtspec/
 
-_Created 2026-06-12 - Reconciled against code 2026-06-19 - Owner: Carl Cope (Smart Veritas BV)_
+_Created 2026-06-12 - Reconciled against code 2026-06-19 - Parked vision item added 2026-06-22 - Owner: Carl Cope (Smart Veritas BV)_

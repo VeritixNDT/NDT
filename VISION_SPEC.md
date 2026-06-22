@@ -1,7 +1,13 @@
 # Vision Photo-Analysis — Feature Spec
 
-Status: **Phase 1 + Phase 2 built** (indication-triage + equipment-label OCR);
-pending Edge redeploy + real-photo eyeball. Author: Veritix. Created 2026-06-21.
+Status: **HELD — future update** (product decision 2026-06-22). The product
+stops at "attach photo to report"; the AI-vision UI is backed out of `master`.
+All built work (Phases 1–3: indication-triage, equipment-label OCR, photo-vs-
+verdict consistency) is preserved on the **`feat/ai-vision`** branch and ready
+to revive — re-add the `js/ai-vision.js` script include + the row/save-bar
+buttons, then deploy the `ai-vision` Edge Function. `js/ai-vision.js` and
+`supabase/functions/ai-vision/` remain in `master` as dormant (unreferenced)
+scaffolding. Author: Veritix. Created 2026-06-21.
 
 ## 1. Goal & scope
 Let Claude's vision model look at inspection photos already attached to a report

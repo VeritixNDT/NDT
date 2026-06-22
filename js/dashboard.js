@@ -1679,7 +1679,6 @@ function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   html += `<div style="display:flex;align-items:center;gap:10px;margin:20px 14px 12px;padding-top:16px;border-top:1px solid var(--border)">
     <button class="btn" data-action="ovCancelReport">Cancel</button>
     <button class="btn" data-action="aiReviewCurrent" title="AI pre-issue review — flags missing data, out-of-band readings, verdict mismatches">✦ AI review</button>
-    <button class="btn" data-action="aiVisionScanLabel" title="Scan an equipment label / calibration sticker — reads the values and offers to fill the matching fields">📷 Scan label</button>
     <span style="flex:1"></span>
     <button class="btn" data-action="ovSaveReport" data-args="'review'">For review</button>
     <button class="btn btn-primary" data-action="ovSaveReport">Save</button>

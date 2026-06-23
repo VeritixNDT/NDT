@@ -2861,6 +2861,35 @@ function dbRefreshCard() {
 
 function dbRefresh() { dbRefreshCard(); toast(t('toast.refreshed', 'Refreshed.')); }
 
+// Testing override — bulk-delete REPORTS only (keeps customers / jobs / settings).
+// Lives in Settings → Database (admin-gated page) instead of the dashboard, and
+// requires typing DELETE, so it can't be fat-fingered during a real-world pilot.
+// Intentionally NOT gated by VX_SHOW_TEST_TOOLS so it stays usable while testing.
+async function dbDeleteAllReports() {
+  if (typeof vxIsAdmin === 'function' && !vxIsAdmin()) {
+    toast(t('db.danger.adminonly', 'Admin only.'), 'warn');
+    return;
+  }
+  const reports = ls(KEYS.reports, []);
+  if (!reports.length) { toast(t('toast.no_reports', 'No reports to delete.')); return; }
+  const typed = await vxPrompt({
+    title: t('db.danger.reports_title', 'Delete all reports'),
+    message: tf('db.danger.reports_prompt', 'This permanently deletes all {n} saved report(s). Type DELETE to confirm.', { n: reports.length }),
+    okLabel: t('vxc.delete', 'Delete all'),
+    placeholder: 'DELETE',
+  });
+  if (typed == null) return;   // cancelled
+  if (String(typed).trim().toUpperCase() !== 'DELETE') {
+    toast(t('db.danger.mismatch', 'Confirmation text didn\'t match — nothing deleted.'), 'warn');
+    return;
+  }
+  lss(KEYS.reports, []);
+  if (typeof updateReportCount === 'function') updateReportCount();
+  if (typeof ovRenderRecentList === 'function') ovRenderRecentList();
+  if (typeof dbRefreshCard === 'function') dbRefreshCard();
+  toast(tf('db.danger.reports_done', 'Deleted {n} report(s).', { n: reports.length }), 'success');
+}
+
 // ══════════════════════════════════════════════
 // NOTIFICATIONS
 // ══════════════════════════════════════════════

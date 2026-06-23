@@ -53,7 +53,7 @@ shipped features as open. Grep the code before trusting any "[OPEN]" here.
 1. [DONE] Backend live since 2026-06-12; portal notifications confirmed live 2026-06-16; cross-device customer-portal access verified on a real device 2026-06-19. [OPEN] cross-device QR report-verify still worth a real-world pass.
 2. [DONE] jsonb sync scaling - per-report rows shipped; only embedded photo dataURLs -> Supabase Storage remains, deferred to pilot volume.
 3. [DONE] Public API + SSO/MFA shipped - enterprise/no-re-entry gate closed.
-4. [OPEN] Test scaffolding still shipping (VX_SHOW_TEST_TOOLS=true -> dashboard "Delete all reports" bar) - flip off before customer launch.
+4. [DONE 2026-06-23] Test scaffolding disabled - VX_SHOW_TEST_TOOLS flipped to false ahead of the real-world company-reporting pilot, so the dashboard "Delete all reports" bulk-clear is gone and live reports can't be wiped.
 5. [DONE] Service-worker cache fragility - fixed (per-build SW cache + footer build stamp + no-cache headers).
 6. [OPEN-DEFERRED] Real-printer PDF check - deferred with the Gotenberg vector-PDF container (GOTENBERG_URL); pdf-render falls back to raster/print until then.
 
@@ -64,7 +64,7 @@ report-review **+ trend digests / NL query**, full Portal v2 (roles + i18n),
 accounting CSV export (5 formats), sync-scaling hardening, **dispatch queue**,
 **formal technique sheets**. Remaining:
 
-1. **Launch-readiness** (gating, mostly external): Stripe go-live; flip VX_SHOW_TEST_TOOLS off / remove the "Delete all reports" tool; Gotenberg container for vector PDFs + real-printer check; cross-device QR-verify pass; photo dataURLs -> Storage before pilot volume.
+1. **Launch-readiness** (gating, mostly external): Stripe go-live; ~~flip VX_SHOW_TEST_TOOLS off~~ [DONE 2026-06-23]; Gotenberg container for vector PDFs + real-printer check (code already supports GOTENBERG_URL); cross-device QR-verify pass; photo dataURLs -> Storage before pilot volume (upload path already implemented).
 2. **Deferred:** live ERP **API** push (vs CSV) - scoped, awaiting a provider choice + the org's API credentials.
 
 **Bottom line:** As of 2026-06-19 the integration/enterprise gate is closed and

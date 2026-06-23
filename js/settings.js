@@ -2817,6 +2817,7 @@ var DB_LABELS = {
 
 function dbRefreshCard() {
   try {
+    dbApplyCollectionsCollapsed();   // restore the minimise state on section load
     const keys=dbAllKeys(), total=dbTotal(), pct=Math.min(100,total/(5*1048576)*100);
     const bar=el('db-size-bar'), lbl=el('db-size-lbl');
     if(bar){ bar.style.width=pct.toFixed(1)+'%'; bar.style.background=pct>80?'var(--red)':pct>60?'var(--amber)':'var(--cyan)'; }
@@ -2860,6 +2861,30 @@ function dbRefreshCard() {
 }
 
 function dbRefresh() { dbRefreshCard(); toast(t('toast.refreshed', 'Refreshed.')); }
+
+// Collapsible Collections table (Settings → Database). Default collapsed so the
+// Backup & restore / Danger zone card sits just under the storage overview; the
+// inspector expands the (potentially long) per-key table on demand. The choice
+// is remembered — a UI pref, not an entity key, so raw localStorage is fine.
+var DB_COLLECTIONS_PREF = 'vx-db-collections-collapsed';
+function dbSetCollectionsCollapsed(collapsed) {
+  const body = document.getElementById('db-collections-body');
+  const btn  = document.getElementById('db-collections-toggle');
+  if (body) body.style.display = collapsed ? 'none' : '';
+  if (btn)  { btn.textContent = collapsed ? '▸' : '▾'; btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true'); }
+}
+function dbApplyCollectionsCollapsed() {
+  let collapsed = true;   // default collapsed
+  try { if (localStorage.getItem(DB_COLLECTIONS_PREF) === '0') collapsed = false; } catch (e) {}
+  dbSetCollectionsCollapsed(collapsed);
+}
+function dbToggleCollections() {
+  const body = document.getElementById('db-collections-body');
+  if (!body) return;
+  const willCollapse = body.style.display !== 'none';   // currently visible → collapse
+  dbSetCollectionsCollapsed(willCollapse);
+  try { localStorage.setItem(DB_COLLECTIONS_PREF, willCollapse ? '1' : '0'); } catch (e) {}
+}
 
 // Testing override — bulk-delete REPORTS only (keeps customers / jobs / settings).
 // Lives in Settings → Database (admin-gated page) instead of the dashboard, and

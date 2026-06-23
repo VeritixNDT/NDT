@@ -3455,10 +3455,15 @@
             </div>
           </div>
 
-          <!-- Collections table -->
+          <!-- Collections table — collapsible (minimise) so the long per-key
+               table doesn't bury the Backup & restore / Danger zone card below.
+               Default collapsed; state remembered (dbToggleCollections). -->
           <div class="sc">
-            <div class="sc-head"><span class="sc-title" data-i18n="sc.collections">Collections</span></div>
-            <div class="sc-body np">
+            <div class="sc-head">
+              <span class="sc-title" data-i18n="sc.collections">Collections</span>
+              <button class="btn btn-sm" data-action="dbToggleCollections" id="db-collections-toggle" aria-expanded="false" aria-controls="db-collections-body" title="Show / hide collections" style="font-size:11px;padding:2px 9px;line-height:1.2">▸</button>
+            </div>
+            <div class="sc-body np" id="db-collections-body" style="display:none">
               <div class="tbl-wrap">
                 <table class="tbl">
                   <thead><tr>

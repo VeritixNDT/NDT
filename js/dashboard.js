@@ -2200,6 +2200,8 @@ function _ovDefectsSectionHtml(){
       const dbd  = item.defectDbDrop       || '';
       const sev  = item.defectSeverity     || '';
       const disp = item.defectDisposition  || '';
+      const orient = item.defectOrientation || '';
+      const narr   = item.defectNarrative   || '';
       const ph   = item.defectPhoto        || '';
       // dB drop is a UT-specific defect measurement (echo-amplitude
       // reduction at the defect edge using a -6 dB / -12 dB / -20 dB
@@ -2299,7 +2301,26 @@ function _ovDefectsSectionHtml(){
           <select data-on-change="ovDefectsCapture" data-args="${idx},'defectDisposition'" data-pass-el="1"
             style="${ctrlStyle}">${_dispOptHtml}</select>
         </div>
-        <div id="ov-acc-chip-${idx}" style="grid-column:1 / 5;grid-row:3;min-width:0">${_ovAcceptanceChipHtml(item)}</div>
+        <div style="grid-column:1 / -1;grid-row:3;display:flex;flex-direction:column;gap:8px;min-width:0">
+          <div id="ov-acc-chip-${idx}">${_ovAcceptanceChipHtml(item)}</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+            <div style="min-width:0">
+              <div style="${lblStyle}">Orientation</div>
+              <input type="text" value="${escapeHtml(orient)}" placeholder="Longitudinal, transverse, 45°…"
+                data-on-input="ovDefectsCapture" data-args="${idx},'defectOrientation'" data-pass-el="1"
+                style="${ctrlStyle};width:220px"/>
+            </div>
+            <button type="button" class="btn btn-sm" data-action="ovDefectsDraftNarrative" data-args="${idx}"
+              title="Draft a narrative description of this indication with AI — editable"
+              style="height:32px;font-size:11.5px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap">✦ Draft narrative</button>
+          </div>
+          <div style="min-width:0">
+            <div style="${lblStyle}">Narrative</div>
+            <textarea placeholder="Describe the indication, or click ✦ Draft narrative for an editable AI draft…"
+              data-on-input="ovDefectsCapture" data-args="${idx},'defectNarrative'" data-pass-el="1"
+              style="width:100%;min-height:62px;resize:vertical;box-sizing:border-box;font-size:12px;padding:7px 9px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font);line-height:1.45">${escapeHtml(narr)}</textarea>
+          </div>
+        </div>
       </div>`;
     }).join('');
   }
@@ -2332,6 +2353,67 @@ function ovDefectsCapture(rowIdx, fieldId, target){
      || fieldId === 'defectDepth' || fieldId === 'defectSize'){
     const chip = document.getElementById('ov-acc-chip-' + rowIdx);
     if(chip) chip.innerHTML = _ovAcceptanceChipHtml(_ovItems[rowIdx]);
+  }
+}
+
+// ── AI narrative draft (Phase-1 Part 1) ────────────────────────────────────
+// Sends the structured finding (method, type, location, dimension, orientation,
+// material, code) to the JWT-gated ai-narrative Edge Function and drops the
+// returned paragraph into this row's editable Narrative field. Drafting aid
+// only — the inspector edits and owns the final text. Mirrors ai-review.js's
+// invoke + error-surfacing pattern.
+async function ovDefectsDraftNarrative(rowIdx){
+  if(!Array.isArray(_ovItems) || !_ovItems[rowIdx]) return;
+  const item = _ovItems[rowIdx];
+  const sb = (typeof _vxSupabase === 'function') ? _vxSupabase() : null;
+  if(!sb || !sb.functions){
+    toast(t('ai.narrative.offline', 'Drafting needs you to be signed in to the cloud.'), 'warn');
+    return;
+  }
+  const ctx = _ovAcceptanceContext();
+  const finding = {
+    method:         _ovMethod || '',
+    component:      item.subject || '',
+    indicationType: item.defectType || '',
+    location:       item.defectLocation || '',
+    orientation:    item.defectOrientation || '',
+    dimension:      _ovAcceptanceGoverningDim(item) || '',
+    depth:          item.defectDepth || '',
+    length:         item.defectLength || '',
+    material:       item.material || '',
+    code:           ctx.code || '',
+  };
+  if(_ovMethod === 'UT' && item.defectDbDrop) finding.dbDrop = item.defectDbDrop;
+  // Need at least something to write about.
+  if(!finding.indicationType && !finding.dimension && !finding.location){
+    toast(t('ai.narrative.needdata', 'Enter an indication type, location, or dimension first.'), 'warn');
+    return;
+  }
+
+  const btn = document.querySelector(`[data-action="ovDefectsDraftNarrative"][data-args="${rowIdx}"]`);
+  const ta  = document.querySelector(`textarea[data-args="${rowIdx},'defectNarrative'"]`);
+  const origLabel = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '… drafting'; }
+  try {
+    const resp = await sb.functions.invoke('ai-narrative', { body: { finding } });
+    if(resp.error || !resp.data || !resp.data.narrative){
+      let msg = t('ai.narrative.failed', 'Could not draft the narrative.');
+      try {
+        if(resp.error && resp.error.context && typeof resp.error.context.json === 'function'){
+          const j = await resp.error.context.json();
+          if(j && j.error) msg = j.error;
+        }
+      } catch(_){}
+      toast(msg, 'error');
+      return;
+    }
+    _ovItems[rowIdx].defectNarrative = resp.data.narrative;
+    if(ta) ta.value = resp.data.narrative;
+    toast(t('ai.narrative.done', 'Draft inserted — review and edit as needed.'), 'success');
+  } catch(e){
+    toast(t('ai.narrative.failed', 'Could not draft the narrative.'), 'error');
+  } finally {
+    if(btn){ btn.disabled = false; btn.innerHTML = origLabel; }
   }
 }
 
@@ -3025,7 +3107,7 @@ async function ovSaveReport(mode) {
       //   here so the printed defect-table card keeps reading from
       //   one field (item.defectSize) without changes.
       if(clean.verdict === 'Not acceptable'){
-        ['defectLocation','defectType','defectDepth','defectLength','defectDbDrop','defectSeverity','defectDisposition'].forEach(fid => {
+        ['defectLocation','defectType','defectOrientation','defectDepth','defectLength','defectDbDrop','defectSeverity','defectDisposition','defectNarrative'].forEach(fid => {
           const v = (row[fid] || '').toString().trim();
           if(v) clean[fid] = v;
         });

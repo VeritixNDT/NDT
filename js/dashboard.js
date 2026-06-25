@@ -2095,6 +2095,77 @@ function ovPmiRemoveItem(idx){ if(_ovMethod !== 'PMI' || !Array.isArray(_ovItems
 // defect-table that will print on the report. Values land on the item
 // itself (item.defectType / item.defectSize) so save persistence and
 // the defect-table render share one source of truth.
+
+// ── Acceptance-criteria inline check (Phase-1 Part 2) ──────────────────────
+// Reads the report-level code (acceptance criteria / specification) and wall
+// thickness from the live form, then classifies a rejected item's indication
+// against js/acceptance.js → PASS / BORDERLINE / REJECT. Advisory only: it
+// surfaces the applicable threshold next to the dimension inputs and never
+// blocks, seals, or auto-sets a disposition — the inspector stays the author.
+function _ovAcceptanceContext(){
+  // Acceptance code lives in the method-specific "Acceptance criteria" field
+  // (eq_acc), with the specification (eq_spec) as a fallback.
+  const codeEl = el(`rf-${_ovMethod}-eq_acc`) || el(`rf-${_ovMethod}-eq_spec`);
+  const code = (codeEl && codeEl.value) || '';
+  return { code, method: _ovMethod, level: _ovAcceptanceLevel(code) };
+}
+
+// The acceptance-criteria dropdown encodes the EN ISO acceptance LEVEL in its
+// text (e.g. "ISO 23278:2015 Level 2", "...Level 2X"). Pull it so EN ISO rules
+// resolve against the level the inspector actually selected. Defaults to 2
+// (the common level) and is ignored by ASME rules, which carry no level.
+function _ovAcceptanceLevel(codeStr){
+  const m = String(codeStr || '').match(/level\s*(\d+)/i);
+  return m ? parseInt(m[1], 10) : 2;
+}
+
+// Wall thickness for the UT length-band rules. There is no report-level
+// thickness field; the examination-details row stores it inside the
+// "Dimensions / thickness" field as "Ø<OD> × <wall>mm", so the wall is the
+// figure after the × separator (fall back to the sole number present).
+function _ovParseWallThk(dimStr){
+  const s = String(dimStr == null ? '' : dimStr);
+  const m = s.match(/[×xX]\s*(\d+(?:[.,]\d+)?)/);
+  if(m) return parseFloat(m[1].replace(',', '.'));
+  return (typeof vxAcceptanceParseDimension === 'function') ? vxAcceptanceParseDimension(s) : null;
+}
+
+// Governing dimension for the rule comparison: surface length is what the
+// acceptance standards limit, so prefer defectLength, then a legacy defectSize
+// string, then depth as a last resort.
+function _ovAcceptanceGoverningDim(item){
+  const cand = [item.defectLength, item.defectSize, item.defectDepth];
+  for(const c of cand){ if(c != null && String(c).trim() !== '') return c; }
+  return '';
+}
+
+function _ovAcceptanceChipHtml(item){
+  if(typeof vxAcceptanceClassify !== 'function') return '';
+  const ctx = _ovAcceptanceContext();
+  const res = vxAcceptanceClassify(_ovAcceptanceGoverningDim(item), {
+    code: ctx.code, method: ctx.method, materialGroup: '*', level: ctx.level,
+    thicknessMm: _ovParseWallThk(item.dimensions), indicationType: item.defectType || '',
+  });
+  // Quiet hint when we genuinely can't resolve a rule — don't shout UNKNOWN.
+  if(res.verdict === 'UNKNOWN'){
+    return `<div style="font-size:10.5px;color:var(--t3);font-style:italic">Acceptance: ${escapeHtml(res.reason || 'enter code, defect type & dimension')}</div>`;
+  }
+  const palette = {
+    PASS:       { bg:'rgba(62,207,142,.10)', bd:'rgba(62,207,142,.45)', fg:'#2faa6f' },
+    BORDERLINE: { bg:'rgba(245,166,35,.12)', bd:'rgba(245,166,35,.50)', fg:'#c97a06' },
+    REJECT:     { bg:'rgba(242,92,92,.12)',  bd:'rgba(242,92,92,.50)',  fg:'#d23c3c' },
+  };
+  const p = palette[res.verdict] || palette.REJECT;
+  const src  = res.source ? ` <span style="color:var(--t3)">· ${escapeHtml(res.source)}</span>` : '';
+  const warn = (res.verified === false)
+    ? ` <span title="Seed threshold not yet verified against the controlled standard" style="color:#c97a06;cursor:help">⚠ verify</span>` : '';
+  const tip = escapeHtml((res.reason || '') + (typeof VX_ACCEPTANCE_DISCLAIMER === 'string' ? ' — ' + VX_ACCEPTANCE_DISCLAIMER : ''));
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:10.5px;background:${p.bg};border:1px solid ${p.bd};border-radius:4px;padding:4px 8px" title="${tip}">
+      <strong style="color:${p.fg};letter-spacing:.04em">${res.verdict}</strong>
+      <span style="color:var(--t2)">${escapeHtml(res.reason || '')}</span>${src}${warn}
+    </div>`;
+}
+
 function _ovDefectsSectionHtml(){
   const rejected = [];
   if(Array.isArray(_ovItems)){
@@ -2164,7 +2235,7 @@ function _ovDefectsSectionHtml(){
       const monoStyle = 'font-size:12.5px;color:var(--t1);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
       const _sevOptHtml  = '<option value="">— —</option>' + _sevOpts.map(o  => `<option${o===sev?' selected':''}>${o}</option>`).join('');
       const _dispOptHtml = '<option value="">— —</option>' + _dispOpts.map(o => `<option${o===disp?' selected':''}>${o}</option>`).join('');
-      return `<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) 160px;grid-template-rows:auto auto;gap:8px 12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)">
+      return `<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) 160px;grid-template-rows:auto auto auto;gap:8px 12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)">
         <div style="min-width:0">
           <div style="${lblStyle}">Weld / object</div>
           <div style="${valStyle}" title="${escapeHtml(subj)}">${escapeHtml(subj)}</div>
@@ -2228,6 +2299,7 @@ function _ovDefectsSectionHtml(){
           <select data-on-change="ovDefectsCapture" data-args="${idx},'defectDisposition'" data-pass-el="1"
             style="${ctrlStyle}">${_dispOptHtml}</select>
         </div>
+        <div id="ov-acc-chip-${idx}" style="grid-column:1 / 5;grid-row:3;min-width:0">${_ovAcceptanceChipHtml(item)}</div>
       </div>`;
     }).join('');
   }
@@ -2253,6 +2325,14 @@ function ovRenderDefectsSection(){
 function ovDefectsCapture(rowIdx, fieldId, target){
   if(!Array.isArray(_ovItems) || !_ovItems[rowIdx]) return;
   _ovItems[rowIdx][fieldId] = target.value;
+  // Refresh the acceptance chip in place when an input that feeds the
+  // classification changes. Updating only the chip element keeps the user's
+  // cursor in the field they're typing in (a full re-render would steal focus).
+  if(fieldId === 'defectType' || fieldId === 'defectLength'
+     || fieldId === 'defectDepth' || fieldId === 'defectSize'){
+    const chip = document.getElementById('ov-acc-chip-' + rowIdx);
+    if(chip) chip.innerHTML = _ovAcceptanceChipHtml(_ovItems[rowIdx]);
+  }
 }
 
 // Defect-row photo handlers. Lives on item.defectPhoto so storage stays

@@ -2145,6 +2145,20 @@ function _ovAcceptanceGoverningDim(item){
   return '';
 }
 
+// Localise the verdict reason from the structured classify result (acceptance.js
+// keeps an English `reason` for non-UI callers; the UI text is built here so it
+// follows the active locale). Distinguishes the two UNKNOWN cases by whether a
+// rule resolved (no source = no rule; source present = no measurable dimension).
+function _ovAcceptanceReason(res){
+  const n = (v) => (typeof v === 'number') ? v.toFixed(2) : v;
+  if(res.alwaysReject) return t('acc.reason.planar', res.note || res.reason || '');
+  if(res.verdict === 'UNKNOWN') return res.source ? t('acc.reason.nodim') : t('acc.reason.norule');
+  const params = { dim: n(res.dimensionMm), limit: n(res.threshold) };
+  if(res.verdict === 'REJECT')     return tf('acc.reason.reject', '', params);
+  if(res.verdict === 'BORDERLINE') return tf('acc.reason.borderline', '', params);
+  return tf('acc.reason.pass', '', params);
+}
+
 function _ovAcceptanceChipHtml(item){
   if(typeof vxAcceptanceClassify !== 'function') return '';
   const ctx = _ovAcceptanceContext();
@@ -2152,9 +2166,11 @@ function _ovAcceptanceChipHtml(item){
     code: ctx.code, method: ctx.method, materialGroup: '*', level: ctx.level,
     thicknessMm: _ovParseWallThk(item.dimensions), indicationType: item.defectType || '',
   });
+  const reason = _ovAcceptanceReason(res);
   // Quiet hint when we genuinely can't resolve a rule — don't shout UNKNOWN.
   if(res.verdict === 'UNKNOWN'){
-    return `<div style="font-size:10.5px;color:var(--t3);font-style:italic">Acceptance: ${escapeHtml(res.reason || 'enter code, defect type & dimension')}</div>`;
+    const hint = res.source ? reason : t('acc.hint', 'enter code, defect type & dimension');
+    return `<div style="font-size:10.5px;color:var(--t3);font-style:italic">${escapeHtml(t('acc.prefix', 'Acceptance:'))} ${escapeHtml(hint)}</div>`;
   }
   const palette = {
     PASS:       { bg:'rgba(62,207,142,.10)', bd:'rgba(62,207,142,.45)', fg:'#2faa6f' },
@@ -2162,13 +2178,15 @@ function _ovAcceptanceChipHtml(item){
     REJECT:     { bg:'rgba(242,92,92,.12)',  bd:'rgba(242,92,92,.50)',  fg:'#d23c3c' },
   };
   const p = palette[res.verdict] || palette.REJECT;
+  const verdictLabel = t('acc.verdict.' + res.verdict, res.verdict);
   const src  = res.source ? ` <span style="color:var(--t3)">· ${escapeHtml(res.source)}</span>` : '';
   const warn = (res.verified === false)
-    ? ` <span title="Seed threshold not yet verified against the controlled standard" style="color:#c97a06;cursor:help">⚠ verify</span>` : '';
-  const tip = escapeHtml((res.reason || '') + (typeof VX_ACCEPTANCE_DISCLAIMER === 'string' ? ' — ' + VX_ACCEPTANCE_DISCLAIMER : ''));
+    ? ` <span title="${escapeHtml(t('acc.verify_title', ''))}" style="color:#c97a06;cursor:help">${escapeHtml(t('acc.verify', '⚠ verify'))}</span>` : '';
+  const disc = t('acc.disclaimer', (typeof VX_ACCEPTANCE_DISCLAIMER === 'string' ? VX_ACCEPTANCE_DISCLAIMER : ''));
+  const tip = escapeHtml(reason + (disc ? ' — ' + disc : ''));
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:10.5px;background:${p.bg};border:1px solid ${p.bd};border-radius:4px;padding:4px 8px" title="${tip}">
-      <strong style="color:${p.fg};letter-spacing:.04em">${res.verdict}</strong>
-      <span style="color:var(--t2)">${escapeHtml(res.reason || '')}</span>${src}${warn}
+      <strong style="color:${p.fg};letter-spacing:.04em">${escapeHtml(verdictLabel)}</strong>
+      <span style="color:var(--t2)">${escapeHtml(reason)}</span>${src}${warn}
     </div>`;
 }
 
@@ -2311,18 +2329,18 @@ function _ovDefectsSectionHtml(){
           <div id="ov-acc-chip-${idx}">${_ovAcceptanceChipHtml(item)}</div>
           <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
             <div style="min-width:0">
-              <div style="${lblStyle}">Orientation</div>
-              <input type="text" value="${escapeHtml(orient)}" placeholder="Longitudinal, transverse, 45°…"
+              <div style="${lblStyle}">${escapeHtml(t('field.orientation', 'Orientation'))}</div>
+              <input type="text" value="${escapeHtml(orient)}" placeholder="${escapeHtml(t('field.orientation_ph', 'Longitudinal, transverse, 45°…'))}"
                 data-on-input="ovDefectsCapture" data-args="${idx},'defectOrientation'" data-pass-el="1"
                 style="${ctrlStyle};width:220px"/>
             </div>
             <button type="button" class="btn btn-sm" data-action="ovDefectsDraftNarrative" data-args="${idx}"
-              title="Draft a narrative description of this indication with AI — editable"
-              style="height:32px;font-size:11.5px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap">✦ Draft narrative</button>
+              title="${escapeHtml(t('ai.narrative.button_title', 'Draft a narrative description of this indication with AI — editable'))}"
+              style="height:32px;font-size:11.5px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap">${escapeHtml(t('ai.narrative.button', '✦ Draft narrative'))}</button>
           </div>
           <div style="min-width:0">
-            <div style="${lblStyle}">Narrative</div>
-            <textarea placeholder="Describe the indication, or click ✦ Draft narrative for an editable AI draft…"
+            <div style="${lblStyle}">${escapeHtml(t('field.narrative', 'Narrative'))}</div>
+            <textarea placeholder="${escapeHtml(t('field.narrative_ph', 'Describe the indication, or click ✦ Draft narrative for an editable AI draft…'))}"
               data-on-input="ovDefectsCapture" data-args="${idx},'defectNarrative'" data-pass-el="1"
               style="width:100%;min-height:62px;resize:vertical;box-sizing:border-box;font-size:12px;padding:7px 9px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--t1);font-family:var(--font);line-height:1.45">${escapeHtml(narr)}</textarea>
           </div>
@@ -2407,7 +2425,7 @@ async function ovDefectsDraftNarrative(rowIdx){
   const btn = document.querySelector(`[data-action="ovDefectsDraftNarrative"][data-args="${rowIdx}"]`);
   const ta  = document.querySelector(`textarea[data-args="${rowIdx},'defectNarrative'"]`);
   const origLabel = btn ? btn.innerHTML : '';
-  if(btn){ btn.disabled = true; btn.innerHTML = '… drafting'; }
+  if(btn){ btn.disabled = true; btn.innerHTML = escapeHtml(t('ai.narrative.drafting', '… drafting')); }
   try {
     const resp = await sb.functions.invoke('ai-narrative', { body: { finding } });
     if(resp.error || !resp.data || !resp.data.narrative){

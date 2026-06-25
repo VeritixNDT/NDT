@@ -363,7 +363,7 @@ function _cvBuildCrossRefMap(report){
 var CV_DEFECT_COLS = [
   { label:'Col 1 (Weld / Location)', width:140, topId:'subject',  topLabel:'Weld / object', botId:'defectLocation',    botLabel:'Location' },
   { label:'Col 2 (Drawing / Type)',  width:120, topId:'drawing',  topLabel:'Drawing no.',   botId:'defectType',        botLabel:'Defect type' },
-  { label:'Col 3 (Material / Size)', width:110, topId:'material', topLabel:'Material',      botId:'defectSize',        botLabel:'Size' },
+  { label:'Col 3 (Material / Dimension)', width:110, topId:'material', topLabel:'Material',      botId:'defectSize',        botLabel:'Dimension' },
   // Col 4 mirrors the standalone Defects log's Severity / Disposition
   // pair so the same information that's captured on the log surfaces
   // on the printed defect table. The new-report Defects section
@@ -3743,8 +3743,12 @@ function cvRenderBlockContent(block, report, preview){
               return `<td rowspan="2" style="height:${halfRowH*2}px;padding:0;${borderRight}border-bottom:0.5px solid #ddd;vertical-align:middle">${inner}</td>`;
             }
             const v = _val(it, c.topId);
+            // First data column carries the indication number (the brief's
+            // "No.") as a bold ordinal prefix — surfaced without adding a
+            // column, so existing template colWidths stay valid.
+            const noPrefix = (ci === 0) ? `<span style="font-weight:700;color:#333">${ri + 1}.</span> ` : '';
             return `<td style="height:${halfRowH}px;padding:3px 5px;${borderRight}font-size:${cellFs};line-height:1.25;vertical-align:top;word-break:break-word;overflow:hidden">
-              <span style="${_lblStyle}">${_h(c.topLabel || '')}</span>${_h(v)}
+              <span style="${_lblStyle}">${_h(c.topLabel || '')}</span>${noPrefix}${_h(v)}
             </td>`;
           }).join('');
           // Bottom row — each data column's botId value (location /
@@ -3755,8 +3759,15 @@ function cvRenderBlockContent(block, report, preview){
             const borderRight  = (ci === lastCol) ? '' : 'border-right:0.5px solid #ddd;';
             const borderBottom = 'border-bottom:0.5px solid #ddd;';
             const v = _val(it, c.botId);
+            // Orientation rides in the Dimension cell as a labelled sub-line —
+            // NDT indications are characterised by size + orientation together
+            // — surfaced without adding a column.
+            let orientLine = '';
+            if(c.botId === 'defectSize' && it && it.defectOrientation && String(it.defectOrientation).trim()){
+              orientLine = `<span style="${_lblStyle};margin-top:2px">Orientation</span>${_h(String(it.defectOrientation).trim())}`;
+            }
             return `<td style="height:${halfRowH}px;padding:3px 5px;${borderRight}${borderBottom}font-size:${cellFs};line-height:1.25;vertical-align:top;word-break:break-word;overflow:hidden">
-              <span style="${_lblStyle}">${_h(c.botLabel || '')}</span>${_h(v)}
+              <span style="${_lblStyle}">${_h(c.botLabel || '')}</span>${_h(v)}${orientLine}
             </td>`;
           }).join('');
           return `<tr>${topCells}</tr><tr>${botCells}</tr>`;

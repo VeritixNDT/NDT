@@ -94,13 +94,24 @@ var VX_ACCEPTANCE_RULES = [
     source:'EN ISO 23277:2015, Table 1 (level 2)', note:'non-linear d ≤ 6 mm', verified:false },
   { code:'EN-ISO', method:'PT', materialGroup:'*', indicationType:'rounded', level:3, maxAcceptableMm:8.0,
     source:'EN ISO 23277:2015, Table 1 (level 3)', note:'non-linear d ≤ 8 mm', verified:false },
-  // VT — EN ISO 17637 references the weld imperfection limits of EN ISO 5817.
-  // Common acceptance: imperfection sizing per 5817 quality level B/C/D ≈ ISO
-  // level 1/2/3. Seeded as indicative linear/rounded caps; verify per 5817.
+  // VT — EN ISO 17637 references the weld-imperfection limits of EN ISO 5817
+  // (steel) / 10042 (aluminium). Quality levels B/C/D map to acceptance levels
+  // 1/2/3 (B most stringent → smallest acceptable). 5817 limits are
+  // imperfection-specific; these linear/rounded caps are INDICATIVE only —
+  // verify per the standard. (The B/C/D → 1/2/3 mapping lives in the editor's
+  // _ovAcceptanceLevel, which reads the level off the acceptance dropdown.)
+  { code:'EN-ISO', method:'VT', materialGroup:'*', indicationType:'linear',  level:1, maxAcceptableMm:1.5,
+    source:'EN ISO 17637 / EN ISO 5817 (quality B)', note:'indicative — verify per EN ISO 5817/10042', verified:false },
   { code:'EN-ISO', method:'VT', materialGroup:'*', indicationType:'linear',  level:2, maxAcceptableMm:3.0,
-    source:'EN ISO 17637 / EN ISO 5817 (quality C)', note:'indicative — verify per EN ISO 5817 imperfection limits', verified:false },
+    source:'EN ISO 17637 / EN ISO 5817 (quality C)', note:'indicative — verify per EN ISO 5817/10042', verified:false },
+  { code:'EN-ISO', method:'VT', materialGroup:'*', indicationType:'linear',  level:3, maxAcceptableMm:5.0,
+    source:'EN ISO 17637 / EN ISO 5817 (quality D)', note:'indicative — verify per EN ISO 5817/10042', verified:false },
+  { code:'EN-ISO', method:'VT', materialGroup:'*', indicationType:'rounded', level:1, maxAcceptableMm:2.0,
+    source:'EN ISO 17637 / EN ISO 5817 (quality B)', note:'indicative — verify per EN ISO 5817/10042', verified:false },
   { code:'EN-ISO', method:'VT', materialGroup:'*', indicationType:'rounded', level:2, maxAcceptableMm:3.0,
-    source:'EN ISO 17637 / EN ISO 5817 (quality C)', note:'indicative — verify per EN ISO 5817 imperfection limits', verified:false },
+    source:'EN ISO 17637 / EN ISO 5817 (quality C)', note:'indicative — verify per EN ISO 5817/10042', verified:false },
+  { code:'EN-ISO', method:'VT', materialGroup:'*', indicationType:'rounded', level:3, maxAcceptableMm:4.0,
+    source:'EN ISO 17637 / EN ISO 5817 (quality D)', note:'indicative — verify per EN ISO 5817/10042', verified:false },
 
   // ── UT — volumetric, thickness-dependent length limits ────────────────────
   // ASME amplitude-based UT (Section V Art.4 detection; Section VIII Div.1
@@ -294,6 +305,9 @@ function vxAcceptanceSelfTest(){
     { args:[3.5, {code:'EN ISO 23278', method:'MT', indicationType:'rounded'}],   want:'REJECT' },
     // Crack: always reject.
     { args:[0.1, {code:'ASME', method:'MT', indicationType:'crack'}],             want:'REJECT' },
+    // VT EN ISO 5817 quality levels: B (level 1) limit 1.5; D (level 3) limit 5.
+    { args:[2.0, {code:'EN ISO 5817', method:'VT', indicationType:'linear', level:1}], want:'REJECT' },
+    { args:[2.0, {code:'EN ISO 5817', method:'VT', indicationType:'linear', level:3}], want:'PASS' },
     // UT thickness-dependent (ASME): t=10 → 6 mm limit; t=30 → 10 mm limit.
     { args:[5.0,  {code:'ASME', method:'UT', indicationType:'linear', thicknessMm:10}], want:'PASS' },
     { args:[8.0,  {code:'ASME', method:'UT', indicationType:'linear', thicknessMm:10}], want:'REJECT' },

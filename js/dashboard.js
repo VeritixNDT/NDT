@@ -2115,8 +2115,14 @@ function _ovAcceptanceContext(){
 // resolve against the level the inspector actually selected. Defaults to 2
 // (the common level) and is ignored by ASME rules, which carry no level.
 function _ovAcceptanceLevel(codeStr){
-  const m = String(codeStr || '').match(/level\s*(\d+)/i);
-  return m ? parseInt(m[1], 10) : 2;
+  const s = String(codeStr || '');
+  const num = s.match(/level\s*(\d+)/i);
+  if(num) return parseInt(num[1], 10);
+  // VT uses EN ISO 5817 / 10042 weld-quality levels B/C/D rather than numbers;
+  // they map to acceptance levels 1/2/3 (B is the most stringent).
+  const letter = s.match(/level\s*([BCD])\b/i);
+  if(letter){ const L = letter[1].toUpperCase(); return L === 'B' ? 1 : (L === 'C' ? 2 : 3); }
+  return 2;
 }
 
 // Wall thickness for the UT length-band rules. There is no report-level

@@ -48,9 +48,16 @@ const SYSTEM_PROMPT =
   `sentences) describing the indication as it would read in the report body.\n\n` +
   `Rules:\n` +
   `• Use only the facts provided. Do NOT invent measurements, locations, equipment, ` +
-  `causes, or any detail not given. If a field is missing, simply omit it — never ` +
-  `guess or write a placeholder.\n` +
-  `• Preserve units and values exactly as supplied (e.g. "3.2 mm", "Ø60.3 × 5.0 mm").\n` +
+  `causes, or any detail not given. If a field is missing or empty, simply omit it — ` +
+  `never guess or write a placeholder. (E.g. if no orientation is given, do not write ` +
+  `"a crack orientation" or any orientation at all.)\n` +
+  `• Preserve units and values EXACTLY as supplied, including the unit (e.g. "3.2 mm", ` +
+  `"Ø60.3 × 5.0 mm"). Never replace a unit with the word "units" and never write a bare ` +
+  `number without its unit.\n` +
+  `• State each measurement exactly ONCE. Do not repeat the same dimension, and do not ` +
+  `restate length or depth in two different ways.\n` +
+  `• Orientation, when given, is a direction (e.g. longitudinal, transverse, 45°) — ` +
+  `describe it as the indication's orientation; it is never a defect type.\n` +
   `• Match the method's terminology: MT (magnetic particle), PT (liquid penetrant), ` +
   `VT (visual), UT (ultrasonic). Reference the applicable code/standard if one is given.\n` +
   `• Describe the indication factually. Do NOT state an acceptance verdict, disposition, ` +

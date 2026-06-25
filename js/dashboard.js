@@ -2371,21 +2371,29 @@ async function ovDefectsDraftNarrative(rowIdx){
     return;
   }
   const ctx = _ovAcceptanceContext();
-  const finding = {
-    method:         _ovMethod || '',
-    component:      item.subject || '',
-    indicationType: item.defectType || '',
-    location:       item.defectLocation || '',
-    orientation:    item.defectOrientation || '',
-    dimension:      _ovAcceptanceGoverningDim(item) || '',
-    depth:          item.defectDepth || '',
-    length:         item.defectLength || '',
-    material:       item.material || '',
-    code:           ctx.code || '',
-  };
-  if(_ovMethod === 'UT' && item.defectDbDrop) finding.dbDrop = item.defectDbDrop;
+  // Build a clean finding: each measurement stated ONCE, with units (the form
+  // stores bare numbers in mm), and empty fields omitted entirely — otherwise
+  // the model echoes the same dimension twice, writes "units", or invents a
+  // value for a blank field (e.g. "a crack orientation" from an empty field).
+  const dimBits = [];
+  const _len = String(item.defectLength || '').trim();
+  const _dep = String(item.defectDepth  || '').trim();
+  const _db  = String(item.defectDbDrop || '').trim();
+  if(_len) dimBits.push(_len + ' mm long');
+  if(_dep) dimBits.push(_dep + ' mm deep');
+  if(_ovMethod === 'UT' && _db) dimBits.push(_db + ' dB echo-amplitude drop');
+  const finding = {};
+  const put = (k, v) => { const s = String(v == null ? '' : v).trim(); if(s) finding[k] = s; };
+  put('method', _ovMethod);
+  put('component', item.subject);
+  put('indicationType', item.defectType);
+  put('location', item.defectLocation);
+  put('orientation', item.defectOrientation);
+  if(dimBits.length) finding.dimensions = dimBits.join(', ');
+  put('material', item.material);
+  put('code', ctx.code);
   // Need at least something to write about.
-  if(!finding.indicationType && !finding.dimension && !finding.location){
+  if(!finding.indicationType && !finding.dimensions && !finding.location){
     toast(t('ai.narrative.needdata', 'Enter an indication type, location, or dimension first.'), 'warn');
     return;
   }

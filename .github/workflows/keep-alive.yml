@@ -17,14 +17,20 @@ jobs:
       - name: Ping Supabase REST API
         env:
           ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Project ref — override with a repo variable SUPABASE_REF if it ever changes.
+          REF: ${{ vars.SUPABASE_REF || 'mmgdqsilgwusehsqgyyj' }}
         run: |
+          # Retry transient DNS/network blips (|| true keeps errexit from aborting
+          # before we can inspect the code).
           code=$(curl -sS -o /dev/null -w '%{http_code}' \
-            "https://mmgdqsilgwusehsqgyyj.supabase.co/rest/v1/orgs?select=id&limit=1" \
-            -H "apikey: $ANON_KEY" \
-            -H "Authorization: Bearer $ANON_KEY")
-          echo "Supabase responded HTTP $code"
-          # 200 (rows or empty) or 401/403 all still count as activity; only a
-          # network failure is a real problem.
+            --retry 4 --retry-all-errors --retry-delay 10 --max-time 30 \
+            "https://$REF.supabase.co/rest/v1/orgs?select=id&limit=1" \
+            -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" || true)
+          echo "Supabase ($REF) responded HTTP ${code:-none}"
+          # Any HTTP response (200/401/403/etc.) counts as activity. Only a total
+          # failure to connect is a real problem — and after retries it means the
+          # project is paused or deleted.
           if [ -z "$code" ] || [ "$code" = "000" ]; then
-            echo "No response from Supabase"; exit 1
+            echo "::warning title=Supabase unreachable::Project '$REF' did not respond after retries — it is likely PAUSED or DELETED. Restore it in the Supabase dashboard (and if the ref changed, set repo variable SUPABASE_REF)."
+            exit 1
           fi

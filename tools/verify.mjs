@@ -98,12 +98,32 @@ export async function openApp(opts = {}) {
 
   if (locale) await page.evaluate((loc) => { try { vxSetLocale(loc); } catch (e) {} }, locale);
 
-  // Seed an admin, reveal the app shell, and open the requested target. A page
-  // is ALWAYS activated — previously, omitting `section` left no page active
-  // and the run screenshotted an empty shell while reporting the dashboard.
-  await page.evaluate((t) => {
-    try { CURRENT_USER = { id: 'verify', name: 'Verify Admin', role: 'Admin' }; } catch (e) { window.CURRENT_USER = { id: 'verify', name: 'Verify Admin', role: 'Admin' }; }
+  // Reveal the app shell. The admin seed lives in gotoTarget — see there.
+  await page.evaluate(() => {
     const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
+  });
+
+  await gotoTarget(page, section);
+
+  const close = async () => { await browser.close(); await new Promise((r) => server.close(r)); };
+  return { browser, ctx, page, url, errors, target, close };
+}
+
+// Open a target in an already-running page, then wait for it to render. Shared
+// by openApp and the all-targets sweep, which reuses ONE browser rather than
+// launching ~30 of them.
+export async function gotoTarget(page, section) {
+  const target = resolveTarget(section);
+  // A page is ALWAYS activated — previously, omitting `section` left no page
+  // active and the run screenshotted an empty shell while reporting a dashboard.
+  await page.evaluate((t) => {
+    // Re-seed the admin user on EVERY navigation, in the same synchronous
+    // block as the showPage call. The app's async auth init clears
+    // CURRENT_USER once it finds no session, and showPage('settings') has an
+    // admin guard that silently `return`s — no throw, no console error, the
+    // page just never switches. Seeding once at boot raced that init and made
+    // settings targets fail intermittently.
+    try { CURRENT_USER = { id: 'verify', name: 'Verify Admin', role: 'Admin' }; } catch (e) { window.CURRENT_USER = { id: 'verify', name: 'Verify Admin', role: 'Admin' }; }
     if (t.kind === 'settings') {
       showPage('settings', document.getElementById('tn-settings'));
       showSS(t.id, document.getElementById('sni-' + t.id));
@@ -121,9 +141,7 @@ export async function openApp(opts = {}) {
     return r.width > 0 && r.height > 0;
   }, null, { timeout: 15000 }).catch(() => {});
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-
-  const close = async () => { await browser.close(); await new Promise((r) => server.close(r)); };
-  return { browser, ctx, page, url, errors, target, close };
+  return target;
 }
 
 // Assert the app actually rendered. Returns { ok, failures, details } rather

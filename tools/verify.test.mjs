@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
-import { openApp, checkRendered, PAGES, SETTINGS_SECTIONS } from './verify.mjs';
+import { openApp, gotoTarget, checkRendered, PAGES, SETTINGS_SECTIONS } from './verify.mjs';
 
 let reason = false;
 try { if (!fs.existsSync(chromium.executablePath())) reason = 'Chromium not installed'; }
@@ -73,4 +73,17 @@ test('exposes the page and settings-section names it accepts', opts, async () =>
   assert.ok(PAGES.includes('reports') && PAGES.includes('overview'));
   assert.ok(SETTINGS_SECTIONS.includes('appearance'));
   assert.equal(PAGES.includes('appearance'), false, 'settings subsections are not top-level pages');
+});
+
+test('gotoTarget switches targets inside one already-open page', opts, async () => {
+  // The all-targets sweep reuses a single browser; without this it would launch
+  // ~30 of them and take a minute and a half.
+  const app = await openApp({ section: 'reports' });
+  try {
+    assert.equal(await activePage(app.page), 'page-reports');
+    await gotoTarget(app.page, 'defects');
+    assert.equal(await activePage(app.page), 'page-defects');
+    await gotoTarget(app.page, 'appearance');
+    assert.equal(await activePage(app.page), 'page-settings');
+  } finally { await app.close(); }
 });

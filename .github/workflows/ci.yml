@@ -60,3 +60,56 @@ jobs:
             echo "::error title=Stale globals manifest::tools/globals.generated.json is out of date. Run 'npm run lint' and commit the result."
             exit 1
           fi
+
+  # Static analysis proves the code resolves; this proves it actually draws.
+  # Runs in parallel so the fast lint feedback is not held up by the browser
+  # install. Every page and settings subsection is opened and asserted to have
+  # rendered — the app-level regression net that did not exist before.
+  browser-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dev tooling
+        # Still skipped here: the postinstall would fetch Firefox and WebKit
+        # too. Only Chromium is installed, explicitly, below.
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm ci
+
+      - name: Cache Chromium
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Chromium system deps
+        # The cache holds the browser binaries but not the apt packages they
+        # link against, so these are needed even on a cache hit.
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Harness tests
+        # These skip in the static-analysis job (no browser); here they run.
+        run: node --test "tools/verify.test.mjs"
+
+      - name: Render every page and settings section
+        run: npm run verify:all -- --shots .verify-out/pages
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-screenshots
+          path: .verify-out/pages
+          retention-days: 7

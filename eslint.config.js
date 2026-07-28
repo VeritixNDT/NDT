@@ -71,14 +71,14 @@ export default [
   // globals (window, document) and app globals (vxApi, ls, CURRENT_USER, …) —
   // 65 no-undef errors that were never surfaced because lint only covered js/.
   //
-  // Scoped to these two files, not all of tools/: serve.mjs and symbols.mjs are
+  // Scoped to these files, not all of tools/: serve.mjs and symbols.mjs are
   // pure Node and stay strict, so a stray `document` in them is still an error.
   // The cost here is that a genuine misuse of a browser global in these files'
   // Node halves won't be caught — ESLint can't tell a page.evaluate callback
   // from its surrounding module, and having the app's real surface checked
   // inside those callbacks is worth more than that.
   {
-    files: ['tools/verify.mjs', 'tools/verify-numbering.mjs'],
+    files: ['tools/verify.mjs', 'tools/verify-numbering.mjs', 'tools/verify.test.mjs'],
     languageOptions: {
       globals: { ...globals.browser, ...appGlobals },
     },

@@ -104,6 +104,11 @@ jobs:
         run: node --test "tools/verify.test.mjs"
 
       - name: Render every page and settings section
+        # always(): a harness-test failure must not hide the page-level signal.
+        # Without this, one failing test short-circuits the sweep, the shots
+        # directory stays empty, and the upload below "succeeds" having
+        # uploaded nothing — a check that always passes.
+        if: always()
         run: npm run verify:all -- --shots .verify-out/pages
 
       - name: Upload screenshots on failure
@@ -112,4 +117,6 @@ jobs:
         with:
           name: verify-screenshots
           path: .verify-out/pages
+          # Uploading zero files is a silent lie — fail loudly instead.
+          if-no-files-found: error
           retention-days: 7

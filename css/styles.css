@@ -86,7 +86,7 @@
   --font-display: 'Funnel Display', 'Geist', sans-serif;
   --mono:         'Geist Mono', ui-monospace, monospace;
   /* Numeric forms used wherever digits appear in a structured context
-     (stat tiles, metric values, table cells, kanban IDs). Aliased so a
+     (stat tiles, metric values, table cells, report IDs). Aliased so a
      future swap of feature-tags happens in one place. */
   --num-features: tabular-nums slashed-zero;
 
@@ -335,30 +335,8 @@
 /* Custom CSS slot — content injected at runtime via #appearance-custom-css-tag */
 
 /* ══════════════════════════════════════════════════════════════════
-   V6 WORKFLOW UI — view toggle, kanban, saved filters, bulk bar
+   V6 WORKFLOW UI — saved filters, bulk bar
 ══════════════════════════════════════════════════════════════════ */
-
-/* View toggle (Table / Kanban) */
-.rpt-vtog {
-  background:transparent;
-  border:none;
-  color:var(--t3);
-  padding:6px 12px;
-  border-radius:5px;
-  font-size:12px;
-  font-weight:500;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  transition:all var(--motion-fast);
-}
-.rpt-vtog:hover { color:var(--t1); }
-.rpt-vtog.active {
-  background:var(--panel);
-  color:var(--t1);
-  box-shadow:var(--sh-sm), var(--sh-inset-top);
-}
 
 /* Saved view chips */
 .rpt-view-chip {
@@ -406,146 +384,9 @@
   letter-spacing:.06em;
 }
 
-/* Kanban */
+/* Bulk-action bar */
 #rpt-bulk-bar { display:none; }
 #rpt-bulk-bar.show { display:flex; }
-
-.kb-board {
-  display:grid;
-  grid-template-columns:repeat(5, minmax(220px, 1fr));
-  gap:12px;
-  align-items:flex-start;
-  height:100%;
-  min-height:480px;
-}
-.kb-col {
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:var(--r2);
-  display:flex;
-  flex-direction:column;
-  max-height:calc(100vh - 280px);
-  min-height:300px;
-}
-.kb-col.drag-over {
-  border-color:var(--cyan);
-  background:rgba(0,212,255,.04);
-}
-.kb-col-head {
-  padding:11px 14px;
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  flex-shrink:0;
-}
-.kb-col-head-title {
-  font-size:13px;
-  font-weight:600;
-  color:var(--t1);
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-}
-.kb-col-head-dot {
-  width:8px; height:8px;
-  border-radius:50%;
-}
-.kb-col-head-count {
-  font-family:var(--mono);
-  font-size:10px;
-  color:var(--t3);
-  background:rgba(255,255,255,.04);
-  border-radius:9px;
-  padding:2px 7px;
-}
-.kb-col-body {
-  padding:8px;
-  overflow-y:auto;
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-.kb-card {
-  background:var(--panel2);
-  background-image:var(--grad-panel);
-  border:1px solid var(--border);
-  border-radius:var(--r2);
-  padding:10px 12px;
-  cursor:grab;
-  transition:all var(--motion-fast);
-  box-shadow:var(--sh-inset-top);
-  position:relative;
-  overflow:hidden;
-}
-.kb-card:hover {
-  border-color:var(--border2);
-  transform:translateY(-1px);
-  box-shadow:var(--sh-md), var(--sh-inset-top);
-}
-.kb-card:active { cursor:grabbing; }
-.kb-card.dragging { opacity:.4; }
-.kb-card.health-stale  { box-shadow:inset 3px 0 0 var(--amber), var(--sh-inset-top); }
-.kb-card.health-critical { box-shadow:inset 3px 0 0 var(--red), var(--sh-inset-top); }
-.kb-card-row1 {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:5px;
-  gap:6px;
-}
-.kb-card-id {
-  font-family:var(--mono);
-  font-size:10px;
-  /* Was cyan — pulled back to neutral so cyan reads as accent/action,
-     not as "every mono identifier in the app". */
-  color:var(--t2);
-  font-weight:600;
-  font-variant-numeric: var(--num-features);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.kb-card-method {
-  font-family:var(--mono);
-  font-size:9px;
-  font-weight:700;
-  letter-spacing:.05em;
-  padding:1px 6px;
-  border-radius:3px;
-  flex-shrink:0;
-}
-.kb-card-subject {
-  font-size:13px;
-  color:var(--t1);
-  margin-bottom:6px;
-  line-height:1.3;
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
-}
-.kb-card-meta {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  font-size:10px;
-  color:var(--t3);
-  font-family:var(--mono);
-}
-.kb-card-meta-time {
-  display:inline-flex;
-  align-items:center;
-  gap:3px;
-}
-.kb-empty {
-  font-size:11px;
-  color:var(--t3);
-  text-align:center;
-  padding:24px 10px;
-  font-style:italic;
-}
 
 /* Multi-select checkboxes in table */
 .rpt-cb {
@@ -6493,13 +6334,6 @@ h1, h2, h3 { letter-spacing: -.015em; }
 [draggable="true"]:active {
   cursor: grabbing;
 }
-.kb-card.dragging {
-  transform: rotate(1.5deg) scale(1.02);
-  box-shadow: 0 24px 48px rgba(0,0,0,.55);
-  opacity: .92;
-  z-index: 100;
-}
-
 /* ── Empty-state polish — restrained, considered placeholder pattern ── */
 .empty-state {
   text-align: center;

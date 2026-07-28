@@ -65,9 +65,15 @@ This is the same shape as the `billRender` bug: a feature that looks wired,
 never runs, and fails silently. Unlike that one it is user-visible — the manual
 documents a feature that cannot work.
 
-**Not fixed here.** Wiring it up versus removing it is a product call, and the
-renderer has never executed against real data, so switching it on during a live
-pilot needs a deliberate decision rather than a drive-by patch.
+**Resolved: removed.** ~370 lines of renderer, drag handlers, view state, CSS,
+i18n keys and documentation for a feature that could not run.
+
+One correction to the analysis above: there is no Kanban toggle button either.
+`rpt-vtog-table` / `rpt-vtog-kanban` were only ever *queried*, always through
+`?.`, so every call silently no-opped — the buttons exist in no file. The
+feature was therefore even less reachable than "renders the table anyway":
+`_rptView` could never become `'kanban'` in the first place. `help.js` told
+users to "click the Kanban toggle" on a button that was never rendered.
 
 ## Finding 2 — the duplicated survey modules have drifted
 

@@ -86,7 +86,7 @@ welcome: {
   <tbody>
     <tr><td><strong>Home</strong></td><td>Dashboard with KPIs, calendar heatmap, top defect types, leaderboard, geo map, expiring certifications. Also where you create new reports.</td></tr>
     <tr><td><strong>Inbox</strong></td><td>What needs your attention right now — approvals waiting on you, your drafts in progress, stale reports, expiring certs.</td></tr>
-    <tr><td><strong>Reports</strong></td><td>The full archive of saved reports. Switch between table view and kanban board. Filter, save views, multi-select for bulk actions.</td></tr>
+    <tr><td><strong>Reports</strong></td><td>The full archive of saved reports. Filter, save views, multi-select for bulk actions.</td></tr>
     <tr><td><strong>Defects</strong></td><td>The defect register — every flaw logged across every report, with photos, severity, disposition, and method context.</td></tr>
     <tr><td><strong>Settings</strong> (admins)</td><td>Company, methods, numbering, templates, PDF editor, procedures, users, inspectors, theme, account & plan, database, integrations.</td></tr>
   </tbody>
@@ -285,9 +285,8 @@ workflow: {
 </table>
 
 <h2>Moving reports between stages</h2>
-<p>There are four ways to change a stage:</p>
+<p>There are three ways to change a stage:</p>
 <ul>
-  <li><strong>Kanban drag & drop.</strong> Open Reports, click the Kanban toggle, grab any card and drop it on a different column. The change is logged to the audit trail with author and timestamp.</li>
   <li><strong>Inbox actions.</strong> The Approve / Reject / Submit buttons in your inbox each move a report by one stage and append an audit entry.</li>
   <li><strong>Bulk stage change.</strong> Select multiple reports in the table view; the bulk action bar offers four stage shortcuts.</li>
   <li><strong>Direct API.</strong> Webhooks fire automatically on stage change — see <a data-action="helpShowChapter" data-args="'integrations'">Integrations</a>.</li>
@@ -300,8 +299,8 @@ workflow: {
 <p>Reports that sit too long on intermediate stages get visual warnings:</p>
 <ul>
   <li><strong>Fresh</strong> (under 3 days on stage): no marker.</li>
-  <li><strong>Stale</strong> (3-7 days on Submitted or Reviewed): amber rail on the kanban card and amber annotation in the table.</li>
-  <li><strong>Critical</strong> (7+ days on Submitted or Reviewed): red rail on the kanban card, red annotation in the table, and the report appears in the <em>Stale reports</em> section of every user's inbox.</li>
+  <li><strong>Stale</strong> (3-7 days on Submitted or Reviewed): amber annotation in the table.</li>
+  <li><strong>Critical</strong> (7+ days on Submitted or Reviewed): red annotation in the table, and the report appears in the <em>Stale reports</em> section of every user's inbox.</li>
 </ul>
 <p>Drafts and Approved/Archived reports don't trigger health warnings — drafts can sit indefinitely (they're personal work-in-progress) and approved reports are done.</p>
 
@@ -459,7 +458,7 @@ filters: {
 <p>All filters are combined with AND. The status line under the page title shows the count of matched reports and how many filters are active. Click <strong>Clear</strong> to reset all filters at once.</p>
 
 <h2>Saved views</h2>
-<p>Once you have a filter combination you'll use repeatedly, click <strong>+ Save view</strong> next to the Clear button. Give it a name. The view stores both the filter state <em>and</em> the current view mode (table or kanban).</p>
+<p>Once you have a filter combination you'll use repeatedly, click <strong>+ Save view</strong> next to the Clear button. Give it a name. The view stores the filter state.</p>
 <p>Saved views appear as cyan chips in a row below the filters. Click any chip to apply that view; click the small × on the chip to delete it. The active view is highlighted; a Clear button to its right resets back to no-view-active.</p>
 <div class="help-callout tip">
   <svg class="help-callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
@@ -471,18 +470,10 @@ filters: {
   </ul></div>
 </div>
 
-<h2>Table vs kanban view</h2>
-<p>Toggle in the upper right of the Reports page. Your choice persists across sessions.</p>
-<ul>
-  <li><strong>Table</strong> is dense and efficient for scanning many reports — best for searching, exporting, deleting.</li>
-  <li><strong>Kanban</strong> is best for understanding workflow state — what's piled up where, what's been sitting too long, who's holding it. Drag cards between columns to change stage.</li>
-</ul>
-
 <h2>Bulk actions</h2>
-<p>Both views support multi-select:</p>
+<p>The reports table supports multi-select:</p>
 <ul>
   <li><strong>Table:</strong> tick the checkbox in the leftmost column of any row. The header checkbox toggles all visible rows.</li>
-  <li><strong>Kanban:</strong> click (don't drag) a card to toggle selection — selected cards highlight with a cyan border.</li>
 </ul>
 <p>When at least one report is selected, a cyan action bar appears between the filters and the content. The bar offers:</p>
 <table class="help-table">

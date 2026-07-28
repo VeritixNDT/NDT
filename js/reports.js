@@ -1125,13 +1125,6 @@ function rptInit() {
   // Rebuilt each init so newly-created customers/jobs appear.
   rptPopulateCustomerFilter();
   rptPopulateJobFilter(el('rpt-fc')?.value || '');
-  // V6: restore saved view preference
-  try {
-    const saved = localStorage.getItem(RPT_VIEW_PREF_KEY);
-    if(saved === 'table' || saved === 'kanban') _rptView = saved;
-  } catch(e){}
-  document.getElementById('rpt-vtog-table')?.classList.toggle('active', _rptView === 'table');
-  document.getElementById('rpt-vtog-kanban')?.classList.toggle('active', _rptView === 'kanban');
   rptRender();
   rptUpdateBulkBar();
 }
@@ -1168,8 +1161,7 @@ function rptCustomerFilterChanged(){
   rptRender();
 }
 
-// V6: View state + selection + saved filters
-var _rptView = 'table';            // 'table' | 'kanban'
+// V6: Selection + saved filters
 var _rptStatusFilter = '';         // '' | 'review' | 'approved' — status-tile filter
 // reportNo -> highest revision number seen. A report below its reportNo's
 // max is superseded (locked). Recomputed at the start of each table render.
@@ -1178,18 +1170,9 @@ var _rptSelectedIdx = new Set();   // indices into the full reports array
 var _rptActiveSavedView = null;    // id of currently active saved view (or null)
 
 var RPT_SAVED_VIEWS_KEY = 'vx-rpt-saved-views-v1';
-var RPT_VIEW_PREF_KEY   = 'vx-rpt-view-pref-v1';
 
 function rptListSavedViews(){ return ls(RPT_SAVED_VIEWS_KEY, []); }
 function rptSaveViewsList(list){ lss(RPT_SAVED_VIEWS_KEY, list); }
-
-function rptSetView(view){
-  _rptView = view;
-  try { localStorage.setItem(RPT_VIEW_PREF_KEY, view); } catch(e){}
-  document.getElementById('rpt-vtog-table')?.classList.toggle('active', view === 'table');
-  document.getElementById('rpt-vtog-kanban')?.classList.toggle('active', view === 'kanban');
-  rptRender();
-}
 
 function rptCollectFilters(){
   return {
@@ -1222,7 +1205,7 @@ async function rptSaveCurrentView(){
   const name = await vxPrompt({ message: t('rpt.view.name_prompt','Name this view:'), defaultValue: 'My filter ' + (rptListSavedViews().length + 1) });
   if(!name || !name.trim()) return;
   const list = rptListSavedViews();
-  const item = { id: 'view-' + Date.now(), name: name.trim(), filters, view: _rptView };
+  const item = { id: 'view-' + Date.now(), name: name.trim(), filters };
   list.push(item);
   rptSaveViewsList(list);
   _rptActiveSavedView = item.id;
@@ -1235,8 +1218,9 @@ function rptApplySavedView(id){
   if(!v) return;
   _rptActiveSavedView = id;
   rptApplyFilters(v.filters);
-  if(v.view) rptSetView(v.view);
-  else rptRender();
+  // Saved views from before the kanban removal may still carry a `view` field.
+  // It is ignored now; the render is unconditional so those views still work.
+  rptRender();
   rptRenderSavedViews();
 }
 
@@ -1719,12 +1703,6 @@ function rptRenderTable(list, allReports){
     const rv = parseInt(o.revision, 10) || 0;
     if(_rptMaxRev[rn] == null || rv > _rptMaxRev[rn]) _rptMaxRev[rn] = rv;
   });
-  // V12: if previous render was kanban, the board needs to go before we
-  // can build the table shell. The shell-creation branch handles this when
-  // table.tbl is missing — but if both exist (theoretically possible after
-  // hot reload), prefer the table.
-  const staleBoard = wrap.querySelector('.kb-board');
-  if(staleBoard) staleBoard.remove();
   const visibleIdxList = list.map(x => x._origIdx);
   const allChecked = visibleIdxList.length > 0 && visibleIdxList.every(i => _rptSelectedIdx.has(i));
 
@@ -2000,144 +1978,6 @@ async function ovAssignJob(idx){
   if(typeof inboxRender === 'function') inboxRender();
   if(typeof ovRenderRecentList === 'function') ovRenderRecentList();
   toast(r.jobId ? t('toast.job_assigned','Report routed to job.') : (r.internalNoCustomer ? t('toast.job_internal','Report marked internal.') : t('toast.job_unassigned','Report unassigned.')), 'success');
-}
-
-function rptRenderKanban(list, allReports){
-  const wrap = el('rpt-table-wrap'); if(!wrap) return;
-  // V12: drop stale table DOM from previous view
-  const staleTable = wrap.querySelector('table.tbl')?.closest('.sc');
-  if(staleTable) staleTable.remove();
-  // Group filtered list by stage
-  const groups = {}; RPT_STAGES.forEach(s => groups[s] = []);
-  list.forEach(({r, _origIdx}) => {
-    const s = getReportStage(r);
-    if(groups[s]) groups[s].push({ r, _origIdx });
-  });
-
-  // V12 perf: keyed reconciliation. Build the board shell once, then on
-  // re-renders only update the cards inside each column. Avoids drag-drop
-  // disruption mid-interaction and saves layout cost on filter typing.
-  let board = wrap.querySelector('.kb-board');
-  if(!board) {
-    // First render — assemble the columns
-    let html = '<div class="kb-board" role="list" aria-label="Report stages">';
-    RPT_STAGES.forEach(stage => {
-      const sc = RPT_STAGE_COLORS[stage];
-      html += `<div class="kb-col" role="listitem" data-stage="${stage}" data-on-dragover="rptKbDragOver" data-pass-event="1" data-on-dragleave="rptKbDragLeave" data-pass-event="1" data-on-drop="rptKbDrop" data-pass-event="1" data-args="'${stage}'" aria-label="${stage} column">
-        <div class="kb-col-head">
-          <span class="kb-col-head-title"><span class="kb-col-head-dot" style="background:${sc.accent}" aria-hidden="true"></span>${tStage(stage)}</span>
-          <span class="kb-col-head-count" aria-label="card count">0</span>
-        </div>
-        <div class="kb-col-body" data-stage-body="${stage}"></div>
-      </div>`;
-    });
-    html += '</div>';
-    wrap.innerHTML = html;
-    board = wrap.querySelector('.kb-board');
-  }
-
-  // Update each column independently with keyed reconciliation
-  RPT_STAGES.forEach(stage => {
-    const body = board.querySelector(`[data-stage-body="${stage}"]`);
-    const head = board.querySelector(`[data-stage="${stage}"] .kb-col-head-count`);
-    if(!body) return;
-    const cards = groups[stage].slice().reverse();   // newest first
-    if(head) head.textContent = String(cards.length);
-
-    if(!cards.length) {
-      body.innerHTML = '<div class="kb-empty">No reports here.<br>Drag a card to move it.</div>';
-      return;
-    }
-    // Drop empty placeholder if it exists
-    const empty = body.querySelector('.kb-empty');
-    if(empty) empty.remove();
-
-    // Build map of existing cards by key
-    const existing = new Map();
-    Array.from(body.children).forEach(card => {
-      if(card.dataset.key) existing.set(card.dataset.key, card);
-    });
-
-    // Walk desired cards
-    let prevNode = null;
-    cards.forEach(({r, _origIdx}) => {
-      const key = 'kb-' + _origIdx;
-      const sig = _rptRowSig(r, _origIdx);
-      let card = existing.get(key);
-      if(card && card.dataset.sig === sig) {
-        // unchanged
-      } else if(card) {
-        // update content in place
-        card.outerHTML = rptRenderKanbanCard(r, _origIdx);
-        // outerHTML replaces the node — refetch
-        card = body.querySelector(`[data-key="${key}"]`);
-      } else {
-        // new card
-        const tmp = document.createElement('div');
-        tmp.innerHTML = rptRenderKanbanCard(r, _origIdx);
-        card = tmp.firstElementChild;
-      }
-      // Position
-      const expectedSibling = prevNode ? prevNode.nextSibling : body.firstChild;
-      if(card !== expectedSibling) {
-        if(prevNode) prevNode.after(card);
-        else body.prepend(card);
-      }
-      existing.delete(key);
-      prevNode = card;
-    });
-    // Remove cards no longer in this column
-    existing.forEach(card => card.remove());
-  });
-}
-function rptRenderKanbanCard(r, idx){
-  const md = NDT_METHODS.find(x => x.id === r.method);
-  const verdict = r.verdict && r.verdict !== '— Select —' ? r.verdict : '—';
-  const vClass = verdict==='Acceptable'?'green':verdict==='Not acceptable'?'red':verdict==='Various'?'amber':null;
-  const isSelected = _rptSelectedIdx.has(idx);
-  const health = stageHealthy(r);
-  const healthClass = health === 'fresh' ? '' : 'health-' + health;
-  // V12: data-key + data-sig for keyed reconciliation
-  return `<div class="kb-card ${isSelected?'selected':''} ${healthClass}" draggable="true" data-idx="${idx}" data-key="kb-${idx}" data-sig="${_rptRowSig(r, idx)}" data-on-dragstart="rptKbDragStart" data-pass-event="1" data-args="${idx}" data-on-dragend="rptKbDragEnd" data-pass-event="1" data-action="rptToggleSelect" data-args="${idx}" tabindex="0" role="article" aria-label="Report ${escapeHtml(r.reportNo||'')} on ${getReportStage(r)} stage">
-    <div class="kb-card-row1">
-      <span class="kb-card-id">${escapeHtml(r.reportNo||'—')}</span>
-      <span class="kb-card-method" style="background:${(md?.color||'#5a6880')}1a;color:${md?.color||'#5a6880'}">${escapeHtml(r.method||'?')}</span>
-    </div>
-    <div class="kb-card-subject">${escapeHtml(r.subject || r.client || 'No subject')}</div>
-    <div class="kb-card-meta">
-      <span title="${escapeHtml(r.inspector||'')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${escapeHtml(r.inspector||'—')}</span>
-      <span class="kb-card-meta-time" style="${health==='critical'?'color:var(--red)':health==='stale'?'color:var(--amber)':''}" title="On stage for ${fmtDuration(timeOnStage(r))}">${fmtDuration(timeOnStage(r))}${vClass==='green'?' · ✓':vClass==='red'?' · ✕':''}</span>
-    </div>
-  </div>`;
-}
-
-// Drag and drop
-var _rptDragIdx = null;
-function rptKbDragStart(e, idx){
-  _rptDragIdx = idx;
-  e.target.classList.add('dragging');
-  try { e.dataTransfer.setData('text/plain', String(idx)); e.dataTransfer.effectAllowed = 'move'; } catch(err){}
-}
-function rptKbDragEnd(e){
-  e.target.classList.remove('dragging');
-  document.querySelectorAll('.kb-col.drag-over').forEach(c => c.classList.remove('drag-over'));
-  _rptDragIdx = null;
-}
-function rptKbDragOver(e){
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.classList.add('drag-over');
-}
-function rptKbDragLeave(e){
-  if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over');
-}
-function rptKbDrop(e, stage){
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-  const idx = _rptDragIdx != null ? _rptDragIdx : parseInt(e.dataTransfer.getData('text/plain'));
-  if(isNaN(idx)) return;
-  if(setReportStage(idx, stage)) toast(tf('toast.moved_to','Moved to {stage}', {stage: tStage(stage)}));
-  _rptDragIdx = null;
 }
 
 function rptDelete(idx) {

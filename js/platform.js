@@ -3574,7 +3574,12 @@ async function vxPullPortalEvents(){
   if(applied){
     try { if(typeof toast === 'function') toast(applied === 1 ? lastSummary : (applied + ' new customer updates'), 'info'); } catch(e){}
     try { if(typeof rptRender === 'function') rptRender(); } catch(e){}
-    try { if(typeof billRender === 'function') billRender(); } catch(e){}
+    // billRefresh, not billingRender: billingRender always runs (its
+    // #billing-list-wrap guard never trips — the element is in the static
+    // shell) and sweeps invoices for due/overdue customer emails. Refreshing
+    // billing because a portal event arrived must not send mail; billRefresh
+    // re-renders only when the billing page is actually visible.
+    try { if(typeof billRefresh === 'function') billRefresh(); } catch(e){}
     try { window.dispatchEvent(new CustomEvent('vx:portal-events', { detail: { applied: applied } })); } catch(e){}
   }
   return { applied: applied };

@@ -85,3 +85,10 @@ test('includes externally-provided globals in the manifest', async () => {
     assert.equal(m[name], 'writable', `external ${name} missing from manifest`);
   }
 });
+
+test('does not report a string-dispatch target as an orphan', async () => {
+  const r = await analyse({ dir: FIXTURES });
+  // Reachable only via data-action="…", resolved at runtime by window[action].
+  assert.equal(names(r.orphans).includes('fixtureDispatchTarget'), false,
+    'a data-action target was reported dead — deleting it would break the UI');
+});

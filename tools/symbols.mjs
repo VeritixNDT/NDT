@@ -33,6 +33,17 @@ const AMBIENT = new Set([
   ...Object.keys(globals.browser),
 ]);
 
+// js/ui.js dispatches UI handlers by NAME — `const fn = window[action]` — so a
+// function wired as data-action="foo" has no direct reference anywhere and
+// looks dead to scope analysis. 410 of the app's 485 raw orphans were exactly
+// this; without this the orphan report is 85% false positives and unusable.
+const DISPATCH_ATTR = /data-(?:action|on-change|on-input)\s*=\s*\\?["'`]?\s*([A-Za-z_$][\w$]*)/g;
+function dispatchTargets(source) {
+  const names = [];
+  for (const m of source.matchAll(DISPATCH_ATTR)) names.push(m[1]);
+  return names;
+}
+
 // Minimal ESTree walk. `loc`/`range` are skipped so the visitor only ever sees
 // real nodes.
 function walk(node, visit) {
@@ -106,7 +117,9 @@ function scanFile(file, source) {
   return { declared, escaping, readLocally };
 }
 
-export async function analyse({ dir }) {
+// `shell` is the app's HTML entry point, which wires handlers with data-action
+// too — omit it and every handler declared only there looks dead.
+export async function analyse({ dir, shell = null }) {
   const files = fs.readdirSync(dir)
     .filter((f) => f.endsWith('.js') && f !== 'qrcode.min.js')
     .sort();
@@ -116,11 +129,16 @@ export async function analyse({ dir }) {
   const used = new Set();
 
   for (const f of files) {
-    const scan = scanFile(f, fs.readFileSync(path.join(dir, f), 'utf8'));
+    const source = fs.readFileSync(path.join(dir, f), 'utf8');
+    const scan = scanFile(f, source);
     for (const d of scan.declared) if (!declared.has(d.name)) declared.set(d.name, d);
     escaping.push(...scan.escaping);
     for (const r of scan.escaping) used.add(r.name);
     for (const n of scan.readLocally) used.add(n);
+    for (const n of dispatchTargets(source)) used.add(n);
+  }
+  if (shell && fs.existsSync(shell)) {
+    for (const n of dispatchTargets(fs.readFileSync(shell, 'utf8'))) used.add(n);
   }
 
   const known = (name) => declared.has(name) || AMBIENT.has(name) || EXTERNAL.has(name);
@@ -164,12 +182,12 @@ function report(title, rows, { detail = true } = {}) {
 }
 
 if (import.meta.filename === process.argv[1]) {
-  const r = await analyse({ dir: 'js' });
+  const r = await analyse({ dir: 'js', shell: 'veritix-ndt-inspect-v3_44.html' });
   console.log(`Scanned ${r.files.length} files · ${r.declared.size} declared globals`);
 
   report('UNDEFINED GLOBALS (referenced, declared nowhere)', r.undefinedGlobals);
   report('IMPLICIT GLOBALS (assigned without declaration)', r.implicitGlobals);
-  report('ORPHANS (declared, read by no file)', r.orphans, { detail: false });
+  report('ORPHANS (declared, referenced by no file and not string-dispatched)', r.orphans);
 
   if (process.argv.includes('--write')) {
     fs.writeFileSync(MANIFEST, JSON.stringify(manifest(r.declared), null, 2) + '\n');

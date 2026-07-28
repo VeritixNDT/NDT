@@ -692,13 +692,6 @@ function apResetShortcut(id){
   apRenderShortcuts();
 }
 
-// Re-render brand preview when accent changes
-var _origApplyAccent = applyAccent;
-applyAccent = function(i){
-  _origApplyAccent.call(this, i);
-  if(typeof apUpdateBrandPreview === 'function') apUpdateBrandPreview();
-};
-
 // Listen for system theme changes when in 'auto' mode
 if(window.matchMedia){
   try{
@@ -2685,6 +2678,11 @@ function applyAccent(i) {
   const c = ACCENT_COLORS[i]||ACCENT_COLORS[0];
   document.documentElement.style.setProperty('--cyan',  c.val);
   document.documentElement.style.setProperty('--cyan2', c.dark);
+  // Re-render the brand preview. This used to be a top-level monkey-patch that
+  // wrapped applyAccent after the fact; folded in here because the body has no
+  // early return, so the wrapper's behaviour is identical — and one less
+  // load-order-sensitive statement runs at script evaluation.
+  if(typeof apUpdateBrandPreview === 'function') apUpdateBrandPreview();
 }
 
 function applyReportTypo(s) {

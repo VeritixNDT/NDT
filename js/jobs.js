@@ -319,7 +319,7 @@ function jobOpenDetail(id) {
   const sealedCount = (typeof jobSealedReports === 'function') ? jobSealedReports(id).length : 0;
 
   // Customer card
-  let custCard = '';
+  let custCard;
   if(cust) {
     const primary = (cust.contacts || [])[0];
     const contactLine = primary

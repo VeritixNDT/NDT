@@ -730,7 +730,7 @@ async function vxDownloadHtmlAsPdf(html, filename, opts){
     if(serverBlob && _vxTriggerDownload(serverBlob, filename)) return;
   } catch(_){}
   // 2) Client-side raster via html2pdf.
-  var ok = false;
+  var ok;
   try { ok = await vxEnsureHtml2Pdf(); } catch(e){ ok = false; }
   if(!ok || typeof window.html2pdf === 'undefined'){
     // Library unavailable — fall back to the print → Save-as-PDF dialog.
@@ -939,7 +939,7 @@ function ovBuildReportSnapshot(report){
   // reads, build, then restore — so a report save never disturbs whatever
   // the user has open on the editor canvas.
   const _pages = cvPages, _page = cvCurrentPage, _ppv = cvPpvMethod;
-  let html = '';
+  let html;
   try {
     cvPages = tpl.pages;
     cvCurrentPage = 0;
@@ -1070,7 +1070,7 @@ function cvDefaultLayoutBlocks(cc){
   add('section-header',true,M,y,W,22,{text:'Result / Verdict',bgColor:cc,color:'#fff',bold:true,showBorder:false,fontSize:'8.5px'}); y+=22;
   add('remarks',false,M,y,W,56); y+=56;
   add('result',false,M,y,col2-5,46); add('indications',false,M+col2-4,y,col2+11,46);
-  y+=46;
+  // (no y+=46 here: nothing follows, so the advance was dead.)
   // page-footer block removed — the Header/Footer zone designer + auto-setup
   // covers everything this block did, and dual sources of footer truth
   // confuse users. The footer for a default layout comes from the zone.

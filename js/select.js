@@ -107,7 +107,7 @@ function _vxSelUpdateLabel(sel, labelEl){
     return;
   }
   const txt = opt.text || '';
-  const isPlaceholder = opt.value === '' || /^[—\-]\s*select/i.test(txt);
+  const isPlaceholder = opt.value === '' || /^[—-]\s*select/i.test(txt);
   labelEl.textContent = txt || '— Select —';
   labelEl.classList.toggle('vxsel-placeholder', isPlaceholder);
 }

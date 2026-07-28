@@ -1,7 +1,7 @@
 # Cross-file globals safety net — design
 
 **Date:** 2026-07-28
-**Status:** Agreed, not yet built
+**Status:** Component 1 built (`tools/symbols.mjs`, 11 tests). Components 2–3 pending.
 **Scope:** Static analysis + lint configuration. No runtime behaviour changes.
 
 ---
@@ -197,7 +197,9 @@ an undeclared name. The test asserts the run reports exactly one undefined
 global and one implicit global, and raises nothing about the legitimate pair.
 
 Run with `node --test`, built into Node — no new dependency. Wired as
-`"test": "node --test tools/"`.
+`"test": "node --test \"tools/*.test.mjs\""`. The bare directory form
+(`node --test tools/`) fails on Node 24 with `Cannot find module` — it treats
+the path as an entry point rather than a directory to scan.
 
 ## Risks
 
@@ -213,6 +215,50 @@ stale at the moment it is used.
 **Step 3 hides a real bug by "cleaning" it.** `applyAccent` is called out
 explicitly above so it gets diagnosed rather than pattern-matched away with the
 other 47.
+
+## Implementation notes
+
+Three things the design did not anticipate, all found by running the analyser
+against real code rather than fixtures:
+
+- **espree must be given `range: true`, not just `loc`.** eslint-scope reads
+  `node.range` while resolving references inside arrow functions and throws
+  without it. Fixtures never hit this; `js/*.js` crashed on the first run.
+- **`globals.browser` is DOM/window APIs only.** It contains no `Math`,
+  `Object`, `Promise` or `Array`, so resolving against it alone reported 1,896
+  undefined globals, almost all of them language built-ins. The ambient set must
+  be `globals.es2023` ∪ `globals.browser`.
+- **`typeof X` on an undeclared name is excluded**, matching ESLint's `no-undef`
+  default. It is legitimate feature detection, and the app leans on the
+  `typeof fn === 'function' && fn()` idiom throughout — the call is the real
+  signal, and counting the guard too reported every finding twice.
+
+## First run
+
+Against 33 files and 2,052 declared globals:
+
+| Report | Count |
+|---|---|
+| Undefined globals | **1** |
+| Implicit globals | **0** |
+| Orphans | 485 |
+
+The single undefined global is real: `js/platform.js:3577` calls `billRender`,
+which is declared in no file. The function is `billingRender`
+(`js/billing.js:635`). It sits behind `typeof billRender === 'function'`, so it
+never throws — it silently does nothing, and the billing page has never
+re-rendered on incoming portal events. Its neighbour `rptRender` resolves
+correctly, so reports do. Exactly the failure mode the tool exists to catch:
+invisible to lint, invisible at load, and only observable as a feature quietly
+not happening.
+
+**Implicit globals: 0.** This is the go/no-go signal for the ES-module
+conversion, and it is clean — no assignment to an undeclared name anywhere in
+`js/*.js`, so module strict mode has nothing to throw on. That removes the
+unknown that made the conversion unspeccable.
+
+Orphans are recorded but not actioned here; 485 unreferenced globals is a
+dead-code finding for separate triage, not a blocker.
 
 ## How this feeds the module conversion
 

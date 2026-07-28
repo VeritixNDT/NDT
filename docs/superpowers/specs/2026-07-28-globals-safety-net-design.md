@@ -1,7 +1,7 @@
 # Cross-file globals safety net — design
 
 **Date:** 2026-07-28
-**Status:** Components 1–2 built; rollout steps 1–4 done. Step 5 (CI gate) pending.
+**Status:** Complete — components 1–3 built, rollout steps 1–5 done.
 **Scope:** Static analysis + lint configuration. No runtime behaviour changes.
 
 ---
@@ -270,6 +270,7 @@ dead-code finding for separate triage, not a blocker.
 | 1–2 | Analyser landed; found `billRender`, fixed in `fd4c5f1` |
 | 3 | 48 errors → 0 (9 vendored, 26 escapes, 12 dead initialisers, 1 monkey-patch) |
 | 4 | Manifest wired, `no-undef` on; 801 warnings → 12 |
+| 5 | `.github/workflows/ci.yml` gates `npm test` + `npm run lint` on push/PR |
 
 Two adjustments the design did not foresee:
 
@@ -287,6 +288,21 @@ misspelt) into `js/jobs.js` produced `'escapeHtmlx' is not defined no-undef`
 from ESLint and a matching line from the analyser. Before this work that typo
 was invisible to both, and would have failed only when a user clicked the
 control that called it. That is the whole point of the exercise, demonstrated.
+
+## Known gap: `tools/` is not linted
+
+`npm run lint` is `eslint js` — deliberately, because `tools/verify.mjs` (12)
+and `tools/verify-numbering.mjs` (56) carry 68 pre-existing errors, so widening
+the gate would fail CI on day one. These predate this work and were never
+visible because lint has only ever covered `js/`.
+
+They are almost all `no-undef` on browser globals (`document`, `window`,
+`CURRENT_USER`, `showPage`) inside `page.evaluate()` callbacks. That code is
+serialised and executed in the browser, not in Node, but the `tools/**/*.mjs`
+config block supplies only `globals.node`. The fix is a config change — give
+those files the browser globals too, or split the evaluate callbacks into a
+block that gets them — not 68 code edits. Worth doing so the tooling is covered
+by the same net as the app; out of scope for this spec.
 
 ## How this feeds the module conversion
 

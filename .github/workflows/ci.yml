@@ -1,0 +1,59 @@
+name: CI
+
+# Static analysis gate for the app. Step 5 of the cross-file globals safety net
+# (docs/superpowers/specs/2026-07-28-globals-safety-net-design.md).
+#
+# js/*.js are plain <script> files sharing one global namespace, so a typo'd or
+# renamed global used to be invisible to lint and fail only when a user clicked
+# the control that called it. `npm run lint` regenerates the globals manifest
+# and runs ESLint with no-undef on, which turns that class of bug into a build
+# failure. `npm test` guards the analyser itself against silently degrading
+# into a no-op — a checker that reports nothing is worse than no checker.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch: {}
+
+# A newer push to the same branch makes an in-flight run redundant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22+ required: tools/symbols.mjs uses import.meta.filename.
+          node-version: '24'
+          cache: npm
+
+      - name: Install dev tooling
+        # The Playwright browser download (~100s of MB) is pure waste here —
+        # this job runs ESLint and the node:test suite, never the browser
+        # harness. Scripts still run, so nothing else is skipped.
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm ci
+
+      - name: Analyser tests
+        run: npm test
+
+      - name: Lint (regenerates the globals manifest, then runs ESLint)
+        run: npm run lint
+
+      - name: Globals manifest is committed up to date
+        # `npm run lint` regenerated it above, so any diff means someone added
+        # or removed a global without committing the regenerated file. Lint
+        # still passed — but a stale committed copy gives every editor false
+        # no-undef squiggles until it is refreshed.
+        run: |
+          if ! git diff --exit-code --stat tools/globals.generated.json; then
+            echo "::error title=Stale globals manifest::tools/globals.generated.json is out of date. Run 'npm run lint' and commit the result."
+            exit 1
+          fi

@@ -25,9 +25,9 @@ jobs:
   static-analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           # 22+ required: tools/symbols.mjs uses import.meta.filename.
           node-version: '24'
@@ -68,9 +68,9 @@ jobs:
   browser-verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -84,7 +84,7 @@ jobs:
 
       - name: Cache Chromium
         id: pw-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -108,7 +108,7 @@ jobs:
 
       - name: Upload screenshots on failure
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: verify-screenshots
           path: .verify-out/pages

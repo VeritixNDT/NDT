@@ -1,0 +1,10 @@
+# tools/globals.generated.json is rewritten by tools/symbols.mjs on every
+# `npm run lint`, and Node writes LF. With core.autocrlf=true (the default on
+# Windows checkouts) git expects CRLF in the working tree, so it reported the
+# file as permanently modified even though `git diff` showed no content change
+# — leaving the tree dirty after every lint run.
+#
+# Pinning it to LF makes the file git writes and the file the tool writes
+# byte-identical. Deliberately scoped to this one generated artifact: a
+# repo-wide `* text=auto` would renormalise every file in the project.
+tools/globals.generated.json text eol=lf

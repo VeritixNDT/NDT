@@ -45,6 +45,9 @@ jobs:
         run: npm test
 
       - name: Lint (regenerates the globals manifest, then runs ESLint)
+        # Covers js/ AND tools/ — the Playwright harnesses contain browser code
+        # in their page.evaluate callbacks and are checked against the app's
+        # real global surface, so a typo there fails here too.
         run: npm run lint
 
       - name: Globals manifest is committed up to date

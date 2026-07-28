@@ -7,7 +7,7 @@
   "scripts": {
     "serve": "node tools/serve.mjs",
     "verify": "node tools/verify.mjs",
-    "lint": "node tools/symbols.mjs --write && eslint js",
+    "lint": "node tools/symbols.mjs --write && eslint js tools",
     "test": "node --test \"tools/*.test.mjs\"",
     "check:globals": "node tools/symbols.mjs"
   },

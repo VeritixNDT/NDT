@@ -8,7 +8,8 @@
 //
 // tools/symbols.mjs now parses every js/*.js and writes the real declared
 // surface to globals.generated.json, which is fed in below so `no-undef` works
-// again. `npm run lint` regenerates it first, so it cannot go stale.
+// again. `npm run lint` regenerates it first, so it cannot go stale, and lints
+// js/ and tools/ alike.
 // See docs/superpowers/specs/2026-07-28-globals-safety-net-design.md
 import fs from 'node:fs';
 import js from '@eslint/js';
@@ -63,6 +64,29 @@ export default [
       globals: { ...globals.node },
     },
     rules: { ...js.configs.recommended.rules },
+  },
+  // The Playwright harnesses are Node modules that CONTAIN browser code: the
+  // callbacks passed to page.evaluate() are serialised and executed in the
+  // page, against the running app. So they legitimately reference browser
+  // globals (window, document) and app globals (vxApi, ls, CURRENT_USER, …) —
+  // 65 no-undef errors that were never surfaced because lint only covered js/.
+  //
+  // Scoped to these two files, not all of tools/: serve.mjs and symbols.mjs are
+  // pure Node and stay strict, so a stray `document` in them is still an error.
+  // The cost here is that a genuine misuse of a browser global in these files'
+  // Node halves won't be caught — ESLint can't tell a page.evaluate callback
+  // from its surrounding module, and having the app's real surface checked
+  // inside those callbacks is worth more than that.
+  {
+    files: ['tools/verify.mjs', 'tools/verify-numbering.mjs'],
+    languageOptions: {
+      globals: { ...globals.browser, ...appGlobals },
+    },
+    rules: {
+      // Same defensive-catch idiom as the app; these callbacks are app code.
+      'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_' }],
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+    },
   },
   // Not linted here: deps, Deno edge functions (different runtime/globals),
   // verify output, and vendored minified libraries — qrcode.min.js is

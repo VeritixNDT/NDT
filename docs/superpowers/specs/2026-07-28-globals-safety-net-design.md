@@ -289,20 +289,30 @@ from ESLint and a matching line from the analyser. Before this work that typo
 was invisible to both, and would have failed only when a user clicked the
 control that called it. That is the whole point of the exercise, demonstrated.
 
-## Known gap: `tools/` is not linted
+## `tools/` coverage
 
-`npm run lint` is `eslint js` — deliberately, because `tools/verify.mjs` (12)
-and `tools/verify-numbering.mjs` (56) carry 68 pre-existing errors, so widening
-the gate would fail CI on day one. These predate this work and were never
-visible because lint has only ever covered `js/`.
+`npm run lint` is `eslint js tools` — the tooling is under the same net as the
+app. Getting there took a config block, not 68 code edits.
 
-They are almost all `no-undef` on browser globals (`document`, `window`,
-`CURRENT_USER`, `showPage`) inside `page.evaluate()` callbacks. That code is
-serialised and executed in the browser, not in Node, but the `tools/**/*.mjs`
-config block supplies only `globals.node`. The fix is a config change — give
-those files the browser globals too, or split the evaluate callbacks into a
-block that gets them — not 68 code edits. Worth doing so the tooling is covered
-by the same net as the app; out of scope for this spec.
+`tools/verify.mjs` (12) and `tools/verify-numbering.mjs` (56) carried 68
+pre-existing errors, never visible because lint had only ever covered `js/`.
+The breakdown: 29 browser globals (`window` ×26, `document` ×3), 36 app globals
+(`vxApi`, `ls`, `CURRENT_USER`, `showPage`, …) and 3 `catch(e)` bindings.
+
+The cause is that those files are Node modules **containing browser code** —
+callbacks passed to `page.evaluate()` are serialised and run in the page,
+against the app — while the `tools/**/*.mjs` block supplied only
+`globals.node`. They now get `globals.browser` plus the generated app manifest,
+and the app's `caughtErrors`/`allowEmptyCatch` treatment, since those callbacks
+are app code.
+
+Scoped to those two files by name rather than all of `tools/`: `serve.mjs` and
+`symbols.mjs` are pure Node and stay strict. Both boundaries were verified by
+probe — a `document` reference added to `symbols.mjs` errors, and a misspelt
+`vxApixx` inside `verify.mjs` errors. The residual cost is that a genuine
+misuse of a browser global in those two files' Node halves goes uncaught;
+ESLint cannot distinguish an evaluate callback from its surrounding module, and
+checking the app's real surface inside the callbacks is worth more.
 
 ## How this feeds the module conversion
 

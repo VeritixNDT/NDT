@@ -1,7 +1,7 @@
 # Cross-file globals safety net — design
 
 **Date:** 2026-07-28
-**Status:** Component 1 built (`tools/symbols.mjs`, 11 tests). Components 2–3 pending.
+**Status:** Components 1–2 built; rollout steps 1–4 done. Step 5 (CI gate) pending.
 **Scope:** Static analysis + lint configuration. No runtime behaviour changes.
 
 ---
@@ -259,6 +259,34 @@ unknown that made the conversion unspeccable.
 
 Orphans are recorded but not actioned here; 485 unreferenced globals is a
 dead-code finding for separate triage, not a blocker.
+
+## Rollout outcome (steps 1–4)
+
+`npx eslint js` went from **849 problems (48 errors, 801 warnings)** to
+**12 warnings, 0 errors**.
+
+| Step | Result |
+|---|---|
+| 1–2 | Analyser landed; found `billRender`, fixed in `fd4c5f1` |
+| 3 | 48 errors → 0 (9 vendored, 26 escapes, 12 dead initialisers, 1 monkey-patch) |
+| 4 | Manifest wired, `no-undef` on; 801 warnings → 12 |
+
+Two adjustments the design did not foresee:
+
+- **The manifest must carry `EXTERNAL` too.** With only `js/*.js` declarations
+  fed in, `no-undef` flagged the CDN globals `L` (3×) and `pdfjsLib`. Folding
+  the allowlist into `manifest()` keeps one source of truth rather than
+  repeating it in `eslint.config.js`.
+- **`vars: 'local'` alone left 302 warnings**, 290 of them `catch(e)` bindings —
+  ESLint 9 flipped `caughtErrors` from `'none'` to `'all'`. Set back to
+  `'none'`, consistent with the `allowEmptyCatch` decision already in the
+  config. The remaining 12 are genuine unused locals, left visible.
+
+**End-to-end proof.** Injecting `escapeHtmlx` (a real cross-file global,
+misspelt) into `js/jobs.js` produced `'escapeHtmlx' is not defined no-undef`
+from ESLint and a matching line from the analyser. Before this work that typo
+was invisible to both, and would have failed only when a user clicked the
+control that called it. That is the whole point of the exercise, demonstrated.
 
 ## How this feeds the module conversion
 

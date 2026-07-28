@@ -74,3 +74,14 @@ test('does not report a name used only in a typeof feature-detection guard', asy
   const r = await analyse({ dir: FIXTURES });
   assert.equal(names(r.undefinedGlobals).includes('fixtureOptionalThing'), false);
 });
+
+test('includes externally-provided globals in the manifest', async () => {
+  const r = await analyse({ dir: FIXTURES });
+  const m = manifest(r.declared);
+  // CDN/vendored libs are real globals at runtime but declared in no js/ file.
+  // ESLint needs them or no-undef flags every use; keeping the list in one
+  // place stops the analyser and eslint.config.js drifting apart.
+  for (const name of ['L', 'pdfjsLib', 'QRCode']) {
+    assert.equal(m[name], 'writable', `external ${name} missing from manifest`);
+  }
+});

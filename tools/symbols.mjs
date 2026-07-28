@@ -141,9 +141,13 @@ export async function analyse({ dir }) {
 // ESLint's `globals` shape. `writable` rather than `readonly` because the app
 // reassigns globals in places, and `readonly` would fire no-global-assign
 // across the codebase. Keys are sorted so the committed file diffs cleanly.
+//
+// EXTERNAL is folded in: those names exist at runtime but are declared in no
+// js/ file, so ESLint would flag every use. Emitting them here keeps one
+// source of truth — eslint.config.js never repeats the allowlist.
 export function manifest(declared) {
   const out = {};
-  for (const name of [...declared.keys()].sort()) out[name] = 'writable';
+  for (const name of [...declared.keys(), ...EXTERNAL].sort()) out[name] = 'writable';
   return out;
 }
 

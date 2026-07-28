@@ -1069,7 +1069,7 @@ function _geoLookup(loc){
   const before = key.split(',')[0].trim();
   if(GEO_CACHE[before]) return GEO_CACHE[before];
   // Try first word
-  const first = key.split(/[\s,;\/]+/)[0];
+  const first = key.split(/[\s,;/]+/)[0];
   if(GEO_CACHE[first]) return GEO_CACHE[first];
   return null;
 }
@@ -1183,7 +1183,7 @@ function ovOpenDrilldown(title, list){
   modal.id = 'drilldown-modal';
   modal.className = 'drilldown-modal open';
   modal.onclick = e => { if(e.target === modal) modal.remove(); };
-  let body = '';
+  let body;
   if(!list.length){
     body = '<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px">No results.</div>';
   } else {
@@ -1208,7 +1208,7 @@ function ovOpenDrilldown(title, list){
         <div style="font-size:14px;font-weight:600;color:var(--t1)">${escapeHtml(title)}</div>
         <div style="font-size:11px;color:var(--t3);margin-top:2px">${list.length} item${list.length!==1?'s':''}</div>
       </div>
-      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'drilldown-modal\'">Close</button>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="'drilldown-modal'">Close</button>
     </div>
     <div class="drilldown-list">${body}</div>
   </div>`;
@@ -1224,7 +1224,7 @@ function ovOpenDefectDrilldown(title, list){
   modal.id = 'drilldown-modal';
   modal.className = 'drilldown-modal open';
   modal.onclick = e => { if(e.target === modal) modal.remove(); };
-  let body = '';
+  let body;
   if(!list.length){ body = '<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px">No results.</div>'; }
   else {
     body = `<table class="tbl" style="width:100%"><thead><tr><th scope="col">ID</th><th scope="col">Type</th><th scope="col">Severity</th><th scope="col">Location</th><th scope="col">Method</th><th scope="col">Date</th></tr></thead><tbody>` +
@@ -1240,7 +1240,7 @@ function ovOpenDefectDrilldown(title, list){
   modal.innerHTML = `<div class="drilldown-card">
     <div class="drilldown-head">
       <div><div style="font-size:14px;font-weight:600;color:var(--t1)">${escapeHtml(title)}</div></div>
-      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'drilldown-modal\'">Close</button>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="'drilldown-modal'">Close</button>
     </div>
     <div class="drilldown-list">${body}</div>
   </div>`;
@@ -2199,7 +2199,7 @@ function _ovDefectsSectionHtml(){
       }
     });
   }
-  let body = '';
+  let body;
   if(!rejected.length){
     body = `<div style="padding:10px 14px;background:rgba(62,207,142,.06);border:1px dashed rgba(62,207,142,.25);border-radius:4px;font-size:11.5px;color:var(--t2);line-height:1.45">
       Mark an item as <strong>Not acceptable</strong> in the examination details table above and it will appear here for defect details.
@@ -3687,7 +3687,7 @@ function apiOpenSchema(){
   modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:680px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--sh-xl);overflow:hidden">
     <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:14px;font-weight:600;color:var(--t1)">Public data schema (v1)</div>
-      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'api-schema-modal\'">Close</button>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="'api-schema-modal'">Close</button>
     </div>
     <div style="overflow-y:auto;flex:1;padding:16px 20px;font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--t1);white-space:pre-wrap">{
   "schema": "veritix-v1",

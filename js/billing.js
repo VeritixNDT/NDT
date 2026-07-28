@@ -784,7 +784,7 @@ function _billCanvasHtml(type, doc) {
   var _pages = (typeof cvPages !== 'undefined') ? cvPages : null;
   var _page  = (typeof cvCurrentPage !== 'undefined') ? cvCurrentPage : 0;
   var _dt    = (typeof cvDocType !== 'undefined') ? cvDocType : 'report';
-  var html = '';
+  var html;
   try {
     cvPages = tpl.pages; cvCurrentPage = 0; cvDocType = type;
     if(typeof cvSync === 'function') cvSync();

@@ -1033,7 +1033,7 @@ function _cvSpecKey(s){
   let x = String(s || '').toLowerCase().trim();
   if(!x) return '';
   // Drop the edition year where it is anchored to a separator or "Ed.".
-  x = x.replace(/[:\-]\s*(?:ed(?:ition)?\.?\s*)?(?:19|20)\d{2}/g, ' ');
+  x = x.replace(/[:-]\s*(?:ed(?:ition)?\.?\s*)?(?:19|20)\d{2}/g, ' ');
   x = x.replace(/\bed(?:ition)?\.?\s*(?:19|20)\d{2}/g, ' ');
   x = x.replace(/\s+(?:19|20)\d{2}\s*$/g, ' ');
   // Reduce to bare alphanumerics, then drop a leading "en" adoption
@@ -4908,7 +4908,7 @@ function cvOpenFindReplace(){
     modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:440px;max-width:96vw;box-shadow:var(--sh-xl);overflow:hidden">
       <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
         <div style="font-size:14px;font-weight:600;color:var(--t1)">Find &amp; replace in template</div>
-        <button data-action="_wRemoveById" data-args="\'cv-fr-modal\'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
+        <button data-action="_wRemoveById" data-args="'cv-fr-modal'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
       </div>
       <div style="padding:18px">
         <div style="font-size:11px;font-weight:500;color:var(--t2);margin-bottom:5px">Find</div>
@@ -4916,7 +4916,7 @@ function cvOpenFindReplace(){
         <div style="font-size:11px;font-weight:500;color:var(--t2);margin-bottom:5px">Replace with</div>
         <input id="cv-fr-rep" type="text" placeholder="Replacement text…" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--t1);font-size:13px;padding:9px 11px;margin-bottom:14px;font-family:var(--font);box-sizing:border-box"/>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'cv-fr-modal\'">Cancel</button>
+          <button class="btn btn-sm" data-action="_wRemoveById" data-args="'cv-fr-modal'">Cancel</button>
           <button class="btn btn-sm" data-action="cvDoFindReplace" data-args="false">Replace once</button>
           <button class="btn btn-sm btn-primary" data-action="cvDoFindReplace" data-args="true">Replace all</button>
         </div>
@@ -4962,7 +4962,7 @@ function cvOpenHistory(){
       <div style="font-size:14px;font-weight:600;color:var(--t1)">Version history (${list.length})</div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-sm btn-primary" data-action="_wCvSaveSnapshotPrompt">+ Save snapshot now</button>
-        <button data-action="_wRemoveById" data-args="\'cv-hist-modal\'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
+        <button data-action="_wRemoveById" data-args="'cv-hist-modal'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
       </div>
     </div>
     <div style="overflow-y:auto;flex:1">${items}</div>
@@ -4994,7 +4994,7 @@ function cvOpenComments(){
   modal.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:560px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--sh-xl);overflow:hidden">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div style="font-size:14px;font-weight:600;color:var(--t1)">Comments (${all.length} total · ${all.filter(c=>!c.resolved).length} unresolved)</div>
-      <button data-action="_wRemoveById" data-args="\'cv-com-modal\'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
+      <button data-action="_wRemoveById" data-args="'cv-com-modal'" style="background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer">✕</button>
     </div>
     <div style="overflow-y:auto;flex:1">${items}</div>
   </div>`;

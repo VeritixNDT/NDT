@@ -37,6 +37,8 @@ export default [
     rules: { ...js.configs.recommended.rules },
   },
   // Not linted here: deps, Deno edge functions (different runtime/globals),
-  // verify output.
-  { ignores: ['node_modules/', 'supabase/', '.verify-out/', 'tools/lib/'] },
+  // verify output, and vendored minified libraries — qrcode.min.js is
+  // third-party build output, so its lint findings are unactionable noise.
+  // tools/symbols.mjs skips it for the same reason.
+  { ignores: ['node_modules/', 'supabase/', '.verify-out/', 'tools/lib/', 'js/qrcode.min.js'] },
 ];

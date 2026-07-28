@@ -2897,7 +2897,7 @@ function inboxOpenAudit(idx){
   modal.id = 'inbox-audit-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
   modal.onclick = e => { if(e.target === modal) modal.remove(); };
-  let logHtml = '';
+  let logHtml;
   if(!log.length) logHtml = '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px">No audit history yet.</div>';
   else logHtml = log.map(entry => `
     <div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start">
@@ -2914,7 +2914,7 @@ function inboxOpenAudit(idx){
         <div style="font-size:14px;font-weight:600;color:var(--t1)">Audit history</div>
         <div style="font-size:11px;color:var(--t3);font-family:var(--mono);margin-top:2px">${escapeHtml(r.reportNo||'')} — ${log.length} event${log.length!==1?'s':''}</div>
       </div>
-      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'inbox-audit-modal\'">Close</button>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="'inbox-audit-modal'">Close</button>
     </div>
     <div style="overflow-y:auto;flex:1">${typeof _aiAuditHtml==='function'?_aiAuditHtml(r):''}${logHtml}</div>
   </div>`;
@@ -3104,7 +3104,7 @@ function defOpenPhotoView(photo){
       <button class="btn btn-sm btn-danger" data-action="defAnnotClear" style="font-size:12px">Clear all</button>
       <span style="flex:1"></span>
       <button class="btn btn-sm btn-primary" data-action="defAnnotSave" style="font-size:12px">Save annotations</button>
-      <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'def-photo-modal\'" style="font-size:12px">Close</button>
+      <button class="btn btn-sm" data-action="_wRemoveById" data-args="'def-photo-modal'" style="font-size:12px">Close</button>
     </div>
     <!-- Stage -->
     <div id="def-photo-stage" style="position:relative;display:inline-block;align-self:center">

@@ -1528,7 +1528,7 @@ function vxOpenSyncActivity() {
   modal.id = 'vx-sync-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
   modal.onclick = e => { if(e.target === modal) modal.remove(); };
-  let body = '';
+  let body;
   if(!queue.length) {
     const authed = vxIsAuthenticated();
     body = '<div style="padding:48px 30px;text-align:center;color:var(--t3);font-size:13px">' +
@@ -1555,7 +1555,7 @@ function vxOpenSyncActivity() {
       </div>
       <div style="display:flex;gap:6px">
         <button class="btn btn-sm" data-action="vxManualSync">↻ Sync now</button>
-        <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'vx-sync-modal\'">Close</button>
+        <button class="btn btn-sm" data-action="_wRemoveById" data-args="'vx-sync-modal'">Close</button>
       </div>
     </div>
     <div style="overflow-y:auto;flex:1">${body}</div>
@@ -2337,7 +2337,7 @@ var vxPhotos = {
     meta = meta || {};
     // Normalise to a Blob with a known content-type
     var blob = file;
-    var ext = 'jpg';
+    var ext;
     if(typeof file === 'string'){
       var m = file.match(/^data:([^;]+);base64,(.+)$/);
       if(!m) return { ok: false, error: 'Unsupported data URL format' };
@@ -3191,7 +3191,7 @@ function vxRenderSidebarOrgBlock(name){
   // (so the legacy invert-only path still works for users who haven't
   // uploaded a dark variant).
   var isLightTheme = (document.documentElement.getAttribute('data-theme') === 'light');
-  var logoSrc = '';
+  var logoSrc;
   var useInvert = false;
   if(useOnSystem === 'dark' && darkSrc){
     logoSrc = darkSrc;
@@ -3790,7 +3790,7 @@ var vxPlan = {
         <div style="font-size:13px;color:var(--t2);line-height:1.55">${escapeHtml(opts.body || `${feature} is available on the Pro plan and above. Upgrade to unlock it for your team.`)}</div>
       </div>
       <div style="padding:18px 28px 22px;display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-sm" data-action="_wRemoveById" data-args="\'vx-paywall-modal\'" style="font-size:12px">Maybe later</button>
+        <button class="btn btn-sm" data-action="_wRemoveById" data-args="'vx-paywall-modal'" style="font-size:12px">Maybe later</button>
         <button class="btn btn-sm" data-action="_wOpenBilling" style="font-size:12px;background:var(--violet);color:#fff;border-color:var(--violet)">View plans →</button>
       </div>
     </div>`;

@@ -170,3 +170,19 @@ test('the IndexedDB storage layer is present and functional', opts, async () => 
     assert.equal(r.roundTrip, true, `entity store did not round-trip: ${r.roundTrip}`);
   } finally { await app.close(); }
 });
+
+test('auth handlers moved to auth.js are still registered', opts, async () => {
+  // These live on the login screen, which the harness hides — so the "every
+  // rendered data-action resolves" test never sees them. They were registered
+  // from platform.js before the split; platform.js loads first, so leaving the
+  // registration there would have referenced them before auth.js had run.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const missing = await app.page.evaluate(() => [
+      'doLogin', 'doOAuth', 'doRegister', 'liGuestMode', 'openMfaModal',
+      'vxAuthTabSwitch', 'vxOpenBilling', 'vxOpenForgotPassword', 'vxRefreshPlan',
+      'vxRenderSubscription', 'vxSignOut',
+    ].filter((n) => typeof vxResolveAction(n) !== 'function'));
+    assert.deepEqual(missing, []);
+  } finally { await app.close(); }
+});

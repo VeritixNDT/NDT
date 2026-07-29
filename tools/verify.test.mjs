@@ -144,3 +144,29 @@ test('cross-module hooks are registered regardless of load order', opts, async (
     }
   } finally { await app.close(); }
 });
+
+test('the IndexedDB storage layer is present and functional', opts, async () => {
+  // vxEntityStore/vxPhotos moved out of platform.js into storage.js. boot.js
+  // calls vxEntityStore.hydrate() inside a try/catch, so losing the layer would
+  // only log a warning — the page would still render and the sweep would still
+  // pass. Assert the API is there and actually round-trips.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(async () => {
+      const out = { entityStore: typeof vxEntityStore, photos: typeof vxPhotos, methods: [], roundTrip: null };
+      if (typeof vxEntityStore !== 'object' || !vxEntityStore) return out;
+      out.methods = ['hydrate', 'read', 'write', 'stats'].filter((m) => typeof vxEntityStore[m] === 'function');
+      try {
+        const key = 'vx-verify-probe';
+        await vxEntityStore.write(key, JSON.stringify({ ok: 1 }));
+        const back = await vxEntityStore.read(key);
+        out.roundTrip = typeof back === 'string' ? JSON.parse(back).ok === 1 : false;
+      } catch (e) { out.roundTrip = 'threw: ' + e.message; }
+      return out;
+    });
+    assert.equal(r.entityStore, 'object', 'vxEntityStore missing');
+    assert.equal(r.photos, 'object', 'vxPhotos missing');
+    assert.deepEqual(r.methods, ['hydrate', 'read', 'write', 'stats'], 'the store API changed shape');
+    assert.equal(r.roundTrip, true, `entity store did not round-trip: ${r.roundTrip}`);
+  } finally { await app.close(); }
+});

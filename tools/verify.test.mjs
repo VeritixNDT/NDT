@@ -233,3 +233,34 @@ test('the API client survives being split into api.js', opts, async () => {
     assert.deepEqual(r.missing, [], 'API methods lost in the split');
   } finally { await app.close(); }
 });
+
+test('workspace org identity survives being split into workspace.js', opts, async () => {
+  // boot.js calls vxLoadOrgName() behind a `typeof === 'function'` guard, so if
+  // workspace.js failed to load nothing would throw — the org name would simply
+  // never render, with all 30 pages still passing. Assert the functions exist
+  // and that the renderer actually writes the sidebar org blocks.
+  //
+  // It writes `.snav-org-name` inside the per-page org blocks, NOT
+  // #vx-org-pill-name — that element belongs to a different function. Asserting
+  // the pill here failed, and the cause was this comment being wrong rather
+  // than the split.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const fns = ['vxLoadOrgName', 'vxRenderSidebarOrgBlock', 'vxOpenWorkspaceSettings', 'vxSaveOrgName']
+        .filter((n) => typeof window[n] !== 'function');
+      const targets = document.querySelectorAll('.snav-org-name');
+      let wrote = null;
+      if (targets.length) {
+        try {
+          vxRenderSidebarOrgBlock('Verify Co');
+          wrote = [...document.querySelectorAll('.snav-org-name')].some((e) => e.textContent === 'Verify Co');
+        } catch (e) { wrote = 'threw: ' + e.message; }
+      }
+      return { missing: fns, targetCount: targets.length, wrote };
+    });
+    assert.deepEqual(r.missing, [], 'workspace functions missing — did workspace.js load?');
+    assert.ok(r.targetCount > 0, 'no .snav-org-name elements in the shell');
+    assert.equal(r.wrote, true, 'vxRenderSidebarOrgBlock() did not write the org name');
+  } finally { await app.close(); }
+});

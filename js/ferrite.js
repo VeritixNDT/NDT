@@ -144,23 +144,6 @@ var FN_DETAIL_COLS = [
   { id:'verdict',     label:'Result',           w:95  },
 ];
 
-function _fnTableEl(headLabels, rowsData, bar, P, colWidths){
-  var colgroup = '';
-  if(Array.isArray(colWidths) && colWidths.length === headLabels.length){
-    var tot = colWidths.reduce(function(s,w){ return s + (+w || 0); }, 0) || 1;
-    colgroup = '<colgroup>' + colWidths.map(function(w){ return '<col style="width:' + ((+w||0)/tot*100).toFixed(3) + '%"/>'; }).join('') + '</colgroup>';
-  }
-  var head = headLabels.map(function(c){ return '<th style="padding:3px 6px;text-align:left;font:600 7.5px \'Geist Mono\',monospace;color:#fff;letter-spacing:.03em;word-break:break-word">' + escapeHtml(c) + '</th>'; }).join('');
-  var n = headLabels.length;
-  var body = rowsData.map(function(r){
-    var cells = r.cells.map(function(cell, ci){
-      var br = (ci === n - 1) ? '' : ('border-right:0.5px solid ' + P.grid + ';');
-      return '<td style="padding:3px 6px;' + br + 'border-bottom:0.5px solid ' + P.grid + ';font-size:8.5px;line-height:1.3;color:#000;vertical-align:middle;word-break:break-word;overflow:hidden;' + (cell.extra || '') + '">' + cell.v + '</td>';
-    }).join('');
-    return '<tr' + (r.rowStyle ? (' style="' + r.rowStyle + '"') : '') + '>' + cells + '</tr>';
-  }).join('');
-  return '<table style="width:100%;border-collapse:separate;border-spacing:0;border-top:1px solid ' + P.grid + ';table-layout:' + (colgroup ? 'fixed' : 'auto') + '">' + colgroup + '<thead style="background:' + bar + '"><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>';
-}
 
 function _fnItemResultChip(weldView){
   var v = fnVerdict(weldView);
@@ -187,7 +170,7 @@ function _fnItemDetails(item, idx, P, bar, weldView, colWidths){
     { v:val(item.dimensions), extra:'font-family:\'Geist Mono\',monospace' },
     { v:_fnItemResultChip(weldView) }
   ];
-  return _fnTableEl(heads, [{ cells:cells }], bar, P, colWidths);
+  return vxSurveyTableEl(heads, [{ cells:cells }], bar, P, colWidths);
 }
 
 // Compact FN bar chart for one weld: a value bar per location, a shaded green
@@ -234,7 +217,7 @@ function _fnTable(weldView, P, bar){
     ].concat(p.r.map(function(x){ return { v:(x === '' || x == null ? '—' : escapeHtml(x)), extra:'font-family:\'Geist Mono\',monospace' }; }))
       .concat([{ v:avgCell, extra:'font-weight:700;font-family:\'Geist Mono\',monospace' }]) };
   });
-  return _fnTableEl(heads, rows, bar, P);
+  return vxSurveyTableEl(heads, rows, bar, P);
 }
 
 function _fnComponentLine(weldView, P){

@@ -89,8 +89,33 @@ copies of one module shape. The orphan data confirms they have diverged:
 | `htIsEmpty` | 0 — never written |
 
 Three copies of the same concept, each evolving separately, with nothing
-enforcing parity. Extracting one weld-survey core is the fix; this is evidence
-for it, not a bug on its own.
+enforcing parity.
+
+**Correction (2026-07-29): "extract one weld-survey core" was the wrong
+conclusion, and this section overstated the problem.** It was inferred from
+name parallelism. Comparing function *bodies* with the prefixes and whitespace
+normalised away tells a different story:
+
+| | |
+|---|---|
+| Top-level functions across the three files | 178 |
+| Duplicated in 2+ files | 30, in 12 groups |
+| Lines deduplication would actually remove | **91** of ~2,150 (~4%) |
+| Roles sharing a name but with different bodies | 31 |
+
+`RenderSurvey` is 64 / 28 / 40 lines; `Normalize` 15 / 9 / 17; `Verdict` 1 / 7.
+Those differ because hardness, ferrite and PMI *are* different measurements —
+forcing them behind one abstraction would make the code worse, not better.
+
+What was real and has been done: `_htTableEl` / `_fnTableEl` / `_pmiTableEl`
+were the same 17-line HTML table renderer three times over, touching no module
+state. Extracted to `vxSurveyTableEl` in `js/utils.js`, verified byte-identical
+against all three originals across four input shapes — the browser sweep never
+renders a PDF, so output was compared directly rather than inferred from the
+page loading.
+
+The drift above stands as a small real inconsistency, but it is dead code in
+two modules, not evidence of a missing abstraction.
 
 ## Finding 3 — 36 genuinely dead globals
 

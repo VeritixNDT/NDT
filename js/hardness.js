@@ -275,7 +275,7 @@ function _htItemDetails(item, idx, P, limit, bar, weldView, colWidths){
     { v:val(item.extent) },
     { v:_htItemResultChip(item, weldView, limit) }
   ];
-  return _htTableEl(heads, [{ cells:cells }], bar, P, colWidths);
+  return vxSurveyTableEl(heads, [{ cells:cells }], bar, P, colWidths);
 }
 
 // Shared table builder — mirrors the report items-table look: coloured header
@@ -283,23 +283,6 @@ function _htItemDetails(item, idx, P, limit, bar, weldView, colWidths){
 function _htAvgCell(a, over){
   if(a == null) return '—';
   return over ? '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600">'+a+'</span>' : String(a);
-}
-function _htTableEl(headLabels, rowsData, bar, P, colWidths){
-  var colgroup = '';
-  if(Array.isArray(colWidths) && colWidths.length === headLabels.length){
-    var tot = colWidths.reduce(function(s,w){ return s + (+w || 0); }, 0) || 1;
-    colgroup = '<colgroup>' + colWidths.map(function(w){ return '<col style="width:'+((+w||0)/tot*100).toFixed(3)+'%"/>'; }).join('') + '</colgroup>';
-  }
-  var head = headLabels.map(function(c){ return '<th style="padding:3px 6px;text-align:left;font:600 7.5px \'Geist Mono\',monospace;color:#fff;letter-spacing:.03em;word-break:break-word">'+escapeHtml(c)+'</th>'; }).join('');
-  var n = headLabels.length;
-  var body = rowsData.map(function(r){
-    var cells = r.cells.map(function(cell, ci){
-      var br = (ci === n-1) ? '' : ('border-right:0.5px solid '+P.grid+';');
-      return '<td style="padding:3px 6px;'+br+'border-bottom:0.5px solid '+P.grid+';font-size:8.5px;line-height:1.3;color:#000;vertical-align:middle;word-break:break-word;overflow:hidden;'+(cell.extra||'')+'">'+cell.v+'</td>';
-    }).join('');
-    return '<tr'+(r.rowStyle?(' style="'+r.rowStyle+'"'):'')+'>'+cells+'</tr>';
-  }).join('');
-  return '<table style="width:100%;border-collapse:separate;border-spacing:0;border-top:1px solid '+P.grid+';table-layout:'+(colgroup?'fixed':'auto')+'">'+colgroup+'<thead style="background:'+bar+'"><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
 }
 
 // dynamic Y domain from data + limit
@@ -474,7 +457,7 @@ function _htSiteTable(survey, P, limit, bar){
     return { cells: [{ v:c, extra:'font-family:\'Geist Mono\',monospace;color:#555' }].concat(pts.map(function(p){ var x=p.clock?p.clock[c]:''; return { v:(x===''||x==null?'—':escapeHtml(x)), extra:'font-family:\'Geist Mono\',monospace' }; })) };
   });
   rows.push({ rowStyle:'background:#f3f4f6', cells: [{ v:'AVG', extra:'font-weight:700' }].concat(pts.map(function(p){ var a=htSiteAvg(p,clocks), over=limit&&a!=null&&a>limit; return { v:_htAvgCell(a, over), extra:'font-weight:700;font-family:\'Geist Mono\',monospace' }; })) });
-  return _htTableEl(heads, rows, bar, P);
+  return vxSurveyTableEl(heads, rows, bar, P);
 }
 
 // Weld readings: a (possibly sliced) flat row list. Flat Line column (no
@@ -490,7 +473,7 @@ function _htTable(survey, P, limit, flat, bar){
     ].concat(p.r.map(function(x){ return { v:(x===''||x==null?'—':escapeHtml(x)), extra:'font-family:\'Geist Mono\',monospace' }; }))
       .concat([{ v:_htAvgCell(a, over), extra:'font-weight:700;font-family:\'Geist Mono\',monospace' }]) };
   });
-  return _htTableEl(heads, rows, bar, P);
+  return vxSurveyTableEl(heads, rows, bar, P);
 }
 
 // ══════════════════════════════════════════════════════════════════════════

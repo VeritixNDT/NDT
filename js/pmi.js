@@ -405,27 +405,10 @@ function _pmiItemDetails(comp, item, idx, mode, P, bar, colWidths){
     { v:(mode === 'xrf' ? 'XRF' : 'OES'), extra:'font-family:\'Geist Mono\',monospace' },
     { v:_pmiVerdictChip(pmiComponentVerdict(comp, mode), P) },
   ];
-  return _pmiTableEl(heads, [{ cells:cells }], bar, P, colWidths);
+  return vxSurveyTableEl(heads, [{ cells:cells }], bar, P, colWidths);
 }
 
 // Shared table builder (mirrors the report items-table look).
-function _pmiTableEl(headLabels, rowsData, bar, P, colWidths){
-  var colgroup = '';
-  if(Array.isArray(colWidths) && colWidths.length === headLabels.length){
-    var tot = colWidths.reduce(function(s,w){ return s + (+w || 0); }, 0) || 1;
-    colgroup = '<colgroup>' + colWidths.map(function(w){ return '<col style="width:'+((+w||0)/tot*100).toFixed(3)+'%"/>'; }).join('') + '</colgroup>';
-  }
-  var head = headLabels.map(function(c){ return '<th style="padding:3px 6px;text-align:left;font:600 7.5px \'Geist Mono\',monospace;color:#fff;letter-spacing:.03em;word-break:break-word">'+escapeHtml(c)+'</th>'; }).join('');
-  var n = headLabels.length;
-  var body = rowsData.map(function(r){
-    var cells = r.cells.map(function(cell, ci){
-      var br = (ci === n-1) ? '' : ('border-right:0.5px solid '+P.grid+';');
-      return '<td style="padding:3px 6px;'+br+'border-bottom:0.5px solid '+P.grid+';font-size:8.5px;line-height:1.3;color:#000;vertical-align:middle;word-break:break-word;overflow:hidden;'+(cell.extra||'')+'">'+cell.v+'</td>';
-    }).join('');
-    return '<tr'+(r.rowStyle?(' style="'+r.rowStyle+'"'):'')+'>'+cells+'</tr>';
-  }).join('');
-  return '<table style="width:100%;border-collapse:separate;border-spacing:0;border-top:1px solid '+P.grid+';table-layout:'+(colgroup?'fixed':'auto')+'">'+colgroup+'<thead style="background:'+bar+'"><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
-}
 
 // Per-element acceptance domain (band-centric so the band reads prominently
 // rather than being a sliver on a 0→max axis).
@@ -531,7 +514,7 @@ function _pmiCompTable(comp, mode, P, bar){
     ] };
   });
   if(!body.length) body = [{ cells:[{ v:'<span style="color:#9aa6b5">No grade selected</span>' },{v:''},{v:''},{v:''},{v:''}] }];
-  return _pmiTableEl(heads, body, bar, P);
+  return vxSurveyTableEl(heads, body, bar, P);
 }
 
 // "How the material is verified" — a welded-pipe side view with the 3 PMI test

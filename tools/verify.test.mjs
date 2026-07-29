@@ -210,3 +210,26 @@ test('platform chrome renders after being split into platform-ui.js', opts, asyn
     assert.equal(r.rendered, true, 'updateDeployModePill() left the pill empty');
   } finally { await app.close(); }
 });
+
+test('the API client survives being split into api.js', opts, async () => {
+  // vxApi is every network call in the app. Nothing invokes it during boot, so
+  // if api.js failed to load nothing would throw — vxApi would just be
+  // undefined and the first user action needing the network would die. Silent,
+  // with all 30 pages still rendering. Pin the surface so a partial move is
+  // caught here rather than by a user.
+  const EXPECTED = [
+    'request', 'refreshToken', 'login', 'register', 'logout', 'hydrate',
+    'hydrateReportHtml', 'hydrateReports', 'hydratePortalEvents', 'upsertEntity',
+    'deleteEntity', 'sendEmail', 'inviteMember', 'listPendingInvites', 'revokeInvite',
+  ];
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate((expected) => ({
+      type: typeof vxApi,
+      missing: typeof vxApi === 'object' && vxApi
+        ? expected.filter((m) => typeof vxApi[m] !== 'function') : expected,
+    }), EXPECTED);
+    assert.equal(r.type, 'object', 'vxApi missing — did api.js load?');
+    assert.deepEqual(r.missing, [], 'API methods lost in the split');
+  } finally { await app.close(); }
+});

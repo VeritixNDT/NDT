@@ -76,7 +76,10 @@ export const realErrors = (errors) => errors.filter((e) => !EXPECTED_NOISE.some(
 // Open the app in a fresh page with CDN blocked, app JS ready, admin seeded.
 // opts: { port, section, locale, headless }
 export async function openApp(opts = {}) {
-  const { port = 8000, section = null, locale = null, headless = true } = opts;
+  // Port 0 = let the OS pick a free one. node --test runs test FILES in
+  // parallel, so a fixed 8000 made the second browser suite die with
+  // EADDRINUSE the moment a second one existed.
+  const { port = 0, section = null, locale = null, headless = true } = opts;
   // Resolve first: an unknown section must fail before a server and browser
   // are started, not leak them behind a rejected promise.
   const target = resolveTarget(section);

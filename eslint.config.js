@@ -78,7 +78,8 @@ export default [
   // from its surrounding module, and having the app's real surface checked
   // inside those callbacks is worth more than that.
   {
-    files: ['tools/verify.mjs', 'tools/verify-numbering.mjs', 'tools/verify.test.mjs'],
+    files: ['tools/verify.mjs', 'tools/verify-numbering.mjs', 'tools/verify.test.mjs',
+      'tools/sync-queue.test.mjs'],
     languageOptions: {
       globals: { ...globals.browser, ...appGlobals },
     },

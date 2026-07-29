@@ -42,7 +42,13 @@ export function startServer(port = 8000) {
         res.end(buf);
       });
     });
-    server.listen(port, '127.0.0.1', () => resolve({ server, port, url: `http://127.0.0.1:${port}/${APP}` }));
+    // Resolve with the port actually bound, not the one requested: pass 0 and
+    // the OS picks a free one, which is what lets several browser test files
+    // run in parallel without fighting over 8000.
+    server.listen(port, '127.0.0.1', () => {
+      const bound = server.address().port;
+      resolve({ server, port: bound, url: `http://127.0.0.1:${bound}/${APP}` });
+    });
   });
 }
 

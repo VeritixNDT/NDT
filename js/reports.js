@@ -1,3 +1,22 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { openA11yModal,} from './a11y.js';
+import { _aiAuditHtml, _aiReviewGate, _aiVerdictBadge,} from './ai-review.js';
+import { CURRENT_USER, KEYS, NDT_METHODS, vxActions, vxFire,} from './constants.js';
+import { _ovCurrentUserInspector, _ovMethod, ovOpenReport,
+  ovRenderRecentList, ovSaveReport, vxCustomerPickerOptions,
+  vxJobPickerOptions,} from './dashboard.js';
+import { ovBuildReportSnapshot, ovPrintReport, ovViewReport,} from './export.js';
+import { t, tStage, tf,} from './i18n.js';
+import { jobCustomerName, jobLoad,} from './jobs.js';
+import { _vxReportCustomerId, el, fmtDate, ls, lss, set, vxAllocReportNo,
+  vxEmitWebhook, vxEnsureReportVerifyUrl, vxIsAdmin, vxIsSeniorOrAdmin,
+  vxNotifyCustomer, vxReportError, vxRequireAdmin, vxUndoable,
+  vxUploadPhoto,} from './platform.js';
+import { INSPECTORS, _inspCertList, _inspMethodCerts, custLoad, daysUntil,
+  eqIsExpired, eqLoad, eqOpenForm, getActiveMethods,} from './settings.js';
+import { escapeHtml, showPage, showSS, toast, updateReportCount, vxConfirm,
+  vxPrompt, vxShield,} from './ui.js';
+
 // ══════════════════════════════════════════════
 // REPORT TEMPLATES
 // ══════════════════════════════════════════════
@@ -3413,3 +3432,15 @@ vxActions({
   rptToggleSelect, submitReport, toggleSidebar, tplClear, tplSave,
   tplSelectMethod, tplSwitchView, voiceToggle,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  RPT_FORM, RPT_ITEM_FIELD_IDS, TPL_CRITERIA_FIELD_IDS, TPL_FIELDS, TPL_KEY,
+  _defPhotos, _ovCanApprove, _ovEnsureReportLinkedForApproval, _rptForms,
+  _rptInspectorChange, _sealReport, _tplData, addReportAudit,
+  captureWizardSetVal, defRenderPhotos, getReportStage, inboxRender,
+  loadSidebarState, loadTemplates, migrateReportsWorkflow, rptAllFormFields,
+  rptFieldHtml, rptInit, rptLatestRevisions, rptRender, tplBuildTabs,
+  tplPersistFieldOpts, updateInboxBadge, updateOnlineStatus, vxEmailCompose,
+  vxSetSnavTooltips,
+};

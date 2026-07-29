@@ -1,3 +1,35 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { a11yWireLabels, openA11yModal,} from './a11y.js';
+import { VX_ACCEPTANCE_DISCLAIMER, vxAcceptanceClassify,
+  vxAcceptanceParseDimension,} from './acceptance.js';
+import { _aiInsightsBarHtml, _aiReviewSaveGate, _aiVerdictBadge,} from './ai-review.js';
+import { billLoad,} from './billing.js';
+import { cadIsEmpty, cadOpenEditor, cadRenderSVG,} from './cad-editor.js';
+import { CURRENT_USER, KEYS, NDT_METHODS, VX_SHOW_TEST_TOOLS, vxActions,
+  vxOn,} from './constants.js';
+import { _defCombined, procInitView,} from './defects.js';
+import { CV_METHOD_TPL_PREFIX, _wOvNewReportFromActiveMethod,} from './editor.js';
+import { ovBuildReportSnapshot,} from './export.js';
+import { fnCollect, fnRenderEntrySection, fnSyncToItems,} from './ferrite.js';
+import { htCollect, htIsTraverse, htRenderEntrySection, htRenderPreview,
+  htSyncToItems,} from './hardness.js';
+import { t, tSeverity, tf, vxLocale,} from './i18n.js';
+import { inspShowSection,} from './inspector.js';
+import { jobCustomerName, jobLoad, jobOpenForm, jobsInit,} from './jobs.js';
+import { _vxSupabase, el, fmtDate, initials, ls, lss, set, uaGrad,
+  vxAllocReportNo, vxEnsureReportVerifyUrl, vxFormatReportNo, vxIsAdmin,
+  vxIsAuthenticated, vxIsSeniorOrAdmin, vxNewId,} from './platform.js';
+import { pmiCollect, pmiRenderEntrySection, pmiSyncToItems,} from './pmi.js';
+import { RPT_FORM, RPT_ITEM_FIELD_IDS, TPL_CRITERIA_FIELD_IDS, TPL_FIELDS,
+  _ovCanApprove, _ovEnsureReportLinkedForApproval, _rptForms,
+  _rptInspectorChange, _sealReport, _tplData, addReportAudit,
+  getReportStage, loadTemplates, rptAllFormFields, rptFieldHtml,
+  rptLatestRevisions, updateInboxBadge,} from './reports.js';
+import { INSPECTORS, _inspCertList, _inspMethodCerts, custLoad,
+  custOpenForm, daysUntil, eqLoad, getActiveMethods,} from './settings.js';
+import { escapeHtml, generate7DaySparkline, refreshNotifBadge, showPage,
+  showSS, sparklineSVG, toast, updateReportCount, vxConfirm,} from './ui.js';
+
 // ══════════════════════════════════════════════
 // OVERVIEW PAGE
 // ══════════════════════════════════════════════
@@ -1076,6 +1108,12 @@ function _geoLookup(loc){
 
 var _geoMap = null;        // The Leaflet map instance
 var _geoMarkers = [];      // For cleanup on re-render
+
+// Bridge to the shell's inline Leaflet loader. That loader is a classic script
+// and cannot see module scope, but it calls this on Leaflet's onload to draw
+// the map as soon as the library lands. Modules expose nothing on window, so
+// this is published explicitly rather than by accident of being a global.
+window.ovRenderGeoMap = ovRenderGeoMap;
 
 function ovRenderGeoMap(){
   const wrap = el('ov-geomap');
@@ -3841,3 +3879,14 @@ vxActions({
   // scan finds these three.
   gsAddCustomer, gsAddJob, gsNewReport,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  OV_VERDICT_COLORS, _ovCurrentUserInspector, _ovDateRange, _ovItems,
+  _ovMethod, _ovOverallVerdict, _ovReviseSource, auditLogRender,
+  ovFilterByRange, ovHtAddItem, ovHtModeChanged, ovHtRemoveItem, ovInit,
+  ovItemsSync, ovNewReport, ovNewReportPicker, ovOpenReport, ovPmiAddItem,
+  ovPmiRemoveItem, ovRefreshDashboard, ovRenderGettingStarted,
+  ovRenderRecentList, ovSaveReport, ovVerdictStyle, vxCustomerPickerOptions,
+  vxJobPickerOptions, webhookLoadIntoUi,
+};

@@ -341,3 +341,9 @@ if(typeof window !== 'undefined'){
   window.VX_ACCEPTANCE_RULES        = VX_ACCEPTANCE_RULES;
   window.VX_ACCEPTANCE_DISCLAIMER   = VX_ACCEPTANCE_DISCLAIMER;
 }
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  VX_ACCEPTANCE_DISCLAIMER, vxAcceptanceClassify,
+  vxAcceptanceParseDimension,
+};

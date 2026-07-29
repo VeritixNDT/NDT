@@ -1,3 +1,19 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { ACCENT_COLORS, AUTH_USERS, CURRENT_USER, KEYS, NDT_METHODS,
+  _activeAccent, _certPills, _editingIdx, _uaView, vxActions, vxFire,} from './constants.js';
+import { ovRenderRecentList,} from './dashboard.js';
+import { t, tf,} from './i18n.js';
+import { _dateFmt, _timeFmt, _vxRoleToDisplay, _vxSupabase, el, fmtDate,
+  fmtSize, initials, ls, lsSize, lss, roleClass, saveUsers, set, signOut,
+  uaGrad, vxApi, vxEntityStore, vxIsAdmin, vxIsAuthenticated,
+  vxNotifySettings, vxNotifySettingsSet, vxPlatformConfig,
+  vxRenderSidebarOrgBlock, vxRequireAdmin,} from './platform.js';
+import { vxPortalLocalLink,} from './portal.js';
+import { tplPersistFieldOpts, vxEmailCompose,} from './reports.js';
+import { escapeHtml, refreshUnitLabels, showPage, showSS, toast,
+  updateReportCount, vxConfirm, vxPrompt,} from './ui.js';
+import { sha256,} from './utils.js';
+
 // ══════════════════════════════════════════════
 // COMPANY PROFILE
 // ══════════════════════════════════════════════
@@ -3637,3 +3653,19 @@ vxActions({
   uaCloseInvite, uaDelete, uaOpenForm, uaOpenInvite, uaRender,
   uaRevokeInvite, uaSetView, uaSubmitInvite, vxWebhookAdd, vxWebhookDelete,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  INSPECTORS, _apIdleLast, _inspCertList, _inspMethodCerts, _methodActive,
+  _wireLogoSection, apApplyCustomCss, apApplyDensity, apApplyTheme,
+  apCancelRebind, apImportTheme, apResetShortcut, apSetSeverity,
+  apSetSidebarPos, apSetToastPos, apSetupIdleTimer, applyAccent,
+  buildAccentGrid, certStatus, custLoad, custOpenForm, custRender,
+  daysUntil, dbAllKeys, dbRefreshCard, eqIsExpired, eqLoad, eqOpenForm,
+  eqRender, eyeUploadLoad, getActiveMethods, getShortcutKey,
+  inspAddCustomMethod, inspRender, loadInspectors, loadMethodOrder,
+  loadSettings, logoLoadFile, logoLoadSaved, markMethodDirty, matchShortcut,
+  openCropModal, renderApiKeys, renderCertPills, renderMethodsTable,
+  renderNumberingPreview, renderSystemInfo, sigLoadUpload, uaRender,
+  vxWebhookRender,
+};

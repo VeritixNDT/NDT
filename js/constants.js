@@ -280,3 +280,9 @@ var _certPills    = [];
 var _uaView       = 'grid';
 var _activeAccent = 0; // default: Blue (#4f8ef7)
 
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  ACCENT_COLORS, AUTH_USERS, CURRENT_USER, KEYS, NDT_METHODS, VX_BUILD,
+  VX_SHOW_TEST_TOOLS, _activeAccent, _certPills, _editingIdx, _uaView,
+  vxActions, vxFire, vxOn, vxResolveAction,
+};

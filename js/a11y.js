@@ -120,3 +120,8 @@ function a11yWireLabels(root = document) {
     label.setAttribute('for', target.id);
   });
 }
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  a11yAnnounce, a11yWireLabels, openA11yModal,
+};

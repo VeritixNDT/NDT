@@ -1,3 +1,15 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { KEYS, vxActions,} from './constants.js';
+import { CV_METHOD_TPL_PREFIX, cvCurrentPage, cvDocType, cvPages,
+  cvSeedBillingTemplate, cvSync,} from './editor.js';
+import { _vxPrintHtml, cvBuildPrintHTML, vxDownloadHtmlAsPdf,} from './export.js';
+import { jobCustomerName, jobLoad, jobOpenDetail,} from './jobs.js';
+import { el, fmtDate, ls, lss, vxEmitWebhook, vxNotifyCheckInvoices,
+  vxNotifyCustomer,} from './platform.js';
+import { vxEmailCompose,} from './reports.js';
+import { custLoad,} from './settings.js';
+import { escapeHtml, toast, vxConfirm,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // BILLING — Quotes & Invoices (Phase 2)
 // ══════════════════════════════════════════════════════════════════════════
@@ -873,3 +885,9 @@ vxActions({
   billPrintDoc, billRecalc, billRemoveLineRow, billSaveDoc, billSetStatus,
   billingRender,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  billBuildDocHtml, billCalc, billDefaultCurrency, billFmtMoney,
+  billIsOverdue, billJobSectionsHtml, billLoad, billRefresh, billingInit,
+};

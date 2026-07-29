@@ -1,3 +1,24 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { cadIsEmpty,} from './cad-editor.js';
+import { KEYS, vxActions,} from './constants.js';
+import { CV_FIELD_DEFS, CV_FONTS, CV_LAYOUT_ITEMS, CV_METHOD_TPL_PREFIX,
+  CV_PAGE_HEIGHT_PX, CV_PAGE_WIDTH_PX, _cvBlockId, _cvBuildCrossRefMap,
+  _cvHtSlice, _cvItemsSlice, _cvPmiSlice, _cvPrintPageNum, _cvPrintTotal,
+  _cvResolveZoneChrome, cvAutoSnapshot, cvBlocks, cvBuildReport,
+  cvCrossRefMap, cvCurrentPage, cvEvalShowWhen, cvFitToView,
+  cvGetCompanyColor, cvNextId, cvPages, cvPpvMethod, cvPpvResult,
+  cvPpvShowDefects, cvPushUndo, cvRenderBlockContent, cvRenderCanvas,
+  cvRenderPageTabs, cvSaveLayout, cvSelectedId, cvSelectedIds, cvSync,
+  cvTplCfg,} from './editor.js';
+import { fnVerdict,} from './ferrite.js';
+import { htRowsOf, htVerdict, htWeldCount,} from './hardness.js';
+import { t, vxLocale,} from './i18n.js';
+import { _vxSupabase, fmtDate, ls,} from './platform.js';
+import { pmiComponentCount, pmiIsEmpty,} from './pmi.js';
+import { TPL_KEY,} from './reports.js';
+import { INSPECTORS,} from './settings.js';
+import { escapeHtml, toast, vxConfirm,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // V22 PRINT / PDF EXPORT
 // ══════════════════════════════════════════════════════════════════════════
@@ -1109,3 +1130,10 @@ if ('serviceWorker' in navigator) {
 vxActions({
   cvOpenInTab, cvPrintOrExport, ovPrintReport, ovViewReport,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  _vxPrintHtml, cvBuildPrintHTML, cvDefaultLayoutBlocks, cvPrintOrExport,
+  ovBuildReportSnapshot, ovPrintReport, ovViewReport, vxBuildReportPackHtml,
+  vxDownloadHtmlAsPdf,
+};

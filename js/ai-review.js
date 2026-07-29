@@ -1,3 +1,17 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { KEYS, vxActions,} from './constants.js';
+import { _ovItems, _ovMethod, _ovOverallVerdict, _ovReviseSource,
+  ovItemsSync,} from './dashboard.js';
+import { fnCollect,} from './ferrite.js';
+import { htCollect,} from './hardness.js';
+import { t,} from './i18n.js';
+import { jobLoad,} from './jobs.js';
+import { _vxSupabase, el, fmtDate, ls, vxIsAuthenticated, vxIsSeniorOrAdmin,} from './platform.js';
+import { pmiCollect,} from './pmi.js';
+import { TPL_FIELDS, getReportStage, rptAllFormFields, rptLatestRevisions,} from './reports.js';
+import { custLoad,} from './settings.js';
+import { escapeHtml, toast,} from './ui.js';
+
 // ═════════════════════════════════════════════════════════════════════════
 // AI report-review (js/ai-review.js)
 // ═════════════════════════════════════════════════════════════════════════
@@ -475,3 +489,11 @@ function aiInsightsOpen(){ vxAiInsightsModal(); }
 vxActions({
   aiInsightsOpen, aiReviewCloseTop, aiReviewCurrent, aiReviewReport,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  AI_REVIEW_RISK, AI_REVIEW_SEV, _AI_DISCLAIMER_HTML, _aiAuditHtml,
+  _aiInsightsBarHtml, _aiReviewCollectLive, _aiReviewGate,
+  _aiReviewSanitize, _aiReviewSaveGate, _aiReviewShowOverlay,
+  _aiReviewTopClose, _aiVerdictBadge,
+};

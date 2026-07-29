@@ -1,3 +1,12 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { vxActions,} from './constants.js';
+import { ovRefreshDashboard,} from './dashboard.js';
+import { defRender,} from './defects.js';
+import { ls, lss, updateDeployModePill,} from './platform.js';
+import { inboxRender, rptRender, vxSetSnavTooltips,} from './reports.js';
+import { toast,} from './ui.js';
+import { vxSyncCopyrightYear,} from './utils.js';
+
 // ══════════════════════════════════════════════
 // CONSTANTS & STATE
 // ══════════════════════════════════════════════
@@ -7952,3 +7961,9 @@ window.addEventListener('vx:locale-change', () => renderLocalePicker());
 vxActions({
   _wPickLocale,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  i18nApply, renderLocalePicker, t, tSeverity, tStage, tStatus, tf,
+  vxLocale,
+};

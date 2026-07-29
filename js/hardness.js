@@ -1,3 +1,12 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { vxActions,} from './constants.js';
+import { OV_VERDICT_COLORS, _ovItems, ovHtAddItem, ovHtModeChanged,
+  ovHtRemoveItem, ovVerdictStyle,} from './dashboard.js';
+import { CV_METHOD_TPL_PREFIX, _cvBlockId, cvTplCfg,} from './editor.js';
+import { cvDefaultLayoutBlocks,} from './export.js';
+import { el, fmtDate, ls, lss,} from './platform.js';
+import { escapeHtml,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // HARDNESS SURVEY (HT) — shared data model, visual renderer and report-form
 // data-entry grid. ONE renderer (htRenderSurvey) feeds both the on-screen form
@@ -781,3 +790,10 @@ vxActions({
   htAddPoint, htAddWeld, htBoreChange, htEntryChanged, htRemovePoint,
   htRemoveWeld, htSetMode,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  HT_DETAIL_COLS, htCollect, htIsTraverse, htRenderEntrySection,
+  htRenderPreview, htRenderSurvey, htRowsOf, htSyncToItems, htVerdict,
+  htWeldCount,
+};

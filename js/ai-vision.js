@@ -1,3 +1,14 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { AI_REVIEW_RISK, AI_REVIEW_SEV, _AI_DISCLAIMER_HTML,
+  _aiReviewCollectLive, _aiReviewSanitize, _aiReviewShowOverlay,
+  _aiReviewTopClose,} from './ai-review.js';
+import { KEYS, vxActions,} from './constants.js';
+import { _ovMethod,} from './dashboard.js';
+import { t, tf,} from './i18n.js';
+import { _vxSupabase, el, ls, vxPhotos,} from './platform.js';
+import { TPL_FIELDS,} from './reports.js';
+import { escapeHtml, toast,} from './ui.js';
+
 // ═════════════════════════════════════════════════════════════════════════
 // AI vision photo-analysis (js/ai-vision.js)
 // ═════════════════════════════════════════════════════════════════════════

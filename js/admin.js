@@ -1,3 +1,14 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { a11yWireLabels,} from './a11y.js';
+import { billingInit,} from './billing.js';
+import { vxActions,} from './constants.js';
+import { ovNewReportPicker, ovRefreshDashboard, ovRenderGettingStarted,} from './dashboard.js';
+import { defInit,} from './defects.js';
+import { jobsInit,} from './jobs.js';
+import { plInit, plRenderUpcoming,} from './planner.js';
+import { inboxRender, rptInit,} from './reports.js';
+import { custRender,} from './settings.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // ADMIN WORKSPACE — one admin-only top button (page-admin) that consolidates
 // Home (dashboard), Reports, Inbox, Defects, Jobs, Customers, Planner and
@@ -102,3 +113,8 @@ function adminNewReport(){
 vxActions({
   adminNewReport, adminShowSection,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  _adminCurrent, adminInit, adminRestore,
+};

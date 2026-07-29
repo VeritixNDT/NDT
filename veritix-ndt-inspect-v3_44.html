@@ -4222,38 +4222,11 @@
 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script>
 
+<!-- Vendored UMD bundle: assigns a global, so it stays a classic script and
+     must load before the module entry that uses it. -->
 <script defer src="js/qrcode.min.js"></script>
-<script defer src="js/constants.js"></script>
-<script defer src="js/acceptance.js"></script>
-<script defer src="js/utils.js"></script>
-<script defer src="js/a11y.js"></script>
-<script defer src="js/i18n.js"></script>
-<script defer src="js/platform.js"></script>
-<script defer src="js/ui.js"></script>
-<script defer src="js/select.js"></script>
-<script defer src="js/datepicker.js"></script>
-<script defer src="js/tooltip.js"></script>
-<script defer src="js/settings.js"></script>
-<script defer src="js/reports.js"></script>
-<script defer src="js/dashboard.js"></script>
-<script defer src="js/jobs.js"></script>
-<script defer src="js/planner.js"></script>
-<script defer src="js/billing.js"></script>
-<script defer src="js/portal.js"></script>
-<script defer src="js/verify.js"></script>
-<script defer src="js/help.js"></script>
-<script defer src="js/defects.js"></script>
-<script defer src="js/inspector.js"></script>
-<script defer src="js/admin.js"></script>
-<script defer src="js/hardness.js"></script>
-<script defer src="js/pmi.js"></script>
-<script defer src="js/ferrite.js"></script>
-<script defer src="js/reports-mgmt.js"></script>
-<script defer src="js/ai-review.js"></script>
-<script defer src="js/cad-editor.js"></script>
-<script defer src="js/editor.js"></script>
-<script defer src="js/export.js"></script>
-<script defer src="js/tests.js"></script>
-<script defer src="js/boot.js"></script>
+<!-- The app. One module entry; the dependency graph lives in the imports,
+     not in tag order. See js/main.js. -->
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

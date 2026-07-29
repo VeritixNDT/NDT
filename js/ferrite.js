@@ -1,3 +1,12 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { vxActions,} from './constants.js';
+import { OV_VERDICT_COLORS, _ovItems, ovHtAddItem, ovHtRemoveItem,
+  ovVerdictStyle,} from './dashboard.js';
+import { CV_METHOD_TPL_PREFIX, _cvBlockId, cvTplCfg,} from './editor.js';
+import { cvDefaultLayoutBlocks,} from './export.js';
+import { el, fmtDate, ls, lss,} from './platform.js';
+import { escapeHtml,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // FERRITE SURVEY (FN) — shared data model, visual renderer and report-form
 // data-entry grid. ONE renderer (fnRenderSurvey) feeds both the on-screen form
@@ -525,3 +534,8 @@ vxActions({
   fnAddPoint, fnAddWeld, fnEntryChanged, fnRemovePoint, fnRemoveWeld,
   fnSetMaterial, fnSetSampling,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  fnCollect, fnRenderEntrySection, fnRenderSurvey, fnSyncToItems, fnVerdict,
+};

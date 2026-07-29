@@ -1,3 +1,12 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { vxActions,} from './constants.js';
+import { OV_VERDICT_COLORS, _ovItems, ovPmiAddItem, ovPmiRemoveItem,
+  ovVerdictStyle,} from './dashboard.js';
+import { CV_METHOD_TPL_PREFIX, _cvBlockId, cvTplCfg,} from './editor.js';
+import { cvDefaultLayoutBlocks,} from './export.js';
+import { el, fmtDate, ls, lss,} from './platform.js';
+import { escapeHtml,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // POSITIVE MATERIAL IDENTIFICATION (PMI) — shared data model, visual renderer
 // and report-form data-entry grid. Mirrors js/hardness.js: ONE renderer
@@ -869,3 +878,9 @@ vxActions({
   pmiAddComponent, pmiEntryChanged, pmiGradeChange, pmiRemoveComponent,
   pmiSetMeasMode, pmiSetMode,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  PMI_DETAIL_COLS, pmiCollect, pmiComponentCount, pmiIsEmpty,
+  pmiRenderEntrySection, pmiRenderSurvey, pmiSyncToItems,
+};

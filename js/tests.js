@@ -1,3 +1,15 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { CV_FIELD_DEFS, CV_LAYOUT_ITEMS, _cvAlignGuidesOn, _cvBlockElCache,
+  _cvBlockId, _cvFieldLabel, _cvLayoutLabel, _cvLoadAlignGuidesPref,
+  _cvRefreshSaveIndicator, cvClearLogo, cvCloseAllDrawers,
+  cvHandleLogoUpload, cvLogoLibAdd, cvLogoLibLoad, cvLogoLibPick,
+  cvLogoLibRemove, cvTogglePaletteDrawer, cvTogglePropsDrawer,} from './editor.js';
+import { HELP_CHAPTERS, _helpChapterBody, _helpChapterTitle,} from './help.js';
+import { t, tf,} from './i18n.js';
+import { VX_PLATFORM_DEFAULTS, _vxReadMetaApiBase, ls, lss, vxDiagnostics,} from './platform.js';
+import { CV_COLOUR_RECENT_KEY, CV_COLOUR_RECENT_MAX, _cvLoadRecentColours,
+  _cvTrackRecentColor, toast,} from './ui.js';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // V28 — END-TO-END SELF-TEST HARNESS
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1,3 +1,40 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { a11yAnnounce, a11yWireLabels,} from './a11y.js';
+import { adminInit, adminRestore,} from './admin.js';
+import { billingInit,} from './billing.js';
+import { AUTH_USERS, CURRENT_USER, KEYS, _certPills, vxActions,
+  vxResolveAction,} from './constants.js';
+import { ovInit, ovNewReport, ovRefreshDashboard, webhookLoadIntoUi,} from './dashboard.js';
+import { _procFileQueue, defInit, procHandleFiles, procInit,
+  procRenderQueue,} from './defects.js';
+import { CV_PAGE_HEIGHT_PX, CV_PAGE_WIDTH_PX, _cvBlockElCache, _cvBlockId,
+  _cvCompany, _cvDetectZone, _cvHasCompanyData, _cvPersistTplCfg, cvBlocks,
+  cvFilterPalette, cvInitCanvas, cvLoadMethodTpl, cvLoadSnapshot,
+  cvOpenComments, cvOpenFullPage, cvOpenHistory, cvPages,
+  cvPaletteCollapsed, cvPpvMethod, cvPpvShowDefects, cvPushUndo,
+  cvRenamePage, cvRenderCanvas, cvResolveComment, cvSaveAsMethodTpl,
+  cvSaveLayout, cvSaveSnapshot, cvSelectBlock, cvSetBlockBg,
+  cvSetBlockColor, cvSwitchPage, cvSync, cvTplCfg, cvUpdateBlock,
+  switchRibbonTab,} from './editor.js';
+import { helpClose, helpOpen,} from './help.js';
+import { renderLocalePicker, t, tf,} from './i18n.js';
+import { inspInit,} from './inspector.js';
+import { jobsInit,} from './jobs.js';
+import { plInit, plRenderUpcoming,} from './planner.js';
+import { VX_ADMIN_ONLY_SECTIONS, _vxSupabase, closeEmailModal,
+  cvShowDesktopOnly, el, fmtDate, initials, ls, roleClass, saveUsers, set,
+  uaGrad, vxDoSignin, vxDoSignup, vxIsAdmin, vxIsDesktopClass, vxPlan,
+  vxPortalNotifMarkAllRead, vxPortalNotifs, vxRenderSubscription,
+  vxReportError, vxShowAdminRequired, vxStore,} from './platform.js';
+import { TPL_KEY, inboxRender, rptInit, tplBuildTabs,} from './reports.js';
+import { _apIdleLast, _methodActive, apCancelRebind, apResetShortcut,
+  custRender, dbRefreshCard, eqRender, eyeUploadLoad, getActiveMethods,
+  getShortcutKey, inspAddCustomMethod, inspRender, logoLoadFile,
+  markMethodDirty, matchShortcut, renderApiKeys, renderCertPills,
+  renderMethodsTable, renderNumberingPreview, renderSystemInfo,
+  sigLoadUpload, uaRender, vxWebhookRender,} from './settings.js';
+import { isSafeImageUrl, sha256,} from './utils.js';
+
 // ── Native confirm() rebrand ────────────────────────────────────────
 // The opts-aware vxConfirm() lives further down the file; an older IIFE
 // that used to live here exported a single-string `show(msg)` to
@@ -1859,3 +1896,12 @@ vxActions({
   openPwdModal, pmSigClear, saveProfileModal, savePwdModal, showPage,
   showSS, toggleNotifDropdown, toggleProfileDropdown, togglePwdVis,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  CV_COLOUR_RECENT_KEY, CV_COLOUR_RECENT_MAX, _cvLoadRecentColours,
+  _cvSyncHeaderFooterUI, _cvTrackRecentColor, escapeHtml, formatLength,
+  generate7DaySparkline, inputValueToMm, mmToDisplayValue,
+  refreshNotifBadge, refreshUnitLabels, showPage, showSS, sparklineSVG,
+  toast, unitLabel, updateReportCount, vxConfirm, vxPrompt, vxShield,
+};

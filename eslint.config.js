@@ -26,31 +26,32 @@ try {
 }
 
 export default [
-  // The shipped app (browser scripts, shared globals).
+  // The shipped app — ES modules since the Phase 2/3 conversion.
   {
     files: ['js/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
-      sourceType: 'script',
-      globals: { ...globals.browser, ...appGlobals },
+      sourceType: 'module',
+      // No generated globals manifest any more. Under modules every cross-file
+      // name arrives through an import, so no-undef resolves it natively —
+      // feeding it ~2k names would mask exactly the errors it exists to catch.
+      // Only genuinely ambient names remain: browser APIs, and the CDN/vendored
+      // libraries that assign globals from classic scripts.
+      globals: {
+        ...globals.browser,
+        L: 'readonly', supabase: 'readonly', pdfjsLib: 'readonly',
+        QRCode: 'readonly', _leafletReady: 'writable',
+      },
     },
     rules: {
       ...js.configs.recommended.rules,
-      // Works now that appGlobals describes the real cross-file surface.
       'no-undef': 'error',
-      // REQUIRED alongside the above. no-redeclare defaults to
-      // builtinGlobals: true, which counts config-supplied globals — with ~2k
-      // names fed in, every file would error on its own declarations.
-      'no-redeclare': ['error', { builtinGlobals: false }],
-      // `vars: 'local'` scopes the unused check to locals. Without it, every
-      // function declared in one file and used in another looks dead (that was
-      // 801 false warnings). The whole-program case is covered properly by
-      // tools/symbols.mjs's orphan report.
+      // `vars: 'local'` no longer needed for cross-file names, but an unused
+      // IMPORT is now a real signal, so keep the check on and let it report.
       // caughtErrors: 'none' — ESLint 9 flipped this default to 'all', which
       // flagged 290 `catch(e){}` bindings. The defensive empty catch is already
-      // an accepted idiom here (see no-empty's allowEmptyCatch below); this
-      // keeps the two rules consistent instead of half-warning about it.
-      'no-unused-vars': ['warn', { args: 'none', vars: 'local', caughtErrors: 'none', varsIgnorePattern: '^_' }],
+      // an accepted idiom here (see no-empty's allowEmptyCatch below).
+      'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_' }],
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-constant-condition': ['warn', { checkLoops: false }],
     },

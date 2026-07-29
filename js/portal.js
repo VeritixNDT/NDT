@@ -1,3 +1,11 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { billBuildDocHtml, billCalc, billFmtMoney, billIsOverdue,} from './billing.js';
+import { KEYS, NDT_METHODS, vxActions,} from './constants.js';
+import { _vxPrintHtml, vxBuildReportPackHtml, vxDownloadHtmlAsPdf,} from './export.js';
+import { VX_PORTAL_REQ_KEY, _vxSupabase, fmtDate, ls, lss,} from './platform.js';
+import { addReportAudit, getReportStage,} from './reports.js';
+import { escapeHtml, toast,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // CUSTOMER PORTAL (Phase 4)
 // ══════════════════════════════════════════════════════════════════════════
@@ -1142,3 +1150,8 @@ vxActions({
   vxPortalQuoteDecision, vxPortalRequestDateChange, vxPortalRequestWork,
   vxPortalSearch,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  _vxApplyPortalEventLocal, vxPortalActive, vxPortalBoot, vxPortalLocalLink,
+};

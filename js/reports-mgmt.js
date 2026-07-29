@@ -1,3 +1,14 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { KEYS, vxActions,} from './constants.js';
+import { _ovDateRange, ovFilterByRange,} from './dashboard.js';
+import { _defCombined,} from './defects.js';
+import { _vxPrintHtml,} from './export.js';
+import { t,} from './i18n.js';
+import { jobLoad,} from './jobs.js';
+import { fmtDate, ls,} from './platform.js';
+import { getReportStage, rptLatestRevisions,} from './reports.js';
+import { escapeHtml, toast,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // MANAGEMENT REPORTS — exportable business analytics (Thread 1 of the Reports
 // feature). The dashboard SHOWS analytics live; this turns the same numbers

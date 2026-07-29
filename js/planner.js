@@ -1,3 +1,13 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { a11yWireLabels,} from './a11y.js';
+import { billLoad,} from './billing.js';
+import { CURRENT_USER, KEYS, vxActions,} from './constants.js';
+import { t,} from './i18n.js';
+import { jobCustomerName, jobLoad, jobOpenDetail, jobSaveAll,} from './jobs.js';
+import { fmtDate, ls, lss, vxIsAdmin, vxIsSeniorOrAdmin,} from './platform.js';
+import { eqLoad,} from './settings.js';
+import { escapeHtml, showPage, showSS, toast, vxConfirm,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // PLANNER + CALENDAR (js/planner.js)
 // ══════════════════════════════════════════════════════════════════════════
@@ -1004,3 +1014,9 @@ vxActions({
   plNewEvent, plNext, plOpenDay, plPrev, plResNew, plSaveEvent, plSetView,
   plToday, plToggleFilter, plUpView,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  _plInjectStyles, _plInstallDrag, _plRootId, _plScopeInspector, plInit,
+  plRender, plRenderUpcoming,
+};

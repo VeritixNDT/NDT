@@ -1,3 +1,6 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { VX_BUILD,} from './constants.js';
+
 // ══════════════════════════════════════════════
 // UTILITIES
 // ══════════════════════════════════════════════
@@ -48,3 +51,7 @@ function setSafeImageSrc(imgEl, url, fallbackInitials) {
   return false;
 }
 
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  isSafeImageUrl, sha256, vxSyncCopyrightYear,
+};

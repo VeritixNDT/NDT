@@ -1,3 +1,13 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { CURRENT_USER, KEYS, NDT_METHODS, vxActions, vxFire,} from './constants.js';
+import { ovViewReport,} from './export.js';
+import { t, tSeverity, tStatus, tf,} from './i18n.js';
+import { el, fmtDate, ls, lss, set, vxUndoable,} from './platform.js';
+import { _defPhotos, defRenderPhotos,} from './reports.js';
+import { getActiveMethods,} from './settings.js';
+import { escapeHtml, formatLength, inputValueToMm, mmToDisplayValue,
+  refreshUnitLabels, toast, unitLabel, vxConfirm,} from './ui.js';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DEFECTS PAGE — Full defect logging, tracking, and management
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1234,3 +1244,9 @@ vxActions({
   procEdit, procExportList, procHideUpload, procOpenInTab, procRender,
   procRenderView, procSave, procShowUpload, procViewFile, procViewFileView,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  _defCombined, _procFileQueue, defInit, defRender, procGetAll,
+  procHandleFiles, procInit, procInitView, procRenderQueue,
+};

@@ -1,3 +1,26 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { a11yWireLabels,} from './a11y.js';
+import { _adminCurrent,} from './admin.js';
+import { AUTH_USERS, CURRENT_USER, KEYS,} from './constants.js';
+import { cvLoadTplConfig,} from './editor.js';
+import { _vxApplySupabaseSession, _vxMaterializeCloudUser, _vxRoleToDisplay,
+  _vxSupabase, clearSession, el, initials, loadSession, loadUsers, ls,
+  renderTrialBanner, saveUsers, updateDeployModePill, vxApplyDeviceGating,
+  vxApplyRoleGating, vxAuthState, vxEntityStore, vxIsAdmin,
+  vxIsAuthenticated, vxLoadOrgName, vxMobileWelcome, vxOpenWelcome,
+  vxPlatformBoot, vxPlatformConfig, vxPlatformSet, vxRealtimeConnect,
+  vxRealtimeDisconnect, vxStore, vxSupabaseConfigured,} from './platform.js';
+import { vxPortalActive, vxPortalBoot,} from './portal.js';
+import { loadSidebarState, loadTemplates, migrateReportsWorkflow,
+  updateInboxBadge, updateOnlineStatus,} from './reports.js';
+import { _wireLogoSection, apApplyCustomCss, apApplyDensity, apApplyTheme,
+  apSetSidebarPos, apSetToastPos, apSetupIdleTimer, applyAccent,
+  buildAccentGrid, loadInspectors, loadMethodOrder, loadSettings,
+  logoLoadSaved, renderMethodsTable, renderNumberingPreview,} from './settings.js';
+import { showPage, updateReportCount,} from './ui.js';
+import { isSafeImageUrl,} from './utils.js';
+import { vxVerifyActive, vxVerifyBoot,} from './verify.js';
+
 // ══════════════════════════════════════════════
 // BOOT
 // ══════════════════════════════════════════════
@@ -293,4 +316,7 @@ function bootApp() {
   });
 })();
 
-
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  bootApp,
+};

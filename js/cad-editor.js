@@ -1,3 +1,8 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { vxActions,} from './constants.js';
+import { ls, lss, vxIsDesktopClass,} from './platform.js';
+import { escapeHtml, toast,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // LITE CAD EDITOR — inspector-drawn vector drawings (weld maps, sketches,
 // component cross-sections, defect maps) that seal into the report PDF.
@@ -810,3 +815,8 @@ function cadOpenStandalone(){
 vxActions({
   cadOpenStandalone,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  cadIsEmpty, cadOpenEditor, cadRenderSVG,
+};

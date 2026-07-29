@@ -1,3 +1,19 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { a11yAnnounce, a11yWireLabels, openA11yModal,} from './a11y.js';
+import { billRefresh,} from './billing.js';
+import { bootApp,} from './boot.js';
+import { AUTH_USERS, CURRENT_USER, KEYS, VX_BUILD, vxActions,} from './constants.js';
+import { auditLogRender, ovRefreshDashboard,} from './dashboard.js';
+import { defRender,} from './defects.js';
+import { cvRenderQR,} from './editor.js';
+import { helpOpen, helpSearch,} from './help.js';
+import { i18nApply, t, tf, vxLocale,} from './i18n.js';
+import { jobLoad,} from './jobs.js';
+import { _vxApplyPortalEventLocal,} from './portal.js';
+import { inboxRender, rptRender,} from './reports.js';
+import { escapeHtml, showPage, showSS, toast, vxConfirm, vxPrompt,} from './ui.js';
+import { sha256,} from './utils.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // V11 PLATFORM LAYER — deployment mode, API client, sync queue, plan gates
 // ══════════════════════════════════════════════════════════════════════════
@@ -4656,3 +4672,25 @@ vxActions({
   // data-action="${ctaAction}" (:1434), so no static scan finds this one.
   vxResendVerification,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  VX_ADMIN_ONLY_SECTIONS, VX_PLATFORM_DEFAULTS, VX_PORTAL_REQ_KEY, _dateFmt,
+  _timeFmt, _vxApplySupabaseSession, _vxMaterializeCloudUser,
+  _vxReadMetaApiBase, _vxReportCustomerId, _vxRoleToDisplay, _vxSupabase,
+  clearSession, closeEmailModal, cvShowDesktopOnly, el, fmtDate, fmtSize,
+  initials, loadSession, loadUsers, ls, lsSize, lss, renderTrialBanner,
+  roleClass, saveUsers, set, signOut, uaGrad, updateDeployModePill,
+  vxAllocReportNo, vxApi, vxApplyDeviceGating, vxApplyRoleGating,
+  vxAuthState, vxDiagnostics, vxDoSignin, vxDoSignup, vxEmitWebhook,
+  vxEnsureReportVerifyUrl, vxEntityStore, vxFormatReportNo, vxIsAdmin,
+  vxIsAuthenticated, vxIsDesktopClass, vxIsSeniorOrAdmin, vxLoadOrgName,
+  vxMobileWelcome, vxNewId, vxNotifyCheckInvoices, vxNotifyCustomer,
+  vxNotifySettings, vxNotifySettingsSet, vxOpenWelcome, vxPhotos, vxPlan,
+  vxPlatformBoot, vxPlatformConfig, vxPlatformSet, vxPortalNotifMarkAllRead,
+  vxPortalNotifs, vxPortalPendingRequests, vxPortalRequestMarkHandled,
+  vxPortalRequests, vxRealtimeConnect, vxRealtimeDisconnect,
+  vxRenderSidebarOrgBlock, vxRenderSubscription, vxReportError,
+  vxRequireAdmin, vxShowAdminRequired, vxStore, vxSupabaseConfigured,
+  vxUndoable, vxUploadPhoto,
+};

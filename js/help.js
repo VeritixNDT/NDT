@@ -1,3 +1,10 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { vxActions,} from './constants.js';
+import { t,} from './i18n.js';
+import { loadSession, loadUsers,} from './platform.js';
+import { dbAllKeys, dbRefreshCard, uaRender,} from './settings.js';
+import { escapeHtml, toast, vxConfirm,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // V10 HELP CENTER — in-app user manual
 // ══════════════════════════════════════════════════════════════════════════
@@ -1193,3 +1200,9 @@ vxActions({
   dbClearConfirm, dbExport, dbImportFile, helpClose, helpOpen, helpPrint,
   helpShowChapter, helpToggleMobileToc,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  HELP_CHAPTERS, _helpChapterBody, _helpChapterTitle, helpClose, helpOpen,
+  helpSearch,
+};

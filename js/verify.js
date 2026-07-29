@@ -1,3 +1,9 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { KEYS,} from './constants.js';
+import { _vxSupabase, fmtDate, ls,} from './platform.js';
+import { getReportStage,} from './reports.js';
+import { escapeHtml,} from './ui.js';
+
 // ═════════════════════════════════════════════════════════════════════════
 // Report verification view (V47) — public #/verify/<token>
 // ═════════════════════════════════════════════════════════════════════════
@@ -106,3 +112,8 @@ function vxVerifyRender(root, data){
     <div style="text-align:center;color:#9aa3b2;font-size:11px;margin-top:8px">Verified via Veritix</div>
   </div>`;
 }
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  vxVerifyActive, vxVerifyBoot,
+};

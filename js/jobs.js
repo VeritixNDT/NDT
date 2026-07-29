@@ -1,3 +1,15 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { billJobSectionsHtml,} from './billing.js';
+import { KEYS, NDT_METHODS, vxActions,} from './constants.js';
+import { procGetAll,} from './defects.js';
+import { _vxPrintHtml, vxBuildReportPackHtml, vxDownloadHtmlAsPdf,} from './export.js';
+import { t,} from './i18n.js';
+import { el, fmtDate, ls, lss, vxPortalPendingRequests,
+  vxPortalRequestMarkHandled, vxPortalRequests,} from './platform.js';
+import { getReportStage, rptLatestRevisions,} from './reports.js';
+import { custLoad, getActiveMethods,} from './settings.js';
+import { escapeHtml, toast, vxConfirm,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // JOBS — the work-management layer (Phase 1)
 // ══════════════════════════════════════════════════════════════════════════
@@ -680,3 +692,9 @@ vxActions({
   jobOpenForm, jobSave, jobSetStatusFromDetail, jobsRender, tsDelete,
   tsOpenForm, tsPrint,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  jobCustomerName, jobLoad, jobOpenDetail, jobOpenForm, jobSaveAll,
+  jobsInit,
+};

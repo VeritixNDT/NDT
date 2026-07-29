@@ -1,3 +1,15 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { a11yWireLabels,} from './a11y.js';
+import { CURRENT_USER, KEYS, NDT_METHODS, vxActions,} from './constants.js';
+import { ovNewReportPicker,} from './dashboard.js';
+import { _defCombined, procInitView,} from './defects.js';
+import { tSeverity, tStatus,} from './i18n.js';
+import { _plInjectStyles, _plInstallDrag, _plRootId, _plScopeInspector,
+  plRender,} from './planner.js';
+import { el, fmtDate, ls,} from './platform.js';
+import { inboxRender,} from './reports.js';
+import { escapeHtml,} from './ui.js';
+
 // ══════════════════════════════════════════════════════════════════════════
 // INSPECTOR WORKSPACE — a role-focused home that gathers the things an
 // inspector does behind one persistent left side menu: make a new report,
@@ -198,3 +210,8 @@ function inspRenderInbox(){
 vxActions({
   inspShowSection,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  inspInit, inspShowSection,
+};

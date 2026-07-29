@@ -1,3 +1,23 @@
+// ── Imports (generated) ─────────────────────────────────────────────────
+import { openA11yModal,} from './a11y.js';
+import { billCalc, billDefaultCurrency, billFmtMoney,} from './billing.js';
+import { cadRenderSVG,} from './cad-editor.js';
+import { CURRENT_USER, KEYS, NDT_METHODS, vxActions,} from './constants.js';
+import { _ovItems, ovNewReport,} from './dashboard.js';
+import { procHandleFiles,} from './defects.js';
+import { cvPrintOrExport,} from './export.js';
+import { fnRenderSurvey,} from './ferrite.js';
+import { HT_DETAIL_COLS, htRenderSurvey,} from './hardness.js';
+import { t, tf,} from './i18n.js';
+import { fmtDate, ls, lss,} from './platform.js';
+import { PMI_DETAIL_COLS, pmiRenderSurvey,} from './pmi.js';
+import { RPT_FORM, RPT_ITEM_FIELD_IDS, TPL_FIELDS, TPL_KEY,
+  captureWizardSetVal,} from './reports.js';
+import { INSPECTORS, _inspMethodCerts, apImportTheme, apSetSeverity,
+  certStatus, custLoad, eqIsExpired, eqLoad, getActiveMethods,
+  getShortcutKey, matchShortcut, openCropModal,} from './settings.js';
+import { _cvSyncHeaderFooterUI, escapeHtml, toast, vxConfirm, vxPrompt,} from './ui.js';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // PDF TEMPLATE EDITOR v2 — Professional Canvas Layout Builder
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7093,3 +7113,26 @@ vxActions({
   cvTogglePaletteDrawer, cvTogglePropsDrawer, cvToggleSnap, cvUndo,
   cvUpdateBlock, cvZoomStep, switchRibbonTab,
 });
+
+// ── Exports (generated) — only names other modules reference ────────────
+export {
+  CV_FIELD_DEFS, CV_FONTS, CV_LAYOUT_ITEMS, CV_METHOD_TPL_PREFIX,
+  CV_PAGE_HEIGHT_PX, CV_PAGE_WIDTH_PX, _cvAlignGuidesOn, _cvBlockElCache,
+  _cvBlockId, _cvBuildCrossRefMap, _cvCompany, _cvDetectZone, _cvFieldLabel,
+  _cvHasCompanyData, _cvHtSlice, _cvItemsSlice, _cvLayoutLabel,
+  _cvLoadAlignGuidesPref, _cvPersistTplCfg, _cvPmiSlice, _cvPrintPageNum,
+  _cvPrintTotal, _cvRefreshSaveIndicator, _cvResolveZoneChrome,
+  _wOvNewReportFromActiveMethod, cvAutoSnapshot, cvBlocks, cvBuildReport,
+  cvClearLogo, cvCloseAllDrawers, cvCrossRefMap, cvCurrentPage, cvDocType,
+  cvEvalShowWhen, cvFilterPalette, cvFitToView, cvGetCompanyColor,
+  cvHandleLogoUpload, cvInitCanvas, cvLoadMethodTpl, cvLoadSnapshot,
+  cvLoadTplConfig, cvLogoLibAdd, cvLogoLibLoad, cvLogoLibPick,
+  cvLogoLibRemove, cvNextId, cvOpenComments, cvOpenFullPage, cvOpenHistory,
+  cvPages, cvPaletteCollapsed, cvPpvMethod, cvPpvResult, cvPpvShowDefects,
+  cvPushUndo, cvRenamePage, cvRenderBlockContent, cvRenderCanvas,
+  cvRenderPageTabs, cvRenderQR, cvResolveComment, cvSaveAsMethodTpl,
+  cvSaveLayout, cvSaveSnapshot, cvSeedBillingTemplate, cvSelectBlock,
+  cvSelectedId, cvSelectedIds, cvSetBlockBg, cvSetBlockColor, cvSwitchPage,
+  cvSync, cvTogglePaletteDrawer, cvTogglePropsDrawer, cvTplCfg,
+  cvUpdateBlock, switchRibbonTab,
+};

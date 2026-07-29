@@ -351,3 +351,74 @@ test('device and role gating survive the split', opts, async () => {
       `VX_ADMIN_ONLY_SECTIONS did not travel with the block: ${r.sections}`);
   } finally { await app.close(); }
 });
+
+test('blocks the third-party CDN by origin without blocking same-origin scripts', opts, async () => {
+  // CDN_BLOCK was /jsdelivr\.net|supabase/i tested against the whole request
+  // URL. That blocks the jsDelivr bundle as intended — and also aborted the
+  // app's own http://127.0.0.1:PORT/js/supabase.js the moment that file existed.
+  // It is now matched against the hostname. Both directions are asserted here,
+  // because loosening it too far is as bad as the bug: the sweep would start
+  // making real network calls to Supabase and stop being deterministic.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => ({
+      // The UMD bundle sets window.supabase. Blocked → still undefined.
+      cdnLoaded: typeof window.supabase,
+      // Same-origin, and its name matches the old regex. Must have loaded.
+      localLoaded: typeof window._vxSupabase,
+    }));
+    assert.equal(r.cdnLoaded, 'undefined', 'the jsDelivr Supabase bundle was NOT blocked — the sweep is hitting the network');
+    assert.equal(r.localLoaded, 'function', 'same-origin js/supabase.js was blocked — CDN_BLOCK is matching the path, not the host');
+  } finally { await app.close(); }
+});
+
+test('the Supabase glue survives being split into supabase.js', opts, async () => {
+  // The worst silent failure in the series. Eighteen files reach for the client
+  // through `typeof _vxSupabase === 'function' ? _vxSupabase() : null`, so if
+  // supabase.js failed to load every one of those guards would take the null
+  // branch — no throw, all 30 pages rendering, and the app quietly behaving as
+  // an unconfigured trial: no sync, no org, no realtime, work never leaving the
+  // device. Exactly the class of bug the safety net exists to make visible.
+  //
+  // Assertions chosen to exercise real bodies, not just names:
+  //   - _vxReadMetaSupabaseUrl() must return the shell's actual meta content,
+  //     which proves the reader travelled AND still sees the live tag.
+  //   - _vxRoleToDisplay('observer') === 'Viewer' — the one non-obvious entry
+  //     in the map, so a truncated switch fails here.
+  //   - window.vxSupabaseConfigured is the block's ONLY top-level statement.
+  //     The hoisted declaration would satisfy a `typeof` check on its own, so
+  //     this is the one assertion that actually covers that executable line.
+  //
+  // vxSupabaseConfigured() is deliberately NOT asserted true: it needs the CDN
+  // UMD bundle, which the harness blocks on purpose (see the CDN_BLOCK test
+  // above). Assert it returns a boolean without throwing instead — that checks
+  // the body arrived without depending on network state.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const missing = ['_vxSupabase', '_vxDisposeSupabaseClient', 'vxSupabaseConfigured',
+        '_vxApplySupabaseSession', '_vxResolveOrgMembership', '_vxCreateOrgForUser',
+        '_vxMaterializeCloudUser', '_vxRoleToDisplay', '_vxReadMetaSupabaseUrl',
+        '_vxReadMetaSupabaseAnonKey']
+        .filter((n) => typeof window[n] !== 'function');
+      const metaUrl = document.querySelector('meta[name="vx-supabase-url"]')?.getAttribute('content') || null;
+      let readUrl, role, disposeOk, configured;
+      try { readUrl = _vxReadMetaSupabaseUrl(); } catch (e) { readUrl = 'threw: ' + e.message; }
+      try { role = _vxRoleToDisplay('observer'); } catch (e) { role = 'threw: ' + e.message; }
+      try { _vxDisposeSupabaseClient(null); disposeOk = true; } catch (e) { disposeOk = 'threw: ' + e.message; }
+      try { configured = typeof vxSupabaseConfigured(); } catch (e) { configured = 'threw: ' + e.message; }
+      return {
+        missing, readUrl, role, disposeOk, configured,
+        metaUrl: metaUrl && metaUrl.replace(/\/+$/, ''),
+        exposedOnWindow: typeof window.vxSupabaseConfigured,
+      };
+    });
+    assert.deepEqual(r.missing, [], 'Supabase functions missing — did supabase.js load?');
+    assert.equal(r.readUrl, r.metaUrl, '_vxReadMetaSupabaseUrl() did not read the shell meta tag');
+    assert.equal(r.role, 'Viewer', "_vxRoleToDisplay('observer') lost its mapping in the move");
+    assert.equal(r.disposeOk, true, '_vxDisposeSupabaseClient(null) threw instead of no-opping');
+    assert.equal(r.configured, 'boolean', 'vxSupabaseConfigured() did not return a boolean');
+    assert.equal(r.exposedOnWindow, 'function',
+      'window.vxSupabaseConfigured is not set — the block\'s only top-level statement did not travel');
+  } finally { await app.close(); }
+});

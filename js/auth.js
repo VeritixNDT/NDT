@@ -5,10 +5,11 @@
 // Both blocks were pure declarations with no top-level executable statements,
 // so moving them cannot change evaluation order.
 //
-// This layer sits ON TOP of the Supabase glue in platform.js and calls into
-// it (_vxSupabase, vxPlatformSet, session handling). That direction of
-// dependency is the point: platform.js owns the client, this owns what the
-// user does with it — which is why it loads after platform.js.
+// This layer sits ON TOP of the Supabase glue — since the tenth slice that is
+// its own file, js/supabase.js — and calls into it (_vxSupabase,
+// _vxApplySupabaseSession) as well as vxPlatformSet. That direction of
+// dependency is the point: supabase.js owns the client, this owns what the user
+// does with it — which is why it loads after both.
 // ── Account & plan settings page renderer ─────────────────────────────────
 function vxRenderSubscription() {
   const cfg = vxPlatformConfig();

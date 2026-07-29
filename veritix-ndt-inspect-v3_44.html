@@ -4218,7 +4218,7 @@
   defined by the time the deferred app scripts execute (defer scripts run
   after the parser hits </html>; non-defer inline/external runs immediately
   in document order). If the CDN is unreachable the app silently falls back
-  to pre-config trial mode (see _vxSupabase() in js/platform.js).
+  to pre-config trial mode (see _vxSupabase() in js/supabase.js).
 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script>
 
@@ -4230,6 +4230,7 @@
 <script defer src="js/i18n.js"></script>
 <script defer src="js/storage.js"></script>
 <script defer src="js/platform.js"></script>
+<script defer src="js/supabase.js"></script>
 <script defer src="js/gating.js"></script>
 <script defer src="js/sync.js"></script>
 <script defer src="js/api.js"></script>

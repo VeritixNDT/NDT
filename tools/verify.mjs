@@ -32,7 +32,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { startServer } from './serve.mjs';
 
-const CDN_BLOCK = /jsdelivr\.net|supabase/i;
+// Third-party origins blocked so the sweep runs offline and deterministically:
+// the jsDelivr UMD bundle and every *.supabase.co call the app would make.
+//
+// Matched against the HOSTNAME, not the whole URL. It used to be
+// /jsdelivr\.net|supabase/i tested against request.url(), which also aborted
+// the app's own same-origin js/supabase.js the moment that file was split out
+// of platform.js — the script failed to load, every `typeof _vxSupabase ===
+// 'function'` guard took its null branch, and the app silently ran as an
+// unconfigured trial. A blocklist of remote origins has no business matching a
+// local path, so scope it to the host.
+const CDN_BLOCK = /(^|\.)jsdelivr\.net$|(^|\.)supabase\.(co|com|io)$/i;
 
 // Two disjoint namespaces the harness used to conflate: top-level pages are
 // `#page-<id>` reached with showPage(), Settings subsections are `#sni-<id>`
@@ -87,7 +97,13 @@ export async function openApp(opts = {}) {
   const browser = await chromium.launch({ headless });
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
   const page = await ctx.newPage();
-  await page.route('**/*', (route) => CDN_BLOCK.test(route.request().url()) ? route.abort() : route.continue());
+  await page.route('**/*', (route) => {
+    // An unparseable URL is not a blocked origin — continue rather than abort,
+    // so a malformed request surfaces as itself instead of as a missing script.
+    let host = '';
+    try { host = new URL(route.request().url()).hostname; } catch { /* not a blockable origin */ }
+    return CDN_BLOCK.test(host) ? route.abort() : route.continue();
+  });
 
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));

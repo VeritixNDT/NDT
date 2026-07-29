@@ -264,3 +264,30 @@ test('workspace org identity survives being split into workspace.js', opts, asyn
     assert.equal(r.wrote, true, 'vxRenderSidebarOrgBlock() did not write the org name');
   } finally { await app.close(); }
 });
+
+test('portal events, webhooks and notifications survive the split', opts, async () => {
+  // Consumed from five files (platform, billing, reports, ui, settings), and
+  // every call site is guarded or lazy — so if portal-events.js failed to load
+  // nothing would throw at boot. Portal notifications would silently stop and
+  // invoice-due mail would silently never send, with all 30 pages passing.
+  //
+  // vxNotifySettings() merges VX_NOTIFY_DEFAULTS, so calling it also proves the
+  // constants moved with the functions rather than being left behind.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const missing = ['vxPullPortalEvents', 'vxNotifyCheckInvoices', 'vxPortalNotifs',
+        'vxPortalNotifUnread', 'vxEmitWebhook', 'vxNotifySettings']
+        .filter((n) => typeof window[n] !== 'function');
+      // No initialisers: both try/catch pairs below assign on every path.
+      let settingsKeys, notifs;
+      try { settingsKeys = Object.keys(vxNotifySettings()).sort(); } catch (e) { settingsKeys = 'threw: ' + e.message; }
+      try { notifs = Array.isArray(vxPortalNotifs()); } catch (e) { notifs = 'threw: ' + e.message; }
+      return { missing, settingsKeys, notifs };
+    });
+    assert.deepEqual(r.missing, [], 'portal/notification functions missing — did portal-events.js load?');
+    assert.ok(Array.isArray(r.settingsKeys) && r.settingsKeys.includes('enabled') && r.settingsKeys.includes('invoiceDue'),
+      `vxNotifySettings() lost its defaults: ${JSON.stringify(r.settingsKeys)}`);
+    assert.equal(r.notifs, true, 'vxPortalNotifs() did not return an array');
+  } finally { await app.close(); }
+});

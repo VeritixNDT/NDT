@@ -86,9 +86,10 @@ test('includes externally-provided globals in the manifest', async () => {
   }
 });
 
-test('does not report a string-dispatch target as an orphan', async () => {
+test('a registered dispatch handler is not an orphan', async () => {
   const r = await analyse({ dir: FIXTURES });
-  // Reachable only via data-action="…", resolved at runtime by window[action].
+  // Its vxActions({ … }) registration is a real reference, so this needs no
+  // special-casing of data-action markup — scope analysis simply sees it.
   assert.equal(names(r.orphans).includes('fixtureDispatchTarget'), false,
-    'a data-action target was reported dead — deleting it would break the UI');
+    'a registered handler was reported dead — deleting it would break the UI');
 });

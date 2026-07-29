@@ -25,17 +25,16 @@ var VX_BUILD = '2026-06-23.3';
 //   vxActions({ rptDelete, rptOpenRow });
 //
 // Lives here because constants.js is the first app script the shell loads, so
-// every later file can register at top level. window is still consulted as a
-// fallback while files migrate; once the registry is complete that comes out
-// and dispatch is fully explicit.
+// every later file can register at top level.
+//
+// The window fallback is gone: all 521 markup dispatch targets are registered,
+// and a harness test asserts every rendered data-action resolves through the
+// registry. Dispatch is now fully explicit — a handler that is not registered
+// does not resolve, which is what makes it visible to static analysis and what
+// unblocks an ES-module conversion.
 var VX_ACTIONS = Object.create(null);
 function vxActions(map) { Object.assign(VX_ACTIONS, map); }
-function vxResolveAction(name) {
-  const fn = VX_ACTIONS[name];
-  return typeof fn === 'function' ? fn : window[name];
-}
-// True when a name resolves only via the window fallback — used by the
-// migration check to report what is still unregistered.
+function vxResolveAction(name) { return VX_ACTIONS[name]; }
 function vxActionIsRegistered(name) { return typeof VX_ACTIONS[name] === 'function'; }
 
 // STAGING-ONLY test tools. `true` keeps the dashboard "Delete all reports"

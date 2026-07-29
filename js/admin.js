@@ -95,3 +95,10 @@ function adminNewReport(){
   _adminCurrent = 'home';
   if(typeof ovNewReportPicker === 'function') ovNewReportPicker('ov');
 }
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  adminNewReport, adminShowSection,
+});

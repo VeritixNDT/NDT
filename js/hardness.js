@@ -773,3 +773,11 @@ function htSeedTemplateBlock(){
   } catch(e){ console.warn('htSeedTemplateBlock failed', e); }
 }
 window.addEventListener('DOMContentLoaded', function(){ try { htSeedTemplateBlock(); } catch(e){} });
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  htAddPoint, htAddWeld, htBoreChange, htEntryChanged, htRemovePoint,
+  htRemoveWeld, htSetMode,
+});

@@ -863,3 +863,13 @@ function billEmailRemind(id) {
   const to = ((cust.contacts || [])[0] || {}).email || '';
   vxEmailCompose({ type: 'reminder', tokens: _billEmailTokens(doc), to, heading: 'Payment reminder — ' + (doc.number || '') });
 }
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  billAddLineRow, billCloseBuilder, billConvertToInvoice, billDelete,
+  billEmailDoc, billEmailRemind, billExportDialog, billOpenBuilder,
+  billPrintDoc, billRecalc, billRemoveLineRow, billSaveDoc, billSetStatus,
+  billingRender,
+});

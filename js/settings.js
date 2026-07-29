@@ -2386,29 +2386,35 @@ function getActiveMethods() {
   return getMethodList().filter(m => _methodActive[m.id] !== false);
 }
 
-function renderMethodsTable() {
-  // Add new method
-  window.addNewMethod = function() {
-    const code  = el('new-method-code').value.trim().toUpperCase();
-    const name  = el('new-method-name').value.trim();
-    const color = el('new-method-color').value;
-    if(!code) { toast(t('toast.method_code_required','Enter a method code.'), 'warn'); return; }
-    if(!name) { toast(t('toast.method_name_required','Enter the full method name.'), 'warn'); return; }
-    if(NDT_METHODS.find(m => m.id === code)) { toast(t('toast.method_code_exists','Method code already exists.'), 'warn'); return; }
-    NDT_METHODS.push({ id: code, name, color });
-    el('new-method-code').value = '';
-    el('new-method-name').value = '';
-    el('new-method-color').value = '#4f8ef7';
-    renderMethodsTable();
-    // Update filter dropdown
-    const filt = el('insp-filter-method');
-    if(filt) {
-      const exists = Array.from(filt.options).some(o => o.value === code);
-      if(!exists) { const o = document.createElement('option'); o.value = code; o.textContent = code; filt.appendChild(o); }
-    }
-    toast(`Method ${code} added.`);
-  };
+// Add new method. This used to be `window.addNewMethod = function(){…}`
+// assigned INSIDE renderMethodsTable, but its button lives in the static shell
+// (veritix-ndt-inspect-v3_44.html:2101) and is therefore in the DOM from page
+// load — so before Settings → Methods had rendered once, clicking it resolved
+// to nothing and silently did nothing. Hoisted to a real declaration: it
+// captured nothing from the enclosing scope (every value comes from an el()
+// lookup), so this is a move, not a rewrite.
+function addNewMethod() {
+  const code  = el('new-method-code').value.trim().toUpperCase();
+  const name  = el('new-method-name').value.trim();
+  const color = el('new-method-color').value;
+  if(!code) { toast(t('toast.method_code_required','Enter a method code.'), 'warn'); return; }
+  if(!name) { toast(t('toast.method_name_required','Enter the full method name.'), 'warn'); return; }
+  if(NDT_METHODS.find(m => m.id === code)) { toast(t('toast.method_code_exists','Method code already exists.'), 'warn'); return; }
+  NDT_METHODS.push({ id: code, name, color });
+  el('new-method-code').value = '';
+  el('new-method-name').value = '';
+  el('new-method-color').value = '#4f8ef7';
+  renderMethodsTable();
+  // Update filter dropdown
+  const filt = el('insp-filter-method');
+  if(filt) {
+    const exists = Array.from(filt.options).some(o => o.value === code);
+    if(!exists) { const o = document.createElement('option'); o.value = code; o.textContent = code; filt.appendChild(o); }
+  }
+  toast(`Method ${code} added.`);
+}
 
+function renderMethodsTable() {
   const list_el = el('methods-list'); if(!list_el) return;
   const list    = getMethodList();
 
@@ -3604,3 +3610,27 @@ async function custPortalLink(id){
     });
   }
 }
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  apApplyLocalePreset, apApplyPreset, apCancelRebind, apConfirmRebind,
+  apDeletePreset, apExportTheme, apRebindShortcut, apResetDefaults,
+  apResetShortcut, apSavePreset, apSetAppIcon, apSetColorBlind,
+  apSetContrast, apSetDensity, apSetMotion, apSetSidebarPos, apSetTheme,
+  addNewMethod,
+  apSetToastPos, apiKeyCreate, apiKeyRevoke, apiOpenDocs, closeCropModal,
+  cropApply, cropReset, cropSetRatio, cropZoom, custAddContactRow,
+  custAddSiteRow, custCloseForm, custDelete, custOpenForm, custPortalLink,
+  custRemoveRow, custSave, dbDeleteAllReports, dbRefresh,
+  dbToggleCollections, eqCloseForm, eqDelete, eqOpenForm, eqSave, etplTab,
+  eyeCertView, eyeUploadClear, eyeUploadView, inspAddCustomMethod,
+  inspCloseForm, inspDelete, inspMcertToggle, inspOpenForm, inspRender,
+  inspSave, logoSetInvertOnDark, logoSetUsage, ovOpenCustomers, pickAccent,
+  renderApiKeys, resetMethodOrder, rtPreview, saveAppearance, saveCompany,
+  saveMethodOrder, saveNotifications, saveNumbering, savePortalSettings,
+  saveUser, selAddOption, selDelOption, sigClearUpload, uaCloseForm,
+  uaCloseInvite, uaDelete, uaOpenForm, uaOpenInvite, uaRender,
+  uaRevokeInvite, uaSetView, uaSubmitInvite, vxWebhookAdd, vxWebhookDelete,
+});

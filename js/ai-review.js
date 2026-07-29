@@ -468,3 +468,10 @@ function _aiInsightsBarHtml(){
     + '<span style="font-size:11px;color:var(--t3)">Trend digest &amp; ask-your-data over your reports</span></div>';
 }
 function aiInsightsOpen(){ vxAiInsightsModal(); }
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  aiInsightsOpen, aiReviewCloseTop, aiReviewCurrent, aiReviewReport,
+});

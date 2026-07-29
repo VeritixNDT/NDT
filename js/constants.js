@@ -10,6 +10,34 @@
 // service-worker / HTTP cache serving old JS). Format: YYYY-MM-DD.<n>.
 var VX_BUILD = '2026-06-23.3';
 
+// ── Action registry ─────────────────────────────────────────────────────────
+// The event router (js/ui.js) used to resolve data-action handlers with
+// `window[action]`. That required every handler to be a global, which:
+//   • made 518 live handlers invisible to static analysis — the orphan report
+//     had to special-case data-action markup to stop calling them dead;
+//   • blocks any ES-module conversion outright, since modules put nothing on
+//     window, so all 518 would break the moment the app became modules.
+//
+// Files register their handlers explicitly instead. Object shorthand keeps the
+// dispatch name and the function in sync — a rename that misses one is then a
+// no-undef error rather than a dead button:
+//
+//   vxActions({ rptDelete, rptOpenRow });
+//
+// Lives here because constants.js is the first app script the shell loads, so
+// every later file can register at top level. window is still consulted as a
+// fallback while files migrate; once the registry is complete that comes out
+// and dispatch is fully explicit.
+var VX_ACTIONS = Object.create(null);
+function vxActions(map) { Object.assign(VX_ACTIONS, map); }
+function vxResolveAction(name) {
+  const fn = VX_ACTIONS[name];
+  return typeof fn === 'function' ? fn : window[name];
+}
+// True when a name resolves only via the window fallback — used by the
+// migration check to report what is still unregistered.
+function vxActionIsRegistered(name) { return typeof VX_ACTIONS[name] === 'function'; }
+
 // STAGING-ONLY test tools. `true` keeps the dashboard "Delete all reports"
 // bulk-clear tool visible (veritix.io is staging). Flip to `false` for the
 // customer launch build — one switch instead of surgically deleting the tool.

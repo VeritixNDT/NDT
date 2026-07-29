@@ -87,3 +87,42 @@ test('gotoTarget switches targets inside one already-open page', opts, async () 
     assert.equal(await activePage(app.page), 'page-settings');
   } finally { await app.close(); }
 });
+
+// Handlers that still come from the window fallback rather than the registry.
+// Deliberately empty: every rendered data-action is now registered, so the
+// fallback in vxResolveAction is dead weight that can be removed — and the ES
+// module conversion is no longer blocked by window[action]. Anything added here
+// re-blocks both, so add only with a reason.
+const WINDOW_ONLY = new Set([]);
+
+test('every rendered data-action resolves, and via the registry not window', opts, async () => {
+  // The router used to resolve handlers with window[action]; they are now
+  // registered explicitly (see vxActions in js/constants.js). This asserts both
+  // that nothing lost its handler and that the registry — not the fallback —
+  // is what answers.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const bad = [];
+    for (const target of ['overview', 'reports', 'jobs', 'defects', 'billing', 'planner', 'inbox', 'settings']) {
+      await gotoTarget(app.page, target);
+      const res = await app.page.evaluate(() => {
+        const names = new Set();
+        for (const el of document.querySelectorAll('[data-action],[data-on-change],[data-on-input]')) {
+          for (const k of ['action', 'onChange', 'onInput']) if (el.dataset[k]) names.add(el.dataset[k]);
+        }
+        return [...names].map((n) => ({
+          name: n,
+          resolves: typeof vxResolveAction(n) === 'function',
+          registered: vxActionIsRegistered(n),
+        }));
+      });
+      for (const h of res) {
+        if (!h.resolves) bad.push(`${target}: ${h.name} resolves to nothing`);
+        else if (!h.registered && !WINDOW_ONLY.has(h.name)) {
+          bad.push(`${target}: ${h.name} only resolves via the window fallback`);
+        }
+      }
+    }
+    assert.deepEqual(bad, []);
+  } finally { await app.close(); }
+});

@@ -3392,3 +3392,20 @@ function barcodeClose(){
   _barcodeTargetInput = null;
 }
 
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  _rptAddEquipmentForMethod, _rptEmailClose, _rptEmailSaveTemplate,
+  _rptEmailSend, _rptGateUpdate, _rptInspectorChange, _rptLightGate,
+  _rptRangeCheck, barcodeClose, captureWizardBack, captureWizardClose,
+  captureWizardNext, defAnnotClear, defAnnotMode, defAnnotSave,
+  defAnnotUndo, defAttachPhotos, inboxApprove, inboxOpenAudit, inboxReject,
+  inboxRender, inboxSubmit, markReportSent, ovAssignJob, rptApplySavedView,
+  rptBulkClearSelection, rptBulkDelete, rptBulkEmail, rptBulkExportCsv,
+  rptBulkOpen, rptBulkPdf, rptBulkView, rptClearActiveView, rptClearFilters,
+  rptCustomerFilterChanged, rptDelete, rptDeleteSavedView, rptFormClear,
+  rptFormSave, rptRender, rptSaveCurrentView, rptSetStatusFilter,
+  rptToggleSelect, submitReport, toggleSidebar, tplClear, tplSave,
+  tplSelectMethod, tplSwitchView, voiceToggle,
+});

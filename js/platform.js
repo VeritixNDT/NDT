@@ -4641,3 +4641,18 @@ function signOut() {
   el('li-email').value=''; el('li-pwd').value=''; el('li-err').classList.remove('show');
 }
 
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  auditLogRenderDebounced, closeEmailModal, defRenderDebounced, doLogin,
+  doOAuth, doRegister, helpSearchDebounced, liGuestMode, openMfaModal,
+  rptRenderDebounced, signOut, switchLoginTab, vxAuthTabSwitch,
+  vxDismissTrialBanner, vxManualSync, vxModePillClick, vxOpenBilling,
+  vxOpenForgotPassword, vxOpenSignin, vxOpenSignup, vxOpenSyncActivity,
+  vxOpenWorkspaceSettings, vxPreviewWithoutAccount, vxRefreshPlan,
+  vxRenderSubscription, vxRunLoading, vxSaveOrgName, vxSignOut,
+  // Reached only through a computed name: the trial banner renders
+  // data-action="${ctaAction}" (:1434), so no static scan finds this one.
+  vxResendVerification,
+});

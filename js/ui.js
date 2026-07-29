@@ -128,7 +128,9 @@ function _vxDispatch(eventName) {
       if(e.key !== wanted) return;
     }
 
-    const fn = window[action];
+    // Registry first, window as the migration fallback — see vxActions in
+    // js/constants.js for why this is no longer a bare window[action].
+    const fn = vxResolveAction(action);
     if(typeof fn !== 'function') {
       console.warn('vx: no handler for action', action);
       return;
@@ -1829,3 +1831,31 @@ function updateReportCount() {
   set('report-count-label', reports.length + ' report' + (reports.length===1?'':'s'));
 }
 
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  _wApFontFamilyPreview, _wApFontSizePreview, _wApLockResume,
+  _wApResetShortcutAndCancel, _wClickInput, _wCloseWelcomeOpenHelp,
+  _wCloseWelcomePullData, _wCmdKBackdropClose, _wCvBgColorChange,
+  _wCvFgColorChange, _wCvJumpToComment, _wCvLoadMethodAndSwitchTab,
+  _wCvLoadSnapshotAndClose, _wCvOpenColourPicker, _wCvPickColour,
+  _wCvPickCustomColour, _wCvResolveCommentAndReopen,
+  _wCvSaveAsMethodWithSelect, _wCvSaveSnapshotPrompt, _wCvSetFooterHeight,
+  _wCvSetHeaderHeight, _wCvSetPpvMethod, _wCvSetTplBaseSize,
+  _wCvSetTplFooter, _wCvSetTplLogo, _wCvSetTplMargin, _wCvToggleFooter,
+  _wCvToggleHeader, _wCvToggleLockZones, _wCvTogglePaletteGroup,
+  _wCvTogglePpvDefects, _wCvUpdateBlockFormat, _wDismissParent,
+  _wEmailModalBackdropClose, _wEyeLoadFromInput, _wFocusInput,
+  _wHelpBackdropClose, _wHelpFromProfile, _wHelpToDefects, _wHelpToInbox,
+  _wHelpToReports, _wHelpToSubscription, _wInboxJumpToSection,
+  _wMethodToggle, _wOpenBilling, _wOpenInspectorsSettings,
+  _wPmPhotoLoadFromInput, _wPmSigLoadFromInput, _wProfileModalBackdropClose,
+  _wPullAll, _wPwdModalBackdropClose, _wRemoveById, _wRemoveCertPill,
+  _wResetProcFileQueue, _wSigLoadFromInput, _wSyncColorHex,
+  _wSyncColorPicker, _wToggleUfPasswordVis, _wUppercaseInput, clearNotifs,
+  closeNotifDropdown, closeProfileModal, closePwdModal, cmdkExec,
+  cmdkRender, cvAutoSetupFromCompany, openCmdK, openProfileModal,
+  openPwdModal, pmSigClear, saveProfileModal, savePwdModal, showPage,
+  showSS, toggleNotifDropdown, toggleProfileDropdown, togglePwdVis,
+});

@@ -7061,3 +7061,35 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  _wApImportThemeFile, _wApSetSeverityValue, _wCaptureWizardSetValue,
+  _wCloseModal, _wCvCopyToMethodConfirm, _wCvDeleteLogoLibCard,
+  _wCvHandleLogoUpload, _wCvLoadMethodTplFromSelect,
+  _wCvResetDefectColWidths, _wCvResetHtColWidths, _wCvResetItemsColWidths,
+  _wCvSetDefectColWidth, _wCvSetHtColWidth, _wCvSetItemsColWidth,
+  _wCvSetShowWhenValue, _wCvUpdateBlockChecked, _wCvUpdateBlockNumber,
+  _wCvUpdateBlockValue, _wHFDClearColor, _wOvNewReportFromActiveMethod,
+  _wProcHandleFiles, cvAddBlockDefault, cvAddCommentToBlock, cvAddPage,
+  cvAlignSelected, cvClearBlockFmt, cvClearCanvas, cvClearLogo,
+  cvCloseAllDrawers, cvCloseHFDesigner, cvDeleteBlock, cvDeleteComment,
+  cvDeleteComponent, cvDeleteMethodTpl, cvDeletePage, cvDeleteSelected,
+  cvDistributeSelected, cvDoFindReplace, cvDuplicateBlock, cvDuplicatePage,
+  cvFilterPalette, cvFitToView, cvHFDesignerMirror, cvHFDesignerReset,
+  cvInsertComponent, cvInsertHRule, cvInsertPageBreak, cvInsertTable,
+  cvLayerSelect, cvLogoLibPick, cvLogoLibRemove, cvMoveZ, cvOpenComments,
+  cvOpenCopyToMethod, cvOpenFindReplace, cvOpenHFDesigner, cvOpenHistory,
+  cvOpenSelectedReport, cvRedo, cvRefreshPreviewSource, cvRenamePage,
+  cvRenderCanvas, cvResetBillingTemplate, cvResetTplConfig,
+  cvResolveComment, cvSaveAsComponent, cvSaveAsMethodTpl, cvSaveHFDesigner,
+  cvSaveLayoutToMethod, cvSaveTplConfig, cvSelectAllBlocks, cvSetBlockAlign,
+  cvSetBlockFont, cvSetBlockFontSize, cvSetDocType, cvSetLanguage,
+  cvSetLogoPos, cvSetLogoSize, cvSetPpvMethod, cvSetPpvResult,
+  cvSetPreviewSource, cvSetSectionColor, cvStepBlockNum, cvStepColWidth,
+  cvStepDefectColWidth, cvStepHtColWidth, cvSwitchPage, cvSwitchRsbTab,
+  cvToggleAlignGuides, cvToggleBlockFmt, cvToggleLock, cvToggleMode,
+  cvTogglePaletteDrawer, cvTogglePropsDrawer, cvToggleSnap, cvUndo,
+  cvUpdateBlock, cvZoomStep, switchRibbonTab,
+});

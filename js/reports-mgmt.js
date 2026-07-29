@@ -140,3 +140,10 @@ function vxMgmtReportExportCsv(){
   URL.revokeObjectURL(url);
   if(typeof toast === 'function') toast(t('toast.mgmt_csv', 'Management report exported (CSV).'), 'success');
 }
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  vxMgmtReportExportCsv, vxOpenMgmtReport,
+});

@@ -3833,3 +3833,28 @@ if(_origDbRefreshCard){
   };
 }
 
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  _ovDraftDiscard, _ovDraftRestore, apiExport, apiOpenSchema,
+  auditLogExportCsv, auditLogRender, autofillApply, exportCertIcs,
+  exportReportIcs, generateIcsForCerts, gsDismiss, ovAddDrawingPage,
+  ovAddPhotoPage, ovAttentionGo, ovCancelReport, ovClearAllReports,
+  ovClearCadDrawing, ovClearDrawing, ovClearPhoto, ovClearSinglePhoto,
+  ovDefectsCapture, ovDefectsClearPhoto, ovDefectsDraftNarrative,
+  ovDefectsRotatePhoto, ovDefectsRotatePhotoCCW, ovDefectsSetPhoto,
+  ovDeleteReport, ovDrillDate, ovDrillDefectType, ovDrillMetric,
+  ovItemsAddRow, ovItemsCapture, ovItemsRemoveRow, ovJobPickerNarrow,
+  ovNewReport, ovNewReportPicker, ovOpenCadEditor, ovOpenDefects,
+  ovOpenReport, ovRemoveDrawingPage, ovRemovePhotoPage, ovRotateDrawing,
+  ovRotateDrawingCCW, ovRotatePhoto, ovRotatePhotoCCW, ovRotateSinglePhoto,
+  ovRotateSinglePhotoCCW, ovSaveReport, ovSetDateRange,
+  ovSetDrawingFromFile, ovSetPhotoCaption, ovSetPhotoDetails,
+  ovSetPhotoFromFile, ovSetSinglePhotoFromFile, ovShowSection,
+  webhookFireTest, webhookSaveFromUi,
+  // Reached through a computed name: the Get-started card renders
+  // data-action="'+s.action+'" from the steps array (:424-426), so no static
+  // scan finds these three.
+  gsAddCustomer, gsAddJob, gsNewReport,
+});

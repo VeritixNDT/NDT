@@ -803,3 +803,10 @@ function cadOpenStandalone(){
     onSave: function(map){ try { if(typeof lss === 'function') lss(CAD_SCRATCH_KEY, map && map.scratch); } catch(e){} if(typeof toast === 'function') toast('Drawing saved to this device.'); },
   });
 }
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  cadOpenStandalone,
+});

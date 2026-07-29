@@ -1132,3 +1132,13 @@ function vxPortalLocalLink(customerId){
   const base = location.origin + location.pathname;
   return base + '#/portal/local-' + customerId;
 }
+
+// ── Dispatch registration — see vxActions in js/constants.js.
+// Object shorthand keeps each data-action name tied to its function, so a
+// rename that misses one is a no-undef error rather than a dead control.
+vxActions({
+  _vxPortalSetLang, vxPortalAckReport, vxPortalDownloadPack,
+  vxPortalOpenDoc, vxPortalOpenReport, vxPortalPayInvoice,
+  vxPortalQuoteDecision, vxPortalRequestDateChange, vxPortalRequestWork,
+  vxPortalSearch,
+});

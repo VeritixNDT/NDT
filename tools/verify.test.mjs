@@ -352,6 +352,46 @@ test('device and role gating survive the split', opts, async () => {
   } finally { await app.close(); }
 });
 
+test('plan gates survive being split into plan.js', opts, async () => {
+  // Only three names are consumed outside this file — vxPlanConfig (auth.js:17),
+  // vxPlanSet (5 sites in auth.js) and vxPlan.openBilling (ui.js:752) — and the
+  // first two are only reached by opening Settings → Subscription. So losing
+  // plan.js throws nothing at boot and the 30-page sweep still passes; the
+  // subscription page would just render with no tier and the billing button
+  // would die on click. Assert the surface and exercise real bodies.
+  //
+  // vxPlan.has()/withinLimit()/recordUsage()/showPaywall() have NO callers in
+  // the app (see the file header). They are asserted here anyway: the whole
+  // point of isolating the module is that its contents stay visible rather than
+  // rotting inside an infrastructure file.
+  const app = await openApp({ section: 'subscription' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const missing = ['vxPlanConfig', 'vxPlanSet'].filter((n) => typeof window[n] !== 'function');
+      const methods = typeof vxPlan === 'object' && vxPlan
+        ? ['has', 'withinLimit', 'recordUsage', 'showPaywall', 'openBilling'].filter((m) => typeof vxPlan[m] !== 'function')
+        : ['(vxPlan is not an object)'];
+      let tier, limitOk, currentIsConfig;
+      // vxPlanConfig() merges VX_PLAN_DEFAULTS, so reading tier back proves the
+      // constant travelled with the functions rather than being left behind.
+      try { tier = vxPlanConfig().tier; } catch (e) { tier = 'threw: ' + e.message; }
+      // Infinity limits mean withinLimit() is true for any addition. A real body
+      // check that does not depend on auth state.
+      try { limitOk = vxPlan.withinLimit('maxReports', 10_000); } catch (e) { limitOk = 'threw: ' + e.message; }
+      // `current: vxPlanConfig` is captured by value when the object literal is
+      // evaluated at load — this is the one assertion covering that.
+      try { currentIsConfig = vxPlan.current === vxPlanConfig; } catch (e) { currentIsConfig = 'threw: ' + e.message; }
+      return { missing, methods, tier, limitOk, currentIsConfig, planKey: typeof VX_PLAN_KEY };
+    });
+    assert.deepEqual(r.missing, [], 'plan functions missing — did plan.js load?');
+    assert.deepEqual(r.methods, [], 'vxPlan lost methods in the split');
+    assert.equal(r.tier, 'unlimited', 'VX_PLAN_DEFAULTS did not travel with the block');
+    assert.equal(r.planKey, 'string', 'VX_PLAN_KEY did not travel with the block');
+    assert.equal(r.limitOk, true, 'vxPlan.withinLimit() did not honour the Infinity default');
+    assert.equal(r.currentIsConfig, true, 'vxPlan.current is not bound to vxPlanConfig');
+  } finally { await app.close(); }
+});
+
 test('blocks the third-party CDN by origin without blocking same-origin scripts', opts, async () => {
   // CDN_BLOCK was /jsdelivr\.net|supabase/i tested against the whole request
   // URL. That blocks the jsDelivr bundle as intended — and also aborted the

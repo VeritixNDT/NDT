@@ -186,3 +186,27 @@ test('auth handlers moved to auth.js are still registered', opts, async () => {
     assert.deepEqual(missing, []);
   } finally { await app.close(); }
 });
+
+test('platform chrome renders after being split into platform-ui.js', opts, async () => {
+  // The mode pill, trial banner, welcome and sync modals moved out of
+  // platform.js. If platform-ui.js failed to load, nothing would throw — the
+  // pill simply would not update and the five window listeners would never
+  // attach. Silent, and the 30-page sweep would still pass. So assert the
+  // functions exist AND that calling the renderer actually fills the pill.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      // Top-level declarations in a classic script land on window, so this is
+      // a straight existence check.
+      const fns = ['updateDeployModePill', 'renderTrialBanner', 'vxOpenWelcome', 'vxOpenSyncActivity']
+        .filter((n) => typeof window[n] !== 'function');
+      const pill = document.getElementById('vx-mode-pill');
+      let rendered = null;
+      if (pill) { try { updateDeployModePill(); rendered = pill.textContent.trim().length > 0; } catch (e) { rendered = 'threw: ' + e.message; } }
+      return { missing: fns, pillPresent: !!pill, rendered };
+    });
+    assert.deepEqual(r.missing, [], 'chrome functions are missing — did platform-ui.js load?');
+    assert.equal(r.pillPresent, true, '#vx-mode-pill is not in the shell');
+    assert.equal(r.rendered, true, 'updateDeployModePill() left the pill empty');
+  } finally { await app.close(); }
+});

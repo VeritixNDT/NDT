@@ -99,9 +99,12 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      - name: Harness tests
-        # These skip in the static-analysis job (no browser); here they run.
-        run: node --test "tools/verify.test.mjs"
+      - name: Browser tests
+        # Every test file, not just the harness one: tools/sync-queue.test.mjs
+        # needs a browser too, and naming a single file meant it only ever ran
+        # in the static-analysis job — where it skips for want of Chromium, so
+        # it never actually executed in CI at all.
+        run: npm test
 
       - name: Render every page and settings section
         # always(): a harness-test failure must not hide the page-level signal.

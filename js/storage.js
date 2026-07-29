@@ -428,3 +428,31 @@ var vxPhotos = {
   },
 };
 
+
+// ── Photo upload pipeline ─────────────────────────────────────────────────
+// Moved here from platform.js: a thin wrapper over vxPhotos.upload() above,
+// kept so older callers using vxUploadPhoto(blob, {name, exifDateTime})
+// keep working.
+// ── Photo upload pipeline ────────────────────────────────────────────────
+// V44: This is a thin wrapper around vxPhotos.upload() — kept so any older
+// callers using `vxUploadPhoto(blob, {name, exifDateTime})` continue to
+// work. Return shape preserved:
+//   { photoId: <local IDB id> | null, remoteUrl: <signed URL> | null }
+// New callers should prefer vxPhotos.upload() directly.
+async function vxUploadPhoto(blobOrDataUrl, opts = {}) {
+  var result = await vxPhotos.upload(blobOrDataUrl, {
+    name:         opts.name,
+    contentType:  opts.contentType,
+    reportNo:     opts.reportNo,
+    defectId:     opts.defectId,
+    exifDateTime: opts.exifDateTime,
+    exif:         opts.exif,
+  });
+  if(result.fallback === 'idb' || !result.storagePath){
+    return { photoId: result.photoId || null, remoteUrl: null };
+  }
+  // Successful cloud upload — get a display URL for the caller.
+  var signed = await vxPhotos.getSignedUrl(result.storagePath);
+  return { photoId: result.photoId || null, remoteUrl: signed, storagePath: result.storagePath };
+}
+

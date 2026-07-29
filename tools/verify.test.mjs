@@ -291,3 +291,27 @@ test('portal events, webhooks and notifications survive the split', opts, async 
     assert.equal(r.notifs, true, 'vxPortalNotifs() did not return an array');
   } finally { await app.close(); }
 });
+
+test('realtime and the photo wrapper survive the split', opts, async () => {
+  // boot.js calls vxRealtimeConnect/Disconnect behind `typeof === 'function'`
+  // guards (boot.js:194, :221), so losing realtime.js throws nothing — live
+  // cross-device updates would just silently stop, with all 30 pages passing.
+  // vxUploadPhoto moved the other way, into storage.js beside vxPhotos.
+  //
+  // vxRealtimeDisconnect() guards on _vxWs being set, so calling it while
+  // disconnected is a safe no-op — a real check that the body came across, not
+  // just the name.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const missing = ['vxRealtimeConnect', 'vxRealtimeDisconnect', '_vxDispatchEntityChange', 'vxUploadPhoto']
+        .filter((n) => typeof window[n] !== 'function');
+      let disconnectOk;
+      try { vxRealtimeDisconnect(); disconnectOk = true; } catch (e) { disconnectOk = 'threw: ' + e.message; }
+      return { missing, disconnectOk, pingInterval: typeof VX_WS_PING_INTERVAL_MS };
+    });
+    assert.deepEqual(r.missing, [], 'realtime/photo functions missing — did realtime.js load?');
+    assert.equal(r.disconnectOk, true, 'vxRealtimeDisconnect() threw when idle');
+    assert.equal(r.pingInterval, 'number', 'VX_WS_PING_INTERVAL_MS did not travel with the block');
+  } finally { await app.close(); }
+});

@@ -2215,6 +2215,10 @@ function setReportStage(idx, newStage, comment){
   if(typeof rptRender === 'function') rptRender();
   if(typeof inboxRender === 'function') inboxRender();
   if(typeof updateReportCount === 'function') updateReportCount();
+  // Fired only when a stage actually changed — every failure path above has
+  // already returned. js/dashboard.js listens for this to emit its webhook; it
+  // used to reassign this function from another file, which ES modules forbid.
+  vxFire('report.stageChanged', r, prev, newStage, comment);
   return true;
 }
 

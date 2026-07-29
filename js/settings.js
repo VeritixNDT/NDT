@@ -2862,6 +2862,9 @@ function dbRefreshCard() {
       }).catch(() => {});
     }
   } catch(e){ console.error('dbRefreshCard:',e); }
+  // js/dashboard.js listens for this to load the webhook config and render the
+  // audit log; it used to reassign this function from another file.
+  vxFire('db.refreshed');
 }
 
 function dbRefresh() { dbRefreshCard(); toast(t('toast.refreshed', 'Refreshed.')); }

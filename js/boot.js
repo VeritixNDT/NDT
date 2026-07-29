@@ -99,6 +99,11 @@ function bootApp() {
 // INIT
 // ══════════════════════════════════════════════
 (async function init() {
+  // Cross-module load-time work, called explicitly rather than left at another
+  // module's top level where the outcome depends on evaluation order. Phase 1
+  // of docs/superpowers/specs/2026-07-29-es-module-conversion-design.md.
+  if(typeof cvLoadTplConfig === 'function') cvLoadTplConfig();
+
   // V15: hydrate localStorage from IndexedDB BEFORE any code reads entity
   // keys. If localStorage has been cleared but IDB still has the data
   // (browser cache cleanup, etc.), this restores the user's work.

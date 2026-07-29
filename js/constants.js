@@ -37,6 +37,27 @@ function vxActions(map) { Object.assign(VX_ACTIONS, map); }
 function vxResolveAction(name) { return VX_ACTIONS[name]; }
 function vxActionIsRegistered(name) { return typeof VX_ACTIONS[name] === 'function'; }
 
+// ── Event hooks ─────────────────────────────────────────────────────────────
+// Cross-module notifications, replacing the top-level monkey-patches where one
+// file reassigned a function another file declared (dashboard.js wrapping
+// setReportStage, defSave and dbRefreshCard). Those are illegal under ES
+// modules, where imported bindings are read-only.
+//
+// This lives in constants.js for the same reason vxActions does: it is the
+// first app script the shell loads, so any file can register regardless of
+// where it sits in the load order. Putting the registries in the emitting
+// modules instead did not work — dashboard.js loads 14th and defects.js 21st,
+// so a registration in dashboard.js ran before its registry existed.
+//
+// A throwing hook is logged and skipped; it never breaks the emitter.
+var VX_HOOKS = Object.create(null);
+function vxOn(event, fn) { (VX_HOOKS[event] = VX_HOOKS[event] || []).push(fn); }
+function vxFire(event, ...args) {
+  for (const fn of VX_HOOKS[event] || []) {
+    try { fn(...args); } catch (e) { console.warn('vx: hook failed for', event, e); }
+  }
+}
+
 // STAGING-ONLY test tools. `true` keeps the dashboard "Delete all reports"
 // bulk-clear tool visible (veritix.io is staging). Flip to `false` for the
 // customer launch build — one switch instead of surgically deleting the tool.

@@ -3628,33 +3628,29 @@ function exportReportIcs(){
 // Routes through the canonical webhook implementation defined above
 // (webhookLoadConfig / webhookFire) which reads its config from
 // KEYS.settings.webhook* — single source of truth.
-var _origSetReportStage = setReportStage;
-setReportStage = function(idx, newStage, comment){
-  const all = ls(KEYS.reports, []);
-  const r = all[idx];
-  const fromStage = r ? getReportStage(r) : null;
-  const result = _origSetReportStage(idx, newStage, comment);
-  if(result && r){
-    try {
-      const cfg = webhookLoadConfig();
-      const stageTrigger = 'stage:' + newStage;
-      if(cfg.enabled && cfg.url && (cfg.triggers || []).includes(stageTrigger)){
-        webhookFire('report.stage_changed', {
-          sentAt: new Date().toISOString(),
-          fromStage, toStage: newStage,
-          report: {
-            reportNo: r.reportNo, method: r.method, client: r.client,
-            subject: r.subject, inspector: r.inspector, verdict: r.verdict,
-            drawing: r.drawing, weldNo: r.weldNo,
-            stage: newStage, createdAt: r.createdAt,
-          },
-          triggeredBy: CURRENT_USER ? { id: CURRENT_USER.id, name: CURRENT_USER.name } : null,
-        });
-      }
-    } catch(e){ console.warn('webhook fire failed', e); }
-  }
-  return result;
-};
+// Registered rather than patched in: this used to reassign setReportStage,
+// which reports.js declares — legal under <script>, illegal under ES modules
+// (imported bindings are read-only). onReportStageChange runs only when a
+// stage actually changed, which is what the old `if(result && r)` guarded.
+vxOn('report.stageChanged', function(r, fromStage, newStage){
+  try {
+    const cfg = webhookLoadConfig();
+    const stageTrigger = 'stage:' + newStage;
+    if(cfg.enabled && cfg.url && (cfg.triggers || []).includes(stageTrigger)){
+      webhookFire('report.stage_changed', {
+        sentAt: new Date().toISOString(),
+        fromStage, toStage: newStage,
+        report: {
+          reportNo: r.reportNo, method: r.method, client: r.client,
+          subject: r.subject, inspector: r.inspector, verdict: r.verdict,
+          drawing: r.drawing, weldNo: r.weldNo,
+          stage: newStage, createdAt: r.createdAt,
+        },
+        triggeredBy: CURRENT_USER ? { id: CURRENT_USER.id, name: CURRENT_USER.name } : null,
+      });
+    }
+  } catch(e){ console.warn('webhook fire failed', e); }
+});
 
 // ── Public API export (snapshots) ──────────────────────────────────
 function _downloadJson(filename, obj){
@@ -3798,40 +3794,27 @@ function auditLogExportCsv(){
   toast(t('toast.audit_exported','Audit log exported.'), 'success');
 }
 
-// Wrap defect save to add audit entries
-var _origDefSave = (typeof defSave === 'function') ? defSave : null;
-if(_origDefSave){
-  defSave = function(){
-    const editIdx = (typeof _defEditIdx === 'number') ? _defEditIdx : -1;
-    const before = editIdx >= 0 ? (ls(KEYS.defects, [])[editIdx]) : null;
-    const result = _origDefSave.apply(this, arguments);
-    // Find the (possibly new) record and append audit
-    const all = ls(KEYS.defects, []);
-    const target = editIdx >= 0 ? all[editIdx] : all[all.length-1];
-    if(target){
-      if(!Array.isArray(target.auditLog)) target.auditLog = [];
-      target.auditLog.push({
-        at: new Date().toISOString(),
-        by: CURRENT_USER ? CURRENT_USER.name : 'System',
-        byId: CURRENT_USER ? CURRENT_USER.id : null,
-        action: before ? 'updated' : 'created',
-        details: target.type ? `${target.type} (${target.severity||'?'})` : '',
-      });
-      lss(KEYS.defects, all);
-    }
-    return result;
-  };
-}
+// Append an audit entry whenever a defect is saved. Registered rather than
+// patched in — this used to reassign defSave, which defects.js declares.
+// The hook runs only on a real save, so a validation-rejected save no longer
+// records a spurious entry against the last defect in the list, and it runs
+// before the write so the entry lands in the same save.
+vxOn('defect.saved', function(defect, wasEdit){
+  if(!Array.isArray(defect.auditLog)) defect.auditLog = [];
+  defect.auditLog.push({
+    at: new Date().toISOString(),
+    by: CURRENT_USER ? CURRENT_USER.name : 'System',
+    byId: CURRENT_USER ? CURRENT_USER.id : null,
+    action: wasEdit ? 'updated' : 'created',
+    details: defect.type ? `${defect.type} (${defect.severity||'?'})` : '',
+  });
+});
 
-// Wire dbRefresh to also load webhook config + render audit on database tab open
-var _origDbRefreshCard = (typeof dbRefreshCard === 'function') ? dbRefreshCard : null;
-if(_origDbRefreshCard){
-  dbRefreshCard = function(){
-    const r = _origDbRefreshCard.apply(this, arguments);
-    try { webhookLoadConfig(); auditLogRender(); } catch(e){ console.warn(e); }
-    return r;
-  };
-}
+// Load webhook config + render the audit log when the Database card refreshes.
+// Also registered rather than patched — dbRefreshCard lives in settings.js.
+vxOn('db.refreshed', function(){
+  try { webhookLoadConfig(); auditLogRender(); } catch(e){ console.warn(e); }
+});
 
 // ── Dispatch registration — see vxActions in js/constants.js.
 // Object shorthand keeps each data-action name tied to its function, so a

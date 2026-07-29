@@ -126,3 +126,21 @@ test('every rendered data-action resolves, and via the registry not window', opt
     assert.deepEqual(bad, []);
   } finally { await app.close(); }
 });
+
+test('cross-module hooks are registered regardless of load order', opts, async () => {
+  // dashboard.js loads 14th but listens for events emitted by defects.js (21st)
+  // and settings.js (12th). An earlier attempt put each registry in its emitting
+  // module, so dashboard.js registered before the registry existed and threw at
+  // load. The registries live in constants.js (2nd) for that reason; this asserts
+  // the listeners actually attached.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const hooks = await app.page.evaluate(() => Object.fromEntries(
+      ['report.stageChanged', 'defect.saved', 'db.refreshed']
+        .map((e) => [e, (VX_HOOKS[e] || []).length]),
+    ));
+    for (const [event, n] of Object.entries(hooks)) {
+      assert.ok(n > 0, `no listener registered for ${event} — the wiring was lost`);
+    }
+  } finally { await app.close(); }
+});

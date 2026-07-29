@@ -1088,8 +1088,11 @@ async function cvLoadDefaultLayout(){
   toast(t('toast.layout_loaded','Default NDT layout loaded — customise freely.'));
 }
 
-// Load tpl config on boot
-cvLoadTplConfig();
+// (cvLoadTplConfig() used to run here at load. It is declared in editor.js and
+// writes editor state, so calling it from another module's top level made the
+// result depend on evaluation order — fine under ordered <script> tags, not
+// under an import graph. js/boot.js now calls it explicitly. See
+// docs/superpowers/specs/2026-07-29-es-module-conversion-design.md, Phase 1.)
 
 // ── Service Worker Registration ──────────────────────────────────────
 if ('serviceWorker' in navigator) {

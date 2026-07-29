@@ -316,6 +316,15 @@ function defGenerateId(){
   return 'DEF-' + String(num).padStart(4,'0');
 }
 
+// 'defect.saved' fires only when a defect was actually written — js/dashboard.js
+// listens for it to append the audit entry, which it used to do by reassigning
+// this function from another file (illegal under ES modules).
+//
+// Firing from inside the save paths also fixes a bug in the old wrapper: it
+// appended an audit entry unconditionally, so a save rejected by the `!type`
+// validation below still recorded a "created" entry against whatever defect
+// happened to be last in the list. Hooks run just BEFORE the write, so their
+// changes land in the same save rather than a second one.
 function defSave(){
   const type = el('def-type')?.value||'';
   const severity = el('def-sev')?.value||'High';
@@ -341,6 +350,7 @@ function defSave(){
     // Update existing
     const d = all[_defEditIdx];
     Object.assign(d, {type,severity,status,method,location,depth,length,width,report,component,drawing,inspector,disposition,notes,photos:_defPhotos.slice(),updatedAt:new Date().toISOString()});
+    vxFire('defect.saved', d, true);
     defSaveAll(all);
     toast(t('toast.defect_updated','Defect updated.'));
   } else {
@@ -354,6 +364,7 @@ function defSave(){
       createdBy: CURRENT_USER?.name||'Unknown',
     };
     all.push(defect);
+    vxFire('defect.saved', defect, false);
     defSaveAll(all);
     toast(t('toast.defect_added','Defect added.'));
   }

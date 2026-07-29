@@ -315,3 +315,39 @@ test('realtime and the photo wrapper survive the split', opts, async () => {
     assert.equal(r.pingInterval, 'number', 'VX_WS_PING_INTERVAL_MS did not travel with the block');
   } finally { await app.close(); }
 });
+
+test('device and role gating survive the split', opts, async () => {
+  // Security-adjacent, and the failure would be silent in the worst way:
+  // boot.js reads `typeof vxIsAdmin === 'function' ? vxIsAdmin() : CURRENT_USER
+  // ?.role === 'Admin'`, so losing gating.js does not throw — it quietly falls
+  // back to the weaker check, with all 30 pages still passing.
+  //
+  // The harness seeds CURRENT_USER.role = 'Admin', and vxIsAdmin() returns true
+  // on that alone (gating.js), so this exercises the real body. Asserting the
+  // Set proves the constant travelled with the functions rather than being left.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const missing = ['vxIsAdmin', 'vxIsSeniorOrAdmin', 'vxRequireAdmin', 'vxApplyRoleGating',
+        'vxApplyDeviceGating', 'vxIsDesktopClass']
+        .filter((n) => typeof window[n] !== 'function');
+      // Seed here, not relying on the harness's: the app's async auth init
+      // clears CURRENT_USER once it finds no session, so by the time this
+      // evaluate runs it is gone again. Asserting vxIsAdmin() without setting
+      // it tests that race, not the function. (Same cause as the settings-target
+      // flakiness that made gotoTarget re-seed on every navigation.)
+      let isAdmin, sections;
+      try {
+        CURRENT_USER = { id: 'verify', name: 'Verify Admin', role: 'Admin' };
+        isAdmin = vxIsAdmin();
+      } catch (e) { isAdmin = 'threw: ' + e.message; }
+      try { sections = VX_ADMIN_ONLY_SECTIONS instanceof Set ? VX_ADMIN_ONLY_SECTIONS.size : 'not a Set'; }
+      catch (e) { sections = 'threw: ' + e.message; }
+      return { missing, isAdmin, sections };
+    });
+    assert.deepEqual(r.missing, [], 'gating functions missing — did gating.js load?');
+    assert.equal(r.isAdmin, true, 'vxIsAdmin() did not recognise the seeded Admin user');
+    assert.ok(typeof r.sections === 'number' && r.sections > 10,
+      `VX_ADMIN_ONLY_SECTIONS did not travel with the block: ${r.sections}`);
+  } finally { await app.close(); }
+});

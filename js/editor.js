@@ -7050,7 +7050,8 @@ vxActions({
   cvInsertComponent, cvInsertHRule, cvInsertPageBreak, cvInsertTable,
   cvLayerSelect, cvLogoLibPick, cvLogoLibRemove, cvMoveZ, cvOpenComments,
   cvOpenCopyToMethod, cvOpenFindReplace, cvOpenHFDesigner, cvOpenHistory,
-  cvOpenSelectedReport, cvRedo, cvRefreshPreviewSource, cvRenamePage,
+  cvOpenSelectedReport, cvPaletteDragStart, cvRedo, cvRefreshPreviewSource,
+  cvRenamePage,
   cvRenderCanvas, cvResetBillingTemplate, cvResetTplConfig,
   cvResolveComment, cvSaveAsComponent, cvSaveAsMethodTpl, cvSaveHFDesigner,
   cvSaveLayoutToMethod, cvSaveTplConfig, cvSelectAllBlocks, cvSetBlockAlign,
@@ -7061,4 +7062,13 @@ vxActions({
   cvToggleAlignGuides, cvToggleBlockFmt, cvToggleLock, cvToggleMode,
   cvTogglePaletteDrawer, cvTogglePropsDrawer, cvToggleSnap, cvUndo,
   cvUpdateBlock, cvZoomStep, switchRibbonTab,
+  // Dispatched from the shell's canvas element but never registered until
+  // 2026-07-30, so drag-and-drop into the PDF editor did not work at all:
+  // cvPaletteDragStart (registered separately, in the same pass) set the drag
+  // payload, and then cvDragOver never allowed the drop and cvDrop never ran.
+  // cvBgMouseDown — click-on-background to deselect / start a marquee — was dead
+  // the same way. Clicking a palette item still added a block via
+  // data-action="cvAddBlockDefault", which is presumably why this survived: the
+  // editor was usable, just not by dragging.
+  cvBgMouseDown, cvDragOver, cvDrop,
 });

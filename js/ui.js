@@ -128,8 +128,17 @@ function _vxDispatch(eventName) {
       if(e.key !== wanted) return;
     }
 
-    // Registry first, window as the migration fallback — see vxActions in
-    // js/constants.js for why this is no longer a bare window[action].
+    // REGISTRY ONLY — no window fallback. This comment used to say "Registry
+    // first, window as the migration fallback", which stopped being true when
+    // the fallback was deleted, and the wording mattered: an unregistered name
+    // is not "resolved the old way", it is a DEAD CONTROL. The button warns to
+    // the console and does nothing, which is silent to everyone but a developer
+    // with devtools open. Five of them were found that way on 2026-07-30 — the
+    // cloud sign-in and sign-up form submits among them.
+    //
+    // So: every data-action / data-on-* name MUST appear in a vxActions({…})
+    // call. tools/symbols.mjs reports an unregistered handler as an orphan,
+    // which is the check that catches this.
     const fn = vxResolveAction(action);
     if(typeof fn !== 'function') {
       console.warn('vx: no handler for action', action);
@@ -658,16 +667,38 @@ function _wKbCertPillAdd(e) {
 // (e, el) which silently swapped the args and made every drag/drop handler
 // throw. Drag-and-drop file uploads (logo, signature, procedures, photo)
 // were broken across the entire app until this fix.
-function _wDragoverHighlight(el, e)   { e.preventDefault(); el.classList.add('drag-over'); }
-function _wDragleaveUnhighlight(el)   { el.classList.remove('drag-over'); }
-function _wDragoverFileZone(el, e) {
-  e.preventDefault();
-  el.style.borderColor = 'var(--blue)';
-  el.style.background  = 'rgba(79,142,247,.08)';
+// ── Drag-and-drop file zones ──────────────────────────────────────────────
+// These take NO positional parameters, deliberately, and it is not a style
+// choice. Every drop zone in the shell carries a click handler as well:
+//
+//   data-action="_wClickInput" data-args="'sig-file-inp'"
+//   data-on-dragover="_wDragoverHighlight" data-pass-el="1" data-pass-event="1"
+//   data-on-dragleave="…" data-on-drop="…"
+//
+// `data-args` is an ELEMENT-level attribute, so the dispatcher prepends it to
+// the argument list of every handler on that element, not just the click one.
+// These handlers used to be written `(el, e)` and therefore received
+// ('sig-file-inp', <div>, <event>) — el was the click handler's string and e was
+// the div, so the very first line, e.preventDefault(), threw. Registering them
+// (2026-07-30) made that visible; it had been dead code before, so the signature
+// mismatch had never had a chance to fail.
+//
+// Two things the dispatcher does guarantee regardless of data-args:
+// it calls fn.apply(target, args), so `this` is always the element; and
+// data-pass-event pushes the event last. Read from those instead of by position
+// and the handler is correct on any element, whatever else is wired to it.
+const _wDragEvent = (args) => [...args].find(a => a instanceof Event);
+
+function _wDragoverHighlight()  { _wDragEvent(arguments)?.preventDefault(); this.classList.add('drag-over'); }
+function _wDragleaveUnhighlight() { this.classList.remove('drag-over'); }
+function _wDragoverFileZone() {
+  _wDragEvent(arguments)?.preventDefault();
+  this.style.borderColor = 'var(--blue)';
+  this.style.background  = 'rgba(79,142,247,.08)';
 }
-function _wDragleaveFileZone(el) {
-  el.style.borderColor = 'var(--border2)';
-  el.style.background  = 'rgba(79,142,247,.03)';
+function _wDragleaveFileZone() {
+  this.style.borderColor = 'var(--border2)';
+  this.style.background  = 'rgba(79,142,247,.03)';
 }
 
 // Form-submit prevention wrappers (replace `onsubmit="event.preventDefault();X()"`)
@@ -869,22 +900,28 @@ function _wCvPickCustomColour(slot){
   const pop = document.getElementById('cv-colour-popover');
   if(pop) pop.remove();
 }
-function _wDropPmSig(el, e) {
-  e.preventDefault(); el.classList.remove('drag-over');
+// Drop handlers — same contract as the dragover/dragleave pair above: element
+// from `this`, event found by type, never by position. See _wDragEvent.
+function _wDropPmSig() {
+  const e = _wDragEvent(arguments); if(!e) return;
+  e.preventDefault(); this.classList.remove('drag-over');
   pmSigLoad(e.dataTransfer.files[0]);
 }
-function _wDropSigUpload(el, e) {
-  e.preventDefault(); el.classList.remove('drag-over');
+function _wDropSigUpload() {
+  const e = _wDragEvent(arguments); if(!e) return;
+  e.preventDefault(); this.classList.remove('drag-over');
   sigLoadUpload(e.dataTransfer.files[0]);
 }
-function _wDropEyeUpload(el, e) {
-  e.preventDefault(); el.classList.remove('drag-over');
+function _wDropEyeUpload() {
+  const e = _wDragEvent(arguments); if(!e) return;
+  e.preventDefault(); this.classList.remove('drag-over');
   eyeUploadLoad(e.dataTransfer.files[0]);
 }
-function _wDropProcFiles(el, e) {
+function _wDropProcFiles() {
+  const e = _wDragEvent(arguments); if(!e) return;
   e.preventDefault();
-  el.style.borderColor = 'var(--border2)';
-  el.style.background  = 'rgba(79,142,247,.03)';
+  this.style.borderColor = 'var(--border2)';
+  this.style.background  = 'rgba(79,142,247,.03)';
   procHandleFiles(e.dataTransfer.files);
 }
 
@@ -1832,6 +1869,7 @@ vxActions({
   _wCvToggleHeader, _wCvToggleLockZones, _wCvTogglePaletteGroup,
   _wCvTogglePpvDefects, _wCvUpdateBlockFormat, _wDismissParent,
   _wEmailModalBackdropClose, _wEyeLoadFromInput, _wFocusInput,
+  _wFormSubmitSignin, _wFormSubmitSignup,
   _wHelpBackdropClose, _wHelpFromProfile, _wHelpToDefects, _wHelpToInbox,
   _wHelpToReports, _wHelpToSubscription, _wInboxJumpToSection,
   _wMethodToggle, _wOpenBilling, _wOpenInspectorsSettings,
@@ -1843,4 +1881,19 @@ vxActions({
   cmdkRender, cvAutoSetupFromCompany, openCmdK, openProfileModal,
   openPwdModal, pmSigClear, saveProfileModal, savePwdModal, showPage,
   showSS, toggleNotifDropdown, toggleProfileDropdown, togglePwdVis,
+  // Dispatched from the shell but never registered until 2026-07-30, so every
+  // one of these was a dead control: the router warned "no handler for action"
+  // to the console and returned. Grouped rather than merged alphabetically
+  // because they share one cause and one date, and the group is the finding.
+  //
+  // What was broken: dragging a file onto the signature, eye-test, PM-signature
+  // or procedures drop zones did nothing, and the zones never highlighted;
+  // pressing Enter to add a cert pill or a custom inspector method did nothing;
+  // and the command palette could not be opened from the search field or driven
+  // with the keyboard. All twelve functions were complete — only the
+  // registration was missing.
+  _wDragleaveFileZone, _wDragleaveUnhighlight, _wDragoverFileZone,
+  _wDragoverHighlight, _wDropEyeUpload, _wDropPmSig, _wDropProcFiles,
+  _wDropSigUpload, _wKbCertPillAdd, _wKbInspAddCustomMethod,
+  _wOpenCmdKFromFocus, cmdkOnKeyDown,
 });

@@ -352,6 +352,104 @@ test('device and role gating survive the split', opts, async () => {
   } finally { await app.close(); }
 });
 
+test('every dispatched handler name is registered, across all source', opts, async () => {
+  // ui.js resolves data-action / data-on-* through vxResolveAction ONLY — there
+  // is no window fallback. An unregistered name is therefore a dead control: the
+  // handler warns to the console and returns, which is invisible to anyone
+  // without devtools open. Five were found this way on 2026-07-30, including the
+  // cloud sign-in and sign-up form submits, and a drag source in the PDF editor.
+  //
+  // The existing "every rendered data-action resolves" test walks eight pages,
+  // so it only sees controls that happen to be rendered there. This reads the
+  // SOURCE instead — every dispatch attribute in every js/ file and in the shell,
+  // including markup built inside template literals that no page-walk reaches
+  // (the palette items, the items-table cells, the auth forms). Static, so it
+  // needs no browser and cannot miss a control for want of navigating to it.
+  const root = new URL('..', import.meta.url);
+  const shell = fs.readFileSync(new URL('veritix-ndt-inspect-v3_44.html', root), 'utf8');
+  const jsDir = new URL('js/', root);
+  const jsFiles = fs.readdirSync(jsDir).filter((f) => f.endsWith('.js') && f !== 'qrcode.min.js');
+  const sources = [['shell', shell], ...jsFiles.map((f) => [f, fs.readFileSync(new URL(f, jsDir), 'utf8')])];
+
+  // Union of every vxActions({...}) body. Split on the object keys only, so
+  // comments inside the call (dashboard.js has one) cannot leak in as names.
+  const registered = new Set();
+  for (const [, src] of sources) {
+    for (const call of src.matchAll(/vxActions\(\{([\s\S]*?)\n\}\)/g)) {
+      for (const line of call[1].split('\n')) {
+        if (line.trim().startsWith('//')) continue;
+        for (const n of line.split(',')) {
+          const clean = n.replace(/:.*$/, '').trim();
+          if (/^[A-Za-z_$][\w$]*$/.test(clean)) registered.add(clean);
+        }
+      }
+    }
+  }
+  assert.ok(registered.size > 300, `only ${registered.size} registered names found — did the scan break?`);
+
+  // Every literal dispatch target. Interpolated ones (data-action="'+x+'") are
+  // skipped: they are computed at runtime and cannot be checked statically.
+  const dead = [];
+  for (const [file, src] of sources) {
+    src.split('\n').forEach((line, i) => {
+      // Skip JS comment lines: ui.js's dispatch documentation contains worked
+      // examples (`<button data-action="rptDelete">`) that are not real markup.
+      const trimmed = line.trim();
+      if (file !== 'shell' && (trimmed.startsWith('//') || trimmed.startsWith('*'))) return;
+      for (const m of line.matchAll(/data-(?:action|on-[a-z]+)="([A-Za-z_$][\w$]*)"/g)) {
+        if (!registered.has(m[1])) dead.push(`${file}:${i + 1}  ${m[1]}`);
+      }
+      // Handlers assigned imperatively rather than in markup, e.g.
+      // `tr.dataset.action = 'rptRowSelect'` — same registry path, same failure.
+      for (const m of line.matchAll(/dataset\.(?:action|on[A-Z][a-z]+)\s*=\s*'([A-Za-z_$][\w$]*)'/g)) {
+        if (!registered.has(m[1])) dead.push(`${file}:${i + 1}  ${m[1]} (via dataset)`);
+      }
+    });
+  }
+  assert.deepEqual(dead, [], `dead controls — dispatched but never registered:\n  ${dead.join('\n  ')}`);
+});
+
+test('drag-and-drop file zones highlight and clear', opts, async () => {
+  // Registering these was necessary but NOT sufficient, and that is the point of
+  // testing behaviour rather than resolution. Every drop zone also carries
+  // `data-action="_wClickInput" data-args="'sig-file-inp'"`, and data-args is an
+  // ELEMENT-level attribute — the dispatcher prepends it to every handler on the
+  // element. So the handlers, written `(el, e)`, were receiving
+  // ('sig-file-inp', <div>, <event>) and threw on their first line. Registering
+  // them simply changed one silent failure into another.
+  //
+  // They now take the element from `this` (fn.apply(target, args)) and find the
+  // event by type. This test drives the real router — no direct calls — so it
+  // would fail again if either the registration or the signature regressed.
+  const app = await openApp({ section: 'company' });
+  try {
+    const consoleErrors = [];
+    app.page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+
+    const r = await app.page.evaluate(() => {
+      const fire = (elNode, type) => elNode.dispatchEvent(
+        new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() }));
+      const zone = document.getElementById('sig-upload-zone');
+      if (!zone) return { err: 'no #sig-upload-zone in the shell' };
+      fire(zone, 'dragover');
+      const highlighted = zone.classList.contains('drag-over');
+      fire(zone, 'dragleave');
+      const cleared = !zone.classList.contains('drag-over');
+      // The procedures zone uses inline styles rather than a class.
+      const pz = document.querySelector('[data-on-dragover="_wDragoverFileZone"]');
+      let lit = null;
+      if (pz) { fire(pz, 'dragover'); lit = pz.style.borderColor !== ''; }
+      return { highlighted, cleared, lit };
+    });
+
+    assert.equal(r.err, undefined, r.err);
+    assert.equal(r.highlighted, true, 'dragover did not highlight the signature drop zone');
+    assert.equal(r.cleared, true, 'dragleave did not clear the highlight');
+    assert.equal(r.lit, true, 'dragover did not light the procedures file zone');
+    assert.deepEqual(consoleErrors, [], `a drag handler threw: ${consoleErrors.join(' | ')}`);
+  } finally { await app.close(); }
+});
+
 test('the four repaired features are reachable, not just declared', opts, async () => {
   // barcodeOpen, captureWizardStart, rptBulkSetStage and cvLoadDefaultLayout were
   // each fully implemented and completely unreachable: no caller, no markup, and

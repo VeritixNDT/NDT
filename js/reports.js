@@ -1918,6 +1918,13 @@ function _rptRowActions(r, idx){
   }
   btns.push(`<button class="btn btn-sm" data-action="inboxOpenAudit" data-args="${idx}" title="View history" style="font-size:10px;padding:3px 6px">⌕</button>`);
   btns.push(`<button class="btn btn-sm" data-action="aiReviewReport" data-args="${idx}" title="AI pre-issue review — flags missing data, out-of-band readings, verdict mismatches" style="font-size:10px;padding:3px 6px">✦ AI</button>`);
+  // aiVisionReport's own comment describes "the ✦ Photos button on each Reports
+  // table row". That button did not exist — only ✦ AI above, which is the
+  // different aiReviewReport feature — so photo analysis was unreachable until
+  // 2026-07-30. The function is structurally identical to aiReviewReport beside
+  // it, guards on cloud sign-in and on the report having photos, and toasts for
+  // both, so wiring it is the whole repair.
+  btns.push(`<button class="btn btn-sm" data-action="aiVisionReport" data-args="${idx}" title="AI photo analysis — checks the attached photos against the report's verdict" style="font-size:10px;padding:3px 6px">✦ Photos</button>`);
   return `<td style="white-space:nowrap;text-align:right">${btns.join(' ')}</td>`;
 }
 
@@ -3099,7 +3106,6 @@ function defAnnotSave(){
 
 // ── Voice notes via Web Speech API ────────────────────────────
 var _voiceRecognition = null;
-var _voiceTargetField = null;
 var _voiceBtn = null;
 
 function voiceToggle(fieldId, btn){
@@ -3115,7 +3121,6 @@ function voiceToggle(fieldId, btn){
   }
   const target = document.getElementById(fieldId);
   if(!target) return;
-  _voiceTargetField = target;
   _voiceBtn = btn;
   const r = new Recognition();
   r.lang = 'en';
@@ -3145,7 +3150,6 @@ function voiceToggle(fieldId, btn){
   r.onend = () => {
     if(_voiceBtn) _voiceBtn.classList.remove('recording');
     _voiceRecognition = null;
-    _voiceTargetField = null;
     _voiceBtn = null;
   };
   r.start();
@@ -3416,7 +3420,7 @@ vxActions({
   rptBulkOpen, rptBulkPdf, rptBulkSetStage, rptBulkView, rptClearActiveView,
   rptClearFilters,
   rptCustomerFilterChanged, rptDelete, rptDeleteSavedView, rptFormClear,
-  rptFormSave, rptRender, rptSaveCurrentView, rptSetStatusFilter,
-  rptToggleSelect, submitReport, toggleSidebar, tplClear, tplSave,
+  rptFormSave, rptRender, rptRowSelect, rptSaveCurrentView,
+  rptSetStatusFilter, rptToggleSelect, submitReport, toggleSidebar, tplClear, tplSave,
   tplSelectMethod, tplSwitchView, voiceToggle,
 });

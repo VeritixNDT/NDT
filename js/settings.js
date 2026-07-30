@@ -2355,7 +2355,6 @@ function renderCertPills() {
 // ══════════════════════════════════════════════
 var _methodOrder  = null;
 var _methodActive = {};
-var _methodDirty  = false;
 
 function getMethodList() {
   const base = _methodOrder
@@ -2530,7 +2529,6 @@ function initMethodDrag(container) {
 }
 
 function markMethodDirty() {
-  _methodDirty = true;
   const hint = el('methods-order-hint');
   if(hint) hint.style.display = '';
 }
@@ -2539,7 +2537,6 @@ function saveMethodOrder() {
   _methodOrder = Array.from(
     (el('methods-list')||{querySelectorAll:()=>[]}).querySelectorAll('.method-row')
   ).map(r => r.dataset.id);
-  _methodDirty = false;
   lss('vx-method-order', { order: _methodOrder, active: _methodActive });
   const hint = el('methods-order-hint');
   if(hint) hint.style.display = 'none';
@@ -2552,7 +2549,6 @@ async function resetMethodOrder() {
   if(!await vxConfirm({ message: t('confirm.reset_order','Are you sure you want to reset the method list to its default order?'), okLabel: t('vxc.reset','Reset'), danger: true })) return;
   _methodOrder  = null;
   _methodActive = {};
-  _methodDirty  = false;
   localStorage.removeItem('vx-method-order');
   renderMethodsTable();
   const hint = el('methods-order-hint');

@@ -12,7 +12,6 @@
 // own popover machinery).
 
 var _vxDateOpenInp = null;
-var _vxDateOpenPop = null;
 var _vxDateView    = null;   // {year, month} of the calendar view
 var _vxDateObs     = null;
 var _vxDateRaf     = 0;
@@ -128,7 +127,6 @@ function _vxDateOpen(inp){
   _vxDateRenderPop(inp, pop);
 
   wrap.appendChild(pop);
-  _vxDateOpenPop = pop;
 
   const rect = pop.getBoundingClientRect();
   if(rect.bottom > window.innerHeight - 16) pop.classList.add('is-up');
@@ -267,7 +265,6 @@ function _vxDateClose(){
     if(p) p.remove();
   }
   _vxDateOpenInp = null;
-  _vxDateOpenPop = null;
   document.removeEventListener('mousedown', _vxDateOutsideClick, true);
 }
 

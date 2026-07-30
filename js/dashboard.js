@@ -1496,7 +1496,7 @@ function webhookLoadIntoUi(){
 // is the source of truth.
 
 // Host of the active new-report form — 'ov' (Overview, default) or 'insp'
-// (Inspector workspace). Read by ovSaveReport / ovCancelReport / ovResetReport
+// (Inspector workspace). Read by ovSaveReport / ovCancelReport
 // so they navigate within the host the form was opened from.
 var _ovHostPfx = 'ov';
 function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
@@ -1679,6 +1679,12 @@ function ovNewReport(methodId, btn, sourceReport, hostPrefix) {
   html += `<div style="display:flex;align-items:center;gap:10px;margin:20px 14px 12px;padding-top:16px;border-top:1px solid var(--border)">
     <button class="btn" data-action="ovCancelReport">Cancel</button>
     <button class="btn" data-action="aiReviewCurrent" title="AI pre-issue review — flags missing data, out-of-band readings, verdict mismatches">✦ AI review</button>
+    <!-- aiVisionScanLabel's own comment calls this "the 📷 Scan label button in
+         the editor save bar". It was never here, so the OCR path — photograph a
+         calibration sticker, have the values read back and applied to the form —
+         was unreachable. The function guards on both an open report and cloud
+         sign-in, so it is safe to offer unconditionally. -->
+    <button class="btn" data-action="aiVisionScanLabel" title="Photograph a calibration sticker or equipment label — the readings are read back and can be applied to this form">📷 Scan label</button>
     <span style="flex:1"></span>
     <button class="btn" data-action="ovSaveReport" data-args="'review'">For review</button>
     <button class="btn btn-primary" data-action="ovSaveReport">Save</button>
@@ -3453,13 +3459,6 @@ async function ovCancelReport(){
   }
 }
 
-async function ovResetReport() {
-  if(!_ovMethod) return;
-  if(!await vxConfirm({ message: 'Are you sure you want to clear the report form? Any unsaved changes will be lost.', okLabel: t('vxc.clear','Clear'), danger: true })) return;
-  const snavId = _ovHostPfx === 'insp' ? 'insp-snav' : 'ov-snav';
-  ovNewReport(_ovMethod, document.querySelector('#'+snavId+' .snav-item.active'), null, _ovHostPfx);
-}
-
 function ovRenderRecentList() {
   const reports = ls(KEYS.reports, []);
   const wrap = el('ov-reports-table'); if(!wrap) return;
@@ -3837,7 +3836,8 @@ vxActions({
   ovDefectsCapture, ovDefectsClearPhoto, ovDefectsDraftNarrative,
   ovDefectsRotatePhoto, ovDefectsRotatePhotoCCW, ovDefectsSetPhoto,
   ovDeleteReport, ovDrillDate, ovDrillDefectType, ovDrillMetric,
-  ovItemsAddRow, ovItemsCapture, ovItemsRemoveRow, ovJobPickerNarrow,
+  ovItemsAddRow, ovItemsCapture, ovItemsFormatDimensions,
+  ovItemsRemoveRow, ovJobPickerNarrow,
   ovNewReport, ovNewReportPicker, ovOpenCadEditor, ovOpenDefects,
   ovOpenReport, ovRemoveDrawingPage, ovRemovePhotoPage, ovRotateDrawing,
   ovRotateDrawingCCW, ovRotatePhoto, ovRotatePhotoCCW, ovRotateSinglePhoto,

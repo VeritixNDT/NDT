@@ -352,6 +352,66 @@ test('device and role gating survive the split', opts, async () => {
   } finally { await app.close(); }
 });
 
+test('the shared helpers survive moving from platform.js to utils.js', opts, async () => {
+  // el() alone is called from nearly every file, so losing this block is the one
+  // move in the series that would NOT be silent — the app would fail loudly and
+  // immediately. What could still slip through quietly is a partial move: the
+  // functions arriving while the state beside them (_dateFmt) or the vxActions
+  // registration does not.
+  //
+  // So the assertions target exactly that. Each exercises a real body:
+  //   - debounce() must actually coalesce, not just exist.
+  //   - fmtDate() must return the default 'dd MMM yyyy' shape, which proves
+  //     _dateFmt travelled. Asserted as a shape rather than a fixed string: the
+  //     function honours a configured timezone, and pinning an exact date would
+  //     be testing the runner's clock settings instead of the move.
+  //   - roleClass('Senior Inspector') is the one entry in that map whose key and
+  //     value do not match, so a truncated object fails here.
+  //   - vxResolveAction() covers the vxActions() call, the block's only
+  //     non-declaration top-level statement. A data-action button silently
+  //     resolving to nothing is precisely the failure the registry exists to
+  //     prevent.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(async () => {
+      const missing = ['el', 'set', 'fmtDate', 'fmtSize', 'lsSize', 'initials', 'uaGrad',
+        'roleClass', 'debounce', 'vxLoading', 'vxRunLoading', 'vxUndoable',
+        'rptRenderDebounced', 'defRenderDebounced', 'auditLogRenderDebounced', 'helpSearchDebounced']
+        .filter((n) => typeof window[n] !== 'function');
+
+      let debounced = null;
+      try {
+        let n = 0;
+        const d = debounce(() => { n++; }, 50);
+        d(); d(); d();
+        await new Promise((res) => setTimeout(res, 250));
+        debounced = n;
+      } catch (e) { debounced = 'threw: ' + e.message; }
+
+      const unregistered = ['rptRenderDebounced', 'defRenderDebounced', 'auditLogRenderDebounced',
+        'helpSearchDebounced', 'vxRunLoading']
+        .filter((n) => typeof vxResolveAction(n) !== 'function');
+
+      let dateShape, emptyDate, size, role, elFound;
+      try { dateShape = /^\d{2} [A-Z][a-z]{2} \d{4}$/.test(fmtDate('2026-07-30T12:00:00Z')); } catch (e) { dateShape = 'threw: ' + e.message; }
+      try { emptyDate = fmtDate(''); } catch (e) { emptyDate = 'threw: ' + e.message; }
+      try { size = fmtSize(1048576); } catch (e) { size = 'threw: ' + e.message; }
+      try { role = roleClass('Senior Inspector'); } catch (e) { role = 'threw: ' + e.message; }
+      try { elFound = el('toast-container') instanceof HTMLElement; } catch (e) { elFound = 'threw: ' + e.message; }
+
+      return { missing, debounced, unregistered, dateShape, emptyDate, size, role, elFound };
+    });
+    assert.deepEqual(r.missing, [], 'helpers missing — did the block reach utils.js?');
+    assert.equal(r.debounced, 1, 'debounce() did not coalesce three rapid calls into one');
+    assert.deepEqual(r.unregistered, [], 'the vxActions() registration did not travel with the block');
+    assert.equal(r.dateShape, true, "fmtDate() did not produce the default 'dd MMM yyyy' shape — did _dateFmt travel?");
+    assert.equal(r.emptyDate, '—', 'fmtDate("") lost its empty guard');
+    assert.equal(r.size, '1.00MB', 'fmtSize() lost its megabyte branch');
+    assert.equal(r.role, 'role-senior', "roleClass('Senior Inspector') lost its mapping");
+    assert.equal(r.elFound, true, 'el() did not resolve a known element id');
+  } finally { await app.close(); }
+});
+
 test('platform boot and deep linking survive being split into platform-boot.js', opts, async () => {
   // boot.js:76 calls vxPlatformBoot() behind `typeof === 'function'`, so losing
   // this file throws nothing and every page still draws — while the sync sweep

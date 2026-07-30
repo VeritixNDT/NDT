@@ -1,6 +1,9 @@
 # ES-module conversion — design
 
 **Date:** 2026-07-29
+**Re-measured:** 2026-07-30, after `js/platform.js` was split into six files
+(commits `13e1d9f`…`b4e1fab`). Every count below was retaken; see
+"Re-measurement" for what changed and what the old numbers were worth.
 **Status:** Phase 1 **done** and on master. Phases 2–3 **attempted and parked**
 on branch `refactor/es-modules` — see "What attempting Phase 2 found" below.
 The cost is materially higher than this document originally estimated.
@@ -19,11 +22,12 @@ conversion itself.
 |---|---|
 | Implicit globals would throw under strict mode — unmeasurable with `no-undef` off | **0**, measured by `tools/symbols.mjs` |
 | 518 handlers resolved via `window[action]`; modules put nothing on `window`, so all would break | **0** — every handler is registered, the fallback is deleted, and CI asserts it stays that way |
-| No regression net beyond a smoke test that passed on a blank page | 22 tests, a 30-page render sweep asserting the DOM, and a dispatch-registry assertion, all gated in CI |
+| No regression net beyond a smoke test that passed on a blank page | 53 tests (22 when written), a 30-page render sweep asserting the DOM, and a dispatch-registry assertion, all gated in CI |
 
 Two further preconditions were measured and hold:
 
-- **No duplicate top-level names** across 2,039 globals in 33 files. The
+- **No duplicate top-level names** across 2,042 globals in 46 files (2,039 in 33
+  when first written; the split added files, not names). The
   `vx`/`ov`/`ht`/`fn` prefix discipline held, so there are no collisions to
   resolve — normally the expensive part.
 - **No inline event handlers** in the HTML shell. Nothing depends on functions
@@ -34,37 +38,94 @@ Two further preconditions were measured and hold:
 Measured with scope-resolved references, not word matching — an earlier
 word-based estimate overcounted bindings by ~15% and cycles by ~20%.
 
-| | |
-|---|---|
-| Import bindings to write | **830** |
-| File-to-file edges | **230** |
-| Mutual import pairs (cycles) | **46** |
-| Top-level executable statements | **102** |
-| …registration calls (`vxActions`, `vxTest`) — order-safe | 42 |
-| …`window.X = fn` exposures — order-safe | 3 |
-| …**genuinely order-sensitive initialisers** | **57** |
+Figures as of 2026-07-30, with the pre-split tree measured by the same script so
+the cost of the split is separable from the cost of the conversion:
 
-Heaviest importers: `ui.js` (116 names from 16 files), `dashboard.js` (95 from
-19), `boot.js` (61 from 10), `export.js` (56 from 11), `reports.js` (56 from 10).
+| | pre-split `bea926f` | now `4994d3d` | Δ |
+|---|---|---|---|
+| Files (excl. vendored qrcode) | 42 | **46** | +4 |
+| Declared globals | 2,042 | **2,042** | 0 |
+| Import bindings to write | 977 | **994** | **+17** |
+| File-to-file edges | 313 | **370** | **+57** |
+| Mutual import pairs (cycles) | 59 | **58** | −1 |
+| Top-level executable statements | 104 | **104** | 0 |
+| …`addEventListener` — order-safe | 34 | 34 | 0 |
+| …registration calls (`vxActions`, `vxOn`) — order-safe | 48 | 48 | 0 |
+| …`window.X =` exposures — order-safe | 3 | 3 | 0 |
+| …everything else | 19 | **19** | 0 |
+| Cross-module assigned variables | 30, at 60 sites | **30, at 60 sites** | 0 |
 
-### The 57, honestly
+Heaviest importers now: `ui.js` (116 names from 22 files), `dashboard.js` (92
+from 23), `boot.js` (62 from 19), `reports.js` (57 from 16), `export.js` (55 from
+13), `settings.js` (51 from 15).
 
-Most are `addEventListener` calls, which attach a listener and care nothing for
-ordering. The sharp edges are few and specific:
+**What the split cost the conversion: 17 more import bindings and 57 more graph
+edges. Nothing else moved.** Cycles went down by one, top-level statements are
+unchanged, and the read-only-binding blocker — the thing that actually parked
+Phase 2 — is the same 30 variables at the same 60 sites. The split neither
+created nor removed a single one. That is the expected shape: extracting code
+into new files converts intra-file references into cross-file ones, which costs
+edges and bindings, not semantics.
 
-- **`js/dashboard.js:3632, 3803, 3828`** — three top-level monkey-patches
-  (`setReportStage = function(…)`, `if(_origDefSave){…}`,
-  `if(_origDbRefreshCard){…}`) that wrap functions defined in *other* files.
-  These are the real order dependency: they must run after their targets exist.
-  Same shape as the `applyAccent` patch removed in `ecf1c7b`.
+### Re-measurement
+
+The numbers this table replaced were 830 bindings, 230 edges and 46 cycles. The
+script written to retake them reports **977 / 313 / 59 for the same pre-split
+tree**, so those original figures came from a method this one does not reproduce
+— roughly 15–25% lower across the board, in the same direction the doc itself
+warns about for word-based counting. The absolute values above should therefore
+be read as "measured this way", not as a correction of someone's arithmetic.
+
+The Δ column is the trustworthy part: both sides come from one script run over
+two commits, so whatever the method's bias is, it cancels.
+
+One figure does nearly reproduce, and it is the one that matters most. The static
+count of cross-module assignments — 30 variables at 60 sites — sits one apart
+from the **59 `no-import-assign` errors ESLint actually reported** on
+`refactor/es-modules` when the conversion was really run. A static approximation
+landing within one of an observed compiler-level count is decent corroboration
+that the write-detection is sound, which is what licenses the "0 change" claim on
+the row that decides whether Phase 2 is affordable.
+
+Method, for whoever retakes these: parse each `js/*.js` with espree and
+eslint-scope exactly as `tools/symbols.mjs` does (same `ecmaVersion`, same
+`typeof`-guard filter), resolve each escaping reference against the union of all
+files' declarations, and count a binding as a distinct (importing file, name)
+pair. Cross-module assignments are escaping references where `isWrite()` holds
+and the declaration lives in another file.
+
+### The sharp edges, honestly
+
+Most top-level statements are `addEventListener` calls, which attach a listener
+and care nothing for ordering, or registry calls into `vxActions` / `vxOn`, which
+`constants.js` makes position-independent by design. After those, 19 statements
+remain, and most of those are `if(document.readyState === 'loading')` guards and
+IIFEs that are order-safe in practice.
+
+Rechecked 2026-07-30. **Three of the four sharp edges this section named are
+gone**, and none of them were removed by the platform split — they went earlier,
+in the work that made Phase 1 possible:
+
+- ~~`js/dashboard.js:3632, 3803, 3828` — three top-level monkey-patches~~
+  **Resolved.** `setReportStage = function(…)`, `if(_origDefSave){…}` and
+  `if(_origDbRefreshCard){…}` no longer exist. They were replaced by the `vxOn`
+  event-hook registry in `constants.js` — `dashboard.js` now has three `vxOn(…)`
+  registrations in their place. This was the single biggest blocker in the
+  section, since reassigning another module's binding is illegal under modules,
+  not merely order-sensitive.
+- ~~`js/export.js:1092` — `cvLoadTplConfig()`~~ **Resolved.** No longer a
+  top-level statement.
 - **`js/editor.js:246, 2389`** — `Object.assign(CV_FIELD_DEFS, {…})` and
-  `_cvLoadAlignGuidesPref()`, which mutate/read state another module owns.
-- **`js/export.js:1092`** — `cvLoadTplConfig()`.
+  `_cvLoadAlignGuidesPref()`, which mutate/read state another module owns. Still
+  present, still the real thing to deal with.
 - **`js/boot.js:101`** — `(async function init(){…})()`, the app entry point,
-  which must remain last.
+  which must remain last. Still present, and correctly so.
 
-That is roughly six statements that genuinely constrain ordering, not 57 and
-certainly not the 95 an earlier line-based count suggested.
+So the ordering constraint is now roughly **three statements**, not six and
+certainly not the 95 an earlier line-based count suggested. Worth being clear
+about the direction of travel: this section has only ever shrunk. The remaining
+cost of Phases 2–3 is concentrated almost entirely in the read-only-binding
+problem below, not in load order.
 
 ---
 
@@ -118,11 +179,28 @@ reads another module's state at load, which is the only case that breaks.
 
 ### Phase 3 — cutover
 
-- Replace the 32 `<script defer src>` tags with one
+- Replace the 46 `<script defer src>` tags (32 when this was written) with one
   `<script type="module" src="js/boot.js">`.
+- **`js/errors.js` must be the first thing the entry module imports.** This is
+  new since `4994d3d` and easy to lose in the cutover. The global error handler
+  covers every script BELOW it in the tag list and none above, so it was moved to
+  position one — deferred scripts execute in document order, and a script whose
+  fetch failed fires its error event at its turn in that same order. Collapsing
+  46 tags into one destroys the tag order that guarantees this. Under modules the
+  equivalent is that `boot.js`'s first import must be `./errors.js`, so its two
+  `addEventListener` calls run before any other module body. The
+  `errors.js loads first` test in `tools/verify.test.mjs` asserts the tag
+  position and will need rewriting against the import graph, not deleting.
 - `js/qrcode.min.js` is a vendored UMD bundle: keep it as a classic script tag
-  before the module, or wrap it. It is excluded from the analyser already.
+  before the module, or wrap it. It is excluded from the analyser already. Note
+  it currently sits second, immediately after `errors.js`, and the coverage test
+  blocks it specifically — moving it out of the deferred list means that test
+  needs a different victim.
 - `sw.js` caches `js/*.js` by name — unchanged, modules fetch the same URLs.
+  (Aside, unrelated to this work but noticed while checking: `export.js:1098`
+  calls `navigator.serviceWorker.register('sw.js')` and there is no `sw.js` in
+  the repo, while `platform-boot.js` registers a *different*, Blob-URL service
+  worker. Two registrations, one of them 404ing. Worth a look on its own.)
 - `netlify.toml` already serves `js/*` with `no-cache`, so no deploy-cache
   concern.
 
@@ -136,11 +214,24 @@ Each phase gates on what already exists, with nothing new to build:
 
 | Check | Catches |
 |---|---|
-| `npm run lint` (`no-undef`, 830 bindings) | a missed or misspelt import |
-| `npm test` — 22 tests | analyser and harness regressions |
+| `npm run lint` (`no-undef`, ~994 bindings) | a missed or misspelt import |
+| `npm test` — 53 tests | analyser and harness regressions |
 | `npm run verify:all` — 30 pages asserted rendered | a module that fails to load or throws at import |
 | dispatch-registry assertion | a handler lost in the conversion |
+| per-block survival tests (15) | a block that moved but arrived incomplete |
 | CI on every push | all of the above, per commit |
+
+The survival tests are new since this was written: 15 in `tools/verify.test.mjs`,
+one per block moved out of `platform.js` (the sync queue is the exception — it
+got 13 behavioural tests in `tools/sync-queue.test.mjs` instead, before it was
+allowed to move). Each asserts that a moved block's functions exist AND that
+calling them does the right thing — the registry entry resolves, the constant
+beside them travelled, the listener actually fires.
+
+They were written for the split, but they are the right shape for the conversion
+too, because the failure mode is identical: a name that quietly resolves to
+nothing. Several were shown to fail against a deliberate mutation before being
+trusted, which is the property that makes them worth relying on here.
 
 The dispatch assertion matters most here: it walks eight pages and asserts every
 rendered `data-action` resolves through the registry. If the conversion drops a
@@ -173,11 +264,26 @@ exactly as specced — 830 imports and 409 exports generated by codemod, every
 file parsing as a module, a `js/main.js` entry, the shell down to one module tag
 — and then linting as modules produced **59 `no-import-assign` errors**.
 
+(Those two counts describe what the codemod produced against the tree as it stood
+on 2026-07-29. Re-running it today would emit more of both, because
+`platform.js`'s six new files turn intra-file references into imports and their
+declarations into exports. The branch was not rebased; it is a record of where
+the attempt got to, not a mergeable state.)
+
 **29 distinct variables are assigned across module boundaries**, at 59 sites:
 the canvas editor's state (`cvPages`, `cvCurrentPage`, `cvSelectedId`,
 `cvNextId`, written from `billing.js`, `export.js`, `ui.js`), `CURRENT_USER`,
 and a cluster in `settings.js`. Imported bindings are read-only, so each is a
 hard error.
+
+**Still true on 2026-07-30, and unchanged by the platform split.** The same
+variables, in the same numbers: `CURRENT_USER` (9 sites) leads, then `cvPages`
+(5), `cvCurrentPage` and `cvPpvMethod` (4 each), tailing into sixteen variables
+written from exactly one other file. The split moved `_dateFmt`, `_timeFmt`,
+`AUTH_USERS` and `_vxSupabaseClient` between files without changing whether
+their writes cross a boundary — they crossed one before and they cross one now.
+So the work this branch is parked behind has neither grown nor shrunk, and the
+codemod remains reproducible against the current tree.
 
 **This document missed it, and the reason is worth recording.** When assessing
 read-only-binding risk above, only *top-level* statements were analysed — that
@@ -222,8 +328,27 @@ to and what remains.
 
 ## Non-goals
 
-- No file splitting. `platform.js` (~12 responsibilities in 4.6k lines) and
-  `editor.js` (7k) are worth breaking up, but not in the same change.
+- No file splitting **in this change**. `platform.js` (~12 responsibilities in
+  4.6k lines) and `editor.js` (7k) are worth breaking up, but not here.
+
+  **Update 2026-07-30: `platform.js` has since been split, in its own series of
+  fifteen commits — 4,658 lines to 381, one responsibility per file.** The
+  non-goal held: it happened separately, not inside the conversion. Its cost to
+  this work is quantified in the table above (+17 bindings, +57 edges, nothing
+  else), and it is not all cost — six of the twelve responsibilities that made
+  `platform.js` hard to reason about are now files with a stated purpose and a
+  test pinning their surface, which is exactly the kind of boundary a codemod
+  finds easier to reason about than a 4.6k-line file. `editor.js` is untouched
+  and the non-goal still stands for it.
 - No bundler or build step. The app stays no-build; native modules only.
 - No TypeScript.
 - The `hardness`/`ferrite`/`pmi` triplication is untouched.
+
+  **Correction:** this was already inaccurate when written. `940c293`, eleven
+  minutes before this document was saved, extracted `_htTableEl`/`_fnTableEl`/
+  `_pmiTableEl` — the same 17-line table renderer three times over — into
+  `vxSurveyTableEl` in `js/utils.js`. The rest of the triplication genuinely is
+  untouched, and deliberately so: measurement in
+  `2026-07-28-orphan-triage.md` found only 91 of ~2,150 lines actually
+  duplicated. So the non-goal is right in substance and wrong in the word
+  "untouched".

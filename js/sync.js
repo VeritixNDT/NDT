@@ -499,3 +499,15 @@ function vxSyncStart() {
   }, 30 * 1000);
 }
 
+// Don't wait up to 30s for the sweep after connectivity returns — flush on the
+// `online` event too. This listener sat inside platform.js's global error-handler
+// block until the twelfth slice; it has nothing to do with error handling and
+// belongs beside the flush it triggers. The 800ms delay lets the connection
+// settle before the first request goes out.
+//
+// It is now this file's only top-level statement. The ninth slice moved the queue
+// on the strength of having none; attaching a listener is order-safe, so that
+// property is preserved in substance — nothing here reads another module's state
+// at load.
+window.addEventListener('online', () => { if(vxIsCloud()) setTimeout(() => vxSyncFlush().catch(()=>{}), 800); });
+

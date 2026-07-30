@@ -352,6 +352,63 @@ test('device and role gating survive the split', opts, async () => {
   } finally { await app.close(); }
 });
 
+test('the global error net survives being split into errors.js', opts, async () => {
+  // The net that catches everything else cannot be checked by "does the page
+  // render" — a page renders perfectly with no error handler attached. And the
+  // failure is worse than silent: losing errors.js removes the thing that makes
+  // OTHER silent failures visible. It is what surfaced the aborted js/supabase.js
+  // load in the tenth slice.
+  //
+  // So this does not check for the function. It dispatches a real ErrorEvent and
+  // asserts the listener ran, which is the only assertion that covers the two
+  // top-level addEventListener calls rather than the hoisted declaration.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const before = _vxErrorCount;
+      // Capture-phase listener on window; dispatching directly on window fires
+      // it in the at-target phase regardless of the capture flag.
+      window.dispatchEvent(new ErrorEvent('error', { error: new Error('synthetic — errors.js split test') }));
+      return {
+        fn: typeof window.vxReportError,
+        countBefore: before,
+        countAfter: _vxErrorCount,
+        window: typeof _vxErrorWindow,
+        max: _vxErrorMaxPerWindow,
+      };
+    });
+    assert.equal(r.fn, 'function', 'vxReportError missing — did errors.js load?');
+    assert.equal(r.countAfter, r.countBefore + 1,
+      'the window error listener did not fire — the top-level addEventListener did not travel');
+    assert.equal(r.window, 'number', '_vxErrorWindow did not travel with the block');
+    assert.equal(r.max, 3, '_vxErrorMaxPerWindow did not travel with the block');
+  } finally { await app.close(); }
+});
+
+test('the online listener moved to sync.js still flushes the queue', opts, async () => {
+  // This listener spent its life inside platform.js's error-handler block, which
+  // is why the ninth slice had to reason about it: it was the one apparent
+  // top-level call into the sync queue. The twelfth slice moved it to sync.js,
+  // beside the flush it triggers.
+  //
+  // Nothing else would notice if it were lost. The 30s periodic sweep also calls
+  // vxSyncFlush, so queued work would still go up — just up to 30 seconds later
+  // instead of ~800ms after connectivity returns. No error, no visible symptom,
+  // only a slower reconnect. Stub the flush and prove the wiring.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const flushed = await app.page.evaluate(async () => {
+      let calls = 0;
+      vxSyncFlush = () => { calls++; return Promise.resolve({}); };
+      window.dispatchEvent(new Event('online'));
+      // The handler defers by 800ms so the connection can settle.
+      await new Promise((r) => setTimeout(r, 1400));
+      return calls;
+    });
+    assert.equal(flushed, 1, 'the online event did not reach vxSyncFlush — did the listener travel to sync.js?');
+  } finally { await app.close(); }
+});
+
 test('plan gates survive being split into plan.js', opts, async () => {
   // Only three names are consumed outside this file — vxPlanConfig (auth.js:17),
   // vxPlanSet (5 sites in auth.js) and vxPlan.openBilling (ui.js:752) — and the

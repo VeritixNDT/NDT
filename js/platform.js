@@ -360,68 +360,6 @@ var vxStore = {
   dirtyKeys() { try { return Object.keys(JSON.parse(localStorage.getItem(VX_DIRTY_FLAGS_KEY) || '{}')); } catch { return []; } },
 };
 
-// ── Global error handler (V14) ────────────────────────────────────────────
-// Catches uncaught exceptions and unhandled promise rejections. Surfaces a
-// non-blocking toast to the user and POSTs to /telemetry/error so the team
-// can diagnose production issues. Rate-limited to avoid toast spam if
-// something throws in a tight loop.
-var _vxErrorCount = 0;
-var _vxLastErrorAt = 0;
-var _vxErrorWindow = 60 * 1000;    // 1 minute
-var _vxErrorMaxPerWindow = 3;
-
-function vxReportError(err, context) {
-  const now = Date.now();
-  if(now - _vxLastErrorAt > _vxErrorWindow) _vxErrorCount = 0;
-  _vxLastErrorAt = now;
-  _vxErrorCount++;
-
-  // Always log to console so devs see it
-  console.error('[vx]', context || 'error', err);
-
-  // Toast at most N times per minute — don't bury the user
-  if(_vxErrorCount <= _vxErrorMaxPerWindow) {
-    const msg = (err && (err.message || err.toString())) || 'Unknown error';
-    // Use the existing toast infra if available; fall back to console
-    if(typeof toast === 'function') {
-      toast(tf('toast.something_wrong','Something went wrong: {msg}', {msg: msg.slice(0, 90)}), 'error');
-    }
-  }
-
-  // Fire-and-forget telemetry to the backend (no await — must not throw)
-  if(typeof vxApi !== 'undefined' && vxApi.request && vxIsAuthenticated && vxIsAuthenticated()) {
-    try {
-      vxApi.request('/telemetry/error', {
-        method: 'POST',
-        body: {
-          message:   String(err?.message || err || 'unknown').slice(0, 500),
-          stack:     String(err?.stack || '').slice(0, 2000),
-          context:   String(context || '').slice(0, 200),
-          url:       location.href,
-          userAgent: navigator.userAgent.slice(0, 200),
-          at:        new Date().toISOString(),
-        },
-      }).catch(() => {});   // Never re-throw from the error handler
-    } catch(e){}
-  }
-}
-
-// Capture sync errors (script errors, resource errors)
-window.addEventListener('error', (e) => {
-  // Resource load failures (e.g. cdnjs offline) come through here without
-  // an Error object — handle separately
-  if(e.error) vxReportError(e.error, 'window.error');
-  else if(e.target && e.target.tagName) vxReportError(new Error('Resource load failed: ' + e.target.tagName + ' ' + (e.target.src || e.target.href || '')), 'resource');
-}, true);
-
-// Capture promise rejections that nothing else handled
-window.addEventListener('unhandledrejection', (e) => {
-  vxReportError(e.reason instanceof Error ? e.reason : new Error(String(e.reason)), 'unhandledrejection');
-});
-
-// Listen for online events to flush sync queue
-window.addEventListener('online', () => { if(vxIsCloud()) setTimeout(() => vxSyncFlush().catch(()=>{}), 800); });
-
 // ── Deep linking via URL hash (mobile bridge friendly) ────────────────────
 // Phone wrapper apps (Capacitor / Cordova / native shell) can navigate to
 // specific records by setting `location.hash = '#/reports/SV-2026-00042'`.

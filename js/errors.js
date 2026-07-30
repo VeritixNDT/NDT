@@ -17,22 +17,34 @@
 // nothing more, so they carry no evaluation-order dependency and every function
 // they name is declared in this file.
 //
-// LOAD POSITION, and a deliberate non-change. This file is placed immediately
-// after platform.js because that is exactly where the block used to execute, so
-// the split cannot alter when the listeners attach. But note what that costs:
-// seven files load before it (qrcode, constants, acceptance, utils, a11y, i18n,
-// storage), and a throw or failed load in any of them is caught by nothing. The
-// supabase.js failure was only visible BECAUSE supabase.js loads later. Moving
-// this file to the front of the order would widen the net to cover the whole
-// boot, and the guards make that safe: vxReportError's toast path is behind
-// `typeof toast === 'function'` (and toast lives in ui.js, which loads after
-// i18n.js, so tf() is available whenever toast is), and its telemetry path
-// short-circuits on `typeof vxApi !== 'undefined'` before it evaluates any
-// other global.
+// LOAD POSITION — THIS FILE MUST LOAD FIRST. It is the first script tag in the
+// shell, ahead of even the vendored qrcode bundle.
 //
-// That is a behaviour change, though — a beneficial one, but not something to
-// smuggle into a refactor whose whole claim is that nothing moved but text. It
-// is recorded here as its own decision to make.
+// The twelfth slice left it eighth, immediately after platform.js, so that the
+// split could not change when the listeners attach. Right for a refactor, wrong
+// as a resting place: seven files executed before the handler existed (qrcode,
+// constants, acceptance, utils, a11y, i18n, storage) and a throw or failed load
+// in any of them was caught by nothing. The supabase.js failure in the tenth
+// slice was only visible BECAUSE supabase.js happens to load later.
+//
+// What moving it buys, precisely. Deferred scripts execute in document order
+// once parsing completes, and a script whose FETCH failed fires its error event
+// at its turn in that same ordered sequence rather than whenever the network
+// gave up. So position in the tag list — not fetch timing — decides coverage,
+// and being first means every other app script is covered for both a throw
+// during execution and a failed load. Asserted rather than assumed:
+// tools/verify.test.mjs blocks js/qrcode.min.js, the very next tag, and requires
+// the handler to have reported it.
+//
+// Running before everything is safe because every global vxReportError touches
+// is either guarded or short-circuits:
+//   - the toast path is behind `typeof toast === 'function'`, and toast lives in
+//     ui.js which loads after i18n.js, so tf() exists whenever toast does;
+//   - the telemetry path stops at `typeof vxApi !== 'undefined'` before it
+//     evaluates vxIsAuthenticated, and api.js loads after platform.js, so vxApi
+//     existing implies vxIsAuthenticated does too.
+// An error raised before either exists still reaches console.error, which is the
+// floor this is meant to guarantee.
 
 // Catches uncaught exceptions and unhandled promise rejections. Surfaces a
 // non-blocking toast to the user and POSTs to /telemetry/error so the team

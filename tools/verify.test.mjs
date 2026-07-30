@@ -501,6 +501,34 @@ test('platform boot and deep linking survive being split into platform-boot.js',
   } finally { await app.close(); }
 });
 
+test('errors.js loads first, so the net covers every other app script', opts, async () => {
+  // Position is the whole mechanism. Deferred scripts execute in document order
+  // after parsing, and a script whose fetch failed fires its error event at its
+  // turn in that same order — so the handler covers everything BELOW it in the
+  // tag list and nothing above. While it sat eighth, a throw or failed load in
+  // qrcode, constants, acceptance, utils, a11y, i18n or storage was caught by
+  // nothing at all.
+  //
+  // Checked two ways, because either alone is weak. The static check pins the
+  // order and would fail if someone moved the tag; the live check blocks the
+  // very next script and requires the handler to have actually reported it,
+  // which is the only proof the mechanism works rather than that the tag is in
+  // the right place.
+  const shell = fs.readFileSync(new URL('../veritix-ndt-inspect-v3_44.html', import.meta.url), 'utf8');
+  const order = [...shell.matchAll(/<script defer src="(js\/[^"]+)"/g)].map((m) => m[1]);
+  assert.equal(order[0], 'js/errors.js',
+    `errors.js must be the first deferred script; found ${order[0]}. Everything above it is uncovered.`);
+
+  // qrcode.min.js is the next tag and is not needed to boot, so failing it
+  // exercises the net without taking the app down.
+  const app = await openApp({ block: 'js/qrcode.min.js' });
+  try {
+    const reported = app.errors.filter((e) => /Resource load failed.*qrcode/i.test(e));
+    assert.ok(reported.length > 0,
+      `the handler did not report the blocked qrcode.min.js — is errors.js still first?\nsaw: ${JSON.stringify(app.errors)}`);
+  } finally { await app.close(); }
+});
+
 test('the global error net survives being split into errors.js', opts, async () => {
   // The net that catches everything else cannot be checked by "does the page
   // render" — a page renders perfectly with no error handler attached. And the

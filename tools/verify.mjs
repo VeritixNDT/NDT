@@ -84,12 +84,18 @@ const EXPECTED_NOISE = [
 export const realErrors = (errors) => errors.filter((e) => !EXPECTED_NOISE.some((rx) => rx.test(e)));
 
 // Open the app in a fresh page with CDN blocked, app JS ready, admin seeded.
-// opts: { port, section, locale, headless }
+// opts: { port, section, locale, headless, block }
+//
+// `block` is a same-origin path substring to abort as well (e.g. 'js/qrcode.min.js').
+// It exists to test the global error handler's coverage: the only way to prove
+// the handler catches a failed script load is to fail one on purpose. Kept
+// separate from CDN_BLOCK, which is about remote origins — conflating the two is
+// what made CDN_BLOCK match a local path in the first place.
 export async function openApp(opts = {}) {
   // Port 0 = let the OS pick a free one. node --test runs test FILES in
   // parallel, so a fixed 8000 made the second browser suite die with
   // EADDRINUSE the moment a second one existed.
-  const { port = 0, section = null, locale = null, headless = true } = opts;
+  const { port = 0, section = null, locale = null, headless = true, block = null } = opts;
   // Resolve first: an unknown section must fail before a server and browser
   // are started, not leak them behind a rejected promise.
   const target = resolveTarget(section);
@@ -98,11 +104,14 @@ export async function openApp(opts = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
   const page = await ctx.newPage();
   await page.route('**/*', (route) => {
+    const reqUrl = route.request().url();
     // An unparseable URL is not a blocked origin — continue rather than abort,
     // so a malformed request surfaces as itself instead of as a missing script.
     let host = '';
-    try { host = new URL(route.request().url()).hostname; } catch { /* not a blockable origin */ }
-    return CDN_BLOCK.test(host) ? route.abort() : route.continue();
+    try { host = new URL(reqUrl).hostname; } catch { /* not a blockable origin */ }
+    if (CDN_BLOCK.test(host)) return route.abort();
+    if (block && reqUrl.includes(block)) return route.abort();
+    return route.continue();
   });
 
   const errors = [];

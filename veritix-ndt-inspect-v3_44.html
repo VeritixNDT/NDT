@@ -4222,6 +4222,16 @@
 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script>
 
+<!--
+  js/errors.js MUST stay first. Deferred scripts execute in document order once
+  parsing completes, and a script whose fetch failed fires its error event at its
+  turn in that same order — so the global handler catches a throw or a failed
+  load in every file BELOW it, and in none above it. It was eighth until now,
+  which left qrcode, constants, acceptance, utils, a11y, i18n and storage
+  uncovered. tools/verify.test.mjs asserts both this position and the resulting
+  coverage; do not reorder without reading that test.
+-->
+<script defer src="js/errors.js"></script>
 <script defer src="js/qrcode.min.js"></script>
 <script defer src="js/constants.js"></script>
 <script defer src="js/acceptance.js"></script>
@@ -4230,7 +4240,6 @@
 <script defer src="js/i18n.js"></script>
 <script defer src="js/storage.js"></script>
 <script defer src="js/platform.js"></script>
-<script defer src="js/errors.js"></script>
 <script defer src="js/supabase.js"></script>
 <script defer src="js/plan.js"></script>
 <script defer src="js/gating.js"></script>

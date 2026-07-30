@@ -471,23 +471,34 @@ test('the shared helpers survive moving from platform.js to utils.js', opts, asy
 test('platform boot and deep linking survive being split into platform-boot.js', opts, async () => {
   // boot.js:76 calls vxPlatformBoot() behind `typeof === 'function'`, so losing
   // this file throws nothing and every page still draws — while the sync sweep
-  // never starts, realtime never connects, no service worker registers, and deep
-  // links stop resolving. As invisible as a failure gets.
+  // never starts, realtime never connects, and deep links stop resolving. As
+  // invisible as a failure gets.
   //
   // The real assertion is the hash route, not the typeof checks: setting
   // location.hash and watching the active page change exercises the top-level
   // addEventListener AND vxRouteFromHash's body together, end to end. A name
   // check would pass with the listener line dropped.
   //
-  // vxRegisterServiceWorker is asserted to exist but deliberately not called —
-  // it registers a Blob-URL service worker, which is not something to leave
-  // running in a test browser.
+  // vxRegisterServiceWorker was in this list until 2026-07-30. It is gone, along
+  // with the Blob-URL worker it registered and a second registration in
+  // export.js — neither could ever succeed. Asserted below as ABSENT, and that
+  // the app really ends up with no worker: the pair of them is what the deletion
+  // was for, and a half-restored version would otherwise pass silently.
   const app = await openApp({ section: 'overview' });
   try {
     const missing = await app.page.evaluate(() =>
-      ['vxPlatformBoot', 'vxRouteFromHash', 'vxRegisterServiceWorker']
+      ['vxPlatformBoot', 'vxRouteFromHash']
         .filter((n) => typeof window[n] !== 'function'));
     assert.deepEqual(missing, [], 'boot functions missing — did platform-boot.js load?');
+
+    const sw = await app.page.evaluate(async () => ({
+      fn: typeof window.vxRegisterServiceWorker,
+      registrations: (await navigator.serviceWorker.getRegistrations()).length,
+    }));
+    assert.equal(sw.fn, 'undefined',
+      'vxRegisterServiceWorker is back — it registered a blob: URL Chromium rejects outright');
+    assert.equal(sw.registrations, 0,
+      'a service worker got registered; the app is meant to have none (see js/platform-boot.js)');
 
     const routed = await app.page.evaluate(async () => {
       const before = document.querySelector('.page.active')?.id || '(none)';

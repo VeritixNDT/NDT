@@ -73,13 +73,20 @@ function resolveTarget(section) {
   );
 }
 
-// Console noise the harness causes on purpose by blocking the CDN, plus the
-// service-worker registration that cannot succeed off a throwaway origin.
-// Anything else is a real page error and must fail the run.
+// Console noise the harness causes on purpose by blocking the CDN. Anything
+// else is a real page error and must fail the run.
+//
+// /ServiceWorker/i used to be on this list, described as "the service-worker
+// registration that cannot succeed off a throwaway origin". That was not the
+// reason it fired. The app had two registrations, neither of which could succeed
+// ANYWHERE — one for an sw.js that has never existed, one for a blob: URL
+// Chromium rejects outright — and this filter is why nobody noticed for two and
+// a half months. Both registrations were deleted on 2026-07-30, so the app emits
+// no service-worker output at all, and the filter is gone with them: if one ever
+// reappears and fails, the run should fail rather than swallow it.
 const EXPECTED_NOISE = [
   /Failed to load resource/i,
   /bad HTTP response code \(404\)/i,
-  /ServiceWorker/i,
 ];
 export const realErrors = (errors) => errors.filter((e) => !EXPECTED_NOISE.some((rx) => rx.test(e)));
 

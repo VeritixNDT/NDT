@@ -1,16 +1,52 @@
 // ══════════════════════════════════════════════════════════════════════════
-// Platform boot — starting the platform layer, deep links, and the SW.
+// Platform boot — starting the platform layer, and deep links.
 // ══════════════════════════════════════════════════════════════════════════
-// Split out of js/platform.js (thirteenth slice). Three things that run at or
-// near startup rather than serving the storage seam the rest of platform.js is:
-// the hash router for mobile deep links, vxPlatformBoot(), and the service
-// worker registration with its inlined SW body.
+// Split out of js/platform.js (thirteenth slice). Two things that run at or near
+// startup rather than serving the storage seam the rest of platform.js is: the
+// hash router for mobile deep links, and vxPlatformBoot().
 //
 // boot.js:76 calls this behind `typeof vxPlatformBoot === 'function'`, so losing
 // this file throws nothing. The consequences are entirely invisible to a render
-// check: the sync sweep never starts (vxSyncStart), realtime never connects, no
-// service worker registers, and deep links stop resolving. Every page still
-// draws. tools/verify.test.mjs asserts the wiring for that reason.
+// check: the sync sweep never starts (vxSyncStart), realtime never connects, and
+// deep links stop resolving. Every page still draws. tools/verify.test.mjs
+// asserts the wiring for that reason.
+//
+// ── NO SERVICE WORKER, and why (2026-07-30) ───────────────────────────────
+// This file used to carry vxRegisterServiceWorker() and a ~90-line inlined
+// worker body. Both are gone, along with a second registration in export.js.
+// Measured in Chromium before deleting anything:
+//
+//   registrations after a full boot           0, no controller
+//   register(blob:…)   — this file's path     TypeError: The URL protocol of
+//                                             the script ('blob:…') is not
+//                                             supported
+//   register('sw.js')  — export.js's path     404 in dev; in production the
+//                                             Netlify SPA fallback returns
+//                                             index.html, so SecurityError:
+//                                             unsupported MIME type 'text/html'
+//
+// So the app had two service-worker registrations and zero service workers,
+// since 2026-05-15. sw.js has never existed in the repo and is not in the
+// Netlify publish dir. The old comments here claimed the Blob approach "works in
+// all modern browsers" and that "Chromium permits" it; both were false.
+//
+// Nothing caught it because both paths failed quietly — export.js used
+// `.catch(() => {})`, this one console.warn'd — and tools/verify.mjs listed
+// /ServiceWorker/i in EXPECTED_NOISE, discarding exactly that signal. That
+// filter has been removed, so a future service-worker error fails the run.
+//
+// What this costs: no offline COLD START, and no Background Sync. Offline *work*
+// is unaffected — it runs on localStorage/IndexedDB with the 30s sweep and the
+// `online` listener in sync.js. The user docs never overclaimed: help.js:536 says
+// "every feature works offline once the page is loaded", which is exactly right
+// without a worker. Deploy freshness comes from netlify.toml's no-cache headers,
+// not from a worker.
+//
+// If a real service worker is ever wanted, it needs a genuine /sw.js in the
+// publish dir, a redirect exception so the SPA fallback does not swallow it, and
+// ONE registration site. Weigh it against this being an audit tool whose stated
+// policy is that a browser must never run stale code — a caching worker is
+// precisely what can serve stale assets, and a bad one is hard to recall.
 //
 // LOAD POSITION. It sits at the end of the platform group, after platform-ui.js,
 // rather than where the block used to execute inside platform.js. That is a
@@ -58,124 +94,16 @@ window.addEventListener('hashchange', vxRouteFromHash);
 // ── Boot the platform layer ───────────────────────────────────────────────
 function vxPlatformBoot() {
   vxSyncStart();
-  // V14: register a minimal service worker for offline shell + background
-  // sync. The SW body is inlined via Blob URL because the single-file
-  // architecture has no separate sw.js file. This works in all modern browsers
-  // but the SW scope is limited to the current URL.
-  try { vxRegisterServiceWorker(); } catch(e){ console.warn('SW registration failed', e); }
+  // NO SERVICE WORKER IS REGISTERED, deliberately. vxRegisterServiceWorker()
+  // was called here and registered a Blob-URL worker; it was deleted on
+  // 2026-07-30 because it had never once succeeded. Chromium rejects `blob:`
+  // as a script protocol outright ("The URL protocol of the script ('blob:…')
+  // is not supported"), so the ~90 lines of inlined worker body it carried had
+  // never run in any browser. See the file header for the full measurement.
   // V14: if signed in at boot, open the realtime channel
   if(vxIsAuthenticated()) {
     try { vxRealtimeConnect(); } catch(e){}
   }
   // Run the deep-link router after bootApp has placed nav buttons
   setTimeout(() => vxRouteFromHash(), 100);
-}
-
-// V14: inline service worker registration. Service workers must come from a
-// same-origin URL with a JavaScript MIME type. We construct one via Blob URL.
-// Note: Blob-URL service workers have an empty scope and can't intercept
-// page navigations the same way file-based SWs can — for full PWA install
-// the deploy pipeline should serve a real /sw.js file.
-async function vxRegisterServiceWorker() {
-  if(!('serviceWorker' in navigator)) return;
-  // Blob-URL SWs have known limitations across browsers (Chromium permits,
-  // Firefox/Safari restrict). Detect and gracefully skip on those.
-  // We register only if location is same-origin file or http(s).
-  if(location.protocol !== 'http:' && location.protocol !== 'https:') return;
-
-  const swCode = `
-    // Veritix service worker — minimal shell + background sync placeholder
-    // CACHE name is versioned PER BUILD (VX_BUILD is injected below), so every
-    // deploy gets a fresh cache and the activate handler purges the old one —
-    // no stale js/*.js can survive a deploy.
-    const CACHE = 'veritix-shell-${(typeof VX_BUILD !== 'undefined' ? VX_BUILD : 'v2')}';
-    self.addEventListener('install', (e) => {
-      self.skipWaiting();
-    });
-    self.addEventListener('activate', (e) => {
-      // Purge any cache that isn't the current version — this is what
-      // evicts the old cache-first JS bundles from veritix-shell-v1.
-      e.waitUntil(
-        caches.keys()
-          .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-          .then(() => self.clients.claim())
-      );
-    });
-    self.addEventListener('fetch', (e) => {
-      const url = new URL(e.request.url);
-      if(url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('.css') || url.pathname.endsWith('.js')) {
-        // NETWORK-FIRST for the app shell. The previous cache-first
-        // strategy meant a cached editor.js / dashboard.js was served
-        // forever — code updates never reached the user without a
-        // manual cache wipe. Now the live file always wins when online;
-        // the cache is only a fallback for genuine offline use.
-        e.respondWith(
-          fetch(e.request).then(res => {
-            if(res.ok && res.type === 'basic'){
-              const clone = res.clone();
-              caches.open(CACHE).then(c => c.put(e.request, clone));
-            }
-            return res;
-          }).catch(() =>
-            caches.open(CACHE).then(c => c.match(e.request).then(r => r || caches.match('/')))
-          )
-        );
-      }
-      // API calls pass through — the app's sync queue handles offline
-    });
-    // V14: Background Sync — replay the sync queue when connectivity returns
-    self.addEventListener('sync', (e) => {
-      if(e.tag === 'vx-sync-flush') {
-        e.waitUntil(
-          self.clients.matchAll().then(clients => {
-            clients.forEach(client => client.postMessage({ type: 'sync-now' }));
-          })
-        );
-      }
-    });
-    // Push notification placeholder — fires when the server sends a push
-    self.addEventListener('push', (e) => {
-      const data = e.data ? e.data.json() : { title: 'Veritix', body: 'New activity' };
-      e.waitUntil(
-        self.registration.showNotification(data.title || 'Veritix', {
-          body: data.body || '',
-          icon: data.icon,
-          tag: data.tag,
-          data: data.data || {},
-        })
-      );
-    });
-    self.addEventListener('notificationclick', (e) => {
-      e.notification.close();
-      const url = e.notification.data?.url || '/';
-      e.waitUntil(self.clients.openWindow(url));
-    });
-  `;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(blob);
-  try {
-    const reg = await navigator.serviceWorker.register(swUrl);
-    console.log('vx: service worker registered', reg.scope);
-
-    // When the SW asks us to sync (after a Background Sync event), do it
-    navigator.serviceWorker.addEventListener('message', (e) => {
-      if(e.data?.type === 'sync-now') {
-        if(vxIsAuthenticated()) vxSyncFlush().catch(() => {});
-      }
-    });
-
-    // Register for Background Sync when the queue has work
-    window.addEventListener('vx:sync-change', async () => {
-      if('sync' in reg) {
-        const stats = vxSyncStats();
-        if(stats.pending > 0 || stats.failed > 0) {
-          try { await reg.sync.register('vx-sync-flush'); } catch(e){}
-        }
-      }
-    });
-  } catch(e) {
-    // Some browsers refuse Blob-URL SWs (Safari, Firefox). Not a failure mode
-    // the user should see — log and move on.
-    console.warn('vx: SW registration via Blob URL not supported:', e.message);
-  }
 }

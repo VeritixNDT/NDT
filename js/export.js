@@ -1094,14 +1094,14 @@ async function cvLoadDefaultLayout(){
 // under an import graph. js/boot.js now calls it explicitly. See
 // docs/superpowers/specs/2026-07-29-es-module-conversion-design.md, Phase 1.)
 
-// ── Service Worker Registration ──────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(() => {});
-  });
-}
+// (A `navigator.serviceWorker.register('sw.js')` block sat here from 2026-05-15
+// until 2026-07-30. It could never have worked: sw.js has never existed in the
+// repo, and netlify.toml's build copies only index.html, js/ and css/ into the
+// publish dir. In dev it 404'd; in production the SPA fallback returns
+// index.html, so it failed on MIME type instead. Its `.catch(() => {})` meant
+// nobody ever saw either outcome. It was also a second registration site — the
+// other was in platform-boot.js, whose header records the full measurement. The
+// app now has no service worker, deliberately and in exactly one place.)
 
 // ── Dispatch registration — see vxActions in js/constants.js.
 // Object shorthand keeps each data-action name tied to its function, so a

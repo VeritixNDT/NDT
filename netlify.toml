@@ -40,8 +40,18 @@
 # code. "no-cache" means the browser MAY store the file but MUST revalidate it
 # with the server on every load (ETag → cheap 304 when unchanged, fresh bytes
 # the instant a deploy changes them). This closes the HTTP-cache path that let
-# old js/*.js linger after a deploy. (The service worker is network-first and
-# its cache name is versioned per build — see vxRegisterServiceWorker.)
+# old js/*.js linger after a deploy.
+#
+# These headers are the ONLY thing providing deploy freshness. This comment used
+# to add "(The service worker is network-first and its cache name is versioned
+# per build — see vxRegisterServiceWorker.)" — there is no service worker. The
+# app registered two and got zero; both were measured to be impossible and were
+# deleted on 2026-07-30. See the header of js/platform-boot.js.
+#
+# For anyone adding a real one later: the SPA fallback above (`/*` → /index.html,
+# 200) swallows /sw.js and serves it as text/html, which browsers reject as a
+# worker script. A real service worker needs its own redirect exception AND to be
+# copied into dist/ by the build command above — it is neither today.
 [[headers]]
   for = "/index.html"
   [headers.values]

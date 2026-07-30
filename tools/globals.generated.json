@@ -1994,7 +1994,6 @@
   "vxRealtimeConnect": "writable",
   "vxRealtimeDisconnect": "writable",
   "vxRefreshPlan": "writable",
-  "vxRegisterServiceWorker": "writable",
   "vxRenderPdfServer": "writable",
   "vxRenderSidebarOrgBlock": "writable",
   "vxRenderSubscription": "writable",

@@ -196,11 +196,17 @@ reads another module's state at load, which is the only case that breaks.
   it currently sits second, immediately after `errors.js`, and the coverage test
   blocks it specifically — moving it out of the deferred list means that test
   needs a different victim.
-- `sw.js` caches `js/*.js` by name — unchanged, modules fetch the same URLs.
-  (Aside, unrelated to this work but noticed while checking: `export.js:1098`
-  calls `navigator.serviceWorker.register('sw.js')` and there is no `sw.js` in
-  the repo, while `platform-boot.js` registers a *different*, Blob-URL service
-  worker. Two registrations, one of them 404ing. Worth a look on its own.)
+- ~~`sw.js` caches `js/*.js` by name — unchanged, modules fetch the same URLs.~~
+  **Moot: there is no service worker, and now no code pretending there is.**
+  The aside added here on 2026-07-30 — two registrations, one 404ing — was
+  investigated the same day and was worse than it looked. Neither registration
+  could succeed anywhere: `sw.js` has never existed in the repo and is not in
+  the Netlify publish dir (in production the SPA fallback serves `index.html` as
+  `text/html`, so it fails on MIME type rather than 404), and the other
+  registered a `blob:` URL, which Chromium rejects as a script protocol
+  outright. Zero registrations after a full boot, measured. Both paths were
+  deleted; `js/platform-boot.js`'s header carries the evidence. So this bullet
+  imposes no constraint on the cutover — there is nothing to keep working.
 - `netlify.toml` already serves `js/*` with `no-cache`, so no deploy-cache
   concern.
 

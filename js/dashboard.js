@@ -1945,7 +1945,16 @@ function ovItemFieldHtml(rowIdx, col, row) {
     return `<select id="${fid}" style="${ctrlStyle};${extra}"${onChange}>${html}</select>`;
   }
   const type = col.type || 'text';
-  return `<input id="${fid}" type="${type}" value="${escapeHtml(val)}" placeholder="${escapeHtml(col.placeholder||'')}" style="${ctrlStyle}"${onInput}${onBlur}/>`;
+  const input = `<input id="${fid}" type="${type}" value="${escapeHtml(val)}" placeholder="${escapeHtml(col.placeholder||'')}" style="${ctrlStyle}${col.scan ? ';padding-right:30px' : ''}"${onInput}${onBlur}/>`;
+  // Scannable columns (component / drawing) get a 📷 button that opens the
+  // barcode viewfinder against THIS cell. barcodeOpen writes the decoded value
+  // back by element id and dispatches `input`, which ovItemsCapture is already
+  // listening for, so a scan lands in _ovItems exactly as a keystroke would.
+  //
+  // On a browser without BarcodeDetector the overlay still opens and says so —
+  // that path is barcodeOpen's own, and help.js:438 documents it.
+  if(!col.scan) return input;
+  return `<span style="position:relative;display:block">${input}<button type="button" class="rpt-scan-btn" data-action="barcodeOpen" data-args="'${fid}'" title="${escapeHtml(t('rpt.scan_tip','Scan a barcode or QR code into this field'))}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;padding:0 2px;cursor:pointer;font-size:13px;line-height:1;opacity:.65">📷</button></span>`;
 }
 
 // Normalise a dimensions / thickness value to the canonical Ø…mm form.

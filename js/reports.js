@@ -399,8 +399,13 @@ var RPT_FORM = {
   // top-level report fields (subject, drawing, …) on save so legacy place
   // cards, filters, and CSV exports keep working unchanged.
   items: [
-    { id:'subject',     label:'Weld / object',          placeholder:'Pipe, vessel, structure…', width:200 },
-    { id:'drawing',     label:'Drawing no.',             placeholder:'OSB-DWG-4420-B',           width:130 },
+    // `scan` puts a 📷 button in the cell that opens the barcode viewfinder and
+    // autofills it. Component and drawing IDs are what is physically labelled
+    // on a part, so these are the two columns worth scanning — which is exactly
+    // what help.js:437 has always told users the form does. It did not: nothing
+    // called barcodeOpen() until 2026-07-30. See ovItemFieldHtml.
+    { id:'subject',     label:'Weld / object',          placeholder:'Pipe, vessel, structure…', width:200, scan:true },
+    { id:'drawing',     label:'Drawing no.',             placeholder:'OSB-DWG-4420-B',           width:130, scan:true },
     { id:'dimensions',  label:'Dimensions / thickness', placeholder:'Ø219.1 × 8.2mm',           width:130 },
     { id:'material',    label:'Material',                placeholder:'e.g. Carbon steel', width:130, options:['Carbon steel','Stainless steel 304','Stainless steel 316','Duplex 2205','Super duplex 2507','Inconel 625','CuNi 90/10','Chrome-moly','Aluminium'] },
     { id:'weldType',    label:'Weld type / prep',        placeholder:'e.g. V-prep',        width:110, options:['V-prep','K-prep','½V-prep','Single bevel','Double V','J-prep','Fillet','Square butt','No prep'] },
@@ -3402,12 +3407,14 @@ function barcodeClose(){
 vxActions({
   _rptAddEquipmentForMethod, _rptEmailClose, _rptEmailSaveTemplate,
   _rptEmailSend, _rptGateUpdate, _rptInspectorChange, _rptLightGate,
-  _rptRangeCheck, barcodeClose, captureWizardBack, captureWizardClose,
-  captureWizardNext, defAnnotClear, defAnnotMode, defAnnotSave,
+  _rptRangeCheck, barcodeClose, barcodeOpen, captureWizardBack,
+  captureWizardClose, captureWizardNext, captureWizardStart, defAnnotClear,
+  defAnnotMode, defAnnotSave,
   defAnnotUndo, defAttachPhotos, inboxApprove, inboxOpenAudit, inboxReject,
   inboxRender, inboxSubmit, markReportSent, ovAssignJob, rptApplySavedView,
   rptBulkClearSelection, rptBulkDelete, rptBulkEmail, rptBulkExportCsv,
-  rptBulkOpen, rptBulkPdf, rptBulkView, rptClearActiveView, rptClearFilters,
+  rptBulkOpen, rptBulkPdf, rptBulkSetStage, rptBulkView, rptClearActiveView,
+  rptClearFilters,
   rptCustomerFilterChanged, rptDelete, rptDeleteSavedView, rptFormClear,
   rptFormSave, rptRender, rptSaveCurrentView, rptSetStatusFilter,
   rptToggleSelect, submitReport, toggleSidebar, tplClear, tplSave,

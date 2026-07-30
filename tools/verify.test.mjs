@@ -352,6 +352,92 @@ test('device and role gating survive the split', opts, async () => {
   } finally { await app.close(); }
 });
 
+test('the four repaired features are reachable, not just declared', opts, async () => {
+  // barcodeOpen, captureWizardStart, rptBulkSetStage and cvLoadDefaultLayout were
+  // each fully implemented and completely unreachable: no caller, no markup, and
+  // in three cases no registry entry either — while help.js and the locale files
+  // described them as working. Repaired 2026-07-30.
+  //
+  // Registration alone is not the assertion. A registry entry with no button is
+  // just as unreachable as it was before, and a button whose data-action does not
+  // resolve is a dead control. So this checks BOTH ends of each wire — the markup
+  // that invokes it and the registry that resolves it — and then exercises the
+  // two whose bodies can be driven headlessly.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const unresolved = ['barcodeOpen', 'captureWizardStart', 'rptBulkSetStage', 'cvLoadDefaultLayout']
+        .filter((n) => typeof vxResolveAction(n) !== 'function');
+
+      const btn = (sel) => !!document.querySelector(sel);
+      const markup = {
+        capture: btn('[data-action="captureWizardStart"]'),
+        defaultLayout: btn('[data-action="cvLoadDefaultLayout"]'),
+        // All four stage moves, each carrying the stage as a data-arg. The names
+        // must match RPT_STAGES — rptBulkSetStage lowercases them for its toast.
+        stages: ['Submitted', 'Reviewed', 'Approved', 'Archived']
+          .filter((s) => !btn(`[data-action="rptBulkSetStage"][data-args="'${s}'"]`)),
+      };
+
+      // The scan button is rendered per items-table cell rather than sitting in
+      // the shell, so drive the renderer directly and read its output.
+      let scanCells;                      // no initialiser: both paths assign
+      try {
+        const cols = RPT_FORM.items.filter((c) => c.scan).map((c) => c.id);
+        const html = RPT_FORM.items
+          .filter((c) => c.scan)
+          .map((c) => ovItemFieldHtml(0, c, {}))
+          .join('');
+        const count = (html.match(/data-action="barcodeOpen"/g) || []).length;
+        scanCells = { cols, count, targetsCell: html.includes(`data-args="'it-0-subject'"`) };
+      } catch (e) { scanCells = 'threw: ' + e.message; }
+
+      // barcodeOpen builds and opens its own overlay. Headless Chromium has no
+      // BarcodeDetector, so it takes the documented unsupported branch (help.js:438)
+      // — which still proves the overlay was built and opened.
+      let barcode;                        // no initialiser: both paths assign
+      try {
+        barcodeOpen('it-0-subject');
+        const ov = document.getElementById('barcode-overlay');
+        barcode = { built: !!ov, open: ov ? ov.classList.contains('open') : false };
+        if (typeof barcodeClose === 'function') barcodeClose();
+      } catch (e) { barcode = 'threw: ' + e.message; }
+
+      // captureWizardStart refuses without a method — that guard is part of the
+      // feature, so check it, then set one and check the wizard actually builds.
+      let wizardNoMethod, wizard;
+      try {
+        _ovMethod = null;
+        captureWizardStart();
+        wizardNoMethod = !document.getElementById('capture-wizard');
+        _ovMethod = 'UT';
+        captureWizardStart();
+        const ov = document.getElementById('capture-wizard');
+        wizard = { built: !!ov, steps: typeof _wizardSteps !== 'undefined' ? _wizardSteps.length : -1 };
+        if (typeof captureWizardClose === 'function') captureWizardClose();
+      } catch (e) { wizard = 'threw: ' + e.message; }
+
+      return { unresolved, markup, scanCells, barcode, wizardNoMethod, wizard };
+    });
+
+    assert.deepEqual(r.unresolved, [], 'a repaired action does not resolve through the registry');
+    assert.equal(r.markup.capture, true, 'no Capture mode button — help.js:440 tells users it is in the new-report header');
+    assert.equal(r.markup.defaultLayout, true, 'no Default layout button, but pe.btn.default_layout is translated in every locale');
+    assert.deepEqual(r.markup.stages, [], 'bulk stage buttons missing for these stages');
+
+    assert.deepEqual(r.scanCells.cols, ['subject', 'drawing'], 'the scannable item columns changed');
+    assert.equal(r.scanCells.count, 2, 'ovItemFieldHtml did not render a scan button for each scannable column');
+    assert.equal(r.scanCells.targetsCell, true, 'the scan button does not target its own cell id');
+
+    assert.equal(r.barcode.built, true, 'barcodeOpen() did not build its overlay');
+    assert.equal(r.barcode.open, true, 'barcodeOpen() built the overlay but never opened it');
+
+    assert.equal(r.wizardNoMethod, true, 'captureWizardStart() built a wizard with no method chosen');
+    assert.equal(r.wizard.built, true, 'captureWizardStart() did not build the wizard overlay');
+    assert.ok(r.wizard.steps > 1, `the wizard built ${r.wizard.steps} steps; it should group the form into several`);
+  } finally { await app.close(); }
+});
+
 test('local session and account email survive moving to auth.js', opts, async () => {
   // The final slice, and the only one that moves code LATER in the load order
   // (auth.js is the fifteenth app script, platform.js the eighth). A top-level

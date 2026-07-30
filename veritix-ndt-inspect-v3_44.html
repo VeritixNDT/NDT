@@ -566,6 +566,15 @@
               <div class="sh-desc" id="ov-nr-desc">Fill in the report details below.</div>
             </div>
             <div class="sh-actions">
+              <!-- Capture mode. help.js:440 has always told users to "Toggle
+                   Capture mode from the new-report header" — this is that
+                   toggle. It did not exist until 2026-07-30: the whole wizard
+                   (steps, Next/Back, field mirroring) was built and registered,
+                   but captureWizardStart had no caller, so the feature could
+                   not be reached. captureWizardStart self-guards on _ovMethod
+                   and toasts "Pick a method first." if none is chosen. -->
+              <button class="btn btn-sm" data-action="captureWizardStart" data-i18n="wiz.capture_mode"
+                      title="Step through the form one section at a time — big tap targets for tablet and field use">📋 Capture mode</button>
               <!-- Autosave indicator — populated by _ovDraftIndicator. Hidden
                    until the first field change so a freshly opened form
                    doesn't claim "Saved" before the user has typed anything. -->
@@ -930,6 +939,16 @@
       <button class="btn btn-sm" data-action="rptBulkView">Open</button>
       <button class="btn btn-sm" data-action="rptBulkEmail" title="Email the selected reports — opens a draft pre-filled from your company template">✉ Email</button>
       <button class="btn btn-sm" data-action="rptBulkOpen">Revise report</button>
+      <span style="width:1px;height:20px;background:var(--border2)"></span>
+      <!-- Bulk stage moves. rptBulkSetStage() and all four rpt.bulk.to_* strings
+           existed, translated in every locale, with no buttons to invoke them —
+           the function was unreachable until 2026-07-30. Stage names must match
+           RPT_STAGES (js/reports.js:2029) exactly; rptBulkSetStage lowercases
+           them to look up the rpt.stage.* label for its toast. -->
+      <button class="btn btn-sm" data-action="rptBulkSetStage" data-args="'Submitted'" data-i18n="rpt.bulk.to_submitted">→ Submitted</button>
+      <button class="btn btn-sm" data-action="rptBulkSetStage" data-args="'Reviewed'" data-i18n="rpt.bulk.to_reviewed">→ Reviewed</button>
+      <button class="btn btn-sm" data-action="rptBulkSetStage" data-args="'Approved'" data-i18n="rpt.bulk.to_approved">→ Approved</button>
+      <button class="btn btn-sm" data-action="rptBulkSetStage" data-args="'Archived'" data-i18n="rpt.bulk.to_archived">→ Archived</button>
       <span style="width:1px;height:20px;background:var(--border2)"></span>
       <button class="btn btn-sm" data-action="rptBulkExportCsv" data-i18n="rpt.bulk.export_csv">Export CSV</button>
       <button class="btn btn-sm btn-danger" data-action="rptBulkDelete" data-i18n="rpt.bulk.delete">Delete</button>
@@ -2580,6 +2599,14 @@
                 <button class="tbe" id="cv-mode-btn" data-action="cvToggleMode" style="font-size:11px;padding:3px 9px" data-i18n="pe.btn.preview">👁 Preview</button>
                 <div class="tbsep"></div>
                 <button class="tbe" data-action="cvClearCanvas" style="font-size:11px;color:var(--red)" data-i18n="pe.btn.clear">🗑 Clear</button>
+                <!-- pe.btn.default_layout and toast.layout_loaded were translated
+                     in every locale, and cvLoadDefaultLayout() was fully written
+                     — confirm prompt, undo snapshot, the lot — with no button to
+                     invoke it. Unreachable until 2026-07-30. Placed beside Clear
+                     because they are the same kind of destructive page-level
+                     action, and it self-guards with a confirm when the page has
+                     blocks on it. -->
+                <button class="tbe" data-action="cvLoadDefaultLayout" style="font-size:11px" title="Replace this page with the default NDT layout" data-i18n="pe.btn.default_layout">📄 Default layout</button>
                 <button class="tbe" data-action="cvSaveLayoutToMethod" style="font-size:11px;color:var(--green)" title="Save to the current method's template (Ctrl+S)" data-i18n="pe.btn.save">💾 Save</button>
                 <button class="tbe" data-action="cvPrintOrExport" style="font-size:11px;color:var(--blue);font-weight:600" title="Print or save as PDF (Ctrl+P)" data-i18n="pe.btn.print_pdf">🖨 Print / PDF</button>
                 <div class="tbsep"></div>

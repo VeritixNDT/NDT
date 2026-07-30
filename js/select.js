@@ -278,13 +278,6 @@ function _vxSelClose(){
   document.removeEventListener('mousedown', _vxSelOutsideClick, true);
 }
 
-// Public refresh hook for callers that change select.value programmatically
-// without dispatching 'change' (rare but possible during form rehydration).
-function vxSelRefresh(sel){
-  if(!sel) return;
-  sel.dispatchEvent(new Event('vxsel:refresh'));
-}
-
 // MutationObserver — picks up dynamically rendered selects so the
 // new-report form, settings panels and editor ribbons get enhanced
 // automatically after any innerHTML swap. Debounced via rAF so a

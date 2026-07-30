@@ -36,7 +36,6 @@ function fnNormalize(survey){
   base.welds = [ { points: survey.points || [] } ];
   return base;
 }
-function fnWeldCount(survey){ survey = fnNormalize(survey); return (survey && survey.welds) ? survey.welds.length : 0; }
 
 function _fnAll(survey){
   if(!survey) return [];
@@ -59,7 +58,6 @@ function fnVerdict(survey){
   var over = all.filter(function(a){ return _fnOut(a.avg, lo, hi); }).length;
   return { over:over, passed:over === 0, total:all.length };
 }
-function fnIsEmpty(survey){ return fnVerdict(survey).total === 0; }
 
 // ── Acceptance presets + testing-parameter (sampling) tables ─────────────────
 // Material acceptance bands (% ferrite). Picking a material sets min/max + unit.
@@ -143,7 +141,6 @@ var FN_DETAIL_COLS = [
   { id:'dimensions',  label:'Thickness',        w:80  },
   { id:'verdict',     label:'Result',           w:95  },
 ];
-
 
 function _fnItemResultChip(weldView){
   var v = fnVerdict(weldView);

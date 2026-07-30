@@ -97,20 +97,6 @@ function loadSettings() {
 // ══════════════════════════════════════════════
 // V4 THEME SYSTEM — load, apply, save
 // ══════════════════════════════════════════════
-var AP_KEYBOARD_SHORTCUTS = [
-  ['⌘K / Ctrl+K', 'Open command palette'],
-  ['⌘F / Ctrl+F', 'Find & replace (template editor)'],
-  ['⌘Z / Ctrl+Z', 'Undo (template editor)'],
-  ['⌘Y / Ctrl+Y', 'Redo (template editor)'],
-  ['⌘D / Ctrl+D', 'Duplicate selected block'],
-  ['⌘A / Ctrl+A', 'Select all blocks'],
-  ['⌘+Shift+S', 'Save snapshot'],
-  ['Esc', 'Close modal / palette'],
-  ['↑ / ↓', 'Navigate command palette'],
-  ['↵ Enter', 'Run command'],
-  ['Del / Backspace', 'Delete selected block'],
-  ['Shift+click', 'Multi-select blocks'],
-];
 
 var AP_LOCALE_PRESETS = {
   'en': { dateFmt:'dd MMM yyyy',  timeFmt:'24', decimal:'.', thousands:',', firstday:'1', timezone:'Europe/London',     units:'metric'  },
@@ -1494,8 +1480,6 @@ var INSP_KEY = 'vx-inspectors-v1';
 var INSPECTORS         = [];
 var _inspEditIdx       = null;
 var _inspCustomMethods = [];
-var _sigLastX          = 0;
-var _sigLastY          = 0;
 
 // Eye-sight test cert upload — staged on the in-progress inspector form
 // until Save. Stores the file as a dataURL alongside its filename and
@@ -2077,7 +2061,6 @@ async function inspDelete(idx) {
   saveInspectors(); inspRender();
   toast(t('toast.inspector_removed','Inspector removed.'));
 }
-
 
 // USERS & ACCESS
 // ══════════════════════════════════════════════

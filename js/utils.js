@@ -35,19 +35,6 @@ function isSafeImageUrl(url) {
   if(/^https:\/\//i.test(url)) return true;
   return /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(url);
 }
-// Helper: set an img element's src safely. Use this anywhere user-supplied
-// image URLs are rendered. Returns true if the src was set, false if rejected.
-function setSafeImageSrc(imgEl, url, fallbackInitials) {
-  if(!imgEl) return false;
-  if(isSafeImageUrl(url)) { imgEl.src = url; return true; }
-  // Reject silently — fall back to initials avatar if requested
-  imgEl.removeAttribute('src');
-  if(fallbackInitials && imgEl.parentElement) {
-    imgEl.parentElement.textContent = fallbackInitials;
-  }
-  return false;
-}
-
 
 // Survey table renderer, shared by the hardness / ferrite / PMI report modules.
 // All three carried a copy that was identical bar whitespace, so a fix to the

@@ -35,12 +35,6 @@ function htBoreClocksText(survey){
   if(b === 'medium') return '4 / 8 o’clock';
   return '12 / 4 / 8 o’clock';
 }
-function htBoreSizeText(survey){
-  var b = survey && survey.bore;
-  if(b === 'small') return 'Ø ≤ 6″';
-  if(b === 'medium') return 'Ø 6–12″';
-  return 'Ø > 12″';
-}
 function htSiteAvg(pt, clocks){
   var c = clocks || ['12H','04H','08H'];
   var v = c.map(function(k){ return pt.clock ? pt.clock[k] : null; }).map(function(x){ return parseFloat(x); }).filter(function(x){ return !isNaN(x); });

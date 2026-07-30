@@ -1022,25 +1022,6 @@ function _cvEqKindStatusCard(rec, reportMethod, emptyLbl){
   }
   return _cvSmartCardHtml(lbl, [rec.name || '—', rec.svId || ''], detail);
 }
-// Normalise a specification / standard string to a comparison key, so the
-// procedure smart card links a report's specification to a registered
-// procedure even when the two were typed in different forms. By agreed
-// rule the key ignores letter case, all whitespace and punctuation, the
-// edition year (":2016", "Ed.2023", a trailing year) and a leading "EN"
-// adoption prefix — so "ISO 17638: 2016", "EN-ISO 17638:2018" and
-// "EN ISO 17638" all collapse to the same key, "iso17638".
-function _cvSpecKey(s){
-  let x = String(s || '').toLowerCase().trim();
-  if(!x) return '';
-  // Drop the edition year where it is anchored to a separator or "Ed.".
-  x = x.replace(/[:-]\s*(?:ed(?:ition)?\.?\s*)?(?:19|20)\d{2}/g, ' ');
-  x = x.replace(/\bed(?:ition)?\.?\s*(?:19|20)\d{2}/g, ' ');
-  x = x.replace(/\s+(?:19|20)\d{2}\s*$/g, ' ');
-  // Reduce to bare alphanumerics, then drop a leading "en" adoption
-  // marker so "eniso17638" matches a plain "iso17638".
-  x = x.replace(/[^a-z0-9]+/g, '').replace(/^en(?=iso)/, '');
-  return x;
-}
 function cvResolveSmartLink(block, report){
   if(!block || !block.key) return '';
   const k = block.key;
@@ -2440,16 +2421,6 @@ function _cvResolveZoneChrome(zone){
     accentColor, accentThickness, accentPos,
     borderColor, borderWidthPx, borderEdge,
   };
-}
-
-// Build the inline CSS for a chrome layer (background, accent strip, single-
-// edge divider border). Used in design-mode band visualisation AND in the
-// print pipeline so design and print stay in sync.
-function _cvZoneChromeStyle(chrome, zone){
-  let css = '';
-  if(chrome.bg && chrome.bg !== 'transparent') css += 'background:' + chrome.bg + ';';
-  if(chrome.borderWidthPx) css += 'border-' + chrome.borderEdge + ':' + chrome.borderWidthPx + 'px solid ' + chrome.borderColor + ';';
-  return css;
 }
 
 function _cvUpsertZoneBand(zone, canvas){
@@ -4189,7 +4160,6 @@ function cvRenderBlockContent(block, report, preview){
     ${valueBlock}
   </div>`;
 }
-
 
 // ── Selection & properties ───────────────────────────────────────────
 function cvSelectBlock(id){
@@ -6239,7 +6209,6 @@ function _cvShowSimpleModal(id, innerHtml){
   }, 50);
 }
 function _wCloseModal(id){ const m = document.getElementById(id); if(m) m.remove(); }
-
 
 // ── Ribbon ───────────────────────────────────────────────────────────
 function switchRibbonTab(id, el){

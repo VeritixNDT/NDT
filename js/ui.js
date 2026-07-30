@@ -633,7 +633,6 @@ function _wCvUpdateBlockFormat(id, el) {
 }
 function _wApFontFamilyPreview(elNode) { const p = document.getElementById('ap-font-preview'); if(p) p.style.fontFamily = elNode.value; }
 function _wApFontSizePreview(elNode)   { const p = document.getElementById('ap-font-preview'); if(p) p.style.fontSize   = elNode.value + 'px'; }
-function _wLogoLoadFromInput(el) { logoLoadFile(el.files[0]); el.value = ''; }
 function _wPmPhotoLoadFromInput(el) { pmPhotoLoad(el.files[0]); el.value = ''; }
 function _wPmSigLoadFromInput(el)   { pmSigLoad(el.files[0]);   el.value = ''; }
 function _wSigLoadFromInput(el)     { sigLoadUpload(el.files[0]); el.value = ''; }
@@ -869,11 +868,6 @@ function _wCvPickCustomColour(slot){
   if(input) input.click();
   const pop = document.getElementById('cv-colour-popover');
   if(pop) pop.remove();
-}
-function _wCvRenamePageStopProp(e, i) { e.stopPropagation(); cvRenamePage(i); }
-function _wDropLogo(el, e) {
-  e.preventDefault(); el.classList.remove('drag-over');
-  logoLoadFile(e.dataTransfer.files[0]);
 }
 function _wDropPmSig(el, e) {
   e.preventDefault(); el.classList.remove('drag-over');
@@ -1141,10 +1135,6 @@ function formatLength(mm, decimals){
 function unitLabel(){
   const s = ls(KEYS.settings, {});
   return s.units === 'imperial' ? 'in' : 'mm';
-}
-function unitName(){
-  const s = ls(KEYS.settings, {});
-  return s.units === 'imperial' ? 'inches' : 'millimetres';
 }
 // Convert raw mm value (storage) → display string in user's preferred unit (no unit suffix).
 function mmToDisplayValue(mm, decimals){
@@ -1528,7 +1518,6 @@ function generate7DaySparkline(items, dateField) {
   return buckets;
 }
 
-
 // ══════════════════════════════════════════════
 // PROFILE PANEL
 // ══════════════════════════════════════════════
@@ -1587,11 +1576,7 @@ function pmPhotoLoad(file) {
   reader.readAsDataURL(file);
 }
 
-function openProfilePanel() { openProfileModal(); }
 function closeProfilePanel() { closeProfileModal(); }
-function closeProfileSubForms() {}
-function startProfileEdit() { openProfileModal(); }
-function cancelProfileEdit() { closeProfileModal(); }
 
 function openProfileModal() {
   closeDropdown();

@@ -31,7 +31,7 @@
 var _vxWs = null;                       // RealtimeChannel | null
 var _vxWsReconnectTimer = null;         // unused under Supabase (SDK handles reconnect) — kept for back-compat
 var _vxWsReconnectAttempt = 0;
-var _vxWsPingTimer = null;              // unused under Supabase — SDK has its own heartbeat
+              // unused under Supabase — SDK has its own heartbeat
 var VX_WS_PING_INTERVAL_MS = 30 * 1000;
 
 // Re-dispatch helper: fired on every remote entity-changed event so the
@@ -183,11 +183,6 @@ function vxRealtimeConnect() {
     console.warn('vx: realtime connect failed', e);
     _vxWs = null;
   }
-}
-
-function _vxRealtimeScheduleReconnect() {
-  // Supabase SDK handles reconnect on its own — this stub is kept only so
-  // nothing breaks if external code calls it.
 }
 
 function vxRealtimeDisconnect() {

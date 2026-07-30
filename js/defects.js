@@ -2,8 +2,6 @@
 // DEFECTS PAGE — Full defect logging, tracking, and management
 // ═══════════════════════════════════════════════════════════════════════════
 
-var DEF_SEVERITIES = ['Critical','High','Medium','Low'];
-var DEF_STATUSES = ['Open','In Progress','Repaired','Verified','Closed'];
 var _defEditIdx = -1;  // -1 = adding new, >=0 = editing index
 
 function defInit(){
@@ -431,7 +429,6 @@ function defExportCsv(){
   toast(t('toast.csv_exported', 'CSV exported'));
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════
 // NDT PROCEDURES — Document management, upload, key info extraction
@@ -708,20 +705,6 @@ function procRenderMetrics(filtered){
     <div class="stat-tile blue"><div class="stat-label">Draft</div><div class="stat-val">${draft}</div><div class="stat-sub">In preparation</div></div>
     <div class="stat-tile amber"><div class="stat-label">With document</div><div class="stat-val">${withFile}</div><div class="stat-sub">File attached</div></div>
     <div class="stat-tile violet"><div class="stat-label">Methods covered</div><div class="stat-val">${methods}</div><div class="stat-sub">of ${NDT_METHODS.length} configured</div></div>`;
-}
-
-// Fill a procedure-form <select> with the canonical options, keeping a
-// non-canonical saved value selectable so editing a legacy procedure
-// never silently loses its specification / acceptance.
-function _procFillSelect(id, options, value){
-  const sel = el(id);
-  if(!sel) return;
-  const v = String(value || '');
-  const opts = (options || []).slice();
-  if(v && opts.indexOf(v) === -1) opts.unshift(v);
-  sel.innerHTML = '<option value=""></option>'
-    + opts.map(o => `<option${o === v ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
-  sel.value = v;
 }
 
 // ── Upload form ──────────────────────────────────────────────────────

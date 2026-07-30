@@ -22,8 +22,6 @@
 //     sourceQuoteId, createdAt, updatedAt }
 // ══════════════════════════════════════════════════════════════════════════
 
-var BILL_STATUSES = { quote: ['Draft','Sent','Accepted','Declined'], invoice: ['Draft','Sent','Paid'] };
-
 // Builder state — which document the overlay is currently editing.
 var _billType  = 'quote';
 var _billJobId = null;
@@ -627,10 +625,6 @@ function billExportDialog(){
     close();
   }));
 }
-
-// Back-compat thin wrappers (older data-action references → export all invoices).
-function billExportXeroCsv(){ billExportRun('xero', 'invoice', 'all'); }
-function billExportQuickBooksCsv(){ billExportRun('quickbooks', 'invoice', 'all'); }
 
 function billingRender() {
   const wrap = el('billing-list-wrap'); if(!wrap) return;

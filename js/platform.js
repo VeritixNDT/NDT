@@ -198,8 +198,6 @@ function vxIsAuthenticated() {
   const c = vxPlatformConfig();
   return !!(c.accessToken && c.userId);
 }
-// V13: New helpers for the cloud-first UX language
-function vxIsTrial()           { return !vxIsAuthenticated(); }
 function vxAuthState() {
   // 'trial'        — no account yet
   // 'signed_out'   — had a session before but token gone (refresh failed, etc)

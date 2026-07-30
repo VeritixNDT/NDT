@@ -352,6 +352,39 @@ test('device and role gating survive the split', opts, async () => {
   } finally { await app.close(); }
 });
 
+test('platform boot and deep linking survive being split into platform-boot.js', opts, async () => {
+  // boot.js:76 calls vxPlatformBoot() behind `typeof === 'function'`, so losing
+  // this file throws nothing and every page still draws — while the sync sweep
+  // never starts, realtime never connects, no service worker registers, and deep
+  // links stop resolving. As invisible as a failure gets.
+  //
+  // The real assertion is the hash route, not the typeof checks: setting
+  // location.hash and watching the active page change exercises the top-level
+  // addEventListener AND vxRouteFromHash's body together, end to end. A name
+  // check would pass with the listener line dropped.
+  //
+  // vxRegisterServiceWorker is asserted to exist but deliberately not called —
+  // it registers a Blob-URL service worker, which is not something to leave
+  // running in a test browser.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const missing = await app.page.evaluate(() =>
+      ['vxPlatformBoot', 'vxRouteFromHash', 'vxRegisterServiceWorker']
+        .filter((n) => typeof window[n] !== 'function'));
+    assert.deepEqual(missing, [], 'boot functions missing — did platform-boot.js load?');
+
+    const routed = await app.page.evaluate(async () => {
+      const before = document.querySelector('.page.active')?.id || '(none)';
+      location.hash = '#/defects';
+      await new Promise((r) => setTimeout(r, 400));
+      return { before, after: document.querySelector('.page.active')?.id || '(none)' };
+    });
+    assert.equal(routed.before, 'page-overview', 'test started somewhere unexpected');
+    assert.equal(routed.after, 'page-defects',
+      'the hashchange listener did not route — did the top-level addEventListener travel?');
+  } finally { await app.close(); }
+});
+
 test('the global error net survives being split into errors.js', opts, async () => {
   // The net that catches everything else cannot be checked by "does the page
   // render" — a page renders perfectly with no error handler attached. And the

@@ -352,6 +352,61 @@ test('device and role gating survive the split', opts, async () => {
   } finally { await app.close(); }
 });
 
+test('local session and account email survive moving to auth.js', opts, async () => {
+  // The final slice, and the only one that moves code LATER in the load order
+  // (auth.js is the fifteenth app script, platform.js the eighth). A top-level
+  // call into any of these from a file in between would now hit an undefined
+  // function. There are none — every call site is inside a function body or
+  // behind a data-action — but "there are none" is a claim about today's code,
+  // and this test is what keeps it true tomorrow.
+  //
+  // The failure would be quiet in the usual way. boot.js:273 calls saveUsers()
+  // behind `typeof === 'function'`, and switchLoginTab / signOut / closeEmailModal
+  // are data-action buttons, which resolve through the registry at click time —
+  // an unregistered one is a dead control, not an error. So the registry
+  // assertion matters as much as the existence checks.
+  const app = await openApp({ section: 'overview' });
+  try {
+    const r = await app.page.evaluate(() => {
+      const missing = ['loadUsers', 'saveUsers', 'loadSession', 'saveSession', 'clearSession',
+        'switchLoginTab', 'signOut', 'emailTemplate', 'showEmailModal', 'closeEmailModal',
+        'showConfirmEmail', 'showWelcomeEmail']
+        .filter((n) => typeof window[n] !== 'function');
+
+      // The three data-action names that travelled from platform.js's vxActions
+      // call into auth.js's. A dead button is exactly what the registry prevents.
+      const unregistered = ['closeEmailModal', 'signOut', 'switchLoginTab']
+        .filter((n) => typeof vxResolveAction(n) !== 'function');
+
+      let maxAge, tpl, cleared;
+      try { maxAge = VX_SESSION_MAX_AGE_MS; } catch (e) { maxAge = 'threw: ' + e.message; }
+      // emailTemplate() wraps its argument in the Veritix chrome — checking the
+      // body came across, not just the name. Matched on the footer string, not
+      // the wordmark: the latter is split across spans to colour the V
+      // (`>V</span>ERITIX`), so 'VERITIX' does not appear in the markup at all.
+      try {
+        const html = emailTemplate('<p>MARKER</p>');
+        tpl = html.includes('MARKER') && html.includes('Veritix NDT Inspect');
+      } catch (e) { tpl = 'threw: ' + e.message; }
+      // clearSession() nulls CURRENT_USER and removes the stored session. Safe to
+      // call — the harness is not relying on a session here, and the page closes
+      // straight after.
+      try {
+        CURRENT_USER = { id: 'verify', name: 'Verify User', role: 'Admin' };
+        clearSession();
+        cleared = CURRENT_USER === null;
+      } catch (e) { cleared = 'threw: ' + e.message; }
+
+      return { missing, unregistered, maxAge, tpl, cleared };
+    });
+    assert.deepEqual(r.missing, [], 'session/email functions missing — did the block reach auth.js?');
+    assert.deepEqual(r.unregistered, [], 'the three data-action names did not reach auth.js\'s vxActions call');
+    assert.equal(r.maxAge, 30 * 24 * 60 * 60 * 1000, 'VX_SESSION_MAX_AGE_MS did not travel with the block');
+    assert.equal(r.tpl, true, 'emailTemplate() did not wrap its body in the Veritix chrome');
+    assert.equal(r.cleared, true, 'clearSession() did not clear CURRENT_USER');
+  } finally { await app.close(); }
+});
+
 test('the shared helpers survive moving from platform.js to utils.js', opts, async () => {
   // el() alone is called from nearly every file, so losing this block is the one
   // move in the series that would NOT be silent — the app would fail loudly and
@@ -379,7 +434,8 @@ test('the shared helpers survive moving from platform.js to utils.js', opts, asy
         'rptRenderDebounced', 'defRenderDebounced', 'auditLogRenderDebounced', 'helpSearchDebounced']
         .filter((n) => typeof window[n] !== 'function');
 
-      let debounced = null;
+      // No initialiser: both branches below assign on every path.
+      let debounced;
       try {
         let n = 0;
         const d = debounce(() => { n++; }, 50);

@@ -771,11 +771,157 @@ function liGuestMode() {
 }
 
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// Local session and account email, moved out of js/platform.js (final slice).
+// ══════════════════════════════════════════════════════════════════════════
+// The last thing in platform.js that was not the platform: the local session
+// (AUTH_USERS / KEYS.session, distinct from the Supabase session that
+// supabase.js owns), the login tab switcher, signOut, and the signup / welcome
+// email previews. This file already owned everything these serve.
+//
+// The email cluster in particular belongs nowhere else. emailTemplate(),
+// showEmailModal() and showWelcomeEmail() have no callers outside the block at
+// all — the only way into any of them is showConfirmEmail(), which this file
+// calls from doRegister. They were four functions in an infrastructure module
+// reachable solely from here.
+//
+// LOAD ORDER, and why this slice needed checking where the others did not. Every
+// earlier slice moved code to a file loading at or before platform.js's
+// position, or moved only declarations. This one moves code LATER: auth.js is
+// the fifteenth app script, platform.js the eighth. A top-level call into any of
+// these names from a file in between would now hit an undefined function.
+//
+// There are none. All thirty call sites across boot, help, settings, ui, api,
+// supabase and the shell are inside function bodies or behind data-action
+// attributes, which resolve through the registry at click time. Verified by
+// grepping for column-0 calls, not assumed from the fact that it works.
+
+// ══════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════
+function loadUsers()    { AUTH_USERS = ls(KEYS.users, []); }
+function saveUsers()    { lss(KEYS.users, AUTH_USERS); }
+
+// Session has a 30-day idle expiry. After 30 days without activity (no
+// new saveSession call), the stored session is treated as expired and
+// the user gets bounced back to the login screen. This is a defensive
+// measure for shared devices — a forgotten device that's been idle for
+// a month shouldn't grant immediate access without re-auth.
+//
+// Note: client-side sessions are inherently weak (any script with
+// localStorage access can read or modify them). When the backend lands,
+// migrate to server-issued HttpOnly cookies or signed JWTs.
+var VX_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+function loadSession()  {
+  const s = ls(KEYS.session);
+  if(!s?.uid) return;
+  // Expiry check — sessions older than 30 days idle don't authenticate
+  if(s.t && (Date.now() - s.t) > VX_SESSION_MAX_AGE_MS){
+    console.log('[session] expired (idle > 30 days), clearing');
+    try { localStorage.removeItem(KEYS.session); } catch(e){}
+    return;
+  }
+  CURRENT_USER = AUTH_USERS.find(u=>u.id===s.uid)||null;
+}
+function saveSession(uid){ lss(KEYS.session,{uid,t:Date.now()}); }
+function clearSession()  { localStorage.removeItem(KEYS.session); CURRENT_USER=null; }
+
+function switchLoginTab(tab, btn) {
+  document.querySelectorAll('.login-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  el('login-form').style.display    = tab==='login'    ? '' : 'none';
+  el('register-form').style.display = tab==='register' ? '' : 'none';
+}
+
+// ── Email templates ──
+function emailTemplate(body) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="margin:0;padding:0;background:#0d1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<div style="max-width:480px;margin:32px auto;background:#161b22;border:1px solid #30363d;border-radius:12px;overflow:hidden">
+<div style="padding:24px 28px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:10px">
+  <svg width="22" height="26" viewBox="0 0 52 60"><path d="M26 2 L50 14 L50 36 Q50 52 26 58 Q2 52 2 36 L2 14 Z" style="fill:rgba(79,142,247,0.15);stroke:#4f8ef7;stroke-width:1.5"/><path d="M17 30 L24 38 L36 22" style="fill:none;stroke:#f25c5c;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/></svg>
+  <span style="font-size:16px;font-weight:700;color:#e8edf8;letter-spacing:.04em;font-family:monospace"><span style="color:#f25c5c">V</span>ERITIX</span>
+</div>
+<div style="padding:28px">${body}</div>
+<div style="padding:16px 28px;border-top:1px solid #30363d;text-align:center;font-size:11px;color:#5a6880">
+  Veritix NDT Inspect v2.0 · This is an automated message
+</div>
+</div></body></html>`;
+}
+
+function showEmailModal(subject, toEmail, html, actionLabel, onAction) {
+  el('email-modal-subject').textContent = subject;
+  el('email-modal-to').textContent = 'To: ' + toEmail;
+  const frame = el('email-modal-frame');
+  frame.srcdoc = html;
+  const actionBtn = el('email-modal-action');
+  actionBtn.textContent = actionLabel || 'OK';
+  actionBtn.onclick = () => { closeEmailModal(); if(onAction) onAction(); };
+  el('email-modal').classList.add('open');
+}
+function closeEmailModal() { el('email-modal').classList.remove('open'); }
+
+function showConfirmEmail(user) {
+  const code = Math.random().toString(36).slice(2,8).toUpperCase();
+  const html = emailTemplate(`
+    <h2 style="margin:0 0 12px;font-size:20px;color:#e8edf8;font-weight:600">Confirm your email</h2>
+    <p style="color:#9aaabf;font-size:14px;line-height:1.6;margin:0 0 20px">Hi <strong style="color:#e8edf8">${escapeHtml(user.name)}</strong>, thanks for signing up! Please confirm your email address to activate your account.</p>
+    <div style="text-align:center;margin:24px 0">
+      <div style="display:inline-block;background:#4f8ef7;color:#fff;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:.02em">Confirm Email Address</div>
+    </div>
+    <p style="color:#5a6880;font-size:12px;line-height:1.5;margin:16px 0 0">Or enter this code manually:</p>
+    <div style="text-align:center;margin:12px 0">
+      <span style="font-family:monospace;font-size:22px;font-weight:700;color:#4f8ef7;letter-spacing:6px;background:#0d1117;padding:10px 24px;border-radius:8px;border:1px solid #30363d;display:inline-block">${code}</span>
+    </div>
+    <p style="color:#5a6880;font-size:11px;margin:20px 0 0;text-align:center">If you didn't create this account, you can ignore this email.</p>
+  `);
+  showEmailModal('Confirm your email', user.email, html, 'Confirm & Continue', () => {
+    showWelcomeEmail(user);
+  });
+}
+
+function showWelcomeEmail(user) {
+  const html = emailTemplate(`
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#0099cc,#00d4ff);display:inline-flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;font-family:monospace">${user.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+    </div>
+    <h2 style="margin:0 0 8px;font-size:20px;color:#e8edf8;font-weight:600;text-align:center">Welcome to Veritix!</h2>
+    <p style="color:#9aaabf;font-size:14px;line-height:1.6;margin:0 0 20px;text-align:center">Your account has been confirmed and is ready to use.</p>
+    <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:16px;margin:16px 0">
+      <table style="width:100%;font-size:13px;color:#9aaabf;border-collapse:collapse">
+        <tr><td style="padding:4px 0;color:#5a6880">Name</td><td style="padding:4px 0;color:#e8edf8;text-align:right;font-weight:500">${escapeHtml(user.name)}</td></tr>
+        <tr><td style="padding:4px 0;color:#5a6880">Email</td><td style="padding:4px 0;color:#e8edf8;text-align:right;font-family:monospace;font-size:12px">${escapeHtml(user.email)}</td></tr>
+        <tr><td style="padding:4px 0;color:#5a6880">Role</td><td style="padding:4px 0;color:#e8edf8;text-align:right">${user.role}</td></tr>
+      </table>
+    </div>
+    <div style="text-align:center;margin:24px 0">
+      <div style="display:inline-block;background:#4f8ef7;color:#fff;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:700">Get Started</div>
+    </div>
+    <p style="color:#5a6880;font-size:12px;text-align:center;margin:16px 0 0">You're all set! Start by adding your company details and setting up your first inspection.</p>
+  `);
+  showEmailModal('Welcome to Veritix NDT Inspect', user.email, html, 'Get Started', () => {
+    bootApp();
+  });
+}
+
+function signOut() {
+  // V13: also clear cloud token. We keep userId in vxPlatformConfig so
+  // vxAuthState() returns 'signed_out' (rather than 'trial') — the trial
+  // banner will say "Session expired" rather than first-run language.
+  try {
+    vxPlatformSet({ accessToken: null, refreshToken: null, tokenExpiry: null });
+  } catch(e){}
+  clearSession();
+  el('login-screen').classList.remove('hidden');
+  el('li-email').value=''; el('li-pwd').value=''; el('li-err').classList.remove('show');
+}
+
 // ── Dispatch registration — see vxActions in js/constants.js.
 // Registered here rather than in platform.js: that file loads first, so a
-// registration there would reference these before this file has run.
+// registration there would reference these before this file has run. The last
+// three arrived with the block above, from the call platform.js used to make.
 vxActions({
-  doLogin, doOAuth, doRegister, liGuestMode, openMfaModal, vxAuthTabSwitch,
-  vxOpenBilling, vxOpenForgotPassword, vxRefreshPlan, vxRenderSubscription,
-  vxSignOut,
+  closeEmailModal, doLogin, doOAuth, doRegister, liGuestMode, openMfaModal,
+  signOut, switchLoginTab, vxAuthTabSwitch, vxOpenBilling, vxOpenForgotPassword,
+  vxRefreshPlan, vxRenderSubscription, vxSignOut,
 });
